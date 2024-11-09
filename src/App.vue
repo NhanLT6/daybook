@@ -1,85 +1,44 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import { RouterView, useRoute } from 'vue-router';
+import { Toaster } from 'vue-sonner';
+
+const route = useRoute();
+
+const items = [
+  { text: 'Home', to: '/' },
+  { text: 'Task', to: '/task' },
+  { text: 'Setting', to: '/setting' },
+];
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <VApp>
+    <VAppBar>
+      <VBtn
+        v-for="(item, i) in items"
+        :key="i"
+        :active="item.to === route.path"
+        class="me-2 text-none"
+        v-bind="item"
+        :to="item.to"
+      />
+    </VAppBar>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-
-  <RouterView />
+    <VMain>
+      <div class="pa-4">
+        <Toaster position="bottom-center" rich-colors close-button />
+        <RouterView />
+      </div>
+    </VMain>
+  </VApp>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
+<style>
+:root {
+  /* Your variables */
+  --header-height: 80px;
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
+  /* Add the top padding and place it below the header */
+  --nv-root-top: var(--header-height);
 }
 </style>

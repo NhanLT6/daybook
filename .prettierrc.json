@@ -1,7 +1,40 @@
-
 {
   "$schema": "https://json.schemastore.org/prettierrc",
-  "semi": false,
+  "semi": true,
   "singleQuote": true,
-  "arrowParens": "avoid"
+  "arrowParens": "always",
+  "printWidth": 120,
+
+  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
+  "importOrder": [
+    "^vue$",
+    "",
+    "^@/store/(.*)$",
+    "",
+    "^@/composables/(.*)$",
+    "",
+    "^@/components/(.*)$",
+    "",
+    "^@/interfaces/(.*)$",
+    "",
+    "<TYPES>",
+    "",
+    "^vuetify$",
+    "",
+    "^@vueuse/(.*)$",
+    "",
+    "^(vee-validate|yup)$",
+    "",
+    "^dayjs$",
+    "",
+    "<THIRD_PARTY_MODULES>",
+    "",
+    "^@/utils/(.*)$",
+    "",
+    "^[./]",
+    "",
+    "^(?!.*[.]css$)[./].*$",
+    ".css$"
+  ],
+  "importOrderSortSpecifiers": true
 }
