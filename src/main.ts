@@ -30,6 +30,10 @@ const app = createApp(App);
 app.use(createPinia());
 app.use(router);
 
+router.isReady().then(() => {
+  router.push('/');
+});
+
 const vuetify = createVuetify({
   components: { ...components, VDateInput, VNumberInput },
   directives,
