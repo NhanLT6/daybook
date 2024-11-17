@@ -1,1 +1,1 @@
-﻿export const shortDateFormat = 'DD/MM/YYYY';
+﻿export const shortDateFormat = 'MM/DD/YYYY';

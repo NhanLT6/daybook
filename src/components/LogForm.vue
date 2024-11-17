@@ -13,10 +13,11 @@ import { date, number, object, string } from 'yup';
 import dayjs from 'dayjs';
 
 import { shortDateFormat } from '@/common/DateFormat';
+import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { nanoid } from 'nanoid';
 
 interface LogFormData {
-  id: string;
+  id?: string;
   date?: Date;
   project?: string;
   task?: string;
@@ -70,7 +71,7 @@ const validationSchema = object({
 });
 
 const emptyLog: LogFormData = {
-  id: nanoid(),
+  id: undefined,
   date: selectedDate,
   project: undefined,
   task: undefined,
@@ -96,7 +97,7 @@ const onSave = handleSubmit((values) => {
     date: values.date!,
     project: values.project!,
     task: values.task!,
-    duration: values.duration!,
+    duration: Math.round(values.duration!),
     description: values.description,
   };
 
@@ -121,7 +122,7 @@ const onCancel = () => {
 
 const formDataToXeroLog = (formData: LogFormData): XeroLog => {
   return {
-    id: formData.id,
+    id: formData.id ?? nanoid(),
     date: dayjs(formData.date).format(shortDateFormat),
     project: formData.project!,
     task: formData.task!,
@@ -173,10 +174,12 @@ const xeroLogToFormData = (log: XeroLog): LogFormData => {
 
         <VNumberInput
           v-model="durationField.value.value"
-          label="Duration"
+          label="Duration (minute)"
           :error-messages="errors.duration"
-          :min="1"
-          :step="1"
+          :min="0"
+          :step="15"
+          :hint="minutesToHourWithMinutes(durationField.value.value)"
+          persistent-hint
         />
       </form>
     </VCardItem>
