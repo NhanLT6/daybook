@@ -191,7 +191,7 @@ const importCsv = async (file?: File) => {
       date: log.date,
       project: log.project,
       task: log.task,
-      duration: log.duration,
+      duration: log.duration * 60, // Template use hour, this app use minute
       description: log.description,
     };
   });
