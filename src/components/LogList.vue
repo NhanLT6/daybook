@@ -66,12 +66,13 @@ const headers = ref([
 
 const loggedTimeByDates = computed(() =>
   chain(logItems)
-    .groupBy('date')
+    .groupBy((item) => item.date)
     .map((items, date) => ({
       date,
       durationSum: sumBy(items, 'duration'),
       tasks: items,
     }))
+    .orderBy((item) => item.date)
     .value(),
 );
 
@@ -105,8 +106,8 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="mb-4 elevation-0 border">
-    <VCardTitle>
+  <VCard class="mb-4 elevation-0 border" style="height: calc(100vh - 112px); overflow-y: scroll">
+    <VCardTitle class="bg-white" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle>Logs</VToolbarTitle>
 

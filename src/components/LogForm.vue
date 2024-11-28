@@ -141,6 +141,12 @@ const xeroLogToFormData = (log: XeroLog): LogFormData => {
     description: log.description ?? '',
   };
 };
+
+const hours = Array.from({ length: 7 }, (_, i) => i + 1);
+
+const onHourClick = (hour: number) => {
+  setFieldValue('duration', hour * 60);
+};
 </script>
 
 <template>
@@ -177,10 +183,14 @@ const xeroLogToFormData = (log: XeroLog): LogFormData => {
           label="Duration (minute)"
           :error-messages="errors.duration"
           :min="0"
-          :step="15"
+          :step="30"
           :hint="minutesToHourWithMinutes(durationField.value.value)"
           persistent-hint
         />
+
+        <div class="d-flex ga-2">
+          <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">{{ hour }}h</VChip>
+        </div>
       </form>
     </VCardItem>
 

@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import LogForm from '@/components/LogForm.vue';
 import LogList from '@/components/LogList.vue';
 
 import type { XeroLog } from '@/interfaces/XeroLog';
+import type { XeroProject } from '@/interfaces/XeroProject';
+import type { XeroTask } from '@/interfaces/XeroTask';
 
 import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
+import { shortDateFormat, templateDateFormat } from '@/common/DateFormat';
 import { saveAs } from 'file-saver';
-import { camelCase, toNumber, unionBy } from 'lodash';
+import { camelCase, chain, sumBy, toNumber, unionBy } from 'lodash';
 import { nanoid } from 'nanoid';
 import { parse, unparse } from 'papaparse';
 import { toast } from 'vue-sonner';
 
 const xeroLogs = useStorage<XeroLog[]>('xeroLogs', []);
+const xeroTasks = useStorage<XeroTask[]>('tasks', []);
+const xeroProjects = useStorage<XeroProject[]>('projects', []);
 
 const selectedDate = ref<Date>(new Date());
 
@@ -25,20 +30,74 @@ const selectedDate = ref<Date>(new Date());
 const viewModeToggle = ref(1);
 const calendarViewMode = computed(() => (viewModeToggle.value === 0 ? 'weekly' : 'monthly'));
 
-const calendarAttrs = ref([
-  {
-    key: 'today',
-    highlight: true,
-    dates: selectedDate.value,
-  },
-]);
+const calendarAttrs = computed(() => {
+  const fullyLoggedDates = chain(xeroLogs.value)
+    .groupBy((item) => item.date)
+    .map((items, date) => ({ date, durationSum: sumBy(items, 'duration') }))
+    .filter((group) => {
+      const loggedHours = group.durationSum / 60;
+      return loggedHours >= 7.5 && loggedHours <= 8;
+    })
+    .map((log) => dayjs(log.date, shortDateFormat).toDate())
+    .value();
 
-watch(selectedDate, () => {
-  calendarAttrs.value = [
+  const invalidLoggedDates = chain(xeroLogs.value)
+    .groupBy((item) => item.date)
+    .map((items, date) => ({ date, durationSum: sumBy(items, 'duration') }))
+    .filter((log) => {
+      const isOverLogged = log.durationSum / 60 > 8;
+      const isLoggedInWeekend = [0, 6, 7].includes(dayjs(log.date, shortDateFormat).day()); // 0 Sunday, 5 Friday, 6 Saturday
+
+      return isOverLogged || isLoggedInWeekend;
+    })
+    .map((log) => dayjs(log.date, shortDateFormat).toDate())
+    .value();
+
+  return [
+    // Today
     {
       key: 'today',
-      highlight: true,
+      highlight: {
+        color: 'blue',
+        fillMode: 'light',
+      },
+      dates: new Date(),
+    },
+    // Selected date
+    {
+      key: 'selected',
+      highlight: {
+        color: 'blue',
+        fillMode: 'outline',
+      },
       dates: selectedDate.value,
+    },
+    // Fully logged dates
+    {
+      key: 'fullyLogged',
+      dot: 'green',
+      dates: fullyLoggedDates,
+    },
+    // Invalid logged dates
+    {
+      key: 'invalidLogged',
+      dot: 'red',
+      dates: invalidLoggedDates,
+    },
+    // Friday and weekend
+    {
+      key: 'weekend',
+      highlight: {
+        color: 'gray',
+        fillMode: 'light',
+      },
+      dates: {
+        start: dayjs().startOf('month').toDate(),
+        repeat: {
+          every: 'week',
+          weekdays: [1, 6, 7],
+        },
+      },
     },
   ];
 });
@@ -84,11 +143,10 @@ const onDeleteLog = (log: XeroLog) => {
 const exportToCsv = () => {
   const transformedData = xeroLogs.value.map((log) => ({
     Id: log.id,
-    Date: log.date,
+    Date: dayjs(log.date).format(templateDateFormat),
     Project: log.project,
     Task: log.task,
-    // Duration: dayjs.duration({ minutes: log.duration }).asHours().toFixed(1),
-    Duration: log.duration,
+    Duration: (log.duration / 60).toFixed(1),
     Description: log.description,
   }));
 
@@ -102,35 +160,57 @@ const exportToCsv = () => {
 const importCsv = async (file?: File) => {
   if (!file) return;
 
-  const fileText = await file.text();
+  const fileContent = await file.text();
 
-  const result = parse(fileText, {
+  const result = parse(fileContent, {
     header: true,
-    transformHeader(header: string, index: number): string {
+    transformHeader(header: string): string {
       return camelCase(header);
+    },
+    transform(value: string, header: string): any {
+      if (header === 'date') return dayjs(value, templateDateFormat).format(shortDateFormat);
+      if (header === 'duration') return toNumber(value);
+
+      return value;
     },
   });
 
   if (result.errors.length) {
     result.errors.map((e) => {
       toast.error(e.message);
+      console.error(e);
     });
 
     return;
   }
 
-  // Merge imported data with existing data, prioritize imported data if there are records with the same id
-  xeroLogs.value = unionBy(result.data, xeroLogs.value, 'id').map((item) => {
+  const dataWithIds: XeroLog[] = result.data.map((item) => {
     const log = item as any;
     return {
       id: log.id ?? nanoid(),
       date: log.date,
       project: log.project,
       task: log.task,
-      duration: toNumber(log.duration),
+      duration: log.duration,
       description: log.description,
     };
   });
+
+  // Merge imported data with existing data, prioritize imported data if there are records with the same id
+  xeroLogs.value = unionBy(dataWithIds, xeroLogs.value, 'id');
+
+  // Extract Projects and Tasks
+  xeroProjects.value = chain(dataWithIds)
+    .map((log) => ({ title: log.project }))
+    .concat(xeroProjects.value)
+    .uniqBy('title')
+    .value();
+
+  xeroTasks.value = chain(dataWithIds)
+    .map((log) => ({ project: log.project, title: log.task }) satisfies XeroTask)
+    .concat(xeroTasks.value)
+    .uniqBy((value) => `${value.project}-${value.title}`)
+    .value();
 
   toast.success('Logs imported');
 };
@@ -139,7 +219,13 @@ const importCsv = async (file?: File) => {
 <template>
   <VRow>
     <VCol cols="auto" class="d-none d-md-flex flex-column ga-4">
-      <Calendar :view="calendarViewMode" :attributes="calendarAttrs" expanded @dayclick="onDayClick" />
+      <Calendar
+        :view="calendarViewMode"
+        :attributes="calendarAttrs"
+        expanded
+        :first-day-of-week="2"
+        @dayclick="onDayClick"
+      />
 
       <VCard class="elevation-0 border">
         <VCardText class="d-flex justify-space-between align-center">
