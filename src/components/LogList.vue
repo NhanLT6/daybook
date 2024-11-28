@@ -1,11 +1,14 @@
 ﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+import SingleFilePicker from '@/components/app/SingleFilePicker.vue';
+
 import type { XeroLog } from '@/interfaces/XeroLog';
 
 import dayjs from 'dayjs';
 
 import { shortDateFormat } from '@/common/DateFormat';
+import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { chain, sumBy } from 'lodash';
 import { toast } from 'vue-sonner';
 
@@ -21,10 +24,12 @@ const { items: logItems, selectedDate } = defineProps<LogListProps>();
 const emit = defineEmits<{
   editLog: [log: XeroLog];
   deleteLog: [log: XeroLog];
+  import: [file?: File];
+  export: [];
 }>();
 
 // Expanded rows
-const openedPanels = ref<string[]>([]);
+const openedPanels = ref<string[]>([dayjs(selectedDate).format(shortDateFormat)]);
 
 watch(
   () => selectedDate,
@@ -34,12 +39,14 @@ watch(
   },
 );
 
-const getColorHint = (duration: number) => {
-  if (duration >= 7.5 && duration <= 8) {
+const getColorHint = (minutes: number) => {
+  const hours = dayjs.duration({ minutes }).asHours();
+
+  if (hours >= 7.5 && hours <= 8) {
     return 'green-darken-3';
   }
 
-  if (duration > 8) {
+  if (hours > 8) {
     return 'error';
   }
 
@@ -53,17 +60,19 @@ const headers = ref([
   { title: 'Project', key: 'project' },
   { title: 'Task', key: 'task' },
   { title: 'Duration', key: 'duration' },
+  { title: 'Description', key: 'description' },
   { title: 'Actions', key: 'actions', sortable: false },
 ]);
 
 const loggedTimeByDates = computed(() =>
   chain(logItems)
-    .groupBy('date')
+    .groupBy((item) => item.date)
     .map((items, date) => ({
       date,
-      totalDuration: sumBy(items, 'duration'),
+      durationSum: sumBy(items, 'duration'),
       tasks: items,
     }))
+    .orderBy((item) => item.date)
     .value(),
 );
 
@@ -90,20 +99,25 @@ const onDeleteLog = (log: XeroLog) => {
     duration: 20000,
   });
 };
+
+const readCsv = (file?: File) => {
+  emit('import', file);
+};
 </script>
 
 <template>
-  <VCard class="mb-4 elevation-0 border">
-    <VCardTitle>
+  <VCard class="mb-4 elevation-0 border" style="height: calc(100vh - 112px); overflow-y: scroll">
+    <VCardTitle class="bg-white" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
-        <VToolbarTitle>Logged time</VToolbarTitle>
+        <VToolbarTitle>Logs</VToolbarTitle>
 
         <VSpacer />
 
         <div class="d-flex ga-1">
           <VBtn icon="mdi-arrow-expand" @click="onExpand" />
           <VBtn icon="mdi-arrow-collapse" @click="onCollapse" />
-          <VBtn icon="mdi-file-delimited-outline" />
+          <SingleFilePicker icon="mdi-import" file-types=".csv" @file-selected="readCsv" />
+          <VBtn icon="mdi-file-delimited-outline" @click="emit('export')" />
         </div>
       </VToolbar>
     </VCardTitle>
@@ -113,14 +127,18 @@ const onDeleteLog = (log: XeroLog) => {
         <VExpansionPanelTitle>
           <div class="me-2">{{ group.date }}</div>
 
-          <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.totalDuration)">
-            {{ group.totalDuration }}
+          <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)">
+            {{ minutesToHourWithMinutes(group.durationSum) }}
           </VChip>
         </VExpansionPanelTitle>
 
         <VExpansionPanelText>
           <VCard class="elevation-0 rounded-4">
             <VDataTable :items="group.tasks" :headers="headers" class="bg-grey-lighten-4" hide-default-footer>
+              <template #item.duration="{ item }">
+                {{ minutesToHourWithMinutes(item.duration) }}
+              </template>
+
               <!--suppress VueUnrecognizedSlot -->
               <template #item.actions="{ item }">
                 <div class="d-flex ga-2">

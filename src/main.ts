@@ -18,6 +18,8 @@ import '@mdi/font/css/materialdesignicons.css';
 import dayjs from 'dayjs';
 
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import duration from 'dayjs/plugin/duration';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { Calendar, setupCalendar } from 'v-calendar';
 
 import 'v-calendar/style.css';
@@ -38,6 +40,8 @@ const vuetify = createVuetify({
 app.use(vuetify);
 
 dayjs.extend(customParseFormat);
+dayjs.extend(duration);
+dayjs.extend(relativeTime);
 
 // V-Calendar
 app.use(setupCalendar, {});
