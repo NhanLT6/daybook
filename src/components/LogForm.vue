@@ -14,6 +14,7 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
+import { storageKeys } from '@/common/storageKeys';
 import { nanoid } from 'nanoid';
 
 interface LogFormData {
@@ -50,8 +51,8 @@ watch(
   },
 );
 
-const tasks = useStorage<XeroTask[]>('tasks', []);
-const projects = useStorage<XeroProject[]>('projects', []);
+const tasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
+const projects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
 
 const projectItems = computed(() => projects.value.map((project) => project.title));
 const taskItems = computed(() =>

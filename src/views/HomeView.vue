@@ -12,16 +12,17 @@ import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { shortDateFormat, templateDateFormat } from '@/common/DateFormat';
+import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { storageKeys } from '@/common/storageKeys';
 import { saveAs } from 'file-saver';
 import { camelCase, chain, sumBy, toNumber, unionBy } from 'lodash';
 import { nanoid } from 'nanoid';
 import { parse, unparse } from 'papaparse';
 import { toast } from 'vue-sonner';
 
-const xeroLogs = useStorage<XeroLog[]>('xeroLogs', []);
-const xeroTasks = useStorage<XeroTask[]>('tasks', []);
-const xeroProjects = useStorage<XeroProject[]>('projects', []);
+const xeroLogs = useStorage<XeroLog[]>(storageKeys.xeroLogsOfCurrentMonth, []);
+const xeroTasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
+const xeroProjects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
 
 const selectedDate = ref<Date>(new Date());
 
@@ -154,7 +155,7 @@ const exportToCsv = () => {
 
   // Save Csv file
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  saveAs(blob, `XeroLog-${dayjs().toISOString()}.csv`);
+  saveAs(blob, `XeroLog-${dayjs().format(yearAndMonthFormat)}.csv`);
 };
 
 const importCsv = async (file?: File) => {
