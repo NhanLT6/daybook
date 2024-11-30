@@ -122,6 +122,15 @@ const readCsv = (file?: File) => {
       </VToolbar>
     </VCardTitle>
 
+    <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
+      <VCardText>
+        <div class="d-flex flex-column ga-2 py-4 align-center bg-grey-lighten-4 rounded text-disabled">
+          <VIcon icon="mdi-package-variant-closed" />
+          <div class="text-subtitle-1">No data</div>
+        </div>
+      </VCardText>
+    </VCard>
+
     <VExpansionPanels variant="accordion" v-model="openedPanels" multiple>
       <VExpansionPanel v-for="group in loggedTimeByDates" :key="group.date" :value="group.date">
         <VExpansionPanelTitle>
