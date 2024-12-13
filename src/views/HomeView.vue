@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import CalendarOverview from '@/components/CalendarOverview.vue';
 import LogForm from '@/components/LogForm.vue';
+import LoggedTimeWithChartView from '@/components/LoggedTimeWithChartView.vue';
 import LogList from '@/components/LogList.vue';
 
 import type { XeroLog } from '@/interfaces/XeroLog';
@@ -26,96 +28,18 @@ const xeroProjects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
 
 const selectedDate = ref<Date>(new Date());
 
-// Calendar
-
-const viewModeToggle = ref(1);
-const calendarViewMode = computed(() => (viewModeToggle.value === 0 ? 'weekly' : 'monthly'));
-
-const calendarAttrs = computed(() => {
-  const fullyLoggedDates = chain(xeroLogs.value)
-    .groupBy((item) => item.date)
-    .map((items, date) => ({ date, durationSum: sumBy(items, 'duration') }))
-    .filter((group) => {
-      const loggedHours = group.durationSum / 60;
-      return loggedHours >= 7.5 && loggedHours <= 8;
-    })
-    .map((log) => dayjs(log.date, shortDateFormat).toDate())
-    .value();
-
-  const invalidLoggedDates = chain(xeroLogs.value)
-    .groupBy((item) => item.date)
-    .map((items, date) => ({ date, durationSum: sumBy(items, 'duration') }))
-    .filter((log) => {
-      const isOverLogged = log.durationSum / 60 > 8;
-      const isLoggedInWeekend = [0, 6, 7].includes(dayjs(log.date, shortDateFormat).day()); // 0 Sunday, 5 Friday, 6 Saturday
-
-      return isOverLogged || isLoggedInWeekend;
-    })
-    .map((log) => dayjs(log.date, shortDateFormat).toDate())
-    .value();
-
-  return [
-    // Today
-    {
-      key: 'today',
-      highlight: {
-        color: 'blue',
-        fillMode: 'light',
-      },
-      dates: new Date(),
-    },
-    // Selected date
-    {
-      key: 'selected',
-      highlight: {
-        color: 'blue',
-        fillMode: 'outline',
-      },
-      dates: selectedDate.value,
-    },
-    // Fully logged dates
-    {
-      key: 'fullyLogged',
-      dot: 'green',
-      dates: fullyLoggedDates,
-    },
-    // Invalid logged dates
-    {
-      key: 'invalidLogged',
-      dot: 'red',
-      dates: invalidLoggedDates,
-    },
-    // Friday and weekend
-    {
-      key: 'weekend',
-      highlight: {
-        color: 'gray',
-        fillMode: 'light',
-      },
-      dates: {
-        start: dayjs().startOf('month').toDate(),
-        repeat: {
-          every: 'week',
-          weekdays: [1, 6, 7],
-        },
-      },
-    },
-  ];
-});
-
-const onDayClick = (day: any) => {
-  selectedDate.value = day.date;
-};
-
-const gotoToday = () => {
-  selectedDate.value = new Date();
+const onDayClick = (day: Date) => {
+  selectedDate.value = day;
 };
 
 // Logs
 
 const editingLog = ref<XeroLog | undefined>();
 
-const totalHours = computed(() => xeroLogs.value.reduce((acc, log) => acc + log.duration, 0));
+const totalHours = computed(() => {
+  const durationInMinutes = xeroLogs.value.reduce((acc, log) => acc + log.duration, 0);
+  return (durationInMinutes / 60).toFixed(1);
+});
 
 const onFormSelectedDateChanged = (value: Date) => {
   selectedDate.value = value;
@@ -218,26 +142,11 @@ const importCsv = async (file?: File) => {
 </script>
 
 <template>
+  <LoggedTimeWithChartView class="mb-4" />
+
   <VRow>
     <VCol cols="auto" class="d-none d-md-flex flex-column ga-4">
-      <Calendar
-        :view="calendarViewMode"
-        :attributes="calendarAttrs"
-        expanded
-        :first-day-of-week="2"
-        @dayclick="onDayClick"
-      />
-
-      <VCard class="elevation-0 border">
-        <VCardText class="d-flex justify-space-between align-center">
-          <VBtn prepend-icon="mdi-calendar-today-outline" variant="text" @click="gotoToday">Today</VBtn>
-
-          <VBtnToggle v-model="viewModeToggle" variant="tonal">
-            <VBtn icon="mdi-view-week-outline" />
-            <VBtn icon="mdi-calendar-month-outline" />
-          </VBtnToggle>
-        </VCardText>
-      </VCard>
+      <CalendarOverview :selected-date="selectedDate" @selected-date-changed="onDayClick" />
 
       <VChip color="" variant="tonal" prepend-icon="mdi-timer-outline"> Total Hours: {{ totalHours }} </VChip>
     </VCol>
