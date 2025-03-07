@@ -106,7 +106,7 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="mb-4 elevation-0 border" style="height: calc(100vh - 112px); overflow-y: scroll">
+  <VCard class="mb-4 elevation-0 border" style="height: calc(100vh - 228px); overflow-y: scroll">
     <VCardTitle class="bg-white" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle>Logs</VToolbarTitle>
@@ -118,6 +118,7 @@ const readCsv = (file?: File) => {
           <VBtn icon="mdi-arrow-collapse" @click="onCollapse" />
           <SingleFilePicker icon="mdi-import" file-types=".csv" @file-selected="readCsv" />
           <VBtn icon="mdi-file-delimited-outline" @click="emit('export')" />
+          <!-- <VBtn icon="mdi-rocket-launch-outline" color="green-darken-3" @click="emit('export')" />-->
         </div>
       </VToolbar>
     </VCardTitle>

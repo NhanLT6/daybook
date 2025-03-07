@@ -17,7 +17,7 @@ import dayjs from 'dayjs';
 import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { saveAs } from 'file-saver';
-import { camelCase, chain, sumBy, toNumber, unionBy } from 'lodash';
+import { camelCase, chain, toNumber, unionBy } from 'lodash';
 import { nanoid } from 'nanoid';
 import { parse, unparse } from 'papaparse';
 import { toast } from 'vue-sonner';

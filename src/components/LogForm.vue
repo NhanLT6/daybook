@@ -190,6 +190,8 @@ const onHourClick = (hour: number) => {
         />
 
         <div class="d-flex ga-2">
+          <VChip @click="onHourClick(0.25)">15m</VChip>
+          <VChip @click="onHourClick(0.5)">30m</VChip>
           <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">{{ hour }}h</VChip>
         </div>
       </form>
