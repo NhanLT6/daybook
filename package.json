@@ -19,6 +19,7 @@
     "chart.js": "^4.4.6",
     "chartjs-plugin-datalabels": "^2.2.0",
     "dayjs": "^1.11.13",
+    "dotenv": "^16.4.7",
     "file-saver": "^2.0.5",
     "lodash": "^4.17.21",
     "nanoid": "^5.0.8",

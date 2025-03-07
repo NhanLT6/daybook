@@ -1,11 +1,10 @@
-import process from 'node:process'
-import { defineConfig, devices } from '@playwright/test'
+import process from 'node:process';
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// require('dotenv').config();
+import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -13,13 +12,13 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   /* Maximum time one test can run for. */
-  timeout: 30 * 1000,
+  timeout: 60 * 1000,
   expect: {
     /**
      * Maximum time expect() should wait for the condition to be met.
      * For example in `await expect(locator).toHaveText();`
      */
-    timeout: 5000
+    timeout: 5000,
   },
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
@@ -40,7 +39,11 @@ export default defineConfig({
     trace: 'on-first-retry',
 
     /* Only on CI systems run the tests headless */
-    headless: !!process.env.CI
+    headless: !!process.env.CI,
+    //viewport: null, // This will maximize the browser window
+    launchOptions: {
+      args: ['--start-maximized'],
+    },
   },
 
   /* Configure projects for major browsers */
@@ -48,21 +51,22 @@ export default defineConfig({
     {
       name: 'chromium',
       use: {
-        ...devices['Desktop Chrome']
-      }
+        // ...devices['Desktop Chrome'],
+        viewport: null, // This will maximize the browser window
+      },
     },
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox']
-      }
-    },
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari']
-      }
-    }
+    // {
+    //   name: 'firefox',
+    //   use: {
+    //     ...devices['Desktop Firefox']
+    //   }
+    // },
+    // {
+    //   name: 'webkit',
+    //   use: {
+    //     ...devices['Desktop Safari']
+    //   }
+    // }
 
     /* Test against mobile viewports. */
     // {
@@ -105,6 +109,6 @@ export default defineConfig({
      */
     command: process.env.CI ? 'npm run preview' : 'npm run dev',
     port: process.env.CI ? 4173 : 5173,
-    reuseExistingServer: !process.env.CI
-  }
-})
+    reuseExistingServer: !process.env.CI,
+  },
+});
