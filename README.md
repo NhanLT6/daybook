@@ -26,7 +26,7 @@ This will start a local web server and open the application in your default brow
 
 To create a shortcut for the automated Xero logging test:
 
-1. Right-click on `powershell-scripts\run-xero-logger.ps1` and select `Run with PowerShell`
+1. Right-click on `powershell-scripts\create-xero-logger-shortcut.ps1` and select `Run with PowerShell`
 2. Once the PowerShell window closes, go to your Desktop
 3. Double-click on the `Log Xero` shortcut to run the automated test
 
