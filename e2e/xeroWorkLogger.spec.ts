@@ -18,12 +18,12 @@ interface XeroConfig {
   contactName: string;
   userName: string;
   password: string;
-  templateFilePath: string;
+  templatePath: string;
 }
 
 const timeToWait = {
-  modalToBeHidden: 15000,
-  dataToBeLoaded: 15000,
+  modalToBeHidden: 30000,
+  dataToBeLoaded: 30000,
 };
 
 test('Log work in Xero', async ({ page }) => {
@@ -31,10 +31,13 @@ test('Log work in Xero', async ({ page }) => {
     contactName: process.env.VITE_XERO_CONTACT_NAME!,
     userName: process.env.VITE_XERO_USERNAME!,
     password: process.env.VITE_XERO_PASSWORD!,
-    templateFilePath: process.env.VITE_XERO_TEMPLATE_FILE_PATH!,
+    templatePath: process.env.VITE_XERO_TEMPLATE_PATH!,
   };
 
-  const taskEntries = getTaskEntries(config.templateFilePath);
+  const fileName = `XeroLog-${dayjs().format('YYYY-MM')}.csv`;
+  const templateFilePath = config.templatePath.replace(/[\\/]$/, '') + fileName;
+
+  const taskEntries = getTaskEntries(templateFilePath);
 
   await loginXero(page, config);
   await filter200ProjectsPerPage(page);
@@ -58,7 +61,7 @@ test('Log work in Xero', async ({ page }) => {
   }
 
   // Wait until browser closed manually
-  await new Promise(() => {});
+  // await new Promise(() => {});
 });
 
 async function loginXero(page: any, config: XeroConfig) {
