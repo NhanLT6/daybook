@@ -1,19 +1,19 @@
-﻿# Get the directory where the script is located
-$scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+﻿# Path of this script
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$projectRoot = Split-Path -Parent -Path $scriptPath
+$distDir    = Join-Path $projectRoot 'dist'
 
 # Change to the dist directory
-Set-Location "$scriptPath\dist"
+Set-Location $distDir
 
 # Check if http-server is already running on port 5000
-$existingProcess = Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue | 
-    Select-Object -ExpandProperty OwningProcess | 
-    ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }
+$isServerRunning = Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess |
+        ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }
 
-if (-not $existingProcess) {
+if (-not $isServerRunning) {
     # Start http-server hidden only if it's not already running
-    Start-Process powershell -WindowStyle Hidden -ArgumentList "http-server -p 5000"
-    # Wait 2 seconds for server to start
-    Start-Sleep -Seconds 2
+    Start-Process powershell -WindowStyle Hidden -ArgumentList "http-server -p 5000 -o"
 }
 
 # Open default browser

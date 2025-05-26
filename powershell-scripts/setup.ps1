@@ -45,19 +45,15 @@ function Initialize-Project {
     try {
         # Install dependencies
         Write-StatusMessage "Installing dependencies with yarn..." -Type "Info"
-        
-        $process = Start-Process -FilePath "yarn" -WorkingDirectory $config.ProjectPath -NoNewWindow -PassThru -Wait
-        if ($process.ExitCode -ne 0) {
-            throw "Yarn install failed with exit code $($process.ExitCode)"
-        }
-        Write-StatusMessage "Dependencies installed" -Type "Success"
+        Write-StatusMessage "-WorkingDirectory $($config.ProjectPath)" -Type "Info"
 
-        # Build project
-        Write-StatusMessage "Building project..." -Type "Info"
-        
-        $process = Start-Process -FilePath "yarn" -ArgumentList "build" -WorkingDirectory $config.ProjectPath -NoNewWindow -PassThru -Wait
-        if ($process.ExitCode -ne 0) {
-            throw "Build failed with exit code $($process.ExitCode)"
+        Push-Location $config.ProjectPath
+        try {
+            & yarn install
+            & yarn build
+        }
+        finally {
+            Pop-Location
         }
         
         Write-StatusMessage "Project built successfully" -Type "Success"
