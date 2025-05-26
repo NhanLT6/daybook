@@ -1,4 +1,12 @@
-﻿# Configuration
+﻿# Stop on all errors and trap them—pause for user input instead of closing immediately.
+$ErrorActionPreference = 'Stop'
+trap {
+    Write-Host "✖ Error: $($_.Exception.Message)" -ForegroundColor Red
+    Read-Host -Prompt "Press Enter to exit..."
+    exit 1
+}
+
+# Configuration
 $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $projectRoot = Split-Path -Parent -Path $scriptPath  # Go up one level to the project root
 
@@ -33,20 +41,48 @@ function Test-ProjectState {
     return $isFirstRun
 }
 
+function Install-NodeAndYarn {
+    # Ensure npm (and thus Node.js) is available
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-StatusMessage "npm is not installed. Attempting to install Node.js..." -Type "Info"
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id OpenJS.NodeJS --source winget --accept-package-agreements --accept-source-agreements
+        }
+        elseif (Get-Command choco -ErrorAction SilentlyContinue) {
+            choco install nodejs.install -y
+        }
+        else {
+            Write-StatusMessage "Neither winget nor Chocolatey found. Please install Node.js manually." -Type "Error"
+            exit 1
+        }
+    }
+    else {
+        Write-StatusMessage "npm is already installed." -Type "Info"
+    }
+
+    # Ensure yarn is installed
+    if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
+        Write-StatusMessage "Yarn is not installed. Installing globally via npm..." -Type "Info"
+        try {
+            npm install -g yarn
+        }
+        catch {
+            Write-StatusMessage "Failed to install yarn: $($_.Exception.Message)" -Type "Error"
+            exit 1
+        }
+    }
+    else {
+        Write-StatusMessage "Yarn is already installed." -Type "Info"
+    }
+}
+
 function Initialize-Project {
     Write-StatusMessage "First time setup detected. Initializing project..." -Type "Info"
 
-    # Check if yarn is installed
-    if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
-        Write-StatusMessage "Yarn is not installed. Please install it first with: npm install -g yarn" -Type "Error"
-        exit 1
-    }
+    Install-NodeAndYarn
 
     try {
-        # Install dependencies
         Write-StatusMessage "Installing dependencies with yarn..." -Type "Info"
-        Write-StatusMessage "-WorkingDirectory $($config.ProjectPath)" -Type "Info"
-
         Push-Location $config.ProjectPath
         try {
             & yarn install
@@ -55,7 +91,6 @@ function Initialize-Project {
         finally {
             Pop-Location
         }
-        
         Write-StatusMessage "Project built successfully" -Type "Success"
     }
     catch {
