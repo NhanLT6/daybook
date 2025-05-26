@@ -35,7 +35,7 @@ test('Log work in Xero', async ({ page }) => {
   };
 
   const fileName = `XeroLog-${dayjs().format('YYYY-MM')}.csv`;
-  const templateFilePath = config.templatePath.replace(/[\\/]$/, '') + fileName;
+  const templateFilePath = config.templatePath.replace(/[\\/]$/, '') + '\\' + fileName;
 
   const taskEntries = getTaskEntries(templateFilePath);
 
@@ -80,12 +80,20 @@ async function loginXero(page: any, config: XeroConfig) {
 
 async function filter200ProjectsPerPage(page: any) {
   try {
+    // try to wait for the dropdown to appear within 2s
+    await page.waitForSelector(
+      "//button[@class='xui-button xui-select--button xui-button-borderless-main xui-button-small xui-button-has-icon']",
+      { timeout: 2_000 },
+    );
+
+    // only if the wait succeeded do we proceed
     await page.click(
       "//button[@class='xui-button xui-select--button xui-button-borderless-main xui-button-small xui-button-has-icon']",
     );
     await page.click('#Selectaperpagecount200 button');
   } catch {
-    // Ignore if filtering fails
+    // timing out means the button never showed up → skip
+    console.log('Paging dropdown never appeared, skipping filter200ProjectsPerPage');
   }
 }
 
