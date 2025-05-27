@@ -2,11 +2,31 @@
 
 Friendly way to log work in Xero.
 
-## Project Setup
+## Install required dependencies
 
-```sh
-  yarn
-```
+Before you dive in, make sure you have the following:
+
+1. **Node.js & npm**  
+   Download & install the LTS build from https://nodejs.org/en/download/  
+   Verify:
+   ```bash
+   node --version
+   npm --version
+   ```
+
+2. **Yarn**  
+   If you already have `yarn`, you’re all set. Otherwise:
+   ```bash
+   npm install --global yarn
+   yarn --version
+   ```
+
+3. **Playwright**  
+   Install the test runner and browsers:
+   ```bash
+   yarn add --dev @playwright/test
+   npx playwright install
+   ```
 
 ## Getting Started
 
@@ -19,7 +39,7 @@ There are two main ways to use this application:
 
 ### Crate .env file
 
-Create a `.env` file in the root of the project and set the following variables:
+Create a `.env` file in the root of the project with these variables to configure the application:
 
 ```env
 VITE_XERO_USERNAME= Email account to log in to Xero
@@ -28,27 +48,10 @@ VITE_XERO_CONTACT_NAME= The contact name found after you logged in to Xero
 VITE_XERO_TEMPLATE_PATH= Your download folder path where the Excel template file is located
 ```
 
-### 1. Use Vue app
+### Setup
 
-Follow these steps to create a shortcut to access the Vue app and run the automated test for logging work in Xero:
+Goto `powershell-scripts` folder > Right-click on `setup.ps1` file and select `Run with PowerShell`. This script will create two shortcuts:
+1. Log work: Vue app to log work and export to Excel
+2. Log Xero: Automated test for logging work in Xero
 
-1. Goto `powershell-scripts` folder > Right-click on `setup.ps1` file and select `Run with PowerShell`. This script will create two shortcuts:
-   1. Log work: Vue app to log work and export to Excel
-   2. Log Xero: Automated test for logging work in Xero
-2. Once the PowerShell window closes, go to your Desktop
-3. Double-click on the `Log work` shortcut to launch the application in your browser
-4. Input your logs and export to Excel by clicking on the `Export to CSV` button in the Vue app
-5. Double-click on the `Log Xero` shortcut to run the automated test for logging work in Xero
-
-Note: An exported CSV file will be saved in your Download folder with the name `XeroLog-YYYY-MM.csv`, where `YYYY-MM` is the current year and month.
-
-### 2. Use Excel template
-
-Use these steps to create a shortcut for the automated Xero logging test:
-
-1. Goto `powershell-scripts` folder > Right-click on `create-xero-logger-shortcut.ps1` and select `Run with PowerShell` to create a shortcut for the automated test
-2. Once the PowerShell window closes, go to your Desktop
-3. Double-click on the `Log Xero` shortcut to run the automated test
-
-You need to configure where to find the Excel template file. Open the `.env` from the project root and set the `VITE_XERO_TEMPLATE_PATH` variable to the path of your Excel template file, for example, C:\Users\UserName\Downloads
-```
+If you don't want to use the Vue app, you can ignore "Log work" shortcut use "Log Xero" only.
