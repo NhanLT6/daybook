@@ -32,7 +32,7 @@ app.use(createPinia());
 app.use(router);
 
 const vuetify = createVuetify({
-  components: { ...components, VDateInput, VNumberInput },
+  components: { ...components, VDateInput },
   directives,
 });
 
