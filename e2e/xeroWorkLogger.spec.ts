@@ -2,7 +2,7 @@
 
 import dayjs from 'dayjs';
 
-import { test } from '@playwright/test';
+import { Page, test } from '@playwright/test';
 import _ from 'lodash';
 import Papa from 'papaparse';
 
@@ -64,7 +64,7 @@ test('Log work in Xero', async ({ page }) => {
   // await new Promise(() => {});
 });
 
-async function loginXero(page: any, config: XeroConfig) {
+async function loginXero(page: Page, config: XeroConfig) {
   await page.goto('https://go.xero.com/app/!lep5g/projects/');
 
   await page.getByPlaceholder('Email address').fill(config.userName);
@@ -78,7 +78,7 @@ async function loginXero(page: any, config: XeroConfig) {
   // await page.waitForTimeout(60000);
 }
 
-async function filter200ProjectsPerPage(page: any) {
+async function filter200ProjectsPerPage(page: Page) {
   try {
     // try to wait for the dropdown to appear within 2s
     await page.waitForSelector(
@@ -97,11 +97,11 @@ async function filter200ProjectsPerPage(page: any) {
   }
 }
 
-async function goBackToAllProjects(page: any) {
+async function goBackToAllProjects(page: Page) {
   await page.getByRole('link', { name: 'All projects' }).click();
 }
 
-async function createOrOpenProject(page: any, contactName: string, projectName: string) {
+async function createOrOpenProject(page: Page, contactName: string, projectName: string) {
   // Wait for project list to be loaded
   await page.waitForSelector('div[data-automationid="list-view-list"]', {
     state: 'visible',
@@ -145,7 +145,7 @@ async function createOrOpenProject(page: any, contactName: string, projectName: 
     .waitFor({ state: 'hidden', timeout: timeToWait.modalToBeHidden });
 }
 
-async function openProject(page: any, contactName: string, projectName: string) {
+async function openProject(page: Page, contactName: string, projectName: string) {
   await page
     .locator('a[data-automationid="project-list-item"]')
     .filter({
@@ -157,7 +157,7 @@ async function openProject(page: any, contactName: string, projectName: string) 
     .click();
 }
 
-async function createTask(page: any, taskName: string) {
+async function createTask(page: Page, taskName: string) {
   // Wait for task list to be loaded
   await page.waitForSelector('div[data-automationid="task-list-container"]', {
     state: 'visible',
@@ -182,9 +182,9 @@ async function createTask(page: any, taskName: string) {
     .waitFor({ state: 'hidden', timeout: timeToWait.modalToBeHidden });
 }
 
-async function addTimeSpentToTask(page: any, taskName: string, duration: number, date: Date, description?: string) {
+async function addTimeSpentToTask(page: Page, taskName: string, duration: number, date: Date, description?: string) {
   // Open time entry modal
-  await page.locator('button[data-automationid="quick-add-dropdown-add-button"]:has-text("Add")').click();
+  await page.locator('button[data-automationid="quick-add-dropdown-add-button"]', { hasText: 'Add' }).click();
   await page.getByRole('button', { name: 'Time entry' }).click();
 
   // Task
@@ -195,7 +195,7 @@ async function addTimeSpentToTask(page: any, taskName: string, duration: number,
   if (description) await page.getByLabel('Description(optional)').fill(description);
 
   // Duration
-  page.locator('#duration').fill(convertDecimalHourToHourMinutes(duration));
+  await page.locator('#duration').fill(convertDecimalHourToHourMinutes(duration));
 
   // Date
   await page.getByPlaceholder('Choose a date').click();
@@ -208,7 +208,7 @@ async function addTimeSpentToTask(page: any, taskName: string, duration: number,
     .waitFor({ state: 'hidden', timeout: timeToWait.modalToBeHidden });
 }
 
-async function openDetailedTimeReport(page: any, contactName: string) {
+async function openDetailedTimeReport(page: Page, contactName: string) {
   // Go to Detailed Time Report
   await page.getByRole('link', { name: 'Reports' }).click();
 
