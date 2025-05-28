@@ -5,7 +5,7 @@ $projectRoot = Split-Path -Parent -Path $scriptPath
 $config = @{
     DesktopPath = [Environment]::GetFolderPath('Desktop')
     ShortcutName = "Log Work"
-    IconPath = Join-Path $projectRoot "src\assets\progress-pencil.ico"
+    IconPath = Join-Path $projectRoot "src\assets\auto-mode-green.ico"
     AppUrl = "https://xero-logger.vercel.app/"
 }
 
