@@ -39,6 +39,7 @@ function Start-Setup {
         & "$scriptPath\create-xero-logger-shortcut.ps1"
 
         Write-Host "✅ Setup completed successfully!" -ForegroundColor Green
+        Read-Host -Prompt "Press Enter to exit..."
     }
     catch {
         Write-Host "❌ Error during setup: $($_.Exception.Message)" -ForegroundColor Red
