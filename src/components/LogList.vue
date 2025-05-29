@@ -113,11 +113,53 @@ const readCsv = (file?: File) => {
 
         <VSpacer />
 
-        <div class="d-flex ga-1">
-          <VBtn icon="mdi-arrow-expand" @click="onExpand" />
-          <VBtn icon="mdi-arrow-collapse" @click="onCollapse" />
-          <SingleFilePicker icon="mdi-import" file-types=".csv" @file-selected="readCsv" />
-          <VBtn icon="mdi-file-delimited-outline" @click="emit('export')" />
+        <div class="d-flex ga-2">
+          <!-- Expand logs-->
+          <VTooltip>
+            <template #activator="{ props }">
+              <VIconBtn icon="mdi-arrow-expand" icon-size="small" rounded="lg" @click="onExpand" v-bind="props" />
+            </template>
+            Expand logs
+          </VTooltip>
+
+          <!-- Collapse logs -->
+          <VTooltip>
+            <template #activator="{ props }">
+              <VIconBtn icon="mdi-arrow-collapse" icon-size="small" rounded="lg" @click="onCollapse" v-bind="props" />
+            </template>
+            Collapse logs
+          </VTooltip>
+
+          <!-- Import from file -->
+          <VTooltip>
+            <template #activator="{ props }">
+              <SingleFilePicker
+                prepend-icon="mdi-import"
+                file-types=".csv"
+                @file-selected="readCsv"
+                text="Import"
+                v-bind="props"
+              />
+            </template>
+            Import data from CSV template
+          </VTooltip>
+
+          <!-- Export to file -->
+          <VTooltip>
+            <template #activator="{ props }">
+              <VBtn
+                prepend-icon="mdi-file-delimited-outline"
+                variant="tonal"
+                color="green-darken-3"
+                @click="emit('export')"
+                v-bind="props"
+              >
+                Export
+              </VBtn>
+            </template>
+            Export Data to CSV file
+          </VTooltip>
+
           <!-- <VBtn icon="mdi-rocket-launch-outline" color="green-darken-3" @click="emit('export')" />-->
         </div>
       </VToolbar>

@@ -146,7 +146,7 @@ const importCsv = async (file?: File) => {
 
   <VRow>
     <VCol cols="auto" class="d-none d-md-flex flex-column ga-4">
-      <CalendarOverview :selected-date="selectedDate" @selected-date-changed="onDayClick" />
+      <CalendarOverview :selected-date="selectedDate" :xero-logs="xeroLogs" @selected-date-changed="onDayClick" />
 
       <VChip color="" variant="tonal" prepend-icon="mdi-timer-outline"> Total Hours: {{ totalHours }} </VChip>
     </VCol>

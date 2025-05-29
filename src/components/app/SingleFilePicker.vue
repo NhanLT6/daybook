@@ -1,11 +1,12 @@
 ﻿<script setup lang="ts">
-import { defineEmits, defineProps, ref } from 'vue';
+import { ref } from 'vue';
 
 export interface SingleFilePickerProps {
   fileTypes?: string;
+  text?: string;
 }
 
-const { fileTypes } = defineProps<SingleFilePickerProps>();
+const { fileTypes, text } = defineProps<SingleFilePickerProps>();
 
 const emit = defineEmits<{
   fileSelected: [file?: File];
@@ -29,7 +30,9 @@ const handleFileChange = (event: Event) => {
 
 <template>
   <div>
-    <VBtn icon="mdi-tray-arrow-up" v-bind="$attrs" @click="triggerFileInput" />
+    <VBtn v-if="!!text" v-bind="$attrs" @click="triggerFileInput">{{ text }}</VBtn>
+    <VBtn v-else icon="mdi-tray-arrow-up" v-bind="$attrs" @click="triggerFileInput" />
+
     <input ref="fileInput" type="file" :accept="fileTypes" style="display: none" @change="handleFileChange" />
   </div>
 </template>

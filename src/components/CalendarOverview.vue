@@ -1,11 +1,13 @@
 ﻿<script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
+import type { Holiday } from '@/apis/holidayApi';
 import type { XeroLog } from '@/interfaces/XeroLog';
 
 import dayjs from 'dayjs';
 
-import { shortDateFormat } from '@/common/DateFormat';
+import { fetchVnHolidays } from '@/apis/holidayApi';
+import { nagerDateFormat, shortDateFormat } from '@/common/DateFormat';
 import { chain, sumBy } from 'lodash';
 
 const props = defineProps<{
@@ -23,77 +25,90 @@ const calendarViewMode = computed(() => (viewModeToggle.value === 0 ? 'weekly' :
 const selectedDate = ref<Date>(props.selectedDate);
 const xeroLogs = computed(() => props.xeroLogs ?? []);
 
-const calendarAttrs = computed(() => {
-  const fullyLoggedDates = chain(xeroLogs.value)
+const holidays = ref<Holiday[]>([]);
+
+onMounted(async () => {
+  try {
+    holidays.value = await fetchVnHolidays();
+  } catch {
+    holidays.value = [];
+  }
+});
+
+// Extracted to compute grouped duration sums by date
+const groupedDurations = computed(() =>
+  chain(xeroLogs.value)
     .groupBy((item) => item.date)
     .map((items, date) => ({ date, durationSum: sumBy(items, 'duration') }))
+    .value(),
+);
+
+// Individual calendar attributes with inline data processing
+const todayAttribute = computed(() => ({
+  key: 'today',
+  highlight: { color: 'blue', fillMode: 'light' },
+  dates: new Date(),
+}));
+
+const selectedDateAttribute = computed(() => ({
+  key: 'selected',
+  highlight: { color: 'blue', fillMode: 'outline' },
+  dates: selectedDate.value,
+}));
+
+const fullyLoggedAttribute = computed(() => ({
+  key: 'fullyLogged',
+  dot: 'green',
+  dates: groupedDurations.value
     .filter((group) => {
       const loggedHours = group.durationSum / 60;
       return loggedHours >= 7.5 && loggedHours <= 8;
     })
-    .map((log) => dayjs(log.date, shortDateFormat).toDate())
-    .value();
+    .map((log) => dayjs(log.date, shortDateFormat).toDate()),
+}));
 
-  const invalidLoggedDates = chain(xeroLogs.value)
-    .groupBy((item) => item.date)
-    .map((items, date) => ({ date, durationSum: sumBy(items, 'duration') }))
+const invalidLoggedAttribute = computed(() => ({
+  key: 'invalidLogged',
+  dot: 'red',
+  dates: groupedDurations.value
     .filter((log) => {
       const isOverLogged = log.durationSum / 60 > 8;
-      const isLoggedInWeekend = [0, 6, 7].includes(dayjs(log.date, shortDateFormat).day()); // 0 Sunday, 5 Friday, 6 Saturday
-
-      return isOverLogged || isLoggedInWeekend;
+      const dayOfWeek = dayjs(log.date, shortDateFormat).day();
+      const isWeekend = [0, 5, 6].includes(dayOfWeek);
+      return isOverLogged || isWeekend;
     })
-    .map((log) => dayjs(log.date, shortDateFormat).toDate())
-    .value();
+    .map((log) => dayjs(log.date, shortDateFormat).toDate()),
+}));
 
-  return [
-    // Today
-    {
-      key: 'today',
-      highlight: {
-        color: 'blue',
-        fillMode: 'light',
-      },
-      dates: new Date(),
+const weekendAttribute = computed(() => ({
+  key: 'weekend',
+  highlight: { color: 'gray', fillMode: 'light' },
+  dates: {
+    start: dayjs().startOf('month').toDate(),
+    repeat: {
+      every: 'week',
+      weekdays: [0, 5, 6], // Sunday (0), Friday (5), Saturday (6)
     },
-    // Selected date
-    {
-      key: 'selected',
-      highlight: {
-        color: 'blue',
-        fillMode: 'outline',
-      },
-      dates: selectedDate.value,
-    },
-    // Fully logged dates
-    {
-      key: 'fullyLogged',
-      dot: 'green',
-      dates: fullyLoggedDates,
-    },
-    // Invalid logged dates
-    {
-      key: 'invalidLogged',
-      dot: 'red',
-      dates: invalidLoggedDates,
-    },
-    // Friday and weekend
-    {
-      key: 'weekend',
-      highlight: {
-        color: 'gray',
-        fillMode: 'light',
-      },
-      dates: {
-        start: dayjs().startOf('month').toDate(),
-        repeat: {
-          every: 'week',
-          weekdays: [1, 6, 7], // 1 Sunday, 6 Friday, 7 Saturday
-        },
-      },
-    },
-  ];
-});
+  },
+}));
+
+const holidayAttributes = computed(() =>
+  holidays.value.map((holiday) => ({
+    dates: dayjs(holiday.date, nagerDateFormat).toDate(),
+    dot: { color: 'purple' },
+    popover: { label: holiday.localName },
+  })),
+);
+
+// All attributes
+const calendarAttrs = computed(() => [
+  todayAttribute.value,
+  selectedDateAttribute.value,
+  fullyLoggedAttribute.value,
+  invalidLoggedAttribute.value,
+  weekendAttribute.value,
+  ...holidayAttributes.value,
+]);
 
 const onDayClick = (day: any) => {
   selectedDate.value = day.date;
@@ -113,6 +128,8 @@ const gotoToday = () => {
     expanded
     :first-day-of-week="2"
     @dayclick="onDayClick"
+    :min-date="dayjs().startOf('month').toDate()"
+    :max-date="dayjs().endOf('month').toDate()"
   />
 
   <VCard class="elevation-0 border">
