@@ -87,7 +87,7 @@ const weekendAttribute = computed(() => ({
     start: dayjs().startOf('month').toDate(),
     repeat: {
       every: 'week',
-      weekdays: [0, 5, 6], // Sunday (0), Friday (5), Saturday (6)
+      weekdays: [1, 6, 7], // 1 Sunday, 6 Friday, 7 Saturday
     },
   },
 }));
