@@ -47,9 +47,22 @@ const onFormSelectedDateChanged = (value: Date) => {
 
 const saveLog = (log: XeroLog) => {
   const logIndex = xeroLogs.value.findIndex((i) => i.id === log.id);
-  if (logIndex !== -1) {
+  const isEdit = logIndex !== -1;
+
+  if (isEdit) {
     xeroLogs.value[logIndex] = log;
     toast.success('Log updated');
+    return;
+  }
+
+  // If having similar log, update duration instead of adding a new one
+  const similarLogIndex = xeroLogs.value.findIndex(
+    (item) => item.date === log.date && item.project === log.project && item.task === log.task,
+  );
+
+  if (similarLogIndex !== -1) {
+    xeroLogs.value[similarLogIndex].duration += log.duration;
+    toast.success('Log already exists, duration updated');
   } else {
     xeroLogs.value.push(log);
     toast.success('Log added');

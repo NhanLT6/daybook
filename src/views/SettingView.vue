@@ -31,7 +31,7 @@ const changeLocale = (locale: any) => {
 </script>
 
 <template>
-  <form>
+  <form class="d-flex flex-column ga-2 v-col-4">
     <VSelect
       :items="allowedLocales"
       label="Locale"
@@ -44,6 +44,17 @@ const changeLocale = (locale: any) => {
       @update:model-value="changeLocale"
     >
     </VSelect>
+
+    <!-- First day of week -->
+    <VSelect
+      :items="['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']"
+      label="First day of week"
+      persistent-hint
+      hint="This option change which day is first day of week in Calendar component"
+    >
+    </VSelect>
+
+    <VBtn class="flex-fill" variant="tonal" color="green-darken-3" prepend-icon="mdi-content-save-outline"> Save </VBtn>
   </form>
 </template>
 

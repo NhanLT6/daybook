@@ -15,6 +15,7 @@ import dayjs from 'dayjs';
 import { shortDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { storageKeys } from '@/common/storageKeys';
+import { uniq, uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
 
 interface LogFormData {
@@ -54,9 +55,32 @@ watch(
 const tasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
 const projects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
 
-const projectItems = computed(() => projects.value.map((project) => project.title));
+const defaultTasks = [
+  { title: 'Daily meeting', project: 'Team work' },
+  { title: 'Code review', project: 'Team work' },
+  { title: 'Retro', project: 'Team work' },
+  { title: 'Grooming', project: 'Team work' },
+  { title: 'Planning', project: 'Team work' },
+  { title: 'Demo', project: 'Team work' },
+  { title: 'Team meeting', project: 'Team work' },
+];
+
+const defaultProjects = uniqBy(
+  defaultTasks.map((task) => ({ title: task.project })),
+  'title',
+);
+
+const projectItems = computed(() =>
+  uniq(uniqBy([...projects.value, ...defaultProjects], 'title').map((project) => project.title)),
+);
+
 const taskItems = computed(() =>
-  tasks.value.filter((t) => t.project === projectField.value.value).map((task) => task.title),
+  uniq(
+    uniqBy(
+      [...tasks.value, ...defaultTasks].filter((t) => t.project === projectField.value.value),
+      'title',
+    ).map((task) => task.title),
+  ),
 );
 
 const onSelectedDateChanged = (selectedDate: string) => {
@@ -114,7 +138,7 @@ const onSave = handleSubmit((values) => {
   if (!isTaskExisting) tasks.value.push({ title: xeroLog.task, project: xeroLog.project } satisfies XeroTask);
 
   resetForm();
-  setFieldValue('date', selectedDate); // Retain selected date
+  setFieldValue('date', selectedDate); // Retain the selected date
 });
 
 const onCancel = () => {
