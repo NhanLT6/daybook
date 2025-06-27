@@ -86,6 +86,7 @@ const exportToCsv = () => {
     Task: log.task,
     Duration: (log.duration / 60).toFixed(1),
     Description: log.description,
+    IsLogged: false,
   }));
 
   const csv = unparse(transformedData);
