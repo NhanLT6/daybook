@@ -25,6 +25,7 @@ test.describe('Xero Work Logger', () => {
     const templateFilePath = path.join(config.templatePath, fileName);
 
     const taskEntries = getTaskEntries(templateFilePath);
+    // eslint-disable-next-line playwright/no-skipped-test
     test.skip(taskEntries.length === 0, 'No task entries found to log.');
 
     try {

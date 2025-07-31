@@ -6,7 +6,6 @@ import _ from 'lodash';
 import Papa from 'papaparse';
 
 import { TaskEntry } from '../interfaces/taskEntry.js';
-import { convertMinutesToDecimalHours } from './utils.js';
 
 function getTaskEntries(filePath: string): TaskEntry[] {
   const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -37,14 +36,13 @@ function saveTaskEntriesWithLoggedStatus(filePath: string, taskEntries: TaskEntr
     Date: dayjs(entry.date).format('MM-DD-YY'),
     Project: entry.project,
     Task: entry.task,
-    Duration: convertMinutesToDecimalHours(entry.duration),
+    Duration: entry.duration,
     Description: entry.description || '',
     IsLogged: entry.isLogged ? 'true' : 'false',
   }));
 
   const csvContent = Papa.unparse(entriesForSaving);
   fs.writeFileSync(filePath, csvContent);
-  console.log(`Updated log status saved to ${filePath}`);
 }
 
 export { getTaskEntries, saveTaskEntriesWithLoggedStatus };
