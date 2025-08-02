@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 
 import CalendarOverview from '@/components/CalendarOverview.vue';
 import LogForm from '@/components/LogForm.vue';
-import LoggedTimeWithChartView from '@/components/LoggedTimeWithChartView.vue';
+import LoggedTimeWithChartView2 from '@/components/LoggedTimeWithChartView2.vue';
 import LogList from '@/components/LogList.vue';
 
 import type { XeroLog } from '@/interfaces/XeroLog';
@@ -156,7 +156,9 @@ const importCsv = async (file?: File) => {
 </script>
 
 <template>
-  <LoggedTimeWithChartView class="mb-4" />
+  <VRow>
+    <LoggedTimeWithChartView2 />
+  </VRow>
 
   <VRow>
     <VCol cols="auto" class="d-none d-md-flex flex-column ga-4">

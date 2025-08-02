@@ -106,7 +106,7 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="mb-4 elevation-0 border" style="height: calc(100vh - 228px); overflow-y: scroll">
+  <VCard class="mb-4 elevation-0 border list-container">
     <VCardTitle class="bg-white" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle>Logs</VToolbarTitle>
@@ -206,4 +206,9 @@ const readCsv = (file?: File) => {
   </VCard>
 </template>
 
-<style scoped></style>
+<style scoped>
+.list-container {
+  height: calc(100vh - 260px);
+  overflow-y: scroll;
+}
+</style>

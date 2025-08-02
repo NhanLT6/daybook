@@ -1,6 +1,8 @@
 ﻿<script setup lang="ts">
 import { computed, watch } from 'vue';
 
+import { useProjectColors } from '@/composables/useProjectColors';
+
 import type { XeroLog } from '@/interfaces/XeroLog';
 import type { XeroProject } from '@/interfaces/XeroProject';
 import type { XeroTask } from '@/interfaces/XeroTask';
@@ -27,7 +29,7 @@ interface LogFormData {
   description?: string;
 }
 
-const { item, selectedDate } = defineProps<{
+const { item: logItem, selectedDate } = defineProps<{
   item?: XeroLog;
   selectedDate?: Date;
 }>();
@@ -45,12 +47,14 @@ watch(
 );
 
 watch(
-  () => item,
+  () => logItem,
   () => {
-    const newValue = !!item ? xeroLogToFormData(item!) : emptyLog;
+    const newValue = !!logItem ? xeroLogToFormData(logItem!) : emptyLog;
     setValues(newValue);
   },
 );
+
+const projectColors = useProjectColors();
 
 const tasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
 const projects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
@@ -192,7 +196,16 @@ const onHourClick = (hour: number) => {
           label="Project"
           :items="projectItems"
           :error-messages="errors.project"
-        ></VCombobox>
+          autocomplete="false"
+        >
+          <template #item="{ props, item }">
+            <VListItem v-bind="props">
+              <template #prepend>
+                <VAvatar :color="projectColors.getProjectColor(item.value)" size="small" />
+              </template>
+            </VListItem>
+          </template>
+        </VCombobox>
 
         <VCombobox
           v-model="taskField.value.value"

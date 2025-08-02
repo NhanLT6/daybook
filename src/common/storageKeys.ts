@@ -8,4 +8,7 @@ export const storageKeys = {
   xeroLogsOfCurrentMonth: `xeroLogs-${currentMonth}`,
   xeroTasks: `xeroTasks-${currentMonth}`,
   xeroProjects: `xeroProjects-${currentMonth}`,
+  settings: {
+    projectColorMaps: 'projectColorMaps',
+  },
 };
