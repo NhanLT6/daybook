@@ -87,7 +87,7 @@ const taskItems = computed(() =>
   ),
 );
 
-const onSelectedDateChanged = (selectedDate: string) => {
+const onSelectedDateChanged = (selectedDate: Date) => {
   emit('selectedDateChanged', dayjs(selectedDate).toDate());
 };
 
