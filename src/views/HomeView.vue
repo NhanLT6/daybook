@@ -55,18 +55,8 @@ const saveLog = (log: XeroLog) => {
     return;
   }
 
-  // If having similar log, update duration instead of adding a new one
-  const similarLogIndex = xeroLogs.value.findIndex(
-    (item) => item.date === log.date && item.project === log.project && item.task === log.task,
-  );
-
-  if (similarLogIndex !== -1) {
-    xeroLogs.value[similarLogIndex].duration += log.duration;
-    toast.success('Log already exists, duration updated');
-  } else {
-    xeroLogs.value.push(log);
-    toast.success('Log added');
-  }
+  xeroLogs.value.push(log);
+  toast.success('Log added');
 };
 
 const onEditLog = (log: XeroLog) => {
