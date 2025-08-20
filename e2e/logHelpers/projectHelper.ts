@@ -29,6 +29,8 @@ async function createOrOpenProject(page: Page, contactName: string, projectName:
   const contactButton = page.locator('button[data-automationid="autocompleter-option--body"]', {
     hasText: contactName,
   });
+  // Wait for autocomplete dropdown to appear with the contact
+  await contactButton.waitFor({ state: 'visible' });
   await contactButton.click();
 
   // Project name

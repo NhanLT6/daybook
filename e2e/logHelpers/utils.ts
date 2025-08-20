@@ -11,9 +11,26 @@ async function loginXero(page: Page, config: XeroConfig) {
   await page.getByRole('button', { name: 'Log in' }).click();
 
   // Wait for 2FA if needed
-  await page.getByLabel('Trust this device', { exact: true }).check();
-  await page.getByPlaceholder('123456').click();
-  // await page.waitForTimeout(60000);
+  try {
+    // Wait for 2FA prompt to appear (30 second timeout)
+    await page.getByPlaceholder('123456').waitFor({ state: 'visible', timeout: 30000 });
+
+    // Check "Trust this device"
+    await page.getByLabel('Trust this device', { exact: true }).check();
+
+    // Click on 2FA input field to focus it
+    await page.getByPlaceholder('123456').click();
+
+    // Wait for user to enter 2FA code and submit (up to 2 minutes)
+    // The page will redirect after successful 2FA
+    await page.waitForURL('**/projects/', { timeout: 120000 });
+  } catch (error) {
+    // If 2FA timeout occurs, check if we're already logged in
+    const isLoggedIn = page.url().includes('/projects/');
+    if (!isLoggedIn) {
+      throw new Error('2FA authentication failed or timed out. Please ensure you can complete 2FA within 2 minutes.');
+    }
+  }
 }
 
 async function filter200ProjectsPerPage(page: Page) {
