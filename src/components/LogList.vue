@@ -15,11 +15,11 @@ import { toast } from 'vue-sonner';
 export interface LogListProps {
   items: XeroLog[];
 
-  // Date in ISO format
-  selectedDate?: Date;
+  // Selected dates to auto-expand panels
+  selectedDates?: Date[];
 }
 
-const { items: logItems, selectedDate } = defineProps<LogListProps>();
+const { items: logItems, selectedDates } = defineProps<LogListProps>();
 
 const emit = defineEmits<{
   editLog: [log: XeroLog];
@@ -28,14 +28,19 @@ const emit = defineEmits<{
   export: [];
 }>();
 
-// Expanded rows
-const openedPanels = ref<string[]>([dayjs(selectedDate).format(shortDateFormat)]);
+// Expanded rows - auto-expand panels for selected dates
+const openedPanels = ref<string[]>(
+  selectedDates ? selectedDates.map(date => dayjs(date).format(shortDateFormat)) : []
+);
 
 watch(
-  () => selectedDate,
-  () => {
-    const selectedDateString = dayjs(selectedDate).format(shortDateFormat);
-    openedPanels.value = [selectedDateString];
+  () => selectedDates,
+  (newDates) => {
+    if (newDates && newDates.length > 0) {
+      openedPanels.value = newDates.map(date => dayjs(date).format(shortDateFormat));
+    } else {
+      openedPanels.value = [];
+    }
   },
 );
 

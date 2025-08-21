@@ -10,7 +10,7 @@ import type { XeroTask } from '@/interfaces/XeroTask';
 import { useStorage } from '@vueuse/core';
 
 import { useField, useForm } from 'vee-validate';
-import { date, number, object, string } from 'yup';
+import { array, date, number, object, string } from 'yup';
 
 import dayjs from 'dayjs';
 
@@ -20,39 +20,24 @@ import { storageKeys } from '@/common/storageKeys';
 import { uniq, uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
 
-interface LogFormData {
+interface BulkLogFormData {
   id?: string;
-  date?: Date;
+  selectedDates: Date[];
   project?: string;
   task?: string;
   duration?: number;
   description?: string;
 }
 
-const { item: logItem, selectedDate } = defineProps<{
+const { selectedDates, item: logItem } = defineProps<{
+  selectedDates: Date[];
   item?: XeroLog;
-  selectedDate?: Date;
 }>();
 
 const emit = defineEmits<{
-  selectedDateChanged: [selectedDate: Date];
-  submit: [log: XeroLog];
+  submit: [logs: XeroLog[]];
+  cancel: [];
 }>();
-
-watch(
-  () => selectedDate,
-  () => {
-    if (selectedDate) dateField.setValue(selectedDate);
-  },
-);
-
-watch(
-  () => logItem,
-  () => {
-    const newValue = !!logItem ? xeroLogToFormData(logItem!) : emptyLog;
-    setValues(newValue);
-  },
-);
 
 const projectColors = useProjectColors();
 
@@ -87,88 +72,107 @@ const taskItems = computed(() =>
   ),
 );
 
-const onSelectedDateChanged = (selectedDate: Date) => {
-  emit('selectedDateChanged', dayjs(selectedDate).toDate());
-};
-
 const validationSchema = object({
-  date: date().required('Required'),
+  selectedDates: array(date()).min(1, 'At least one date must be selected'),
   project: string().required('Required'),
   task: string().required('Required'),
   duration: number().required('Required').min(1, 'Must be greater than 0'),
   description: string(),
 });
 
-const emptyLog: LogFormData = {
+const emptyLog: BulkLogFormData = {
   id: undefined,
-  date: selectedDate,
+  selectedDates: [],
   project: undefined,
   task: undefined,
   duration: undefined,
   description: undefined,
 };
 
-const { errors, handleSubmit, resetForm, setValues, setFieldValue } = useForm<LogFormData>({
+const { errors, handleSubmit, resetForm, setFieldValue, setValues } = useForm<BulkLogFormData>({
   initialValues: emptyLog,
   validationSchema,
+  validateOnMount: false,
 });
 
-const dateField = useField<Date>('date');
+const selectedDatesField = useField<Date[]>('selectedDates');
 const projectField = useField<string>('project');
 const taskField = useField<string>('task');
 const durationField = useField<number>('duration');
 const descriptionField = useField<string>('description');
 
+// Watch for prop changes after fields are declared
+watch(
+  () => selectedDates,
+  (newDates) => {
+    selectedDatesField.setValue(newDates);
+  },
+);
+
+// Watch for logItem changes to populate form for editing
+watch(
+  () => logItem,
+  () => {
+    const newValue = !!logItem ? xeroLogToFormData(logItem!) : emptyLog;
+    setValues(newValue);
+  },
+);
+
+const selectedDatesText = computed(() => {
+  if (!selectedDatesField.value.value || selectedDatesField.value.value.length === 0) {
+    return '';
+  }
+
+  const dates = [...selectedDatesField.value.value].sort((a, b) => dayjs(a).diff(dayjs(b)));
+
+  if (dates.length === 1) {
+    return dayjs(dates[0]).format('MMM D, YYYY');
+  }
+
+  return dates.map((date) => dayjs(date).format('MMM D')).join(', ');
+});
+
+const isEditMode = computed(() => !!logItem);
+
 const onSave = handleSubmit((values) => {
-  // Emit log
-  const newLog: LogFormData = {
-    id: values.id,
-    date: values.date!,
-    project: values.project!,
-    task: values.task!,
-    duration: Math.round(values.duration!),
-    description: values.description,
-  };
+  let logs: XeroLog[];
 
-  const xeroLog = formDataToXeroLog(newLog);
+  // Edit mode: update single existing log
+  if (logItem && values.id) {
+    const updatedLog: XeroLog = formDataToXeroLog(values);
+    logs = [updatedLog];
+  } else {
+    // Bulk mode: create multiple logs
+    logs = values.selectedDates.map((date) => ({
+      id: nanoid(),
+      date: dayjs(date).format(shortDateFormat),
+      project: values.project!,
+      task: values.task!,
+      duration: Math.round(values.duration!),
+      description: values.description,
+    }));
+  }
 
-  emit('submit', xeroLog);
+  emit('submit', logs);
 
   // Save Project and Task if needed
-  const isProjectExisting = projects.value.map((p) => p.title).includes(xeroLog.project);
-  if (!isProjectExisting) projects.value.push({ title: xeroLog.project } satisfies XeroProject);
+  const isProjectExisting = projects.value.map((p) => p.title).includes(values.project!);
+  if (!isProjectExisting) projects.value.push({ title: values.project! } satisfies XeroProject);
 
-  const isTaskExisting = tasks.value.map((t) => t.title).includes(xeroLog.task);
-  if (!isTaskExisting) tasks.value.push({ title: xeroLog.task, project: xeroLog.project } satisfies XeroTask);
+  const isTaskExisting = tasks.value.map((t) => t.title).includes(values.task!);
+  if (!isTaskExisting) tasks.value.push({ title: values.task!, project: values.project! } satisfies XeroTask);
 
   resetForm();
-  setFieldValue('date', selectedDate); // Retain the selected date
 });
 
 const onCancel = () => {
   resetForm();
+  emit('cancel');
 };
 
-const formDataToXeroLog = (formData: LogFormData): XeroLog => {
-  return {
-    id: formData.id ?? nanoid(),
-    date: dayjs(formData.date).format(shortDateFormat),
-    project: formData.project!,
-    task: formData.task!,
-    duration: formData.duration!,
-    description: formData.description,
-  };
-};
-
-const xeroLogToFormData = (log: XeroLog): LogFormData => {
-  return {
-    id: log.id,
-    date: dayjs(log.date, shortDateFormat).toDate(),
-    project: log.project,
-    task: log.task,
-    duration: log.duration,
-    description: log.description ?? '',
-  };
+const onClearSelection = () => {
+  selectedDatesField.setValue([]);
+  emit('cancel');
 };
 
 const hours = Array.from({ length: 7 }, (_, i) => i + 1);
@@ -176,19 +180,56 @@ const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 const onHourClick = (hour: number) => {
   setFieldValue('duration', hour * 60);
 };
+
+// Helper functions for editing functionality
+const formDataToXeroLog = (formData: BulkLogFormData): XeroLog => {
+  return {
+    id: formData.id ?? nanoid(),
+    date: dayjs(formData.selectedDates[0]).format(shortDateFormat),
+    project: formData.project!,
+    task: formData.task!,
+    duration: formData.duration!,
+    description: formData.description,
+  };
+};
+
+const xeroLogToFormData = (log: XeroLog): BulkLogFormData => {
+  return {
+    id: log.id,
+    selectedDates: [dayjs(log.date, shortDateFormat).toDate()],
+    project: log.project,
+    task: log.task,
+    duration: log.duration,
+    description: log.description ?? '',
+  };
+};
 </script>
 
 <template>
   <div class="pa-4">
     <form class="d-flex flex-column ga-2">
-      <VDateInput
-        v-model="dateField.value.value"
-        label="Date"
-        append-inner-icon="$calendar"
-        prepend-icon=""
-        :error-messages="errors.date"
-        @update:model-value="onSelectedDateChanged"
-      />
+      <VTextField
+        label="Selected Dates"
+        readonly
+        :model-value="selectedDatesText"
+        :error-messages="errors.selectedDates"
+      >
+        <template #append-inner>
+          <VFadeTransition>
+            <VBtn
+              v-if="selectedDatesField.value.value?.length > 0"
+              icon="mdi-close-circle"
+              variant="plain"
+              color="grey-darken-1"
+              size="small"
+              @click="onClearSelection"
+            >
+              <VIcon size="18">mdi-close-circle</VIcon>
+              <VTooltip activator="parent" location="top"> Clear selection </VTooltip>
+            </VBtn>
+          </VFadeTransition>
+        </template>
+      </VTextField>
 
       <VCombobox
         v-model="projectField.value.value"
@@ -230,9 +271,11 @@ const onHourClick = (hour: number) => {
         <VChip @click="onHourClick(0.5)">30m</VChip>
         <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">{{ hour }}h</VChip>
       </div>
-      
+
       <div class="d-flex ga-2 mt-4">
-        <VBtn type="submit" class="flex-fill" variant="tonal" prepend-icon="mdi-cancel" @click="onCancel"> Cancel </VBtn>
+        <VBtn type="submit" class="flex-fill" variant="tonal" prepend-icon="mdi-cancel" @click="onCancel">
+          Cancel
+        </VBtn>
 
         <VBtn
           type="submit"
@@ -242,7 +285,7 @@ const onHourClick = (hour: number) => {
           prepend-icon="mdi-content-save-outline"
           @click="onSave"
         >
-          Save
+          {{ isEditMode ? 'Update Log' : `Save ${selectedDatesField.value.value?.length || 0} Logs` }}
         </VBtn>
       </div>
     </form>

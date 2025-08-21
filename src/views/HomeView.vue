@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import BulkLogForm from '@/components/BulkLogForm.vue';
 import CalendarOverview from '@/components/CalendarOverview.vue';
-import LogForm from '@/components/LogForm.vue';
+// import LogForm from '@/components/LogForm.vue'; // Replaced with BulkLogForm
 import LoggedTimeWithChartView2 from '@/components/LoggedTimeWithChartView2.vue';
 import LogList from '@/components/LogList.vue';
 
@@ -26,10 +27,10 @@ const xeroLogs = useStorage<XeroLog[]>(storageKeys.xeroLogsOfCurrentMonth, []);
 const xeroTasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
 const xeroProjects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
 
-const selectedDate = ref<Date>(new Date());
+const selectedDates = ref<Date[]>([]);
 
-const onDayClick = (day: Date) => {
-  selectedDate.value = day;
+const onSelectedDatesChanged = (dates: Date[]) => {
+  selectedDates.value = dates;
 };
 
 // Logs
@@ -41,22 +42,47 @@ const totalHours = computed(() => {
   return (durationInMinutes / 60).toFixed(1);
 });
 
-const onFormSelectedDateChanged = (value: Date) => {
-  selectedDate.value = value;
-};
+const saveLog = (logs: XeroLog[]) => {
+  // Handle single log from unified form (edit mode or single entry)
+  if (logs.length === 1) {
+    const log = logs[0];
+    const logIndex = xeroLogs.value.findIndex((i) => i.id === log.id);
+    const isEdit = logIndex !== -1;
 
-const saveLog = (log: XeroLog) => {
-  const logIndex = xeroLogs.value.findIndex((i) => i.id === log.id);
-  const isEdit = logIndex !== -1;
+    if (isEdit) {
+      xeroLogs.value[logIndex] = log;
+      toast.success('Log updated');
+      editingLog.value = undefined; // Clear editing state
+      return;
+    }
 
-  if (isEdit) {
-    xeroLogs.value[logIndex] = log;
-    toast.success('Log updated');
+    xeroLogs.value.push(log);
+    toast.success('Log added');
     return;
   }
 
-  xeroLogs.value.push(log);
-  toast.success('Log added');
+  // Handle multiple logs (shouldn't happen in single mode, but kept for safety)
+  xeroLogs.value.push(...logs);
+  toast.success(`${logs.length} logs added`);
+};
+
+const saveBulkLogs = (logs: XeroLog[]) => {
+  xeroLogs.value.push(...logs);
+  toast.success(`${logs.length} logs added`);
+  selectedDates.value = [];
+};
+
+const handleFormSubmit = (logs: XeroLog[]) => {
+  if (editingLog.value) {
+    saveLog(logs);
+  } else {
+    saveBulkLogs(logs);
+  }
+};
+
+const onBulkCancel = () => {
+  selectedDates.value = [];
+  editingLog.value = undefined; // Clear editing state
 };
 
 const onEditLog = (log: XeroLog) => {
@@ -152,24 +178,26 @@ const importCsv = async (file?: File) => {
 
   <VRow>
     <VCol cols="auto" class="d-none d-md-flex flex-column ga-4">
-      <CalendarOverview :selected-date="selectedDate" :xero-logs="xeroLogs" @selected-date-changed="onDayClick" />
+      <CalendarOverview :selected-dates="selectedDates" @selected-dates-changed="onSelectedDatesChanged" />
 
       <VChip color="" variant="tonal" prepend-icon="mdi-timer-outline"> Total Hours: {{ totalHours }} </VChip>
     </VCol>
 
     <VCol style="min-width: 300px">
-      <LogForm
-        :item="editingLog"
-        :selected-date="selectedDate"
-        @selected-date-changed="onFormSelectedDateChanged"
-        @submit="saveLog"
-      />
+      <VCard class="elevation-0 border">
+        <BulkLogForm
+          :item="editingLog"
+          :selected-dates="editingLog ? [dayjs(editingLog.date, shortDateFormat).toDate()] : selectedDates"
+          @submit="handleFormSubmit"
+          @cancel="onBulkCancel"
+        />
+      </VCard>
     </VCol>
 
     <VCol cols="12" lg="6">
       <LogList
         :items="xeroLogs"
-        :selected-date="selectedDate"
+        :selected-dates="selectedDates"
         @edit-log="onEditLog"
         @delete-log="onDeleteLog"
         @import="importCsv"

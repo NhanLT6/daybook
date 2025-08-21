@@ -1,49 +1,56 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import type { Holiday } from '@/apis/holidayApi';
-import type { XeroLog } from '@/interfaces/XeroLog';
+
+import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
 import { fetchVnHolidays } from '@/apis/holidayApi';
-import { nagerDateFormat, shortDateFormat } from '@/common/DateFormat';
-import { chain, sumBy } from 'lodash';
+import { nagerDateFormat } from '@/common/DateFormat';
+import { storageKeys } from '@/common/storageKeys';
+import { toast } from 'vue-sonner';
 
 const props = defineProps<{
-  selectedDate: Date; // | Date[];
-  xeroLogs?: XeroLog[];
+  selectedDates: Date[];
 }>();
 
 const emit = defineEmits<{
-  selectedDateChanged: [day: Date];
+  selectedDatesChanged: [days: Date[]];
 }>();
 
 const viewModeToggle = ref(1);
 const calendarViewMode = computed(() => (viewModeToggle.value === 0 ? 'weekly' : 'monthly'));
 
-const selectedDate = ref<Date>(props.selectedDate);
-const xeroLogs = computed(() => props.xeroLogs ?? []);
+const selectedDates = ref<Date[]>(props.selectedDates ?? []);
 
-const holidays = ref<Holiday[]>([]);
+const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
 
+// Watch for prop changes
+watch(
+  () => props.selectedDates,
+  (newDates) => {
+    selectedDates.value = [...newDates];
+  },
+  { immediate: true },
+);
+
+// Fetch holidays if not already cached for the current year
 onMounted(async () => {
-  try {
-    holidays.value = await fetchVnHolidays();
-  } catch {
-    holidays.value = [];
+  if (holidays.value.length === 0) {
+    try {
+      holidays.value = await fetchVnHolidays();
+    } catch (error) {
+      toast.warning('Failed to fetch holidays:');
+      console.warn('Failed to fetch holidays:', error);
+
+      holidays.value = [];
+    }
   }
 });
 
-// Extracted to compute grouped duration sums by date
-const groupedDurations = computed(() =>
-  chain(xeroLogs.value)
-    .groupBy((item) => item.date)
-    .map((items, date) => ({ date, durationSum: sumBy(items, 'duration') }))
-    .value(),
-);
-
-// Individual calendar attributes with inline data processing
+// Calendar attributes
 const todayAttribute = computed(() => ({
   key: 'today',
   highlight: { color: 'blue', fillMode: 'light' },
@@ -53,31 +60,7 @@ const todayAttribute = computed(() => ({
 const selectedDateAttribute = computed(() => ({
   key: 'selected',
   highlight: { color: 'blue', fillMode: 'outline' },
-  dates: selectedDate.value,
-}));
-
-const fullyLoggedAttribute = computed(() => ({
-  key: 'fullyLogged',
-  dot: 'green',
-  dates: groupedDurations.value
-    .filter((group) => {
-      const loggedHours = group.durationSum / 60;
-      return loggedHours >= 7.5 && loggedHours <= 8;
-    })
-    .map((log) => dayjs(log.date, shortDateFormat).toDate()),
-}));
-
-const invalidLoggedAttribute = computed(() => ({
-  key: 'invalidLogged',
-  dot: 'red',
-  dates: groupedDurations.value
-    .filter((log) => {
-      const isOverLogged = log.durationSum / 60 > 8;
-      const dayOfWeek = dayjs(log.date, shortDateFormat).day();
-      const isWeekend = [0, 5, 6].includes(dayOfWeek);
-      return isOverLogged || isWeekend;
-    })
-    .map((log) => dayjs(log.date, shortDateFormat).toDate()),
+  dates: selectedDates.value,
 }));
 
 const weekendAttribute = computed(() => ({
@@ -100,24 +83,70 @@ const holidayAttributes = computed(() =>
   })),
 );
 
-// All attributes
 const calendarAttrs = computed(() => [
   todayAttribute.value,
   selectedDateAttribute.value,
-  fullyLoggedAttribute.value,
-  invalidLoggedAttribute.value,
   weekendAttribute.value,
   ...holidayAttributes.value,
 ]);
 
-const onDayClick = (day: any) => {
-  selectedDate.value = day.date;
-  emit('selectedDateChanged', day.date);
-};
+// Upcoming holidays (next 30 days)
+const upcomingHolidays = computed(() => {
+  if (holidays.value.length === 0) return [];
 
-const gotoToday = () => {
-  selectedDate.value = new Date();
-  emit('selectedDateChanged', new Date());
+  const today = dayjs();
+  const in30Days = today.add(30, 'day');
+
+  return holidays.value
+    .map((holiday) => ({
+      ...holiday,
+      dayjs: dayjs(holiday.date, nagerDateFormat),
+    }))
+    .filter(
+      (holiday) =>
+        holiday.dayjs.isValid() && holiday.dayjs.isAfter(today, 'day') && holiday.dayjs.isBefore(in30Days, 'day'),
+    )
+    .sort((a, b) => a.dayjs.diff(b.dayjs))
+    .slice(0, 3); // Show only next 3 holidays
+});
+
+const upcomingHolidaysText = computed(() => {
+  if (upcomingHolidays.value.length === 0) return '';
+
+  const today = dayjs();
+  return upcomingHolidays.value
+    .map((holiday) => {
+      const diff = holiday.dayjs.diff(today, 'day');
+      let dateText: string;
+
+      if (diff === 1) {
+        dateText = 'Tomorrow';
+      } else if (diff <= 7) {
+        dateText = `In ${diff} days`;
+      } else {
+        dateText = holiday.dayjs.format('MMM D');
+      }
+
+      return `${holiday.localName} (${dateText})`;
+    })
+    .join(' • ');
+});
+
+const onDayClick = (day: any) => {
+  const clickedDate = day.date;
+
+  // Toggle date selection
+  const dateIndex = selectedDates.value.findIndex(
+    (date) => dayjs(date).format('YYYY-MM-DD') === dayjs(clickedDate).format('YYYY-MM-DD'),
+  );
+
+  if (dateIndex > -1) {
+    selectedDates.value.splice(dateIndex, 1);
+  } else {
+    selectedDates.value.push(clickedDate);
+  }
+
+  emit('selectedDatesChanged', [...selectedDates.value]);
 };
 </script>
 
@@ -132,16 +161,28 @@ const gotoToday = () => {
     :max-date="dayjs().endOf('month').toDate()"
   />
 
-  <VCard class="elevation-0 border">
-    <VCardText class="d-flex justify-space-between align-center">
-      <VBtn prepend-icon="mdi-calendar-today-outline" variant="text" @click="gotoToday">Today</VBtn>
-
-      <VBtnToggle v-model="viewModeToggle" variant="tonal">
-        <VBtn icon="mdi-view-week-outline" />
-        <VBtn icon="mdi-calendar-month-outline" />
-      </VBtnToggle>
+  <!-- Upcoming Holidays Banner -->
+  <VCard v-if="upcomingHolidaysText" class="elevation-0 border mt-2" color="purple-lighten-5">
+    <VCardText class="d-flex align-center ga-2 py-3">
+      <VIcon color="purple-darken-1" size="18">mdi-party-popper</VIcon>
+      <div class="text-body-2 text-purple-darken-2 holiday-banner-text">
+        <span class="font-weight-medium">Next:</span> {{ upcomingHolidaysText }}
+      </div>
     </VCardText>
   </VCard>
 </template>
 
-<style scoped></style>
+<style scoped>
+:deep(.vc-day) {
+  cursor: pointer;
+}
+
+:deep(.vc-day:hover) {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.holiday-banner-text {
+  line-height: 1.3;
+  word-break: break-word;
+}
+</style>

@@ -12,10 +12,41 @@ export default defineConfig({
     vue(),
     vuetify({
       autoImport: { labs: true },
-      styles: 'sass',
     }),
     // vueDevTools(),
   ],
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern-compiler',
+      },
+      sass: {
+        api: 'modern-compiler',
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vue ecosystem
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          // UI library
+          'vuetify': ['vuetify'],
+          // Chart libraries
+          'chart': ['chart.js', 'chartjs-plugin-datalabels', 'patternomaly'],
+          // Utility libraries
+          'utils': ['lodash', 'dayjs', 'nanoid', 'axios'],
+          // Form libraries
+          'forms': ['vee-validate', 'yup'],
+          // File and data processing
+          'data': ['papaparse', 'file-saver'],
+          // Calendar and UI components
+          'calendar': ['v-calendar', '@vueuse/core'],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
