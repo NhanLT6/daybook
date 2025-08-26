@@ -37,7 +37,7 @@ onMounted(async () => {
 <template>
   <VApp>
     <VAppBar>
-      <VAppBarTitle>Xero logger</VAppBarTitle>
+      <VAppBarTitle>Daybook</VAppBarTitle>
 
       <!-- <VBtn-->
       <!--   v-for="(item, i) in items"-->

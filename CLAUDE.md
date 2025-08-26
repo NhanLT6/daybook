@@ -1,7 +1,7 @@
 # Project Context for Claude
 
 ## Project Overview
-**auto-xero** - A Vue.js application that provides a friendly way to log work in Xero. It offers two approaches:
+**daybook** - A Vue.js application for daily task logging to track what you've accomplished. It offers two approaches:
 1. Vue app interface for inputting logs
 2. Excel template integration for bulk work logging
 
