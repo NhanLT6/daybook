@@ -1,61 +1,84 @@
 ﻿<script setup lang="ts">
-import { ref } from 'vue';
+import { computed } from 'vue';
 
-import type { LocaleItem } from '@/interfaces/LocaleItem';
+import { useSettingsStore } from '@/stores/settings';
 
-import { useLocale } from 'vuetify';
+import dayjs from 'dayjs';
 
-import { useStorage } from '@vueuse/core';
+const settingsStore = useSettingsStore();
 
-const allowedLocales = ref<LocaleItem[]>([
-  { country: 'English', localeCode: 'en' },
-  { country: 'Vietnamese', localeCode: 'vi' },
-]);
+// Create a preview of current date format
+const dateFormatPreview = computed(() => {
+  const today = dayjs();
+  return today.format(settingsStore.dateDisplayFormat);
+});
 
-const { current } = useLocale();
-console.log('current', current.value);
+// Create a computed property for weekend display
+const selectedWeekendPattern = computed({
+  get: () => {
+    // Find the pattern that matches current weekend days
+    const current = settingsStore.weekendPatterns.find(pattern => 
+      JSON.stringify(pattern.value.sort()) === JSON.stringify([...settingsStore.weekendDays].sort())
+    );
+    return current || settingsStore.weekendPatterns[0];
+  },
+  set: (pattern) => {
+    settingsStore.weekendDays = pattern.value;
+  }
+});
 
-const userLocale = useStorage('userLocale', allowedLocales.value[0]);
-
-const changeLocale = (locale: any) => {
-  console.log('changeLocale', locale);
-  current.value = locale;
-
-  const newLocal = allowedLocales.value.find((l) => l.localeCode === locale);
-  if (newLocal === undefined) return;
-
-  userLocale.value = newLocal;
-
-  console.log('currentLocale', current.value);
-};
 </script>
 
 <template>
-  <form class="d-flex flex-column ga-2 v-col-4">
-    <VSelect
-      :items="allowedLocales"
-      label="Locale"
-      :model-value="userLocale"
-      item-title="country"
-      item-value="localeCode"
-      persistent-hint
-      hint="This option change how Date input component display selected date. Required because Vuetify doesn't expose
-          config this for now"
-      @update:model-value="changeLocale"
-    >
-    </VSelect>
+  <VRow justify="start">
+    <VCol cols="12" md="6" lg="4">
+      <form class="d-flex flex-column ga-2">
+        <!-- Date Display Format -->
+        <VSelect
+          v-model="settingsStore.dateDisplayFormat"
+          :items="settingsStore.dateFormatOptions"
+          label="Date Display Format"
+          item-title="label"
+          item-value="value"
+          persistent-hint
+          :hint="`Preview: ${dateFormatPreview}. This affects how dates are displayed in the interface only. Import/export formats remain unchanged.`"
+        >
+          <template #item="{ props, item }">
+            <VListItem v-bind="props" :subtitle="item.raw.example" />
+          </template>
+        </VSelect>
 
-    <!-- First day of week -->
-    <VSelect
-      :items="['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']"
-      label="First day of week"
-      persistent-hint
-      hint="This option change which day is first day of week in Calendar component"
-    >
-    </VSelect>
+        <!-- First day of week -->
+        <VSelect
+          v-model="settingsStore.firstDayOfWeek"
+          :items="settingsStore.firstDayOfWeekOptions"
+          label="First day of week"
+          item-title="label"
+          item-value="value"
+          persistent-hint
+          hint="This option changes which day is the first day of the week in Calendar component"
+        >
+        </VSelect>
 
-    <VBtn class="flex-fill" variant="tonal" color="green-darken-3" prepend-icon="mdi-content-save-outline"> Save </VBtn>
-  </form>
+        <!-- Weekend days -->
+        <VSelect
+          v-model="selectedWeekendPattern"
+          :items="settingsStore.weekendPatterns"
+          label="Weekend days"
+          item-title="label"
+          return-object
+          persistent-hint
+          hint="This option changes which days are highlighted as weekend days in Calendar and affects time tracking calculations"
+        >
+          <template #item="{ props, item }">
+            <VListItem v-bind="props" :subtitle="item.raw.description" />
+          </template>
+        </VSelect>
+
+
+      </form>
+    </VCol>
+  </VRow>
 </template>
 
 <style scoped></style>

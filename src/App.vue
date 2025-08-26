@@ -25,13 +25,12 @@ onMounted(async () => {
   }
 });
 
-// const route = useRoute();
-//
-// const items = [
-//   { text: 'Home', to: '/' },
-//   { text: 'Task', to: '/task' },
-//   { text: 'Setting', to: '/setting' },
-// ];
+const route = useRoute();
+
+const items = [
+  { text: 'Home', to: '/' },
+  { text: 'Settings', to: '/setting' },
+];
 </script>
 
 <template>
@@ -39,14 +38,14 @@ onMounted(async () => {
     <VAppBar>
       <VAppBarTitle>Daybook</VAppBarTitle>
 
-      <!-- <VBtn-->
-      <!--   v-for="(item, i) in items"-->
-      <!--   :key="i"-->
-      <!--   :active="item.to === route.path"-->
-      <!--   class="me-2 text-none"-->
-      <!--   v-bind="item"-->
-      <!--   :to="item.to"-->
-      <!-- />-->
+      <VBtn
+        v-for="(item, i) in items"
+        :key="i"
+        :active="item.to === route.path"
+        class="me-2 text-none"
+        v-bind="item"
+        :to="item.to"
+      />
     </VAppBar>
 
     <VMain>

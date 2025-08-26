@@ -6,6 +6,7 @@ import { useProjectColors } from '@/composables/useProjectColors';
 import type { XeroLog } from '@/interfaces/XeroLog';
 import type { XeroProject } from '@/interfaces/XeroProject';
 import type { XeroTask } from '@/interfaces/XeroTask';
+import { useDateDisplay } from '@/composables/useDateDisplay';
 
 import { useStorage } from '@vueuse/core';
 
@@ -39,6 +40,7 @@ const emit = defineEmits<{
 }>();
 
 const projectColors = useProjectColors();
+const { formatDateForDisplay } = useDateDisplay();
 
 const tasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
 const projects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
@@ -119,11 +121,22 @@ const selectedDatesText = computed(() => {
 
   const dates = [...selectedDatesField.value.value].sort((a, b) => dayjs(a).diff(dayjs(b)));
 
+  // Use compact format for selected dates display (no year, space-efficient)
+  const formatCompact = (date: Date) => {
+    const d = dayjs(date);
+    // If it's current month, show just "MMM D" (e.g., "Dec 25")
+    // If different month/year, show "MMM D, YYYY" for clarity
+    if (d.isSame(dayjs(), 'month') && d.isSame(dayjs(), 'year')) {
+      return d.format('MMM D');
+    }
+    return d.format('MMM D, YYYY');
+  };
+
   if (dates.length === 1) {
-    return dayjs(dates[0]).format('MMM D, YYYY');
+    return formatCompact(dates[0]);
   }
 
-  return dates.map((date) => dayjs(date).format('MMM D')).join(', ');
+  return dates.map((date) => formatCompact(date)).join(', ');
 });
 
 const onSave = handleSubmit((values) => {
@@ -179,11 +192,14 @@ const onHourClick = (hour: number) => {
 <template>
   <div class="pa-4">
     <form class="d-flex flex-column ga-2">
-      <VTextField
+      <VTextarea
         label="Selected Dates"
         readonly
         :model-value="selectedDatesText"
         :error-messages="errors.selectedDates"
+        auto-grow
+        rows="1"
+        max-rows="3"
       >
         <template #append-inner>
           <VFadeTransition>
@@ -200,7 +216,7 @@ const onHourClick = (hour: number) => {
             </VBtn>
           </VFadeTransition>
         </template>
-      </VTextField>
+      </VTextarea>
 
       <VCombobox
         v-model="projectField.value.value"

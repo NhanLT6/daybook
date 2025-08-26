@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import type { Holiday } from '@/apis/holidayApi';
+import { useSettingsStore } from '@/stores/settings';
 
 import { useStorage } from '@vueuse/core';
 
@@ -9,6 +10,8 @@ import dayjs from 'dayjs';
 
 import { nagerDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
+
+const settingsStore = useSettingsStore();
 
 const props = defineProps<{
   selectedDates: Date[];
@@ -55,7 +58,7 @@ const weekendAttribute = computed(() => ({
     start: dayjs().startOf('month').toDate(),
     repeat: {
       every: 'week',
-      weekdays: [1, 6, 7], // 1 Sunday, 6 Friday, 7 Saturday
+      weekdays: settingsStore.vCalendarWeekendDays,
     },
   },
 }));
@@ -140,7 +143,7 @@ const onDayClick = (day: any) => {
     :view="calendarViewMode"
     :attributes="calendarAttrs"
     expanded
-    :first-day-of-week="2"
+    :first-day-of-week="settingsStore.vCalendarFirstDay"
     @dayclick="onDayClick"
     :min-date="dayjs().startOf('month').toDate()"
     :max-date="dayjs().endOf('month').toDate()"

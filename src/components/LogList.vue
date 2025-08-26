@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue';
 import SingleFilePicker from '@/components/app/SingleFilePicker.vue';
 
 import type { XeroLog } from '@/interfaces/XeroLog';
+import { useDateDisplay } from '@/composables/useDateDisplay';
 
 import dayjs from 'dayjs';
 
@@ -26,6 +27,8 @@ const emit = defineEmits<{
   import: [file?: File];
   export: [];
 }>();
+
+const { formatInternalDateForDisplay } = useDateDisplay();
 
 // Expanded rows - auto-expand panels for selected dates
 const openedPanels = ref<string[]>(
@@ -178,7 +181,7 @@ const readCsv = (file?: File) => {
     <VExpansionPanels variant="accordion" v-model="openedPanels" multiple>
       <VExpansionPanel v-for="group in loggedTimeByDates" :key="group.date" :value="group.date">
         <VExpansionPanelTitle>
-          <div class="me-2">{{ group.date }}</div>
+          <div class="me-2">{{ formatInternalDateForDisplay(group.date) }}</div>
 
           <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)">
             {{ minutesToHourWithMinutes(group.durationSum) }}

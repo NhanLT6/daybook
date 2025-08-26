@@ -5,6 +5,7 @@ import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { XeroLog } from '@/interfaces/XeroLog';
 import type { ChartConfiguration, ChartData } from 'chart.js';
+import { useSettingsStore } from '@/stores/settings';
 
 import { useStorage } from '@vueuse/core';
 
@@ -19,12 +20,13 @@ import * as pattern from 'patternomaly';
 const daysInMonth = Array.from({ length: dayjs().daysInMonth() }, (_, i) => dayjs().startOf('month').add(i, 'day'));
 
 const projectColors = useProjectColors();
+const settingsStore = useSettingsStore();
 
 const xeroLogs = useStorage<XeroLog[]>(storageKeys.xeroLogsOfCurrentMonth, []);
 
 const loggedDataSet = computed(() =>
   chain(xeroLogs.value)
-    .filter((log) => ![5, 6, 0].includes(dayjs(log.date, shortDateFormat).day())) // NOT in Friday (5), Saturday (6), Sunday (0)
+    .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day())) // Exclude weekend days
     .groupBy((l) => l.project)
     .map((logsByProject, projectName) => ({
       label: projectName,
@@ -44,7 +46,7 @@ const remainingDataSet = computed(() => ({
   label: 'Remaining',
   backgroundColor: projectColors.remainingDataColor,
   data: daysInMonth.map((d) => {
-    const isWeekend = [5, 6, 0].includes(d.day()); // Friday (5), Saturday (6), Sunday (0)
+    const isWeekend = settingsStore.weekendDays.includes(d.day()); // Check if day is in configured weekend days
     if (isWeekend) return 0;
 
     const loggedHours = chain(xeroLogs.value)
@@ -59,7 +61,7 @@ const remainingDataSet = computed(() => ({
 
 const weekendDataSet = computed(() =>
   chain(xeroLogs.value)
-    .filter((log) => [5, 6, 0].includes(dayjs(log.date, shortDateFormat).day())) // NOT in Friday (5), Saturday (6), Sunday (0)
+    .filter((log) => settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day())) // Include weekend days
     .groupBy((l) => l.project)
     .map((logsByProject) => ({
       label: 'Invalid Data',
