@@ -3,7 +3,6 @@ import { computed, ref } from 'vue';
 
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import CalendarOverview from '@/components/CalendarOverview.vue';
-// import LogForm from '@/components/LogForm.vue'; // Replaced with BulkLogForm
 import LoggedTimeWithChartView2 from '@/components/LoggedTimeWithChartView2.vue';
 import LogList from '@/components/LogList.vue';
 

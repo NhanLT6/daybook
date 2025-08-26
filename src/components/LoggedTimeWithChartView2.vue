@@ -80,6 +80,10 @@ const data = computed<ChartData<'bar', number[], string>>(() => ({
   datasets: [...loggedDataSet.value, ...weekendDataSet.value, remainingDataSet.value],
 }));
 
+const truncateText = (text: string, maxLength = 20): string => {
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+};
+
 const config = computed<ChartConfiguration<'bar', number[], string>>(() => ({
   type: 'bar',
   data: data.value,
@@ -91,8 +95,36 @@ const config = computed<ChartConfiguration<'bar', number[], string>>(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: true },
-      tooltip: { enabled: true },
+      legend: { 
+        display: true,
+        labels: {
+          generateLabels: (chart) => {
+            const datasets = chart.data.datasets || [];
+            return datasets.map((dataset, index) => ({
+              text: truncateText(dataset.label || ''),
+              fillStyle: Array.isArray(dataset.backgroundColor) 
+                ? dataset.backgroundColor[0] 
+                : dataset.backgroundColor as string,
+              strokeStyle: Array.isArray(dataset.borderColor) 
+                ? dataset.borderColor[0] 
+                : dataset.borderColor as string,
+              lineWidth: typeof dataset.borderWidth === 'number' ? dataset.borderWidth : 0,
+              hidden: !chart.isDatasetVisible(index),
+              datasetIndex: index,
+            }));
+          },
+        },
+      },
+      tooltip: { 
+        enabled: true,
+        callbacks: {
+          title: (tooltipItems) => {
+            // Show full text in tooltip
+            const dataset = tooltipItems[0]?.dataset;
+            return dataset?.label || '';
+          },
+        },
+      },
     },
   },
 }));
