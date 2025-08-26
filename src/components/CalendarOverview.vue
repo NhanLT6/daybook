@@ -147,7 +147,7 @@ const onDayClick = (day: any) => {
   />
 
   <!-- Upcoming Holidays Banner -->
-  <VCard v-if="upcomingHolidaysText" class="elevation-0 border mt-2" color="purple-lighten-5">
+  <VCard v-if="upcomingHolidaysText" class="elevation-0 mt-2" color="purple-lighten-5">
     <VCardText class="d-flex align-center ga-2 py-3">
       <VIcon color="purple-darken-1" size="18">mdi-party-popper</VIcon>
       <div class="text-body-2 text-purple-darken-2 holiday-banner-text">

@@ -144,7 +144,14 @@ const importCsv = async (file?: File) => {
     <VCol cols="auto" class="d-none d-md-flex flex-column ga-4">
       <CalendarOverview :selected-dates="selectedDates" @selected-dates-changed="onSelectedDatesChanged" />
 
-      <VChip color="" variant="tonal" prepend-icon="mdi-timer-outline"> Total Hours: {{ totalHours }} </VChip>
+      <VCard class="elevation-0" color="grey-lighten-4">
+        <VCardText class="d-flex align-center ga-2 py-3">
+          <VIcon color="grey-darken-1" size="18">mdi-timer-outline</VIcon>
+          <div class="text-body-2 text-grey-darken-2">
+            <span class="font-weight-medium">Total Hours:</span> {{ totalHours }}
+          </div>
+        </VCardText>
+      </VCard>
     </VCol>
 
     <VCol style="min-width: 300px">
