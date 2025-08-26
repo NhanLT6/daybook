@@ -35,36 +35,10 @@ const onSelectedDatesChanged = (dates: Date[]) => {
 
 // Logs
 
-const editingLog = ref<XeroLog | undefined>();
-
 const totalHours = computed(() => {
   const durationInMinutes = xeroLogs.value.reduce((acc, log) => acc + log.duration, 0);
   return (durationInMinutes / 60).toFixed(1);
 });
-
-const saveLog = (logs: XeroLog[]) => {
-  // Handle single log from unified form (edit mode or single entry)
-  if (logs.length === 1) {
-    const log = logs[0];
-    const logIndex = xeroLogs.value.findIndex((i) => i.id === log.id);
-    const isEdit = logIndex !== -1;
-
-    if (isEdit) {
-      xeroLogs.value[logIndex] = log;
-      toast.success('Log updated');
-      editingLog.value = undefined; // Clear editing state
-      return;
-    }
-
-    xeroLogs.value.push(log);
-    toast.success('Log added');
-    return;
-  }
-
-  // Handle multiple logs (shouldn't happen in single mode, but kept for safety)
-  xeroLogs.value.push(...logs);
-  toast.success(`${logs.length} logs added`);
-};
 
 const saveBulkLogs = (logs: XeroLog[]) => {
   xeroLogs.value.push(...logs);
@@ -73,20 +47,11 @@ const saveBulkLogs = (logs: XeroLog[]) => {
 };
 
 const handleFormSubmit = (logs: XeroLog[]) => {
-  if (editingLog.value) {
-    saveLog(logs);
-  } else {
-    saveBulkLogs(logs);
-  }
+  saveBulkLogs(logs);
 };
 
 const onBulkCancel = () => {
   selectedDates.value = [];
-  editingLog.value = undefined; // Clear editing state
-};
-
-const onEditLog = (log: XeroLog) => {
-  editingLog.value = log;
 };
 
 const onDeleteLog = (log: XeroLog) => {
@@ -185,12 +150,7 @@ const importCsv = async (file?: File) => {
 
     <VCol style="min-width: 300px">
       <VCard class="elevation-0 border">
-        <BulkLogForm
-          :item="editingLog"
-          :selected-dates="editingLog ? [dayjs(editingLog.date, shortDateFormat).toDate()] : selectedDates"
-          @submit="handleFormSubmit"
-          @cancel="onBulkCancel"
-        />
+        <BulkLogForm :selected-dates="selectedDates" @submit="handleFormSubmit" @cancel="onBulkCancel" />
       </VCard>
     </VCol>
 
@@ -198,7 +158,6 @@ const importCsv = async (file?: File) => {
       <LogList
         :items="xeroLogs"
         :selected-dates="selectedDates"
-        @edit-log="onEditLog"
         @delete-log="onDeleteLog"
         @import="importCsv"
         @export="exportToCsv"

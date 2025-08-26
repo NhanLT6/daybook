@@ -29,8 +29,7 @@ interface LogFormData {
   description?: string;
 }
 
-const { item: logItem, selectedDate } = defineProps<{
-  item?: XeroLog;
+const { selectedDate } = defineProps<{
   selectedDate?: Date;
 }>();
 
@@ -46,13 +45,6 @@ watch(
   },
 );
 
-watch(
-  () => logItem,
-  () => {
-    const newValue = !!logItem ? xeroLogToFormData(logItem!) : emptyLog;
-    setValues(newValue);
-  },
-);
 
 const projectColors = useProjectColors();
 
@@ -120,17 +112,15 @@ const durationField = useField<number>('duration');
 const descriptionField = useField<string>('description');
 
 const onSave = handleSubmit((values) => {
-  // Emit log
-  const newLog: LogFormData = {
-    id: values.id,
-    date: values.date!,
+  // Create new log
+  const xeroLog: XeroLog = {
+    id: nanoid(),
+    date: dayjs(values.date).format(shortDateFormat),
     project: values.project!,
     task: values.task!,
     duration: Math.round(values.duration!),
     description: values.description,
   };
-
-  const xeroLog = formDataToXeroLog(newLog);
 
   emit('submit', xeroLog);
 
@@ -149,27 +139,6 @@ const onCancel = () => {
   resetForm();
 };
 
-const formDataToXeroLog = (formData: LogFormData): XeroLog => {
-  return {
-    id: formData.id ?? nanoid(),
-    date: dayjs(formData.date).format(shortDateFormat),
-    project: formData.project!,
-    task: formData.task!,
-    duration: formData.duration!,
-    description: formData.description,
-  };
-};
-
-const xeroLogToFormData = (log: XeroLog): LogFormData => {
-  return {
-    id: log.id,
-    date: dayjs(log.date, shortDateFormat).toDate(),
-    project: log.project,
-    task: log.task,
-    duration: log.duration,
-    description: log.description ?? '',
-  };
-};
 
 const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 

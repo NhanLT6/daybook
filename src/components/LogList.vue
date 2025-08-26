@@ -22,7 +22,6 @@ export interface LogListProps {
 const { items: logItems, selectedDates } = defineProps<LogListProps>();
 
 const emit = defineEmits<{
-  editLog: [log: XeroLog];
   deleteLog: [log: XeroLog];
   import: [file?: File];
   export: [];
@@ -89,9 +88,6 @@ const onCollapse = () => {
   openedPanels.value = [];
 };
 
-const onEditLog = (log: XeroLog) => {
-  emit('editLog', log);
-};
 
 const onDeleteLog = (log: XeroLog) => {
   toast.warning('Delete log?', {
@@ -199,7 +195,6 @@ const readCsv = (file?: File) => {
               <!--suppress VueUnrecognizedSlot -->
               <template #item.actions="{ item }">
                 <div class="d-flex ga-2">
-                  <VBtn icon="mdi-pencil-outline" variant="text" size="sm" @click="onEditLog(item)" class="me-2" />
                   <VBtn icon="mdi-trash-can-outline" variant="text" size="sm" @click="onDeleteLog(item)" class="me-2" />
                 </div>
               </template>

@@ -1,6 +1,29 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 import { Toaster } from 'vue-sonner';
+
+import type { Holiday } from '@/apis/holidayApi';
+
+import { useStorage } from '@vueuse/core';
+
+import { fetchVnHolidays } from '@/apis/holidayApi';
+import { storageKeys } from '@/common/storageKeys';
+
+// Initialize holidays for current year
+const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
+
+// Fetch holidays if not already cached for the current year
+onMounted(async () => {
+  if (holidays.value.length === 0) {
+    try {
+      holidays.value = await fetchVnHolidays();
+    } catch (error) {
+      console.warn('Failed to fetch holidays:', error);
+      holidays.value = [];
+    }
+  }
+});
 
 // const route = useRoute();
 //

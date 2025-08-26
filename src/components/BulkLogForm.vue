@@ -29,9 +29,8 @@ interface BulkLogFormData {
   description?: string;
 }
 
-const { selectedDates, item: logItem } = defineProps<{
+const { selectedDates } = defineProps<{
   selectedDates: Date[];
-  item?: XeroLog;
 }>();
 
 const emit = defineEmits<{
@@ -89,7 +88,7 @@ const emptyLog: BulkLogFormData = {
   description: undefined,
 };
 
-const { errors, handleSubmit, resetForm, setFieldValue, setValues } = useForm<BulkLogFormData>({
+const { errors, handleSubmit, resetForm, setFieldValue } = useForm<BulkLogFormData>({
   initialValues: emptyLog,
   validationSchema,
   validateOnMount: false,
@@ -105,17 +104,12 @@ const descriptionField = useField<string>('description');
 watch(
   () => selectedDates,
   (newDates) => {
-    selectedDatesField.setValue(newDates);
+    // Only update if dates actually changed to avoid unnecessary validation
+    if (JSON.stringify(selectedDatesField.value.value) !== JSON.stringify(newDates)) {
+      selectedDatesField.setValue(newDates, false); // false = don't validate
+    }
   },
-);
-
-// Watch for logItem changes to populate form for editing
-watch(
-  () => logItem,
-  () => {
-    const newValue = !!logItem ? xeroLogToFormData(logItem!) : emptyLog;
-    setValues(newValue);
-  },
+  { immediate: true },
 );
 
 const selectedDatesText = computed(() => {
@@ -132,26 +126,16 @@ const selectedDatesText = computed(() => {
   return dates.map((date) => dayjs(date).format('MMM D')).join(', ');
 });
 
-const isEditMode = computed(() => !!logItem);
-
 const onSave = handleSubmit((values) => {
-  let logs: XeroLog[];
-
-  // Edit mode: update single existing log
-  if (logItem && values.id) {
-    const updatedLog: XeroLog = formDataToXeroLog(values);
-    logs = [updatedLog];
-  } else {
-    // Bulk mode: create multiple logs
-    logs = values.selectedDates.map((date) => ({
-      id: nanoid(),
-      date: dayjs(date).format(shortDateFormat),
-      project: values.project!,
-      task: values.task!,
-      duration: Math.round(values.duration!),
-      description: values.description,
-    }));
-  }
+  // Create multiple logs for selected dates
+  const logs = values.selectedDates.map((date) => ({
+    id: nanoid(),
+    date: dayjs(date).format(shortDateFormat),
+    project: values.project!,
+    task: values.task!,
+    duration: Math.round(values.duration!),
+    description: values.description,
+  }));
 
   emit('submit', logs);
 
@@ -162,11 +146,21 @@ const onSave = handleSubmit((values) => {
   const isTaskExisting = tasks.value.map((t) => t.title).includes(values.task!);
   if (!isTaskExisting) tasks.value.push({ title: values.task!, project: values.project! } satisfies XeroTask);
 
-  resetForm();
+  resetForm({
+    values: {
+      ...emptyLog,
+      selectedDates: [], // Clear selected dates after save
+    },
+  });
 });
 
 const onCancel = () => {
-  resetForm();
+  resetForm({
+    values: {
+      ...emptyLog,
+      selectedDates: [], // Clear selected dates on cancel
+    },
+  });
   emit('cancel');
 };
 
@@ -179,29 +173,6 @@ const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 
 const onHourClick = (hour: number) => {
   setFieldValue('duration', hour * 60);
-};
-
-// Helper functions for editing functionality
-const formDataToXeroLog = (formData: BulkLogFormData): XeroLog => {
-  return {
-    id: formData.id ?? nanoid(),
-    date: dayjs(formData.selectedDates[0]).format(shortDateFormat),
-    project: formData.project!,
-    task: formData.task!,
-    duration: formData.duration!,
-    description: formData.description,
-  };
-};
-
-const xeroLogToFormData = (log: XeroLog): BulkLogFormData => {
-  return {
-    id: log.id,
-    selectedDates: [dayjs(log.date, shortDateFormat).toDate()],
-    project: log.project,
-    task: log.task,
-    duration: log.duration,
-    description: log.description ?? '',
-  };
 };
 </script>
 
@@ -285,7 +256,7 @@ const xeroLogToFormData = (log: XeroLog): BulkLogFormData => {
           prepend-icon="mdi-content-save-outline"
           @click="onSave"
         >
-          {{ isEditMode ? 'Update Log' : `Save ${selectedDatesField.value.value?.length || 0} Logs` }}
+          Save {{ selectedDatesField.value.value?.length || 0 }} Logs
         </VBtn>
       </div>
     </form>

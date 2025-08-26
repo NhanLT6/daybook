@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import type { Holiday } from '@/apis/holidayApi';
 
@@ -7,10 +7,8 @@ import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { fetchVnHolidays } from '@/apis/holidayApi';
 import { nagerDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
-import { toast } from 'vue-sonner';
 
 const props = defineProps<{
   selectedDates: Date[];
@@ -36,19 +34,6 @@ watch(
   { immediate: true },
 );
 
-// Fetch holidays if not already cached for the current year
-onMounted(async () => {
-  if (holidays.value.length === 0) {
-    try {
-      holidays.value = await fetchVnHolidays();
-    } catch (error) {
-      toast.warning('Failed to fetch holidays:');
-      console.warn('Failed to fetch holidays:', error);
-
-      holidays.value = [];
-    }
-  }
-});
 
 // Calendar attributes
 const todayAttribute = computed(() => ({
