@@ -115,3 +115,13 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - Static file serving from `/public`
 - Client-side routing with Vue Router
 - No server-side dependencies (client-only app)
+
+## Development Best Practices
+- **Code Optimization**: Always optimize new code for performance and maintainability
+- **Clean Up**: Clean up code after modifications (remove unused imports, variables, etc.)
+- **ESLint Compliance**: Fix all ESLint errors before completing tasks
+- **Library Utilization**: Prioritize existing libraries over custom implementations
+- **Command Execution**: 
+  - Prefer PowerShell scripts over bash commands (Windows development environment)
+  - Always explain why a command is needed and what it will accomplish
+  - Apply explanations when asking for user permission to run commands
