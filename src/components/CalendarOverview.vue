@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue';
 
 import type { Holiday } from '@/apis/holidayApi';
-import { useSettingsStore } from '@/stores/settings';
 
 import { useStorage } from '@vueuse/core';
 
@@ -10,6 +9,7 @@ import dayjs from 'dayjs';
 
 import { nagerDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
+import { useSettingsStore } from '@/stores/settings';
 
 const settingsStore = useSettingsStore();
 
@@ -36,7 +36,6 @@ watch(
   },
   { immediate: true },
 );
-
 
 // Calendar attributes
 const todayAttribute = computed(() => ({
@@ -152,7 +151,7 @@ const onDayClick = (day: any) => {
   <!-- Upcoming Holidays Banner -->
   <VCard v-if="upcomingHolidaysText" class="elevation-0 mt-2" color="purple-lighten-5">
     <VCardText class="d-flex align-center ga-2 py-3">
-      <VIcon color="purple-darken-1" size="18">mdi-party-popper-outline</VIcon>
+      <VIcon color="purple-darken-1" size="18">mdi-party-popper</VIcon>
       <div class="text-body-2 text-purple-darken-2 holiday-banner-text">
         <span class="font-weight-medium">Next:</span> {{ upcomingHolidaysText }}
       </div>
