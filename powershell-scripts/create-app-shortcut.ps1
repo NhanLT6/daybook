@@ -6,7 +6,7 @@ $config = @{
     DesktopPath = [Environment]::GetFolderPath('Desktop')
     ShortcutName = "Log Work"
     IconPath = Join-Path $projectRoot "public\favicon.ico"
-    AppUrl = "https://xero-logger.vercel.app/"
+    AppUrl = "https://daybook-io.vercel.app/"
 }
 
 function New-XeroLoggerShortcut {
