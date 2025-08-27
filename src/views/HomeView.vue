@@ -141,7 +141,8 @@ const importCsv = async (file?: File) => {
   </VRow>
 
   <VRow>
-    <VCol cols="auto" class="d-none d-md-flex flex-column ga-4">
+    <!-- Calendar and Total Hours - Visible on all screen sizes -->
+    <VCol cols="12" md="3" lg="3" class="d-flex flex-column ga-4">
       <CalendarOverview :selected-dates="selectedDates" @selected-dates-changed="onSelectedDatesChanged" />
 
       <VCard class="elevation-0" color="grey-lighten-4">
@@ -154,13 +155,15 @@ const importCsv = async (file?: File) => {
       </VCard>
     </VCol>
 
-    <VCol style="min-width: 300px">
+    <!-- Bulk Log Form -->
+    <VCol cols="12" md="4" lg="3">
       <VCard class="elevation-0 border">
         <BulkLogForm :selected-dates="selectedDates" @submit="handleFormSubmit" @cancel="onBulkCancel" />
       </VCard>
     </VCol>
 
-    <VCol cols="12" lg="6">
+    <!-- Log List - Horizontally aligned on medium+ screens -->
+    <VCol cols="12" md="5" lg="6">
       <LogList
         :items="xeroLogs"
         :selected-dates="selectedDates"

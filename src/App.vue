@@ -29,6 +29,7 @@ const route = useRoute();
 
 const items = [
   { text: 'Home', to: '/' },
+  { text: 'Tasks', to: '/task' },
   { text: 'Settings', to: '/setting' },
 ];
 </script>

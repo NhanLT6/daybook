@@ -75,6 +75,14 @@ const selectedWeekendPattern = computed({
           </template>
         </VSelect>
 
+        <!-- Use Default Tasks -->
+        <VSwitch
+          v-model="settingsStore.useDefaultTasks"
+          label="Use Default Tasks"
+          persistent-hint
+          hint="When enabled, provides a default set of common tasks (Daily meeting, Code review, etc.) to help you get started quickly"
+          color="primary"
+        />
 
       </form>
     </VCol>

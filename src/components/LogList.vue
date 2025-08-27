@@ -1,10 +1,11 @@
 ﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+import { useDateDisplay } from '@/composables/useDateDisplay';
+
 import SingleFilePicker from '@/components/app/SingleFilePicker.vue';
 
 import type { XeroLog } from '@/interfaces/XeroLog';
-import { useDateDisplay } from '@/composables/useDateDisplay';
 
 import dayjs from 'dayjs';
 
@@ -32,14 +33,14 @@ const { formatInternalDateForDisplay } = useDateDisplay();
 
 // Expanded rows - auto-expand panels for selected dates
 const openedPanels = ref<string[]>(
-  selectedDates ? selectedDates.map(date => dayjs(date).format(shortDateFormat)) : []
+  selectedDates ? selectedDates.map((date) => dayjs(date).format(shortDateFormat)) : [],
 );
 
 watch(
   () => selectedDates,
   (newDates) => {
     if (newDates && newDates.length > 0) {
-      openedPanels.value = newDates.map(date => dayjs(date).format(shortDateFormat));
+      openedPanels.value = newDates.map((date) => dayjs(date).format(shortDateFormat));
     } else {
       openedPanels.value = [];
     }
@@ -90,7 +91,6 @@ const onExpand = () => {
 const onCollapse = () => {
   openedPanels.value = [];
 };
-
 
 const onDeleteLog = (log: XeroLog) => {
   toast.warning('Delete log?', {
@@ -172,7 +172,7 @@ const readCsv = (file?: File) => {
     <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
       <VCardText>
         <div class="d-flex flex-column ga-2 py-4 align-center bg-grey-lighten-4 rounded text-disabled">
-          <VIcon icon="mdi-package-variant-closed" />
+          <VIcon icon="mdi-package-variant-closed-outline" />
           <div class="text-subtitle-1">No data</div>
         </div>
       </VCardText>

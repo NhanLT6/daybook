@@ -58,6 +58,9 @@ export const useSettingsStore = defineStore('settings', () => {
   // Weekend days configuration (dayjs day values: 0=Sunday, 1=Monday, etc.)
   const weekendDays = useStorage('weekendDays', [5, 6, 0]); // Default Fri, Sat, Sun
 
+  // Use default tasks setting
+  const useDefaultTasks = useStorage('useDefaultTasks', true);
+
   // Convert our 0-6 value to v-calendar's 1-7 format
   const vCalendarFirstDay = computed(() => {
     return firstDayOfWeek.value === 0 ? 1 : firstDayOfWeek.value + 1;
@@ -72,6 +75,7 @@ export const useSettingsStore = defineStore('settings', () => {
     dateDisplayFormat,
     firstDayOfWeek,
     weekendDays,
+    useDefaultTasks,
     vCalendarFirstDay,
     vCalendarWeekendDays,
     dateFormatOptions,

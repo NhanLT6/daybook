@@ -106,8 +106,14 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - Composables for shared logic
 - Vuetify design system
 - ESLint + Prettier for code quality
-- Kebab-case for component files
+- **PascalCase** for component files and component names in templates
 - camelCase for composables and utilities
+
+### Comments Guidelines
+- **Add comments for each block of code when necessary** to explain functionality
+- **Template sections should have comments** for each layout block to identify structure faster
+- Keep comments concise and focused on explaining the "why" not the "what"
+- Use block comments for major sections, inline comments for complex logic
 
 ## Deployment Considerations (Vercel Free Tier)
 - Build output optimized with chunk splitting
@@ -125,3 +131,9 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
   - Prefer PowerShell scripts over bash commands (Windows development environment)
   - Always explain why a command is needed and what it will accomplish
   - Apply explanations when asking for user permission to run commands
+
+# Important Instruction Reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+**Update documentation or README files only when needed** - create or modify documentation when explicitly requested or when significant architectural changes require documentation updates.

@@ -1,14 +1,13 @@
 ﻿<script setup lang="ts">
 import { computed, watch } from 'vue';
 
+import { useDateDisplay } from '@/composables/useDateDisplay';
+import { useDefaultTasksProjects } from '@/composables/useDefaultTasksProjects';
 import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { XeroLog } from '@/interfaces/XeroLog';
 import type { XeroProject } from '@/interfaces/XeroProject';
 import type { XeroTask } from '@/interfaces/XeroTask';
-import { useDateDisplay } from '@/composables/useDateDisplay';
-
-import { useStorage } from '@vueuse/core';
 
 import { useField, useForm } from 'vee-validate';
 import { array, date, number, object, string } from 'yup';
@@ -17,8 +16,6 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
-import { storageKeys } from '@/common/storageKeys';
-import { uniq, uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
 
 interface BulkLogFormData {
@@ -40,38 +37,9 @@ const emit = defineEmits<{
 }>();
 
 const projectColors = useProjectColors();
-const { formatDateForDisplay } = useDateDisplay();
+const { tasks, projects, projectItems, taskItems } = useDefaultTasksProjects();
 
-const tasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
-const projects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
-
-const defaultTasks = [
-  { title: 'Daily meeting', project: 'Team work' },
-  { title: 'Code review', project: 'Team work' },
-  { title: 'Retro', project: 'Team work' },
-  { title: 'Grooming', project: 'Team work' },
-  { title: 'Planning', project: 'Team work' },
-  { title: 'Demo', project: 'Team work' },
-  { title: 'Team meeting', project: 'Team work' },
-];
-
-const defaultProjects = uniqBy(
-  defaultTasks.map((task) => ({ title: task.project })),
-  'title',
-);
-
-const projectItems = computed(() =>
-  uniq(uniqBy([...projects.value, ...defaultProjects], 'title').map((project) => project.title)),
-);
-
-const taskItems = computed(() =>
-  uniq(
-    uniqBy(
-      [...tasks.value, ...defaultTasks].filter((t) => t.project === projectField.value.value),
-      'title',
-    ).map((task) => task.title),
-  ),
-);
+const taskItemsForProject = computed(() => taskItems.value(projectField.value.value));
 
 const validationSchema = object({
   selectedDates: array(date()).min(1, 'At least one date must be selected'),
@@ -205,13 +173,13 @@ const onHourClick = (hour: number) => {
           <VFadeTransition>
             <VBtn
               v-if="selectedDatesField.value.value?.length > 0"
-              icon="mdi-close-circle"
+              icon="mdi-close-circle-outline"
               variant="plain"
               color="grey-darken-1"
               size="small"
               @click="onClearSelection"
             >
-              <VIcon size="18">mdi-close-circle</VIcon>
+              <VIcon size="18">mdi-close-circle-outline</VIcon>
               <VTooltip activator="parent" location="top"> Clear selection </VTooltip>
             </VBtn>
           </VFadeTransition>
@@ -237,7 +205,7 @@ const onHourClick = (hour: number) => {
       <VCombobox
         v-model="taskField.value.value"
         label="Task"
-        :items="taskItems"
+        :items="taskItemsForProject"
         :error-messages="errors.task"
       ></VCombobox>
 
@@ -260,7 +228,7 @@ const onHourClick = (hour: number) => {
       </div>
 
       <div class="d-flex ga-2 mt-4">
-        <VBtn type="submit" class="flex-fill" variant="tonal" prepend-icon="mdi-cancel" @click="onCancel">
+        <VBtn type="submit" class="flex-fill" variant="tonal" prepend-icon="mdi-cancel-outline" @click="onCancel">
           Cancel
         </VBtn>
 
