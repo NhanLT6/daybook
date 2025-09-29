@@ -1,6 +1,5 @@
 import skipFormatting from '@vue/eslint-config-prettier/skip-formatting';
-import tseslint from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
+import tseslint from 'typescript-eslint';
 import pluginPlaywright from 'eslint-plugin-playwright';
 import pluginVue from 'eslint-plugin-vue';
 import vueParser from 'vue-eslint-parser';
@@ -18,23 +17,7 @@ export default [
 
   ...pluginVue.configs['flat/strongly-recommended'],
 
-  // TypeScript configuration for .ts files
-  {
-    files: ['**/*.{ts,tsx}'],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-    },
-    rules: {
-      ...tseslint.configs.recommended.rules,
-    },
-  },
+  ...tseslint.configs.recommended,
 
   // Vue + TypeScript configuration
   {
@@ -42,17 +25,11 @@ export default [
     languageOptions: {
       parser: vueParser,
       parserOptions: {
-        parser: tsParser,
+        parser: '@typescript-eslint/parser',
         ecmaVersion: 'latest',
         sourceType: 'module',
         extraFileExtensions: ['.vue'],
       },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-    },
-    rules: {
-      ...tseslint.configs.recommended.rules,
     },
   },
 

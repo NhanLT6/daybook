@@ -24,7 +24,7 @@ async function loginXero(page: Page, config: XeroConfig) {
     // Wait for user to enter 2FA code and submit (up to 2 minutes)
     // The page will redirect after successful 2FA
     await page.waitForURL('**/projects/', { timeout: 120000 });
-  } catch (error) {
+  } catch {
     // If 2FA timeout occurs, check if we're already logged in
     const isLoggedIn = page.url().includes('/projects/');
     if (!isLoggedIn) {

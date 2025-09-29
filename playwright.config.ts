@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file

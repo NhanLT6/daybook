@@ -6,9 +6,9 @@ const currentMonth = dayjs().format(yearAndMonthFormat);
 const currentYear = dayjs().year();
 
 export const storageKeys = {
-  xeroLogsOfCurrentMonth: `xeroLogs-${currentMonth}`,
-  xeroTasks: `xeroTasks-${currentMonth}`,
-  xeroProjects: `xeroProjects-${currentMonth}`,
+  timeLogsOfCurrentMonth: `timeLogs-${currentMonth}`,
+  tasks: `tasks-${currentMonth}`,
+  projects: `projects-${currentMonth}`,
   holidays: `holidays-${currentYear}`,
   settings: {
     projectColorMaps: 'projectColorMaps',

@@ -14,6 +14,8 @@ import dayjs from 'dayjs';
 
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import duration from 'dayjs/plugin/duration';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Calendar, setupCalendar } from 'v-calendar';
 
@@ -39,9 +41,11 @@ app.use(vuetify);
 
 dayjs.extend(customParseFormat);
 dayjs.extend(duration);
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
 dayjs.extend(relativeTime);
 
-// V-Calendar
+// V-Calendar setup - using minimal config to avoid date rule errors
 app.use(setupCalendar, {});
 app.component('Calendar', Calendar);
 

@@ -1,7 +1,8 @@
 ﻿<script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import type { Holiday } from '@/apis/holidayApi';
+import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
 
 import { useStorage } from '@vueuse/core';
 
@@ -11,33 +12,20 @@ import { nagerDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { useSettingsStore } from '@/stores/settings';
 
+const emit = defineEmits<{
+  monthChanged: [month: number];
+}>();
+
+const selectedDates = defineModel<Date[]>({ default: () => [] });
+
 const settingsStore = useSettingsStore();
 
-const props = defineProps<{
-  selectedDates: Date[];
-}>();
-
-const emit = defineEmits<{
-  selectedDatesChanged: [days: Date[]];
-}>();
-
-const viewModeToggle = ref(1);
-const calendarViewMode = computed(() => (viewModeToggle.value === 0 ? 'weekly' : 'monthly'));
-
-const selectedDates = ref<Date[]>(props.selectedDates ?? []);
+// Template ref for calendar component
+const calendar = ref();
 
 const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
 
-// Watch for prop changes
-watch(
-  () => props.selectedDates,
-  (newDates) => {
-    selectedDates.value = [...newDates];
-  },
-  { immediate: true },
-);
-
-// Calendar attributes
+// Calendar attributes - static, not reactive to displayed month to avoid recursion
 const todayAttribute = computed(() => ({
   key: 'today',
   highlight: { color: 'blue', fillMode: 'light' },
@@ -50,11 +38,12 @@ const selectedDateAttribute = computed(() => ({
   dates: selectedDates.value,
 }));
 
+// Weekend attribute - simplified to avoid date interval issues
 const weekendAttribute = computed(() => ({
   key: 'weekend',
   highlight: { color: 'gray', fillMode: 'light' },
   dates: {
-    start: dayjs().startOf('month').toDate(),
+    start: new Date(1900, 0, 1),
     repeat: {
       every: 'week',
       weekdays: settingsStore.vCalendarWeekendDays,
@@ -62,13 +51,19 @@ const weekendAttribute = computed(() => ({
   },
 }));
 
-const holidayAttributes = computed(() =>
-  holidays.value.map((holiday) => ({
-    dates: dayjs(holiday.date, nagerDateFormat).toDate(),
-    dot: { color: 'purple' },
-    popover: { label: holiday.localName },
-  })),
-);
+// Holiday attributes - show all holidays without month filtering to avoid recursion
+const holidayAttributes = computed(() => {
+  return holidays.value
+    .filter((holiday) => {
+      const holidayDate = dayjs(holiday.date, nagerDateFormat);
+      return holidayDate.isValid();
+    })
+    .map((holiday) => ({
+      dates: dayjs(holiday.date, nagerDateFormat).toDate(),
+      dot: { color: 'purple' },
+      popover: { label: holiday.localName },
+    }));
+});
 
 const calendarAttrs = computed(() => [
   todayAttribute.value,
@@ -77,49 +72,49 @@ const calendarAttrs = computed(() => [
   ...holidayAttributes.value,
 ]);
 
-// Upcoming holidays (next 30 days)
-const upcomingHolidays = computed(() => {
-  if (holidays.value.length === 0) return [];
+// Next holiday (including today, next 30 days)
+const nextHoliday = computed(() => {
+  if (holidays.value.length === 0) return null;
 
   const today = dayjs();
   const in30Days = today.add(30, 'day');
 
-  return holidays.value
+  const holiday = holidays.value
     .map((holiday) => ({
       ...holiday,
       dayjs: dayjs(holiday.date, nagerDateFormat),
+      daysFromToday: dayjs(holiday.date, nagerDateFormat).diff(today, 'day'),
     }))
     .filter(
-      (holiday) =>
-        holiday.dayjs.isValid() && holiday.dayjs.isAfter(today, 'day') && holiday.dayjs.isBefore(in30Days, 'day'),
+      (holiday) => holiday.dayjs.isValid() && holiday.daysFromToday >= 0 && holiday.dayjs.isBefore(in30Days, 'day'),
     )
-    .sort((a, b) => a.dayjs.diff(b.dayjs))
-    .slice(0, 3); // Show only next 3 holidays
+    .sort((a, b) => a.daysFromToday - b.daysFromToday)[0]; // Get the first (closest) holiday
+
+  return holiday || null;
 });
 
-const upcomingHolidaysText = computed(() => {
-  if (upcomingHolidays.value.length === 0) return '';
+const upcomingHolidaysDisplay = computed(() => {
+  if (!nextHoliday.value) return '';
 
-  const today = dayjs();
-  return upcomingHolidays.value
-    .map((holiday) => {
-      const diff = holiday.dayjs.diff(today, 'day');
-      let dateText: string;
+  const holiday = nextHoliday.value;
 
-      if (diff === 1) {
-        dateText = 'Tomorrow';
-      } else if (diff <= 7) {
-        dateText = `In ${diff} days`;
-      } else {
-        dateText = holiday.dayjs.format('MMM D');
-      }
+  if (holiday.daysFromToday === 0) {
+    return `Today: ${holiday.localName}`;
+  } else {
+    let dateText: string;
+    if (holiday.daysFromToday === 1) {
+      dateText = 'Tomorrow';
+    } else if (holiday.daysFromToday <= 7) {
+      dateText = `In ${holiday.daysFromToday} days`;
+    } else {
+      dateText = holiday.dayjs.format('MMM D');
+    }
 
-      return `${holiday.localName} (${dateText})`;
-    })
-    .join(' • ');
+    return `Next: ${holiday.localName} (${dateText})`;
+  }
 });
 
-const onDayClick = (day: any) => {
+const onDayClick = (day: { date: Date }) => {
   const clickedDate = day.date;
 
   // Toggle date selection
@@ -133,27 +128,54 @@ const onDayClick = (day: any) => {
     selectedDates.value.push(clickedDate);
   }
 
-  emit('selectedDatesChanged', [...selectedDates.value]);
+  // selectedDates is automatically synced with parent via v-model
+};
+
+// Handle calendar page navigation
+const onPageChange = (pages: Page[]) => {
+  const newSelectedMonth = pages[0];
+  // Only emit month change, don't track internal state to avoid recursion
+  emit('monthChanged', newSelectedMonth.month);
+};
+
+// Navigate to today using v-calendar's move API
+const goToToday = async () => {
+  if (calendar.value) {
+    try {
+      await calendar.value.move(new Date());
+    } catch (error) {
+      console.warn('Failed to navigate to today:', error);
+    }
+  }
 };
 </script>
 
 <template>
+  <!-- Main calendar component with attributes and event handlers -->
   <Calendar
-    :view="calendarViewMode"
+    ref="calendar"
+    view="monthly"
     :attributes="calendarAttrs"
     expanded
     :first-day-of-week="settingsStore.vCalendarFirstDay"
     @dayclick="onDayClick"
-    :min-date="dayjs().startOf('month').toDate()"
-    :max-date="dayjs().endOf('month').toDate()"
-  />
+    @update:pages="onPageChange"
+  >
+    <!-- Calendar footer with Today navigation button -->
+    <template #footer>
+      <VBtn variant="tonal" block @click="goToToday">
+        <VIcon start>mdi-calendar-today</VIcon>
+        Today
+      </VBtn>
+    </template>
+  </Calendar>
 
-  <!-- Upcoming Holidays Banner -->
-  <VCard v-if="upcomingHolidaysText" class="elevation-0 mt-2" color="purple-lighten-5">
+  <!-- Holidays Banner -->
+  <VCard v-if="upcomingHolidaysDisplay" class="elevation-0 mt-2" color="purple-lighten-5">
     <VCardText class="d-flex align-center ga-2 py-3">
       <VIcon color="purple-darken-1" size="18">mdi-party-popper</VIcon>
       <div class="text-body-2 text-purple-darken-2 holiday-banner-text">
-        <span class="font-weight-medium">Next:</span> {{ upcomingHolidaysText }}
+        {{ upcomingHolidaysDisplay }}
       </div>
     </VCardText>
   </VCard>

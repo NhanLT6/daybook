@@ -1,13 +1,12 @@
 ﻿<script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 
-import { useDateDisplay } from '@/composables/useDateDisplay';
 import { useDefaultTasksProjects } from '@/composables/useDefaultTasksProjects';
 import { useProjectColors } from '@/composables/useProjectColors';
 
-import type { XeroLog } from '@/interfaces/XeroLog';
-import type { XeroProject } from '@/interfaces/XeroProject';
-import type { XeroTask } from '@/interfaces/XeroTask';
+import type { TimeLog } from '@/interfaces/TimeLog';
+import type { Project } from '@/interfaces/Project';
+import type { Task } from '@/interfaces/Task';
 
 import { useField, useForm } from 'vee-validate';
 import { array, date, number, object, string } from 'yup';
@@ -27,19 +26,27 @@ interface BulkLogFormData {
   description?: string;
 }
 
-const { selectedDates } = defineProps<{
-  selectedDates: Date[];
+const { selectedDates = [] } = defineProps<{
+  selectedDates?: Date[];
 }>();
 
 const emit = defineEmits<{
-  submit: [logs: XeroLog[]];
+  submit: [logs: TimeLog[]];
   cancel: [];
+  clearDates: [];
 }>();
 
 const projectColors = useProjectColors();
-const { tasks, projects, projectItems, taskItems } = useDefaultTasksProjects();
+const { tasks, projects, projectItems, taskItems, initializeDefaults } = useDefaultTasksProjects();
+
+// Initialize default tasks and projects on mount
+onMounted(() => {
+  initializeDefaults();
+});
 
 const taskItemsForProject = computed(() => taskItems.value(projectField.value.value));
+
+const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 
 const validationSchema = object({
   selectedDates: array(date()).min(1, 'At least one date must be selected'),
@@ -70,18 +77,6 @@ const taskField = useField<string>('task');
 const durationField = useField<number>('duration');
 const descriptionField = useField<string>('description');
 
-// Watch for prop changes after fields are declared
-watch(
-  () => selectedDates,
-  (newDates) => {
-    // Only update if dates actually changed to avoid unnecessary validation
-    if (JSON.stringify(selectedDatesField.value.value) !== JSON.stringify(newDates)) {
-      selectedDatesField.setValue(newDates, false); // false = don't validate
-    }
-  },
-  { immediate: true },
-);
-
 const selectedDatesText = computed(() => {
   if (!selectedDatesField.value.value || selectedDatesField.value.value.length === 0) {
     return '';
@@ -92,11 +87,12 @@ const selectedDatesText = computed(() => {
   // Use compact format for selected dates display (no year, space-efficient)
   const formatCompact = (date: Date) => {
     const d = dayjs(date);
-    // If it's current month, show just "MMM D" (e.g., "Dec 25")
-    // If different month/year, show "MMM D, YYYY" for clarity
-    if (d.isSame(dayjs(), 'month') && d.isSame(dayjs(), 'year')) {
+    // If it's the same year, show just "MMM D" (e.g. "Dec 25")
+    // If a different year, show "MMM D, YYYY" for clarity
+    if (d.isSame(dayjs(), 'year')) {
       return d.format('MMM D');
     }
+
     return d.format('MMM D, YYYY');
   };
 
@@ -104,7 +100,7 @@ const selectedDatesText = computed(() => {
     return formatCompact(dates[0]);
   }
 
-  return dates.map((date) => formatCompact(date)).join(', ');
+  return dates.map((date) => formatCompact(date)).join('; '); // Dates separated by semicolon
 });
 
 const onSave = handleSubmit((values) => {
@@ -122,24 +118,19 @@ const onSave = handleSubmit((values) => {
 
   // Save Project and Task if needed
   const isProjectExisting = projects.value.map((p) => p.title).includes(values.project!);
-  if (!isProjectExisting) projects.value.push({ title: values.project! } satisfies XeroProject);
+  if (!isProjectExisting) projects.value.push({ title: values.project! } satisfies Project);
 
   const isTaskExisting = tasks.value.map((t) => t.title).includes(values.task!);
-  if (!isTaskExisting) tasks.value.push({ title: values.task!, project: values.project! } satisfies XeroTask);
+  if (!isTaskExisting) tasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
 
-  resetForm({
-    values: {
-      ...emptyLog,
-      selectedDates: [], // Clear selected dates after save
-    },
-  });
+  resetForm();
 });
 
 const onCancel = () => {
   resetForm({
     values: {
       ...emptyLog,
-      selectedDates: [], // Clear selected dates on cancel
+      selectedDates: [],
     },
   });
   emit('cancel');
@@ -147,14 +138,20 @@ const onCancel = () => {
 
 const onClearSelection = () => {
   selectedDatesField.setValue([]);
-  emit('cancel');
+  emit('clearDates');
 };
-
-const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 
 const onHourClick = (hour: number) => {
   setFieldValue('duration', hour * 60);
 };
+
+watch(
+  () => selectedDates,
+  (newDates) => {
+    selectedDatesField.setValue(newDates, false);
+  },
+  { immediate: false, deep: true },
+);
 </script>
 
 <template>
@@ -193,8 +190,8 @@ const onHourClick = (hour: number) => {
         :error-messages="errors.project"
         autocomplete="false"
       >
-        <template #item="{ props, item }">
-          <VListItem v-bind="props">
+        <template #item="{ props: itemProps, item }">
+          <VListItem v-bind="itemProps">
             <template #prepend>
               <VAvatar :color="projectColors.getProjectColor(item.value)" size="small" />
             </template>
@@ -221,19 +218,16 @@ const onHourClick = (hour: number) => {
         persistent-hint
       />
 
-      <div class="d-flex ga-2">
+      <div class="d-flex flex-wrap ga-2">
         <VChip @click="onHourClick(0.25)">15m</VChip>
         <VChip @click="onHourClick(0.5)">30m</VChip>
         <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">{{ hour }}h</VChip>
       </div>
 
       <div class="d-flex ga-2 mt-4">
-        <VBtn type="submit" class="flex-fill" variant="tonal" prepend-icon="mdi-cancel-outline" @click="onCancel">
-          Cancel
-        </VBtn>
+        <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel-outline" @click="onCancel"> Cancel </VBtn>
 
         <VBtn
-          type="submit"
           class="flex-fill"
           variant="tonal"
           color="green-darken-3"

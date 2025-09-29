@@ -1,15 +1,15 @@
-import { computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import { useStorage } from '@vueuse/core';
 import { uniq, uniqBy } from 'lodash';
 
-import type { XeroProject } from '@/interfaces/XeroProject';
-import type { XeroTask } from '@/interfaces/XeroTask';
+import type { Project } from '@/interfaces/Project';
+import type { Task } from '@/interfaces/Task';
 import { storageKeys } from '@/common/storageKeys';
 import { useSettingsStore } from '@/stores/settings';
 
 export function useDefaultTasksProjects() {
-  const tasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
-  const projects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
+  const tasks = useStorage<Task[]>(storageKeys.tasks, []);
+  const projects = useStorage<Project[]>(storageKeys.projects, []);
   const settingsStore = useSettingsStore();
 
   const defaultTasks = [
@@ -27,14 +27,14 @@ export function useDefaultTasksProjects() {
     'title',
   );
 
-  // Initialize default tasks if they don't exist and setting is enabled
-  onMounted(() => {
+  // Initialize function that can be called manually from components
+  const initializeDefaults = () => {
     if (settingsStore.useDefaultTasks && tasks.value.length === 0 && projects.value.length === 0) {
       // Initialize with default tasks and projects
       projects.value = [...defaultProjects];
       tasks.value = [...defaultTasks];
     }
-  });
+  };
 
   const projectItems = computed(() => {
     const allProjects = settingsStore.useDefaultTasks 
@@ -79,5 +79,6 @@ export function useDefaultTasksProjects() {
     projectItems,
     taskItems,
     tasksByProject,
+    initializeDefaults,
   };
 }

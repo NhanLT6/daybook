@@ -5,7 +5,7 @@ import { useDateDisplay } from '@/composables/useDateDisplay';
 
 import SingleFilePicker from '@/components/app/SingleFilePicker.vue';
 
-import type { XeroLog } from '@/interfaces/XeroLog';
+import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
 
@@ -15,7 +15,7 @@ import { chain, sumBy } from 'lodash';
 import { toast } from 'vue-sonner';
 
 export interface LogListProps {
-  items: XeroLog[];
+  items: TimeLog[];
 
   // Selected dates to auto-expand panels
   selectedDates?: Date[];
@@ -24,7 +24,7 @@ export interface LogListProps {
 const { items: logItems, selectedDates } = defineProps<LogListProps>();
 
 const emit = defineEmits<{
-  deleteLog: [log: XeroLog];
+  deleteLog: [log: TimeLog];
   import: [file?: File];
   export: [];
 }>();
@@ -92,7 +92,7 @@ const onCollapse = () => {
   openedPanels.value = [];
 };
 
-const onDeleteLog = (log: XeroLog) => {
+const onDeleteLog = (log: TimeLog) => {
   toast.warning('Delete log?', {
     action: {
       label: 'Delete',
@@ -172,7 +172,7 @@ const readCsv = (file?: File) => {
     <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
       <VCardText>
         <div class="d-flex flex-column ga-2 py-4 align-center bg-grey-lighten-4 rounded text-disabled">
-          <VIcon icon="mdi-package-variant-closed-outline" />
+          <VIcon icon="mdi-package-variant-closed" />
           <div class="text-subtitle-1">No data</div>
         </div>
       </VCardText>

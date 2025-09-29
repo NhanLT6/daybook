@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref, watchEffect } from 'vue';
 
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import CalendarOverview from '@/components/CalendarOverview.vue';
-import LoggedTimeWithChartView2 from '@/components/LoggedTimeWithChartView2.vue';
 import LogList from '@/components/LogList.vue';
+// import LoggedTimeWithChartView2 from '@/components/LoggedTimeWithChartView2.vue';
+import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
-import type { XeroLog } from '@/interfaces/XeroLog';
-import type { XeroProject } from '@/interfaces/XeroProject';
-import type { XeroTask } from '@/interfaces/XeroTask';
+import type { Project } from '@/interfaces/Project';
+import type { Task } from '@/interfaces/Task';
+import type { TimeLog } from '@/interfaces/TimeLog';
 
 import { useStorage } from '@vueuse/core';
 
@@ -22,30 +23,50 @@ import { nanoid } from 'nanoid';
 import { parse, unparse } from 'papaparse';
 import { toast } from 'vue-sonner';
 
-const xeroLogs = useStorage<XeroLog[]>(storageKeys.xeroLogsOfCurrentMonth, []);
-const xeroTasks = useStorage<XeroTask[]>(storageKeys.xeroTasks, []);
-const xeroProjects = useStorage<XeroProject[]>(storageKeys.xeroProjects, []);
+// Use dynamic storage that updates with month changes
+const timeLogs = ref<TimeLog[]>([]);
+const tasks = useStorage<Task[]>(storageKeys.tasks, []);
+const projects = useStorage<Project[]>(storageKeys.projects, []);
+
+// Storage map to keep track of different month storages
+const monthStorages = new Map<string, ReturnType<typeof useStorage<TimeLog[]>>>();
 
 const selectedDates = ref<Date[]>([]);
+const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
 
-const onSelectedDatesChanged = (dates: Date[]) => {
-  selectedDates.value = dates;
+// Function to get or create storage for a specific month
+const getTimeLogsForMonth = (month: number) => {
+  const monthForKey = dayjs().month(month - 1); // Convert from 1-based to 0-based for dayjs
+  const storageKey = `timeLogs-${monthForKey.format(yearAndMonthFormat)}`;
+
+  if (!monthStorages.has(storageKey)) {
+    monthStorages.set(storageKey, useStorage<TimeLog[]>(storageKey, []));
+  }
+  return monthStorages.get(storageKey)!;
+};
+
+// Initialize with current month and watch for changes
+watchEffect(() => {
+  const monthStorage = getTimeLogsForMonth(currentMonth.value);
+  timeLogs.value = monthStorage.value;
+});
+
+const onMonthChanged = (month: number) => {
+  currentMonth.value = month; // v-calendar uses 1-based months (1-12)
 };
 
 // Logs
 
-const totalHours = computed(() => {
-  const durationInMinutes = xeroLogs.value.reduce((acc, log) => acc + log.duration, 0);
-  return (durationInMinutes / 60).toFixed(1);
-});
-
-const saveBulkLogs = (logs: XeroLog[]) => {
-  xeroLogs.value.push(...logs);
+const saveBulkLogs = (logs: TimeLog[]) => {
+  const monthStorage = getTimeLogsForMonth(currentMonth.value);
+  monthStorage.value.push(...logs);
+  // Update the reactive timeLogs ref as well
+  timeLogs.value = monthStorage.value;
   toast.success(`${logs.length} logs added`);
   selectedDates.value = [];
 };
 
-const handleFormSubmit = (logs: XeroLog[]) => {
+const handleFormSubmit = (logs: TimeLog[]) => {
   saveBulkLogs(logs);
 };
 
@@ -53,13 +74,20 @@ const onBulkCancel = () => {
   selectedDates.value = [];
 };
 
-const onDeleteLog = (log: XeroLog) => {
-  xeroLogs.value = xeroLogs.value.filter((item) => item !== log);
+const onClearDates = () => {
+  selectedDates.value = [];
+};
+
+const onDeleteLog = (log: TimeLog) => {
+  const monthStorage = getTimeLogsForMonth(currentMonth.value);
+  monthStorage.value = monthStorage.value.filter((item: TimeLog) => item !== log);
+  // Update the reactive timeLogs ref as well
+  timeLogs.value = monthStorage.value;
   toast.success('Log deleted');
 };
 
 const exportToCsv = () => {
-  const transformedData = xeroLogs.value.map((log) => ({
+  const transformedData = timeLogs.value.map((log) => ({
     Id: log.id,
     Date: dayjs(log.date).format(templateDateFormat),
     Project: log.project,
@@ -73,7 +101,7 @@ const exportToCsv = () => {
 
   // Save Csv file
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  saveAs(blob, `XeroLog-${dayjs().format(yearAndMonthFormat)}.csv`);
+  saveAs(blob, `TimeLog-${dayjs().format(yearAndMonthFormat)}.csv`);
 };
 
 const importCsv = async (file?: File) => {
@@ -86,7 +114,7 @@ const importCsv = async (file?: File) => {
     transformHeader(header: string): string {
       return camelCase(header);
     },
-    transform(value: string, header: string): any {
+    transform(value: string, header: string): string | number {
       if (header === 'date') return dayjs(value, templateDateFormat).format(shortDateFormat);
       if (header === 'duration') return toNumber(value);
 
@@ -103,31 +131,34 @@ const importCsv = async (file?: File) => {
     return;
   }
 
-  const dataWithIds: XeroLog[] = result.data.map((item) => {
-    const log = item as any;
+  const dataWithIds: TimeLog[] = result.data.map((item) => {
+    const log = item as Record<string, string | number>;
     return {
-      id: log.id ?? nanoid(),
-      date: log.date,
-      project: log.project,
-      task: log.task,
-      duration: log.duration * 60, // Template use hour, this app use minute
-      description: log.description,
+      id: (log.id as string) ?? nanoid(),
+      date: log.date as string,
+      project: log.project as string,
+      task: log.task as string,
+      duration: (log.duration as number) * 60, // Template use hour, this app use minute
+      description: log.description as string,
     };
   });
 
   // Merge imported data with existing data, prioritize imported data if there are records with the same id
-  xeroLogs.value = unionBy(dataWithIds, xeroLogs.value, 'id');
+  const monthStorage = getTimeLogsForMonth(currentMonth.value);
+  monthStorage.value = unionBy(dataWithIds, monthStorage.value, 'id');
+  // Update the reactive timeLogs ref as well
+  timeLogs.value = monthStorage.value;
 
   // Extract Projects and Tasks
-  xeroProjects.value = chain(dataWithIds)
+  projects.value = chain(dataWithIds)
     .map((log) => ({ title: log.project }))
-    .concat(xeroProjects.value)
+    .concat(projects.value)
     .uniqBy('title')
     .value();
 
-  xeroTasks.value = chain(dataWithIds)
-    .map((log) => ({ project: log.project, title: log.task }) satisfies XeroTask)
-    .concat(xeroTasks.value)
+  tasks.value = chain(dataWithIds)
+    .map((log) => ({ project: log.project, title: log.task }) satisfies Task)
+    .concat(tasks.value)
     .uniqBy((value) => `${value.project}-${value.title}`)
     .value();
 
@@ -137,35 +168,32 @@ const importCsv = async (file?: File) => {
 
 <template>
   <VRow>
-    <LoggedTimeWithChartView2 />
+    <!-- <LoggedTimeWithChartView2 :current-month="currentMonth" /> -->
+    <WorkTimeBarChart :current-month="currentMonth" />
   </VRow>
 
   <VRow>
     <!-- Calendar and Total Hours - Visible on all screen sizes -->
     <VCol cols="12" md="3" lg="3" class="d-flex flex-column ga-4">
-      <CalendarOverview :selected-dates="selectedDates" @selected-dates-changed="onSelectedDatesChanged" />
-
-      <VCard class="elevation-0" color="grey-lighten-4">
-        <VCardText class="d-flex align-center ga-2 py-3">
-          <VIcon color="grey-darken-1" size="18">mdi-timer-outline</VIcon>
-          <div class="text-body-2 text-grey-darken-2">
-            <span class="font-weight-medium">Total Hours:</span> {{ totalHours }}
-          </div>
-        </VCardText>
-      </VCard>
+      <CalendarOverview v-model="selectedDates" @month-changed="onMonthChanged" />
     </VCol>
 
     <!-- Bulk Log Form -->
-    <VCol cols="12" md="4" lg="3">
+    <VCol cols="12" md="4" lg="4">
       <VCard class="elevation-0 border">
-        <BulkLogForm :selected-dates="selectedDates" @submit="handleFormSubmit" @cancel="onBulkCancel" />
+        <BulkLogForm
+          :selected-dates="selectedDates"
+          @submit="handleFormSubmit"
+          @cancel="onBulkCancel"
+          @clear-dates="onClearDates"
+        />
       </VCard>
     </VCol>
 
     <!-- Log List - Horizontally aligned on medium+ screens -->
-    <VCol cols="12" md="5" lg="6">
+    <VCol cols="12" md="4" lg="5">
       <LogList
-        :items="xeroLogs"
+        :items="timeLogs"
         :selected-dates="selectedDates"
         @delete-log="onDeleteLog"
         @import="importCsv"

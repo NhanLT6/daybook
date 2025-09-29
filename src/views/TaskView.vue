@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import { useDefaultTasksProjects } from '@/composables/useDefaultTasksProjects';
 import { useProjectColors } from '@/composables/useProjectColors';
 
-import type { XeroProject } from '@/interfaces/XeroProject';
-import type { XeroTask } from '@/interfaces/XeroTask';
+import type { Project } from '@/interfaces/Project';
+import type { Task } from '@/interfaces/Task';
 
 import { useField, useForm } from 'vee-validate';
 import { object, string } from 'yup';
@@ -16,10 +16,15 @@ interface TaskFormData {
 }
 
 const projectColors = useProjectColors();
-const { tasks, projects, projectItems, tasksByProject } = useDefaultTasksProjects();
+const { tasks, projects, projectItems, tasksByProject, initializeDefaults } = useDefaultTasksProjects();
 
-const editingTask = ref<XeroTask | null>(null);
-const editingProject = ref<XeroProject | null>(null);
+// Initialize default tasks and projects on mount
+onMounted(() => {
+  initializeDefaults();
+});
+
+const editingTask = ref<Task | null>(null);
+const editingProject = ref<Project | null>(null);
 const isNewTask = ref(false);
 const isNewProject = ref(false);
 const isDialogOpen = ref(false);
@@ -46,7 +51,7 @@ const { errors, handleSubmit, resetForm } = useForm<TaskFormData>({
 const projectField = useField<string>('projectTitle');
 const taskField = useField<string>('taskTitle');
 
-const editTask = (task: XeroTask) => {
+const editTask = (task: Task) => {
   editingTask.value = task;
   editingProject.value = null;
   isNewTask.value = false;
@@ -61,7 +66,7 @@ const editTask = (task: XeroTask) => {
   });
 };
 
-const editProject = (project: XeroProject) => {
+const editProject = (project: Project) => {
   editingProject.value = project;
   editingTask.value = null;
   isNewProject.value = false;
