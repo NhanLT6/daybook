@@ -21,7 +21,7 @@ test.describe('Xero Work Logger', () => {
       templatePath: process.env.VITE_XERO_TEMPLATE_PATH!,
     };
 
-    const fileName = `XeroLog-${dayjs().format('YYYY-MM')}.csv`;
+    const fileName = `TimeLog-${dayjs().format('YYYY-MM')}.csv`;
     const templateFilePath = path.join(config.templatePath, fileName);
 
     const taskEntries = getTaskEntries(templateFilePath);
