@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+
 import { computed, ref, watch } from 'vue';
 
 import { useDateDisplay } from '@/composables/useDateDisplay';
@@ -36,6 +37,7 @@ const openedPanels = ref<string[]>(
   selectedDates ? selectedDates.map((date) => dayjs(date).format(shortDateFormat)) : [],
 );
 
+// Watch selectedDates and update openedPanels accordingly
 watch(
   () => selectedDates,
   (newDates) => {
@@ -45,6 +47,7 @@ watch(
       openedPanels.value = [];
     }
   },
+  { immediate: true, deep: true },
 );
 
 const getColorHint = (minutes: number) => {

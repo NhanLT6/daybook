@@ -4,9 +4,9 @@ import { computed, onMounted, watch } from 'vue';
 import { useDefaultTasksProjects } from '@/composables/useDefaultTasksProjects';
 import { useProjectColors } from '@/composables/useProjectColors';
 
-import type { TimeLog } from '@/interfaces/TimeLog';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
+import type { TimeLog } from '@/interfaces/TimeLog';
 
 import { useField, useForm } from 'vee-validate';
 import { array, date, number, object, string } from 'yup';
@@ -142,7 +142,9 @@ const onClearSelection = () => {
 };
 
 const onHourClick = (hour: number) => {
-  setFieldValue('duration', hour * 60);
+  // Add to the existing duration instead of replacing it
+  const currentDuration = durationField.value.value || 0;
+  setFieldValue('duration', currentDuration + hour * 60);
 };
 
 watch(
@@ -204,6 +206,7 @@ watch(
         label="Task"
         :items="taskItemsForProject"
         :error-messages="errors.task"
+        autocomplete="false"
       ></VCombobox>
 
       <VTextField v-model="descriptionField.value.value" label="Description" :error-messages="errors.description" />
@@ -219,9 +222,9 @@ watch(
       />
 
       <div class="d-flex flex-wrap ga-2">
-        <VChip @click="onHourClick(0.25)">15m</VChip>
-        <VChip @click="onHourClick(0.5)">30m</VChip>
-        <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">{{ hour }}h</VChip>
+        <VChip @click="onHourClick(0.25)">+15m</VChip>
+        <VChip @click="onHourClick(0.5)">+30m</VChip>
+        <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">+{{ hour }}h</VChip>
       </div>
 
       <div class="d-flex ga-2 mt-4">
