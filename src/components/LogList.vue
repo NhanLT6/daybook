@@ -1,6 +1,5 @@
 ﻿<script setup lang="ts">
-
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import { useDateDisplay } from '@/composables/useDateDisplay';
 
@@ -32,6 +31,32 @@ const emit = defineEmits<{
 
 const { formatInternalDateForDisplay } = useDateDisplay();
 
+// Scroll to the selected date's expansion panel if it's outside viewport
+const scrollToSelectedDate = async (date: Date) => {
+  if (!date) return;
+
+  // Wait for DOM to update and panels to expand
+  await nextTick();
+
+  // Get the date and find its element
+  const dateId = dayjs(date).format(shortDateFormat);
+  const element = document.getElementById(dateId);
+  if (!element) return;
+
+  const rect = element.getBoundingClientRect();
+
+  // Find container and check whether the element is outside
+  const container = element.closest('.log-list');
+  if (!container) return;
+
+  const containerRect = container.getBoundingClientRect();
+
+  const isOutsideContainer = rect.top < containerRect.top || rect.bottom > containerRect.bottom;
+  if (isOutsideContainer) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
 // Expanded rows - auto-expand panels for selected dates
 const openedPanels = ref<string[]>(
   selectedDates ? selectedDates.map((date) => dayjs(date).format(shortDateFormat)) : [],
@@ -43,6 +68,8 @@ watch(
   (newDates) => {
     if (newDates && newDates.length > 0) {
       openedPanels.value = newDates.map((date) => dayjs(date).format(shortDateFormat));
+      const lastSelectedDate = newDates[newDates.length - 1];
+      scrollToSelectedDate(lastSelectedDate);
     } else {
       openedPanels.value = [];
     }
@@ -113,7 +140,7 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="mb-4 elevation-0 border list-container">
+  <VCard class="log-list mb-4 elevation-0 border list-container">
     <VCardTitle class="bg-white" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle>Logs</VToolbarTitle>
@@ -182,7 +209,7 @@ const readCsv = (file?: File) => {
     </VCard>
 
     <VExpansionPanels variant="accordion" v-model="openedPanels" multiple>
-      <VExpansionPanel v-for="group in loggedTimeByDates" :key="group.date" :value="group.date">
+      <VExpansionPanel v-for="group in loggedTimeByDates" :id="group.date" :key="group.date" :value="group.date">
         <VExpansionPanelTitle>
           <div class="me-2">{{ formatInternalDateForDisplay(group.date) }}</div>
 
