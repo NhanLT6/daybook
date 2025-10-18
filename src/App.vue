@@ -16,7 +16,7 @@ import { toast, Toaster } from 'vue-sonner';
 const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
 
 // Jira integration
-const { validateJiraConfigs, syncTicketsToLocalStorage, shouldAutoSync, getAllTickets } = useJira();
+const { validateJiraConfigs, syncTicketsToLocalStorage, shouldAutoSync } = useJira();
 
 // Version tracking for release notifications
 const lastSeenVersion = useStorage('app-last-seen-version', '');
@@ -45,8 +45,8 @@ const autoSyncJiraTickets = async () => {
     // Check if we need to sync today
     if (shouldAutoSync()) {
       try {
-        await syncTicketsToLocalStorage();
-        toast.success(`Auto-synced ${getAllTickets().length} Jira ticket(s)`);
+        const savedTicketCount = await syncTicketsToLocalStorage();
+        toast.success(`Auto-synced ${savedTicketCount} Jira ticket(s)`);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Auto-sync failed');
       }
