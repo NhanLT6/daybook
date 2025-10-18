@@ -1,7 +1,6 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
 
-import { useJira } from '@/composables/useJira';
 import { useProjectColors } from '@/composables/useProjectColors';
 import { useWorkspace } from '@/composables/useWorkspace';
 
@@ -16,7 +15,6 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
-import { useSettingsStore } from '@/stores/settings';
 import { nanoid } from 'nanoid';
 
 interface BulkLogFormData {
@@ -39,46 +37,21 @@ const emit = defineEmits<{
 }>();
 
 const projectColors = useProjectColors();
-const settingsStore = useSettingsStore();
-const {
-  customTasks: tasks,
-  customProjects: projects,
-  availableProjects: projectItems,
-  availableTasks: taskItems,
-  initializePresets: initializeDefaults,
-} = useWorkspace();
-
-const { getTeamTickets } = useJira();
+const { allProjects, allTasks, myProjects, codeReviewDescriptions, getTasksByProject, initTeamWorkPreset } =
+  useWorkspace();
 
 // Initialize default tasks and projects on mount
 onMounted(() => {
-  initializeDefaults();
+  initTeamWorkPreset();
 });
 
-const taskItemsForProject = computed(() => taskItems.value(projectField.value.value));
+const tasksOfProject = computed(() => getTasksByProject(projectField.value.value).map((t) => t.title));
 
-// Check if Description should be a combobox (Jira enabled + Team work + Code review)
-const shouldShowJiraCombobox = computed(() => {
-  return (
-    settingsStore.jiraConfig.enabled &&
-    projectField.value.value === 'Team work' &&
-    taskField.value.value === 'Code review'
-  );
-});
+const descriptions = computed((): string[] => {
+  const isCodeReview = projectField.value.value === 'Team work' && taskField.value.value === 'Code review';
+  if (!isCodeReview) return [];
 
-// Get team tickets for description combobox
-const teamTicketDescriptions = computed(() => {
-  if (!shouldShowJiraCombobox.value || !settingsStore.jiraConfig.email) {
-    return [];
-  }
-
-  const teamTickets = getTeamTickets(settingsStore.jiraConfig.email);
-
-  return teamTickets.map((ticket) => {
-    const ticketKey = ticket.jira?.ticketKey || '';
-    const summary = ticket.title.substring(ticketKey.length).trim();
-    return `Review ticket ${ticketKey} ${summary}`;
-  });
+  return codeReviewDescriptions.value;
 });
 
 const hours = Array.from({ length: 7 }, (_, i) => i + 1);
@@ -152,11 +125,11 @@ const onSave = handleSubmit((values) => {
   emit('submit', logs);
 
   // Save Project and Task if needed
-  const isProjectExisting = projects.value.map((p) => p.title).includes(values.project!);
-  if (!isProjectExisting) projects.value.push({ title: values.project! } satisfies Project);
+  const isProjectExisting = allProjects.value.map((p) => p.title).includes(values.project!);
+  if (!isProjectExisting) allProjects.value.push({ title: values.project! } satisfies Project);
 
-  const isTaskExisting = tasks.value.map((t) => t.title).includes(values.task!);
-  if (!isTaskExisting) tasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
+  const isTaskExisting = allTasks.value.map((t) => t.title).includes(values.task!);
+  if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
 
   resetForm();
 });
@@ -223,7 +196,7 @@ watch(
       <VCombobox
         v-model="projectField.value.value"
         label="Project"
-        :items="projectItems"
+        :items="myProjects.map((p) => p.title)"
         :error-messages="errors.project"
         autocomplete="false"
       >
@@ -239,29 +212,19 @@ watch(
       <VCombobox
         v-model="taskField.value.value"
         label="Task"
-        :items="taskItemsForProject"
+        :items="tasksOfProject"
         :error-messages="errors.task"
         autocomplete="false"
       ></VCombobox>
 
-      <!-- Description: Combobox when Jira enabled + Team work + Code review, otherwise TextField -->
       <VCombobox
-        v-if="shouldShowJiraCombobox"
         v-model="descriptionField.value.value"
         label="Description"
-        :items="teamTicketDescriptions"
+        :items="descriptions"
         :error-messages="errors.description"
         autocomplete="false"
         placeholder="Select a ticket or type custom description"
       ></VCombobox>
-
-      <VTextField
-        v-else
-        v-model="descriptionField.value.value"
-        label="Description"
-        autocomplete="false"
-        :error-messages="errors.description"
-      />
 
       <VNumberInput
         v-model="durationField.value.value"

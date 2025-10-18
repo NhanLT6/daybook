@@ -1,5 +1,6 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
+import type { JiraProject } from '@/interfaces/JiraProject';
 import type { JiraTicket } from '@/interfaces/JiraTicket';
 import type { Project } from '@/interfaces/Project';
 
@@ -25,6 +26,7 @@ export function useJira() {
 
   // Storage for current month's projects
   const projects = useStorage<Project[]>(storageKeys.projects, []);
+  const jiraProjects = useStorage<JiraProject[]>(storageKeys.jiraProjects, []);
 
   const { jiraConfig } = useSettingsStore();
 
@@ -42,17 +44,13 @@ export function useJira() {
     );
   };
 
-  /**
-   * Transform JiraTicket to Project format for storage
-   */
-  const transformTicketToProject = (ticket: JiraTicket): Project => ({
+  const transformTicketToJiraProject = (ticket: JiraTicket): JiraProject => ({
     title: `${ticket.key} ${ticket.summary}`,
-    jira: {
-      ticketKey: ticket.key,
-      assigneeEmail: ticket.assigneeEmail,
-      assigneeName: ticket.assigneeDisplayName,
-      status: ticket.statusName,
-    },
+
+    jiraTicketKey: ticket.key,
+    jiraAssigneeEmail: ticket.assigneeEmail,
+    jiraAssigneeName: ticket.assigneeDisplayName,
+    jiraStatus: ticket.statusName,
   });
 
   /**
@@ -60,6 +58,8 @@ export function useJira() {
    * Returns true if last sync was on a different day
    */
   const shouldAutoSync = (): boolean => {
+    if (!jiraConfig.enabled) return false;
+
     if (!lastSyncDate.value) {
       return true; // Never synced before
     }
@@ -72,39 +72,29 @@ export function useJira() {
    * Fetch Jira tickets and save them as Projects to localStorage
    * Uses the Vercel API proxy to bypass CORS
    * Internal method used by both auto-sync and manual sync
+   *
+   * @return number - Number of saved tickets
    */
-  const syncTicketsToLocalStorage = async (): Promise<void> => {
+  const syncTicketsToLocalStorage = async (): Promise<number> => {
     isSyncing.value = true;
     error.value = null;
 
     try {
       // Fetch tickets via Vercel serverless function
       const tickets = await fetchJiraTickets(jiraConfig);
-      const jiraProjects = tickets.map(transformTicketToProject);
-
-      const newProjects = differenceBy(jiraProjects, projects.value, (p) => p.title);
-      projects.value.push(...newProjects);
+      const newJiraProjects = tickets.map(transformTicketToJiraProject);
+      const projectsToAdd = differenceBy(newJiraProjects, jiraProjects.value, (p) => p.title);
+      jiraProjects.value.push(...projectsToAdd);
 
       lastSyncDate.value = dayjs().format(shortDateFormat);
+
+      return projectsToAdd.length;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sync Jira tickets';
       error.value = message;
       throw new Error(message);
     } finally {
       isSyncing.value = false;
-    }
-  };
-
-  /**
-   * Manual sync with user feedback (toast notifications)
-   * TanStack Query style - handles loading state and error handling internally
-   */
-  const syncTickets = async (): Promise<void> => {
-    try {
-      await syncTicketsToLocalStorage();
-      toast.success(`Successfully synced ${getAllTickets().length} ticket(s)`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to sync Jira tickets');
     }
   };
 
@@ -129,58 +119,29 @@ export function useJira() {
     }
   };
 
-  /**
-   * Get tickets assigned to the current user
-   * @param userEmail - Current user's email address
-   */
-  const getMyTickets = (userEmail: string): Project[] => {
-    return projects.value.filter((project) => project.jira?.assigneeEmail?.toLowerCase() === userEmail.toLowerCase());
-  };
-
-  /**
-   * Get tickets assigned to other team members (not current user)
-   * @param userEmail - Current user's email address
-   */
-  const getTeamTickets = (userEmail: string): Project[] => {
-    return projects.value.filter(
-      (project) => project.jira?.assigneeEmail && project.jira.assigneeEmail.toLowerCase() !== userEmail.toLowerCase(),
+  const myJiraProjects = computed((): JiraProject[] => {
+    return jiraProjects.value.filter(
+      (project) => project.jiraAssigneeEmail?.toLowerCase() === jiraConfig.email.toLowerCase(),
     );
-  };
+  });
 
-  /**
-   * Get all Jira tickets from localStorage
-   */
-  const getAllTickets = (): Project[] => {
-    return projects.value.filter((project) => project.jira != null);
-  };
-
-  /**
-   * Clear all Jira tickets from localStorage
-   */
-  const clearTickets = (): void => {
-    projects.value = projects.value.filter((project) => project.jira == null);
-  };
+  const teamJiraProjects = computed((): JiraProject[] => {
+    return jiraProjects.value.filter(
+      (project) => project.jiraAssigneeEmail?.toLowerCase() !== jiraConfig.email.toLowerCase(),
+    );
+  });
 
   return {
-    // Loading states (TanStack Query style - consumers don't manage these)
-
     isSyncing,
     isTesting,
     error,
 
-    // User-facing methods with built-in loading & error handling
-    testConnection,
-    syncTickets,
-
-    // Internal methods (for auto-sync and advanced use cases)
     validateJiraConfigs,
+    testConnection,
     syncTicketsToLocalStorage,
     shouldAutoSync,
 
-    // Data access methods
-    getMyTickets,
-    getTeamTickets,
-    getAllTickets,
-    clearTickets,
+    myJiraProjects,
+    teamJiraProjects,
   };
 }

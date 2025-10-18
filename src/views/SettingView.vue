@@ -6,11 +6,12 @@ import { useJira } from '@/composables/useJira';
 import dayjs from 'dayjs';
 
 import { useSettingsStore } from '@/stores/settings';
+import { toast } from 'vue-sonner';
 
 const settingsStore = useSettingsStore();
 
 // TanStack Query style API - loading states are managed by the composable
-const { isTesting, isSyncing, testConnection, syncTickets } = useJira();
+const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJira();
 
 // Password visibility toggle
 const showApiToken = ref(false);
@@ -34,6 +35,15 @@ const selectedWeekendPattern = computed({
     settingsStore.weekendDays = pattern.value;
   },
 });
+
+const handleSyncTickets = async (): Promise<void> => {
+  try {
+    const savedTicketCount = await syncTicketsToLocalStorage();
+    toast.success(`Successfully synced ${savedTicketCount} ticket(s)`);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Failed to sync Jira tickets');
+  }
+};
 </script>
 
 <template>
@@ -170,7 +180,7 @@ const selectedWeekendPattern = computed({
               :loading="isSyncing"
               color="success"
               variant="tonal"
-              @click="syncTickets"
+              @click="handleSyncTickets"
               class="flex-grow-1"
               prepend-icon="mdi-sync"
             >

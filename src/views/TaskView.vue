@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
-import { useWorkspace } from '@/composables/useWorkspace';
 import { useProjectColors } from '@/composables/useProjectColors';
+import { useWorkspace } from '@/composables/useWorkspace';
 
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
@@ -16,17 +16,11 @@ interface TaskFormData {
 }
 
 const projectColors = useProjectColors();
-const {
-  customTasks: tasks,
-  customProjects: projects,
-  availableProjects: projectItems,
-  tasksByProject,
-  initializePresets: initializeDefaults,
-} = useWorkspace();
+const { allTasks, allProjects, getTasksByProject, initTeamWorkPreset } = useWorkspace();
 
 // Initialize default tasks and projects on mount
 onMounted(() => {
-  initializeDefaults();
+  initTeamWorkPreset();
 });
 
 const editingTask = ref<Task | null>(null);
@@ -111,7 +105,7 @@ const createNewTask = (forProjectTitle?: string) => {
   isDialogOpen.value = true;
   resetForm({
     values: {
-      projectTitle: forProjectTitle || projectItems.value[0] || undefined,
+      projectTitle: forProjectTitle || undefined,
       taskTitle: undefined,
     },
   });
@@ -119,14 +113,14 @@ const createNewTask = (forProjectTitle?: string) => {
 
 const onSave = handleSubmit((values) => {
   if (isNewProject.value || editingProject.value) {
-    const isProjectExisting = projects.value.map((p) => p.title).includes(values.projectTitle);
+    const isProjectExisting = allProjects.value.map((p) => p.title).includes(values.projectTitle);
     if (!isProjectExisting) {
-      projects.value.push({ title: values.projectTitle });
+      allProjects.value.push({ title: values.projectTitle });
     } else if (editingProject.value && editingProject.value.title !== values.projectTitle) {
-      const projectIndex = projects.value.findIndex((p) => p.title === editingProject.value!.title);
+      const projectIndex = allProjects.value.findIndex((p) => p.title === editingProject.value!.title);
       if (projectIndex >= 0) {
-        projects.value[projectIndex].title = values.projectTitle;
-        tasks.value.forEach((task) => {
+        allProjects.value[projectIndex].title = values.projectTitle;
+        allTasks.value.forEach((task) => {
           if (task.project === editingProject.value!.title) {
             task.project = values.projectTitle;
           }
@@ -136,9 +130,11 @@ const onSave = handleSubmit((values) => {
 
     // If creating a new project and task name is provided, create the task too
     if (isNewProject.value && values.taskTitle && values.taskTitle.trim()) {
-      const isTaskExisting = tasks.value.some((t) => t.title === values.taskTitle && t.project === values.projectTitle);
+      const isTaskExisting = allTasks.value.some(
+        (t) => t.title === values.taskTitle && t.project === values.projectTitle,
+      );
       if (!isTaskExisting) {
-        tasks.value.push({
+        allTasks.value.push({
           title: values.taskTitle,
           project: values.projectTitle,
         });
@@ -148,19 +144,21 @@ const onSave = handleSubmit((values) => {
 
   if (isNewTask.value || editingTask.value) {
     if (!isNewTask.value && editingTask.value) {
-      const taskIndex = tasks.value.findIndex(
+      const taskIndex = allTasks.value.findIndex(
         (t) => t.title === editingTask.value!.title && t.project === editingTask.value!.project,
       );
       if (taskIndex >= 0) {
-        tasks.value[taskIndex] = {
+        allTasks.value[taskIndex] = {
           title: values.taskTitle,
           project: values.projectTitle,
         };
       }
     } else {
-      const isTaskExisting = tasks.value.some((t) => t.title === values.taskTitle && t.project === values.projectTitle);
+      const isTaskExisting = allTasks.value.some(
+        (t) => t.title === values.taskTitle && t.project === values.projectTitle,
+      );
       if (!isTaskExisting) {
-        tasks.value.push({
+        allTasks.value.push({
           title: values.taskTitle,
           project: values.projectTitle,
         });
@@ -186,10 +184,10 @@ const onCancel = () => {
 };
 
 const confirmDeleteProject = (projectTitle: string) => {
-  const tasksInProject = tasksByProject.value[projectTitle]?.length || 0;
+  const tasksInProject = getTasksByProject(projectTitle).length;
 
   if (tasksInProject === 0) {
-    projects.value = projects.value.filter((p) => p.title !== projectTitle);
+    allProjects.value = allProjects.value.filter((p) => p.title !== projectTitle);
     return;
   }
 
@@ -200,10 +198,10 @@ const confirmDeleteProject = (projectTitle: string) => {
 const executeDeleteProject = () => {
   if (projectToDelete.value) {
     // Delete from projects array (handles both regular and Jira projects)
-    projects.value = projects.value.filter((p) => p.title !== projectToDelete.value);
+    allProjects.value = allProjects.value.filter((p) => p.title !== projectToDelete.value);
 
     // Delete associated tasks
-    tasks.value = tasks.value.filter((t) => t.project !== projectToDelete.value);
+    allTasks.value = allTasks.value.filter((t) => t.project !== projectToDelete.value);
 
     projectToDelete.value = null;
     isDeleteProjectDialogOpen.value = false;
@@ -216,9 +214,9 @@ const cancelDeleteProject = () => {
 };
 
 const deleteTaskDirectly = (taskTitle: string, projectTitle: string) => {
-  const taskIndex = tasks.value.findIndex((t) => t.title === taskTitle && t.project === projectTitle);
+  const taskIndex = allTasks.value.findIndex((t) => t.title === taskTitle && t.project === projectTitle);
   if (taskIndex >= 0) {
-    tasks.value.splice(taskIndex, 1);
+    allTasks.value.splice(taskIndex, 1);
   }
 };
 
@@ -234,7 +232,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
 
 // Expand/Collapse all panels
 const onExpandAll = () => {
-  openedPanels.value = projectItems.value;
+  openedPanels.value = allProjects.value.map((p) => p.title);
 };
 
 const onCollapseAll = () => {
@@ -327,13 +325,7 @@ const onCollapseAll = () => {
                 <!-- Expand all -->
                 <VTooltip>
                   <template #activator="{ props }">
-                    <VBtn
-                      icon="mdi-arrow-expand"
-                      variant="text"
-                      size="small"
-                      @click="onExpandAll"
-                      v-bind="props"
-                    />
+                    <VBtn icon="mdi-arrow-expand" variant="text" size="small" @click="onExpandAll" v-bind="props" />
                   </template>
                   Expand all projects
                 </VTooltip>
@@ -341,13 +333,7 @@ const onCollapseAll = () => {
                 <!-- Collapse all -->
                 <VTooltip>
                   <template #activator="{ props }">
-                    <VBtn
-                      icon="mdi-arrow-collapse"
-                      variant="text"
-                      size="small"
-                      @click="onCollapseAll"
-                      v-bind="props"
-                    />
+                    <VBtn icon="mdi-arrow-collapse" variant="text" size="small" @click="onCollapseAll" v-bind="props" />
                   </template>
                   Collapse all projects
                 </VTooltip>
@@ -366,8 +352,18 @@ const onCollapseAll = () => {
           </VCardTitle>
 
           <!-- Projects List - Expandable panels showing tasks for each project -->
-          <VExpansionPanels v-if="projectItems.length > 0" variant="accordion" multiple elevation="0" v-model="openedPanels">
-            <VExpansionPanel v-for="projectTitle in projectItems" :key="projectTitle" :value="projectTitle">
+          <VExpansionPanels
+            v-if="allProjects.length > 0"
+            variant="accordion"
+            multiple
+            elevation="0"
+            v-model="openedPanels"
+          >
+            <VExpansionPanel
+              v-for="projectTitle in allProjects.map((p) => p.title)"
+              :key="projectTitle"
+              :value="projectTitle"
+            >
               <VExpansionPanelTitle>
                 <div class="d-flex align-center justify-space-between w-100">
                   <div class="d-flex align-center flex-grow-1 min-width-0">
@@ -381,8 +377,7 @@ const onCollapseAll = () => {
                       {{ projectTitle }}
 
                       <VChip size="x-small" variant="tonal">
-                        {{ tasksByProject[projectTitle]?.length || 0 }}
-                        {{ tasksByProject[projectTitle]?.length <= 1 ? ' Task' : ' Tasks' }}
+                        {{ getTasksByProject(projectTitle).length || 0 }} Task(s)
                       </VChip>
                     </span>
                   </div>
@@ -399,7 +394,7 @@ const onCollapseAll = () => {
                           v-bind="props"
                         />
                       </template>
-                      Delete project{{ (tasksByProject[projectTitle]?.length || 0) > 0 ? ' and all its tasks' : '' }}
+                      Delete project{{ getTasksByProject(projectTitle).length > 0 ? ' and all its tasks' : '' }}
                     </VTooltip>
 
                     <VTooltip>
@@ -436,9 +431,9 @@ const onCollapseAll = () => {
                 <VCard class="elevation-0 rounded-0">
                   <!-- Tasks Table - Shows all tasks within the current project -->
                   <VDataTable
-                    v-if="tasksByProject[projectTitle]?.length"
+                    v-if="getTasksByProject(projectTitle).length"
                     :items="
-                      tasksByProject[projectTitle].map((taskTitle) => ({ title: taskTitle, project: projectTitle }))
+                      getTasksByProject(projectTitle).map((task) => ({ title: task.title, project: projectTitle }))
                     "
                     :headers="[]"
                     class="bg-grey-lighten-4"
@@ -521,7 +516,7 @@ const onCollapseAll = () => {
         </p>
 
         <p class="text-error">
-          This will also delete all {{ tasksByProject[projectToDelete || '']?.length || 0 }} task(s) in this project.
+          This will also delete all {{ getTasksByProject(projectToDelete!).length || 0 }} task(s) in this project.
         </p>
       </VCardText>
 
