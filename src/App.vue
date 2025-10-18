@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { RouterView, useRoute } from 'vue-router';
-import { Toaster, toast } from 'vue-sonner';
+
+import { useJira } from '@/composables/useJira';
 
 import type { Holiday } from '@/apis/holidayApi';
 
@@ -9,13 +9,17 @@ import { useStorage } from '@vueuse/core';
 
 import { fetchVnHolidays } from '@/apis/holidayApi';
 import { storageKeys } from '@/common/storageKeys';
-import { useJira } from '@/composables/useJira';
+import { RouterView, useRoute } from 'vue-router';
+import { toast, Toaster } from 'vue-sonner';
 
 // Initialize holidays for current year
 const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
 
 // Jira integration
 const { validateJiraConfigs, syncTicketsToLocalStorage, shouldAutoSync, getAllTickets } = useJira();
+
+// Version tracking for release notifications
+const lastSeenVersion = useStorage('app-last-seen-version', '');
 
 /**
  * Auto-fetch VN holidays if not already cached for the current year
@@ -50,10 +54,26 @@ const autoSyncJiraTickets = async () => {
   }
 };
 
+/**
+ * Show release notification if app version has changed
+ * Runs once on app mount
+ */
+const showReleaseNotification = () => {
+  if (lastSeenVersion.value !== __APP_VERSION__) {
+    toast.info('New Update', {
+      description: __COMMIT_MESSAGE__,
+      duration: 6000,
+    });
+
+    lastSeenVersion.value = __APP_VERSION__;
+  }
+};
+
 // Initialize data on app mount
 onMounted(async () => {
   await autoFetchHolidays();
   await autoSyncJiraTickets();
+  showReleaseNotification();
 });
 
 const route = useRoute();
