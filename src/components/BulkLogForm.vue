@@ -1,8 +1,9 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
 
-import { useDefaultTasksProjects } from '@/composables/useDefaultTasksProjects';
+import { useJira } from '@/composables/useJira';
 import { useProjectColors } from '@/composables/useProjectColors';
+import { useWorkspace } from '@/composables/useWorkspace';
 
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
@@ -15,6 +16,7 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
+import { useSettingsStore } from '@/stores/settings';
 import { nanoid } from 'nanoid';
 
 interface BulkLogFormData {
@@ -37,7 +39,16 @@ const emit = defineEmits<{
 }>();
 
 const projectColors = useProjectColors();
-const { tasks, projects, projectItems, taskItems, initializeDefaults } = useDefaultTasksProjects();
+const settingsStore = useSettingsStore();
+const {
+  customTasks: tasks,
+  customProjects: projects,
+  availableProjects: projectItems,
+  availableTasks: taskItems,
+  initializePresets: initializeDefaults,
+} = useWorkspace();
+
+const { getTeamTickets } = useJira();
 
 // Initialize default tasks and projects on mount
 onMounted(() => {
@@ -45,6 +56,30 @@ onMounted(() => {
 });
 
 const taskItemsForProject = computed(() => taskItems.value(projectField.value.value));
+
+// Check if Description should be a combobox (Jira enabled + Team work + Code review)
+const shouldShowJiraCombobox = computed(() => {
+  return (
+    settingsStore.jiraConfig.enabled &&
+    projectField.value.value === 'Team work' &&
+    taskField.value.value === 'Code review'
+  );
+});
+
+// Get team tickets for description combobox
+const teamTicketDescriptions = computed(() => {
+  if (!shouldShowJiraCombobox.value || !settingsStore.jiraConfig.email) {
+    return [];
+  }
+
+  const teamTickets = getTeamTickets(settingsStore.jiraConfig.email);
+
+  return teamTickets.map((ticket) => {
+    const ticketKey = ticket.jira?.ticketKey || '';
+    const summary = ticket.title.substring(ticketKey.length).trim();
+    return `Review ticket ${ticketKey} ${summary}`;
+  });
+});
 
 const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 
@@ -209,7 +244,24 @@ watch(
         autocomplete="false"
       ></VCombobox>
 
-      <VTextField v-model="descriptionField.value.value" label="Description" :error-messages="errors.description" />
+      <!-- Description: Combobox when Jira enabled + Team work + Code review, otherwise TextField -->
+      <VCombobox
+        v-if="shouldShowJiraCombobox"
+        v-model="descriptionField.value.value"
+        label="Description"
+        :items="teamTicketDescriptions"
+        :error-messages="errors.description"
+        autocomplete="false"
+        placeholder="Select a ticket or type custom description"
+      ></VCombobox>
+
+      <VTextField
+        v-else
+        v-model="descriptionField.value.value"
+        label="Description"
+        autocomplete="false"
+        :error-messages="errors.description"
+      />
 
       <VNumberInput
         v-model="durationField.value.value"

@@ -9,6 +9,7 @@ A Vue.js application for daily task logging to track what you've accomplished. K
 - 📁 **Bulk Import/Export**: Import tasks from CSV or export your logs for external use
 - 🎯 **Task Management**: Organize work by projects and categories
 - 📅 **Calendar Integration**: Visual timeline of your logged activities
+- 🔗 **Jira Integration**: Sync tickets from Jira for easier code review logging (optional)
 - 💾 **Local Storage**: All data stored locally in your browser
 
 ## 🚀 Quick Start
@@ -37,11 +38,52 @@ git clone <repository-url>
 cd daybook
 yarn install
 
-# Start development server
+# Start development server (for basic usage)
 yarn dev
+
+# OR run with Vercel dev (required for Jira integration)
+yarn dev:vercel
 ```
 
-Open your browser to `http://localhost:5173`
+**Important Notes:**
+- Basic app features work with `yarn dev` at `http://localhost:5173`
+- **Jira integration requires `yarn dev:vercel`** to enable API routes (see Jira Integration section below)
+- Vercel CLI automatically detects and serves serverless functions from `/api` directory
+
+## ⚙️ Advanced: Jira Integration
+
+> **Optional Feature**: Connect to Jira to sync tickets and streamline code review logging.
+
+### Setup
+
+1. **Start development server with Vercel:**
+   ```bash
+   yarn dev:vercel
+   ```
+   This enables the API routes required for Jira integration (bypasses CORS restrictions).
+
+2. **Configure Jira in Settings:**
+   - Navigate to Settings in the app
+   - Toggle "Jira Integration" ON
+   - Enter your Jira credentials:
+     - **Domain**: Your Jira subdomain (e.g., `acme` from `acme.atlassian.net`)
+     - **Email**: Your Jira account email
+     - **API Token**: Generate at [Atlassian API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+     - **Project Key**: Your project key (e.g., `ABC` from ticket `ABC-123`)
+   - Click "Test Connection" to verify
+
+3. **How it works:**
+   - Jira tickets are fetched via Vercel serverless functions in `/api/jira`
+   - Tickets are stored locally in your browser
+   - Team members' tickets appear in code review workflows for easier logging
+
+### API Routes
+
+The following serverless functions handle Jira API communication:
+- `api/jira/test-connection.ts` - Validates Jira credentials
+- `api/jira/fetch-tickets.ts` - Retrieves tickets from your Jira project
+
+**Note**: These routes only work when running with `yarn dev:vercel` or in production on Vercel.
 
 ## ⚙️ Advanced: Xero Integration
 

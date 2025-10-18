@@ -22,28 +22,6 @@
 - **Forms**: vee-validate, yup
 - **HTTP**: axios
 
-## Project Structure
-```
-/src
-  /components         # Reusable Vue components
-    - BulkLogForm.vue # Bulk time logging
-    - LogForm.vue     # Individual log entry
-    - LogList.vue     # Display logged entries
-    - Calendar*.vue   # Calendar-related components
-  /views             # Page components
-    - HomeView.vue   # Main dashboard
-    - SettingView.vue # Configuration
-    - TaskView.vue   # Task management
-  /apis             # API integrations
-  /common           # Shared utilities
-  /composables      # Vue composables
-  /interfaces       # TypeScript interfaces
-  /stores           # Pinia state stores
-/e2e              # Playwright E2E tests
-/powershell-scripts # Windows automation scripts
-/templates        # CSV templates for Xero
-```
-
 ## Development Commands (Yarn Priority)
 ```bash
 # Development
@@ -84,6 +62,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 ## Key Features
 - **Time Logging**: Individual and bulk time entry
 - **Xero Integration**: Automated work logging via Playwright
+- **Jira Integration**: Ticket sync with daily auto-cache (3-layer architecture: Vercel API for CORS bypass → jiraApi.ts for HTTP client → useJiraApi.ts for business logic)
 - **Calendar View**: Visual time tracking overview
 - **Data Export**: CSV export functionality
 - **Charts**: Visual time tracking with Chart.js

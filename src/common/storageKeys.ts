@@ -13,4 +13,8 @@ export const storageKeys = {
   settings: {
     projectColorMaps: 'projectColorMaps',
   },
+  jira: {
+    config: 'jiraConfig',
+    lastSyncDate: 'jiraLastSyncDate', // Stores the date of last auto-sync
+  },
 };

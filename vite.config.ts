@@ -15,6 +15,17 @@ export default defineConfig({
     }),
     // vueDevTools(),
   ],
+  server: {
+    port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
+    proxy: {
+      // Proxy API requests to Vercel functions
+      '/api': {
+        target: 'http://localhost:3000', // Vercel dev port
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   css: {
     preprocessorOptions: {
       scss: {
@@ -32,17 +43,17 @@ export default defineConfig({
           // Vue ecosystem
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
           // UI library
-          'vuetify': ['vuetify'],
+          vuetify: ['vuetify'],
           // Chart libraries
-          'chart': ['chart.js', 'chartjs-plugin-datalabels', 'patternomaly'],
+          chart: ['chart.js', 'chartjs-plugin-datalabels', 'patternomaly'],
           // Utility libraries
-          'utils': ['lodash', 'dayjs', 'nanoid', 'axios'],
+          utils: ['lodash', 'dayjs', 'nanoid', 'axios'],
           // Form libraries
-          'forms': ['vee-validate', 'yup'],
+          forms: ['vee-validate', 'yup'],
           // File and data processing
-          'data': ['papaparse', 'file-saver'],
+          data: ['papaparse', 'file-saver'],
           // Calendar and UI components
-          'calendar': ['v-calendar', '@vueuse/core'],
+          calendar: ['v-calendar', '@vueuse/core'],
         },
       },
     },

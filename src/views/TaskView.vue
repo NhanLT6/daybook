@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
-import { useDefaultTasksProjects } from '@/composables/useDefaultTasksProjects';
+import { useWorkspace } from '@/composables/useWorkspace';
 import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { Project } from '@/interfaces/Project';
@@ -16,7 +16,13 @@ interface TaskFormData {
 }
 
 const projectColors = useProjectColors();
-const { tasks, projects, projectItems, tasksByProject, initializeDefaults } = useDefaultTasksProjects();
+const {
+  customTasks: tasks,
+  customProjects: projects,
+  availableProjects: projectItems,
+  tasksByProject,
+  initializePresets: initializeDefaults,
+} = useWorkspace();
 
 // Initialize default tasks and projects on mount
 onMounted(() => {
@@ -30,6 +36,9 @@ const isNewProject = ref(false);
 const isDialogOpen = ref(false);
 const isDeleteProjectDialogOpen = ref(false);
 const projectToDelete = ref<string | null>(null);
+
+// Expansion panels state
+const openedPanels = ref<string[]>([]);
 
 const validationSchema = computed(() =>
   object({
@@ -190,8 +199,12 @@ const confirmDeleteProject = (projectTitle: string) => {
 
 const executeDeleteProject = () => {
   if (projectToDelete.value) {
+    // Delete from projects array (handles both regular and Jira projects)
     projects.value = projects.value.filter((p) => p.title !== projectToDelete.value);
+
+    // Delete associated tasks
     tasks.value = tasks.value.filter((t) => t.project !== projectToDelete.value);
+
     projectToDelete.value = null;
     isDeleteProjectDialogOpen.value = false;
   }
@@ -218,6 +231,15 @@ const currentMode = computed(() => {
 });
 
 const showTaskField = computed(() => isNewTask.value || editingTask.value || isNewProject.value);
+
+// Expand/Collapse all panels
+const onExpandAll = () => {
+  openedPanels.value = projectItems.value;
+};
+
+const onCollapseAll = () => {
+  openedPanels.value = [];
+};
 </script>
 
 <template>
@@ -301,19 +323,50 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
 
               <VSpacer />
 
-              <VTooltip>
-                <template #activator="{ props }">
-                  <VBtn variant="tonal" prepend-icon="mdi-plus-outline" @click="createNewProject" v-bind="props">
-                    New Project
-                  </VBtn>
-                </template>
-                Create a new project
-              </VTooltip>
+              <div class="d-flex ga-2">
+                <!-- Expand all -->
+                <VTooltip>
+                  <template #activator="{ props }">
+                    <VBtn
+                      icon="mdi-arrow-expand"
+                      variant="text"
+                      size="small"
+                      @click="onExpandAll"
+                      v-bind="props"
+                    />
+                  </template>
+                  Expand all projects
+                </VTooltip>
+
+                <!-- Collapse all -->
+                <VTooltip>
+                  <template #activator="{ props }">
+                    <VBtn
+                      icon="mdi-arrow-collapse"
+                      variant="text"
+                      size="small"
+                      @click="onCollapseAll"
+                      v-bind="props"
+                    />
+                  </template>
+                  Collapse all projects
+                </VTooltip>
+
+                <!-- New Project button -->
+                <VTooltip>
+                  <template #activator="{ props }">
+                    <VBtn variant="tonal" prepend-icon="mdi-plus-outline" @click="createNewProject" v-bind="props">
+                      New Project
+                    </VBtn>
+                  </template>
+                  Create a new project
+                </VTooltip>
+              </div>
             </VToolbar>
           </VCardTitle>
 
           <!-- Projects List - Expandable panels showing tasks for each project -->
-          <VExpansionPanels v-if="projectItems.length > 0" variant="accordion" multiple elevation="0">
+          <VExpansionPanels v-if="projectItems.length > 0" variant="accordion" multiple elevation="0" v-model="openedPanels">
             <VExpansionPanel v-for="projectTitle in projectItems" :key="projectTitle" :value="projectTitle">
               <VExpansionPanelTitle>
                 <div class="d-flex align-center justify-space-between w-100">

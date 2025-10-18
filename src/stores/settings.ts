@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { defineStore } from 'pinia';
 import { useStorage } from '@vueuse/core';
+import type { JiraConfig } from '@/interfaces/JiraConfig';
 
 export interface DateFormatOption {
   label: string;
@@ -50,7 +51,7 @@ export const weekendPatterns: WeekendPattern[] = [
 export const useSettingsStore = defineStore('settings', () => {
   // Date display format (for UI display only, not import/export)
   const dateDisplayFormat = useStorage('dateDisplayFormat', 'MM/DD/YYYY');
-  
+
   // First day of week for calendar (0 = Sunday, 1 = Monday, etc.)
   // v-calendar uses 1-7 where 1=Sunday, so we need to convert
   const firstDayOfWeek = useStorage('firstDayOfWeek', 1); // Default Monday
@@ -60,6 +61,15 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Use default tasks setting
   const useDefaultTasks = useStorage('useDefaultTasks', true);
+
+  // Jira integration configuration
+  const jiraConfig = useStorage<JiraConfig>('jiraConfig', {
+    enabled: false,
+    domain: '',
+    email: '',
+    apiToken: '',
+    projectKey: '',
+  });
 
   // Convert our 0-6 value to v-calendar's 1-7 format
   const vCalendarFirstDay = computed(() => {
@@ -76,6 +86,7 @@ export const useSettingsStore = defineStore('settings', () => {
     firstDayOfWeek,
     weekendDays,
     useDefaultTasks,
+    jiraConfig,
     vCalendarFirstDay,
     vCalendarWeekendDays,
     dateFormatOptions,
