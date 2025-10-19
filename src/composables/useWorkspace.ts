@@ -67,7 +67,7 @@ export function useWorkspace() {
 
     const jiraTasks: Task[] = myJiraProjects.value
       .filter((jp) => jp.title === projectTitle)
-      .map((jp) => ({ title: projectTitle, project: projectTitle }) satisfies Task);
+      .map(() => ({ title: projectTitle, project: projectTitle }) satisfies Task);
 
     return uniqBy([...tasks, ...jiraTasks], (t) => t.title);
   };

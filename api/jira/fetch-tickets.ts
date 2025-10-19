@@ -64,19 +64,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const {
-      domain,
-      email,
-      apiToken,
-      projectKey,
-      statuses = ['To Do', 'In Progress', 'Code Review', 'Done', 'Document'],
-    } = req.body as FetchTicketsRequest;
+    const { domain, email, apiToken, projectKey, statuses } = req.body as FetchTicketsRequest;
 
     // Validate required fields
     if (!domain || !email || !apiToken || !projectKey) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: domain, email, apiToken, projectKey',
+      });
+    }
+
+    // Validate statuses array
+    if (!statuses || !Array.isArray(statuses) || statuses.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing or invalid statuses field. Expected a non-empty array of status names.',
       });
     }
 

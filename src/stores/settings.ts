@@ -69,6 +69,7 @@ export const useSettingsStore = defineStore('settings', () => {
     email: '',
     apiToken: '',
     projectKey: '',
+    statuses: 'To Do;In Progress;In Review;Done;QA', // Default statuses separated by semicolon
   });
 
   // Convert our 0-6 value to v-calendar's 1-7 format

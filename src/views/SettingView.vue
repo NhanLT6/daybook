@@ -3,6 +3,9 @@ import { computed, ref } from 'vue';
 
 import { useJira } from '@/composables/useJira';
 
+import { useField, useForm } from 'vee-validate';
+import * as yup from 'yup';
+
 import dayjs from 'dayjs';
 
 import { useSettingsStore } from '@/stores/settings';
@@ -10,11 +13,81 @@ import { toast } from 'vue-sonner';
 
 const settingsStore = useSettingsStore();
 
-// TanStack Query style API - loading states are managed by the composable
 const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJira();
 
-// Password visibility toggle
 const showApiToken = ref(false);
+
+const jiraValidationSchema = yup.object({
+  email: yup.string().email('Please enter a valid email address').required('Email is required'),
+  domain: yup
+    .string()
+    .required('Domain is required')
+    .min(2, 'Domain must be at least 2 characters')
+    .matches(/^[a-zA-Z0-9-]+$/, 'Domain can only contain letters, numbers, and hyphens')
+    .test('no-atlassian-suffix', 'Enter only the subdomain (without .atlassian.net)', (value) => {
+      if (!value) return true;
+      return !value.toLowerCase().includes('atlassian');
+    }),
+  apiToken: yup.string().required('API Token is required').min(10, 'API Token seems too short'),
+  projectKey: yup
+    .string()
+    .required('Project Key is required')
+    .min(2, 'Project Key must be at least 2 characters')
+    .max(10, 'Project Key must be at most 10 characters'),
+  statuses: yup
+    .string()
+    .required('At least one status is required')
+    .test('has-valid-statuses', 'Please enter at least one valid status', (value) => {
+      if (!value) return false;
+      const statuses = value
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      return statuses.length > 0;
+    }),
+});
+
+useForm({
+  validationSchema: jiraValidationSchema,
+});
+
+// Set up individual field validation with two-way binding to settings store
+const emailField = useField<string>(() => settingsStore.jiraConfig.email, {
+  validateOnValueUpdate: false, // Only validate on blur
+});
+
+const domainField = useField<string>(() => settingsStore.jiraConfig.domain, {
+  validateOnValueUpdate: false,
+});
+
+const apiTokenField = useField<string>(() => settingsStore.jiraConfig.apiToken, {
+  validateOnValueUpdate: false,
+});
+
+const projectKeyField = useField<string>(() => settingsStore.jiraConfig.projectKey, {
+  validateOnValueUpdate: false,
+});
+
+const statusesField = useField<string>(() => settingsStore.jiraConfig.statuses, {
+  validateOnValueUpdate: false,
+});
+
+// Smart domain detection from email when user finishes typing (on blur)
+const handleEmailBlur = () => {
+  // First, trigger validation
+  emailField.handleBlur();
+
+  // Then, auto-detect domain from email
+  const email = settingsStore.jiraConfig.email;
+
+  // Only autofill domain if it's currently empty
+  if (!settingsStore.jiraConfig.domain && email && email.includes('@')) {
+    const domainPart = email.split('@')[1];
+    if (!domainPart) return;
+
+    settingsStore.jiraConfig.domain = domainPart.split('.')[0].toLowerCase();
+  }
+};
 
 // Create a preview of current date format
 const dateFormatPreview = computed(() => {
@@ -41,7 +114,9 @@ const handleSyncTickets = async (): Promise<void> => {
     const savedTicketCount = await syncTicketsToLocalStorage();
     toast.success(`Successfully synced ${savedTicketCount} ticket(s)`);
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to sync Jira tickets');
+    toast.error('Failed to sync Jira tickets', {
+      description: error instanceof Error ? error.message : 'Unknown error occurred',
+    });
   }
 };
 </script>
@@ -123,22 +198,25 @@ const handleSyncTickets = async (): Promise<void> => {
             change your token often for better security.
           </VAlert>
 
-          <!-- Jira Configuration Fields -->
-          <VTextField
-            v-model="settingsStore.jiraConfig.domain"
-            label="Domain"
-            placeholder="your-company"
-            :disabled="!settingsStore.jiraConfig.enabled"
-            persistent-hint
-            hint="Your Jira subdomain only (e.g., 'acme' from 'acme.atlassian.net', not 'acme.com')"
-          />
-
           <VTextField
             v-model="settingsStore.jiraConfig.email"
             label="Email"
             type="email"
             placeholder="your-email@company.com"
             :disabled="!settingsStore.jiraConfig.enabled"
+            :error-messages="settingsStore.jiraConfig.enabled ? emailField.errorMessage.value : undefined"
+            @blur="handleEmailBlur"
+          />
+
+          <VTextField
+            v-model="settingsStore.jiraConfig.domain"
+            label="Domain"
+            placeholder="your-company"
+            :disabled="!settingsStore.jiraConfig.enabled"
+            :error-messages="settingsStore.jiraConfig.enabled ? domainField.errorMessage.value : undefined"
+            @blur="domainField.handleBlur"
+            persistent-hint
+            hint="Your Jira subdomain only (e.g., 'acme' from 'acme.atlassian.net', not 'acme.com')"
           />
 
           <VTextField
@@ -146,6 +224,8 @@ const handleSyncTickets = async (): Promise<void> => {
             label="API Token"
             :type="showApiToken ? 'text' : 'password'"
             :disabled="!settingsStore.jiraConfig.enabled"
+            :error-messages="settingsStore.jiraConfig.enabled ? apiTokenField.errorMessage.value : undefined"
+            @blur="apiTokenField.handleBlur"
             :append-inner-icon="showApiToken ? 'mdi-eye-off' : 'mdi-eye'"
             @click:append-inner="showApiToken = !showApiToken"
             clearable
@@ -158,8 +238,21 @@ const handleSyncTickets = async (): Promise<void> => {
             label="Project Key"
             placeholder="ABC"
             :disabled="!settingsStore.jiraConfig.enabled"
+            :error-messages="settingsStore.jiraConfig.enabled ? projectKeyField.errorMessage.value : undefined"
+            @blur="projectKeyField.handleBlur"
             persistent-hint
             hint="Your project key (e.g., 'ABC' from ticket 'ABC-123')"
+          />
+
+          <VTextField
+            v-model="settingsStore.jiraConfig.statuses"
+            label="Ticket Statuses"
+            placeholder="To Do;In Progress;Done"
+            :disabled="!settingsStore.jiraConfig.enabled"
+            :error-messages="settingsStore.jiraConfig.enabled ? statusesField.errorMessage.value : undefined"
+            @blur="statusesField.handleBlur"
+            persistent-hint
+            hint="Statuses to fetch, separated by semicolon (;). Example: To Do;In Progress;In Review;Done;QA"
           />
 
           <!-- Action Buttons -->

@@ -93,6 +93,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Template sections should have comments** for each layout block to identify structure faster
 - Keep comments concise and focused on explaining the "why" not the "what"
 - Use block comments for major sections, inline comments for complex logic
+- Avoid pollute code with unnecessary comments
 
 ## Deployment Considerations (Vercel Free Tier)
 - Build output optimized with chunk splitting

@@ -2,7 +2,6 @@ import { computed, ref } from 'vue';
 
 import type { JiraProject } from '@/interfaces/JiraProject';
 import type { JiraTicket } from '@/interfaces/JiraTicket';
-import type { Project } from '@/interfaces/Project';
 
 import { useStorage } from '@vueuse/core';
 
@@ -24,25 +23,9 @@ export function useJira() {
   // Storage for last sync date - tracks when we last auto-synced
   const lastSyncDate = useStorage<string | null>(storageKeys.jira.lastSyncDate, null);
 
-  // Storage for current month's projects
-  const projects = useStorage<Project[]>(storageKeys.projects, []);
   const jiraProjects = useStorage<JiraProject[]>(storageKeys.jiraProjects, []);
 
   const { jiraConfig } = useSettingsStore();
-
-  /**
-   * Validate if all required Jira configurations are provided
-   * @returns true if all required configs are present, false otherwise
-   */
-  const validateJiraConfigs = (): boolean => {
-    return !!(
-      jiraConfig.enabled &&
-      jiraConfig.domain &&
-      jiraConfig.email &&
-      jiraConfig.apiToken &&
-      jiraConfig.projectKey
-    );
-  };
 
   const transformTicketToJiraProject = (ticket: JiraTicket): JiraProject => ({
     title: `${ticket.key} ${ticket.summary}`,
@@ -113,7 +96,9 @@ export function useJira() {
         toast.error(result.message);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Connection test failed');
+      toast.error('Connection test failed', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
     } finally {
       isTesting.value = false;
     }
@@ -136,7 +121,6 @@ export function useJira() {
     isTesting,
     error,
 
-    validateJiraConfigs,
     testConnection,
     syncTicketsToLocalStorage,
     shouldAutoSync,

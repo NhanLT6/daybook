@@ -46,10 +46,17 @@ export const testJiraConnection = async (
 };
 
 // Fetch tickets from Jira via Vercel API
-export const fetchJiraTickets = async (
-  config: JiraConfig,
-  statuses: string[] = ['To Do', 'In Progress', 'In Review', 'Done', 'QA'],
-): Promise<JiraTicket[]> => {
+export const fetchJiraTickets = async (config: JiraConfig): Promise<JiraTicket[]> => {
+  const statuses = (config.statuses || '')
+    .split(';')
+    .map((status) => status.trim())
+    .filter((status) => status.length > 0);
+
+  // If no valid statuses, throw error
+  if (statuses.length === 0) {
+    throw new Error('No valid statuses configured. Please add at least one status in settings.');
+  }
+
   const response = await httpClient.post<FetchTicketsResponse>(`${API_BASE_URL}/jira/fetch-tickets`, {
     domain: config.domain,
     email: config.email,
