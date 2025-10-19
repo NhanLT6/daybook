@@ -44,14 +44,6 @@ function encodeCredentials(email: string, apiToken: string): string {
   return Buffer.from(credentials, 'utf-8').toString('base64');
 }
 
-function normalizeDomain(domain: string): string {
-  let normalized = domain.replace(/^https?:\/\//, '');
-  normalized = normalized.replace(/\.atlassian\.net.*$/i, '');
-  normalized = normalized.replace(/\.(com|net|org|io)$/i, '');
-  normalized = normalized.replace(/\/.*$/, '');
-  return normalized.trim();
-}
-
 function buildJqlQuery(projectKey: string, statuses: string[]): string {
   const statusList = statuses.map((status) => `"${status}"`).join(',');
   return `project = ${projectKey} AND status IN (${statusList}) AND sprint in openSprints() ORDER BY created DESC`;
@@ -82,9 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Normalize domain and create Jira API URL
-    const cleanDomain = normalizeDomain(domain);
-    const baseURL = `https://${cleanDomain}.atlassian.net/rest/api/3`;
+    const baseURL = `https://${domain}.atlassian.net/rest/api/3`;
     const authToken = encodeCredentials(email, apiToken);
     const jql = buildJqlQuery(projectKey, statuses);
 
@@ -130,60 +120,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       total: response.data.total,
     });
   } catch (error) {
-    // Handle Axios errors
     if (axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const responseData = error.response?.data;
+      const status = error.response?.status || 500;
+      const message = error.response?.data?.errorMessages?.[0] || error.response?.data?.message || error.message;
 
-      // Log detailed error for debugging
-      console.error('[Jira API Error]', {
-        status,
-        statusText,
-        data: responseData,
-        url: error.config?.url,
-        params: error.config?.params,
-      });
-
-      const errorMessages: Record<number, string> = {
-        400: 'Invalid request. Please check your project key and settings.',
-        401: 'Authentication failed. Please check your credentials.',
-        403: 'Access denied. Please check your permissions.',
-        404: 'Project not found. Please verify your project key.',
-        410: 'Resource no longer available. This may indicate an issue with the Jira API endpoint or your account permissions.',
-        429: 'Rate limit exceeded. Please try again in a few minutes.',
-      };
-
-      let message: string;
-
-      if (status) {
-        const baseMessage = errorMessages[status] || 'Failed to fetch tickets';
-        // Include Jira's error message if available
-        const jiraError = responseData?.errorMessages?.[0] || responseData?.message;
-        const detailMessage = jiraError ? ` Details: ${jiraError}` : '';
-        message = `${baseMessage} (Status: ${status}${statusText ? ` - ${statusText}` : ''})${detailMessage}`;
-      } else if (error.code === 'ECONNABORTED') {
-        message = 'Connection timeout. Please check your internet connection.';
-      } else if (error.code === 'ENOTFOUND') {
-        message = 'Cannot reach Jira server. Please check your domain.';
-      } else {
-        message = `Network error: ${error.message}`;
-      }
-
-      return res.status(status || 500).json({
+      return res.status(status).json({
         success: false,
         message,
-        statusCode: status,
-        details: responseData, // Include full error response for debugging
       });
     }
 
-    // Handle unexpected errors
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return res.status(500).json({
       success: false,
-      message: `An unexpected error occurred while fetching tickets: ${errorMessage}`,
-      statusCode: 500,
+      message: error instanceof Error ? error.message : 'Failed to fetch tickets',
     });
   }
 }

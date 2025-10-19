@@ -108,8 +108,8 @@ const selectedWeekendPattern = computed({
 
 const handleSyncTickets = async (): Promise<void> => {
   try {
-    const savedTicketCount = await syncTicketsToLocalStorage();
-    toast.success(`Successfully synced ${savedTicketCount} ticket(s)`);
+    const { fetched, saved } = await syncTicketsToLocalStorage();
+    toast.success(`Fetched ${fetched} ticket(s), saved ${saved} new ticket(s)`);
   } catch (error) {
     toast.error('Failed to sync Jira tickets', {
       description: error instanceof Error ? error.message : 'Unknown error occurred',

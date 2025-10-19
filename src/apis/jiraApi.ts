@@ -10,7 +10,6 @@ const API_BASE_URL = '/api';
 interface TestConnectionResponse {
   success: boolean;
   message: string;
-  statusCode?: number;
   user?: {
     accountId: string;
     displayName: string;
@@ -23,7 +22,6 @@ interface FetchTicketsResponse {
   tickets?: JiraTicket[];
   total?: number;
   message?: string;
-  statusCode?: number;
 }
 
 // Test connection to Jira via Vercel API

@@ -40,11 +40,10 @@ const autoFetchHolidays = async () => {
  * Auto-sync Jira tickets if enabled and needed (once per day only)
  */
 const autoSyncJiraTickets = async () => {
-  // Check if we need to sync today (shouldAutoSync checks if Jira is enabled internally)
   if (shouldAutoSync()) {
     try {
-      const savedTicketCount = await syncTicketsToLocalStorage();
-      toast.success(`Auto-synced ${savedTicketCount} Jira ticket(s)`);
+      const { fetched, saved } = await syncTicketsToLocalStorage();
+      toast.success(`Fetched ${fetched} ticket(s), saved ${saved} new ticket(s)`);
     } catch (error) {
       toast.error('Auto-sync Jira tickets failed', {
         description: error instanceof Error ? error.message : 'Unknown error occurred',

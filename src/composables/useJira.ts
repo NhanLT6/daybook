@@ -51,19 +51,11 @@ export function useJira() {
     return lastSyncDate.value !== today;
   };
 
-  /**
-   * Fetch Jira tickets and save them as Projects to localStorage
-   * Uses the Vercel API proxy to bypass CORS
-   * Internal method used by both auto-sync and manual sync
-   *
-   * @return number - Number of saved tickets
-   */
-  const syncTicketsToLocalStorage = async (): Promise<number> => {
+  const syncTicketsToLocalStorage = async (): Promise<{ fetched: number; saved: number }> => {
     isSyncing.value = true;
     error.value = null;
 
     try {
-      // Fetch tickets via Vercel serverless function
       const tickets = await fetchJiraTickets(jiraConfig);
       const newJiraProjects = tickets.map(transformTicketToJiraProject);
       const projectsToAdd = differenceBy(newJiraProjects, jiraProjects.value, (p) => p.title);
@@ -71,7 +63,10 @@ export function useJira() {
 
       lastSyncDate.value = dayjs().format(shortDateFormat);
 
-      return projectsToAdd.length;
+      return {
+        fetched: tickets.length,
+        saved: projectsToAdd.length,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sync Jira tickets';
       error.value = message;
