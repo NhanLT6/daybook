@@ -39,10 +39,7 @@ const jiraValidationSchema = yup.object({
     .required('At least one status is required')
     .test('has-valid-statuses', 'Please enter at least one valid status', (value) => {
       if (!value) return false;
-      const statuses = (value || '')
-        .split(';')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+      const statuses = value.split(';').map((s) => s.trim()).filter((s) => s.length > 0);
       return statuses.length > 0;
     }),
 });
