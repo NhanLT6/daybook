@@ -39,7 +39,10 @@ const jiraValidationSchema = yup.object({
     .required('At least one status is required')
     .test('has-valid-statuses', 'Please enter at least one valid status', (value) => {
       if (!value) return false;
-      const statuses = value.split(';').map((s) => s.trim()).filter((s) => s.length > 0);
+      const statuses = value
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
       return statuses.length > 0;
     }),
 });
@@ -227,8 +230,21 @@ const handleSyncTickets = async (): Promise<void> => {
             @click:append-inner="showApiToken = !showApiToken"
             clearable
             persistent-hint
-            hint="Get your API token at https://id.atlassian.com/manage-profile/security/api-tokens"
-          />
+          >
+            <template #details>
+              <div class="text-caption text-medium-emphasis">
+                Get your API token at
+                <a
+                  href="https://id.atlassian.com/manage-profile/security/api-tokens"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-primary text-decoration-none"
+                >
+                  Atlassian API Tokens
+                </a>
+              </div>
+            </template>
+          </VTextField>
 
           <VTextField
             v-model="settingsStore.jiraConfig.projectKey"
