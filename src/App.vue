@@ -60,7 +60,7 @@ const showReleaseNotification = () => {
   if (lastSeenVersion.value !== __APP_VERSION__) {
     toast.info('New Update', {
       description: __COMMIT_MESSAGE__,
-      duration: 6000,
+      duration: 10000,
     });
 
     lastSeenVersion.value = __APP_VERSION__;
