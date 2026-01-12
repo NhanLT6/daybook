@@ -45,13 +45,17 @@ onMounted(() => {
   initTeamWorkPreset();
 });
 
-const tasksOfProject = computed(() => getTasksByProject(projectField.value.value).map((t) => t.title));
+const tasksOfProject = computed(() =>
+  getTasksByProject(projectField.value.value)
+    .map((t) => t.title)
+    .sort(),
+);
 
 const descriptions = computed((): string[] => {
   const isCodeReview = projectField.value.value === 'Team work' && taskField.value.value === 'Code review';
   if (!isCodeReview) return [];
 
-  return codeReviewDescriptions.value;
+  return [...codeReviewDescriptions.value].sort();
 });
 
 const hours = Array.from({ length: 7 }, (_, i) => i + 1);
@@ -166,7 +170,7 @@ watch(
 
 <template>
   <div class="pa-4">
-    <form class="d-flex flex-column ga-2">
+    <form class="d-flex flex-column ga-2" autocomplete="off">
       <VTextarea
         label="Selected Dates"
         readonly
@@ -196,9 +200,10 @@ watch(
       <VCombobox
         v-model="projectField.value.value"
         label="Project"
-        :items="myProjects.map((p) => p.title)"
+        :items="myProjects.map((p) => p.title).sort()"
         :error-messages="errors.project"
-        autocomplete="false"
+        autocomplete="new-password"
+        aria-autocomplete="list"
       >
         <template #item="{ props: itemProps, item }">
           <VListItem v-bind="itemProps">
@@ -214,7 +219,8 @@ watch(
         label="Task"
         :items="tasksOfProject"
         :error-messages="errors.task"
-        autocomplete="false"
+        autocomplete="new-password"
+        aria-autocomplete="list"
       ></VCombobox>
 
       <VCombobox
@@ -222,7 +228,8 @@ watch(
         label="Description"
         :items="descriptions"
         :error-messages="errors.description"
-        autocomplete="false"
+        autocomplete="new-password"
+        aria-autocomplete="list"
         placeholder="Select a ticket or type custom description"
       ></VCombobox>
 

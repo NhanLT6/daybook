@@ -94,7 +94,6 @@ const getColorHint = (minutes: number) => {
 // Table
 
 const headers = ref([
-  { title: 'Date', key: 'date' },
   { title: 'Project', key: 'project' },
   { title: 'Task', key: 'task' },
   { title: 'Duration', key: 'duration' },
