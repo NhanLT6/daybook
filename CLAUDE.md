@@ -95,6 +95,14 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - Use block comments for major sections, inline comments for complex logic
 - Avoid pollute code with unnecessary comments
 
+### Reactive State & Watchers
+- **Single Source of Truth**: Avoid multiple watchers competing over the same state
+- **Prefer `computed` over `watch + ref`**: Use computed properties with getter/setter for prop synchronization
+- **Combine related watchers**: Use single watch with multiple dependencies instead of separate watchers
+- **Explicit priority**: When watching multiple sources, use clear if/else to show precedence
+- **Use `defineModel()`**: Leverage Vue 3.4+ `defineModel()` for two-way binding (already used in `CalendarOverview`)
+- **Controlled vs Uncontrolled**: Decide state ownership upfront - parent-controlled (props + events) or self-managed (internal state)
+
 ## Deployment Considerations (Vercel Free Tier)
 - Build output optimized with chunk splitting
 - Environment variables configured in Vercel dashboard

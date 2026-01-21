@@ -12,6 +12,10 @@ import { nagerDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { useSettingsStore } from '@/stores/settings';
 
+const { singleDateMode = false } = defineProps<{
+  singleDateMode?: boolean;
+}>();
+
 const emit = defineEmits<{
   monthChanged: [month: number];
 }>();
@@ -28,13 +32,13 @@ const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
 // Calendar attributes - static, not reactive to displayed month to avoid recursion
 const todayAttribute = computed(() => ({
   key: 'today',
-  highlight: { color: 'blue', fillMode: 'light' },
+  highlight: { color: 'green', fillMode: 'light' },
   dates: new Date(),
 }));
 
 const selectedDateAttribute = computed(() => ({
   key: 'selected',
-  highlight: { color: 'blue', fillMode: 'outline' },
+  highlight: { color: 'green', fillMode: 'outline' },
   dates: selectedDates.value,
 }));
 
@@ -117,15 +121,30 @@ const upcomingHolidaysDisplay = computed(() => {
 const onDayClick = (day: { date: Date }) => {
   const clickedDate = day.date;
 
-  // Toggle date selection
-  const dateIndex = selectedDates.value.findIndex(
-    (date) => dayjs(date).format('YYYY-MM-DD') === dayjs(clickedDate).format('YYYY-MM-DD'),
-  );
+  if (singleDateMode) {
+    // Single date mode: Replace selection with clicked date
+    const isSameDate =
+      selectedDates.value.length === 1 &&
+      dayjs(selectedDates.value[0]).format('YYYY-MM-DD') === dayjs(clickedDate).format('YYYY-MM-DD');
 
-  if (dateIndex > -1) {
-    selectedDates.value.splice(dateIndex, 1);
+    if (isSameDate) {
+      // Clicking the same date deselects it
+      selectedDates.value = [];
+    } else {
+      // Replace with new date
+      selectedDates.value = [clickedDate];
+    }
   } else {
-    selectedDates.value.push(clickedDate);
+    // Multi-date mode: Toggle date selection
+    const dateIndex = selectedDates.value.findIndex(
+      (date) => dayjs(date).format('YYYY-MM-DD') === dayjs(clickedDate).format('YYYY-MM-DD'),
+    );
+
+    if (dateIndex > -1) {
+      selectedDates.value.splice(dateIndex, 1);
+    } else {
+      selectedDates.value.push(clickedDate);
+    }
   }
 
   // selectedDates is automatically synced with parent via v-model
@@ -155,18 +174,22 @@ const goToToday = async () => {
   <Calendar
     ref="calendar"
     view="monthly"
-    :attributes="calendarAttrs"
     expanded
+    title-position="left"
+    color="green"
     :first-day-of-week="settingsStore.vCalendarFirstDay"
+    :attributes="calendarAttrs"
     @dayclick="onDayClick"
     @update:pages="onPageChange"
   >
     <!-- Calendar footer with Today navigation button -->
     <template #footer>
-      <VBtn variant="tonal" block @click="goToToday">
-        <VIcon start>mdi-calendar-today</VIcon>
-        Today
-      </VBtn>
+      <div class="pa-2">
+        <VBtn block variant="tonal" color="green-darken-3" @click="goToToday">
+          <VIcon start>mdi-calendar-today</VIcon>
+          Today
+        </VBtn>
+      </div>
     </template>
   </Calendar>
 
