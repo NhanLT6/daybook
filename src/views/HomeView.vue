@@ -4,7 +4,6 @@ import { ref, watchEffect } from 'vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import CalendarOverview from '@/components/CalendarOverview.vue';
 import LogList from '@/components/LogList.vue';
-// import LoggedTimeWithChartView2 from '@/components/LoggedTimeWithChartView2.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
 import type { Project } from '@/interfaces/Project';
@@ -33,6 +32,7 @@ const monthStorages = new Map<string, ReturnType<typeof useStorage<TimeLog[]>>>(
 
 const selectedDates = ref<Date[]>([]);
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
+const editingLog = ref<TimeLog | undefined>(undefined);
 
 // Function to get or create storage for a specific month
 const getTimeLogsForMonth = (month: number) => {
@@ -59,11 +59,31 @@ const onMonthChanged = (month: number) => {
 
 const saveBulkLogs = (logs: TimeLog[]) => {
   const monthStorage = getTimeLogsForMonth(currentMonth.value);
-  monthStorage.value.push(...logs);
+
+  // Handle both create and update based on log ID
+  logs.forEach((log) => {
+    const existingIndex = monthStorage.value.findIndex((item) => item.id === log.id);
+
+    if (existingIndex !== -1) {
+      // Update existing log
+      monthStorage.value[existingIndex] = log;
+      toast.success('Log updated');
+    } else {
+      // Add new log
+      monthStorage.value.push(log);
+    }
+  });
+
   // Update the reactive timeLogs ref as well
   timeLogs.value = monthStorage.value;
-  toast.success(`${logs.length} logs added`);
+
+  // Show success message for bulk add (not for single update)
+  if (logs.length > 1 || !logs.some((log) => monthStorage.value.findIndex((item) => item.id === log.id) !== -1)) {
+    toast.success(`${logs.length} logs added`);
+  }
+
   selectedDates.value = [];
+  editingLog.value = undefined;
 };
 
 const handleFormSubmit = (logs: TimeLog[]) => {
@@ -72,10 +92,17 @@ const handleFormSubmit = (logs: TimeLog[]) => {
 
 const onBulkCancel = () => {
   selectedDates.value = [];
+  editingLog.value = undefined;
 };
 
 const onClearDates = () => {
   selectedDates.value = [];
+};
+
+const onEditLog = (log: TimeLog) => {
+  editingLog.value = log;
+  // Set calendar to show the log's date as selected (user can change it)
+  selectedDates.value = [dayjs(log.date, shortDateFormat).toDate()];
 };
 
 const onDeleteLog = (log: TimeLog) => {
@@ -175,7 +202,7 @@ const importCsv = async (file?: File) => {
   <VRow>
     <!-- Calendar and Total Hours - Visible on all screen sizes -->
     <VCol cols="12" md="3" lg="3" class="d-flex flex-column ga-4">
-      <CalendarOverview v-model="selectedDates" @month-changed="onMonthChanged" />
+      <CalendarOverview v-model="selectedDates" :single-date-mode="!!editingLog" @month-changed="onMonthChanged" />
     </VCol>
 
     <!-- Bulk Log Form -->
@@ -183,6 +210,7 @@ const importCsv = async (file?: File) => {
       <VCard class="elevation-0 border">
         <BulkLogForm
           :selected-dates="selectedDates"
+          :editing-log="editingLog"
           @submit="handleFormSubmit"
           @cancel="onBulkCancel"
           @clear-dates="onClearDates"
@@ -195,6 +223,7 @@ const importCsv = async (file?: File) => {
       <LogList
         :items="timeLogs"
         :selected-dates="selectedDates"
+        @edit-log="onEditLog"
         @delete-log="onDeleteLog"
         @import="importCsv"
         @export="exportToCsv"

@@ -26,8 +26,9 @@ interface BulkLogFormData {
   description?: string;
 }
 
-const { selectedDates = [] } = defineProps<{
+const { selectedDates = [], editingLog } = defineProps<{
   selectedDates?: Date[];
+  editingLog?: TimeLog;
 }>();
 
 const emit = defineEmits<{
@@ -89,6 +90,9 @@ const taskField = useField<string>('task');
 const durationField = useField<number>('duration');
 const descriptionField = useField<string>('description');
 
+// Edit mode detection
+const isEditMode = computed(() => !!editingLog);
+
 const selectedDatesText = computed(() => {
   if (!selectedDatesField.value.value || selectedDatesField.value.value.length === 0) {
     return '';
@@ -116,17 +120,31 @@ const selectedDatesText = computed(() => {
 });
 
 const onSave = handleSubmit((values) => {
-  // Create multiple logs for selected dates
-  const logs = values.selectedDates.map((date) => ({
-    id: nanoid(),
-    date: dayjs(date).format(shortDateFormat),
-    project: values.project!,
-    task: values.task!,
-    duration: Math.round(values.duration!),
-    description: values.description,
-  }));
+  // Edit mode: Update single log (emit as array with 1 item)
+  if (isEditMode.value && editingLog) {
+    const updatedLog: TimeLog = {
+      id: editingLog.id, // Keep existing ID
+      date: dayjs(values.selectedDates[0]).format(shortDateFormat),
+      project: values.project!,
+      task: values.task!,
+      duration: Math.round(values.duration!),
+      description: values.description,
+    };
 
-  emit('submit', logs);
+    emit('submit', [updatedLog]);
+  } else {
+    // Create mode: Create multiple logs for selected dates
+    const logs = values.selectedDates.map((date) => ({
+      id: nanoid(),
+      date: dayjs(date).format(shortDateFormat),
+      project: values.project!,
+      task: values.task!,
+      duration: Math.round(values.duration!),
+      description: values.description,
+    }));
+
+    emit('submit', logs);
+  }
 
   // Save Project and Task if needed
   const isProjectExisting = allProjects.value.map((p) => p.title).includes(values.project!);
@@ -159,12 +177,27 @@ const onHourClick = (hour: number) => {
   setFieldValue('duration', currentDuration + hour * 60);
 };
 
+// Single combined watch with clear priority
 watch(
-  () => selectedDates,
-  (newDates) => {
-    selectedDatesField.setValue(newDates, false);
+  () => ({ dates: selectedDates, editing: editingLog }),
+  ({ dates, editing }) => {
+    if (editing) {
+      // Edit mode: Pre-populate form with log data, but allow date changes from calendar
+      resetForm({
+        values: {
+          selectedDates: dates.length > 0 ? dates : [dayjs(editing.date, shortDateFormat).toDate()],
+          project: editing.project,
+          task: editing.task,
+          duration: editing.duration,
+          description: editing.description,
+        },
+      });
+    } else if (dates) {
+      // Create mode: Sync with parent's selected dates
+      selectedDatesField.setValue(dates, false);
+    }
   },
-  { immediate: false, deep: true },
+  { immediate: true, deep: true },
 );
 </script>
 
@@ -259,7 +292,7 @@ watch(
           prepend-icon="mdi-content-save-outline"
           @click="onSave"
         >
-          Save {{ selectedDatesField.value.value?.length || 0 }} Logs
+          {{ isEditMode ? 'Update Log' : `Save ${selectedDatesField.value.value?.length || 0} Logs` }}
         </VBtn>
       </div>
     </form>

@@ -24,6 +24,7 @@ export interface LogListProps {
 const { items: logItems, selectedDates } = defineProps<LogListProps>();
 
 const emit = defineEmits<{
+  editLog: [log: TimeLog];
   deleteLog: [log: TimeLog];
   import: [file?: File];
   export: [];
@@ -119,6 +120,10 @@ const onExpand = () => {
 
 const onCollapse = () => {
   openedPanels.value = [];
+};
+
+const onEditLog = (log: TimeLog) => {
+  emit('editLog', log);
 };
 
 const onDeleteLog = (log: TimeLog) => {
@@ -227,7 +232,8 @@ const readCsv = (file?: File) => {
               <!--suppress VueUnrecognizedSlot -->
               <template #item.actions="{ item }">
                 <div class="d-flex ga-2">
-                  <VBtn icon="mdi-trash-can-outline" variant="text" size="sm" @click="onDeleteLog(item)" class="me-2" />
+                  <VBtn icon="mdi-pencil-outline" variant="text" size="sm" @click="onEditLog(item)" />
+                  <VBtn icon="mdi-trash-can-outline" variant="text" size="sm" @click="onDeleteLog(item)" />
                 </div>
               </template>
             </VDataTable>
