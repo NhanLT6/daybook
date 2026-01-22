@@ -6,6 +6,7 @@ import { useProjectColors } from '@/composables/useProjectColors';
 import type { TimeLog } from '@/interfaces/TimeLog';
 
 import { useStorage } from '@vueuse/core';
+import { useTheme } from 'vuetify';
 
 import dayjs from 'dayjs';
 
@@ -14,6 +15,17 @@ import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
 import { chain, round } from 'lodash';
 import * as pattern from 'patternomaly';
+
+// Theme integration
+const theme = useTheme();
+const isDark = computed(() => theme.global.name.value === 'dark');
+
+// Theme-aware colors for chart
+const chartColors = computed(() => ({
+  gridColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+  tickColor: isDark.value ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+  legendColor: isDark.value ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)',
+}));
 
 // Component props
 const props = defineProps<{
@@ -76,7 +88,7 @@ const chartData = computed(() => {
       .groupBy(() => 'Invalid Data')
       .map((logsByProject) => ({
         label: 'Invalid Data',
-        backgroundColor: pattern.draw('diagonal', projectColors.invalidDataColor),
+        backgroundColor: pattern.draw('diagonal', projectColors.invalidDataColor()),
         data: daysInMonth.value.map((d) =>
           chain(logsByProject)
             .filter((item) => item.date === d.format(shortDateFormat))
@@ -104,7 +116,7 @@ const chartData = computed(() => {
 
     const remainingDataSet = {
       label: 'Remaining',
-      backgroundColor: projectColors.remainingDataColor,
+      backgroundColor: projectColors.remainingDataColor(),
       data: remainingData,
     };
 
@@ -127,11 +139,25 @@ const chartData = computed(() => {
 
 const chartOptions = computed(() => ({
   scales: {
-    x: { stacked: true },
+    x: {
+      stacked: true,
+      grid: {
+        color: chartColors.value.gridColor,
+      },
+      ticks: {
+        color: chartColors.value.tickColor,
+      },
+    },
     y: {
       stacked: true,
       beginAtZero: true,
       max: 8, // 8-hour workday target
+      grid: {
+        color: chartColors.value.gridColor,
+      },
+      ticks: {
+        color: chartColors.value.tickColor,
+      },
     },
   },
   responsive: true,
@@ -144,6 +170,7 @@ const chartOptions = computed(() => ({
     legend: {
       display: true,
       labels: {
+        color: chartColors.value.legendColor,
         generateLabels: (chart: Chart) => {
           const datasets = chart.data.datasets || [];
           return datasets.map((dataset, index) => ({
@@ -159,6 +186,7 @@ const chartOptions = computed(() => ({
             lineWidth: typeof dataset.borderWidth === 'number' ? dataset.borderWidth : 0,
             hidden: !chart.isDatasetVisible(index),
             datasetIndex: index,
+            fontColor: chartColors.value.legendColor,
           }));
         },
       },
@@ -214,6 +242,11 @@ watch(
   },
   { deep: true }
 );
+
+// Watch for theme changes and update chart colors
+watch(isDark, () => {
+  updateChart();
+});
 
 // Expose updateChart method for parent components
 defineExpose({

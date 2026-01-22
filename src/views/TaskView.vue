@@ -288,7 +288,7 @@ const onCollapseAll = () => {
             <template #activator="{ props }">
               <VBtn
                 variant="tonal"
-                color="green-darken-3"
+                color="primary"
                 prepend-icon="mdi-content-save-outline"
                 @click="onSave"
                 v-bind="props"
@@ -428,7 +428,7 @@ const onCollapseAll = () => {
               </VExpansionPanelTitle>
 
               <VExpansionPanelText class="pa-0">
-                <VCard class="elevation-0 rounded-0">
+                <VCard class="elevation-0 rounded-lg">
                   <!-- Tasks Table - Shows all tasks within the current project -->
                   <VDataTable
                     v-if="getTasksByProject(projectTitle).length"
@@ -436,7 +436,7 @@ const onCollapseAll = () => {
                       getTasksByProject(projectTitle).map((task) => ({ title: task.title, project: projectTitle }))
                     "
                     :headers="[]"
-                    class="bg-grey-lighten-4"
+                    class="bg-container"
                     hide-default-footer
                     hide-default-header
                   >
@@ -479,7 +479,7 @@ const onCollapseAll = () => {
                   </VDataTable>
 
                   <!-- Empty State - Shown when project has no tasks -->
-                  <div v-else class="text-center py-4 text-medium-emphasis bg-grey-lighten-4 rounded-0">
+                  <div v-else class="text-center py-4 text-medium-emphasis bg-container">
                     No tasks in this project.
                     <a
                       href="#"

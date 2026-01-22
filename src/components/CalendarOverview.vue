@@ -5,12 +5,17 @@ import type { Holiday } from '@/apis/holidayApi';
 import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
 
 import { useStorage } from '@vueuse/core';
+import { useTheme } from 'vuetify';
 
 import dayjs from 'dayjs';
 
 import { nagerDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { useSettingsStore } from '@/stores/settings';
+
+// Theme integration
+const theme = useTheme();
+const isDark = computed(() => theme.global.name.value === 'dark');
 
 const { singleDateMode = false } = defineProps<{
   singleDateMode?: boolean;
@@ -176,7 +181,8 @@ const goToToday = async () => {
     view="monthly"
     expanded
     title-position="left"
-    color="green"
+    color="primary"
+    :is-dark="isDark"
     :first-day-of-week="settingsStore.vCalendarFirstDay"
     :attributes="calendarAttrs"
     @dayclick="onDayClick"
@@ -185,7 +191,7 @@ const goToToday = async () => {
     <!-- Calendar footer with Today navigation button -->
     <template #footer>
       <div class="pa-2">
-        <VBtn block variant="tonal" color="green-darken-3" @click="goToToday">
+        <VBtn block variant="tonal" color="primary" @click="goToToday">
           <VIcon start>mdi-calendar-today</VIcon>
           Today
         </VBtn>
@@ -194,10 +200,10 @@ const goToToday = async () => {
   </Calendar>
 
   <!-- Holidays Banner -->
-  <VCard v-if="upcomingHolidaysDisplay" class="elevation-0 mt-2" color="purple-lighten-5">
+  <VCard v-if="upcomingHolidaysDisplay" class="elevation-0 mt-2" color="accent-light">
     <VCardText class="d-flex align-center ga-2 py-3">
-      <VIcon color="purple-darken-1" size="18">mdi-party-popper</VIcon>
-      <div class="text-body-2 text-purple-darken-2 holiday-banner-text">
+      <VIcon color="accent" size="18">mdi-party-popper</VIcon>
+      <div class="text-body-2 text-accent holiday-banner-text">
         {{ upcomingHolidaysDisplay }}
       </div>
     </VCardText>
@@ -205,12 +211,17 @@ const goToToday = async () => {
 </template>
 
 <style scoped>
+/* Calendar day interaction styles */
 :deep(.vc-day) {
   cursor: pointer;
 }
 
 :deep(.vc-day:hover) {
   background-color: rgba(0, 0, 0, 0.04);
+}
+
+:deep(.vc-dark .vc-day:hover) {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .holiday-banner-text {

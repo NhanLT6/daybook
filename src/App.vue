@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 
 import { useJira } from '@/composables/useJira';
 
 import type { Holiday } from '@/apis/holidayApi';
+
+import { useTheme } from 'vuetify';
 
 import { useStorage } from '@vueuse/core';
 
@@ -76,6 +78,30 @@ onMounted(async () => {
 
 const route = useRoute();
 
+// Theme toggle
+const theme = useTheme();
+const savedTheme = useStorage<'light' | 'dark'>('app-theme', 'light');
+
+// Initialize theme from storage
+theme.global.name.value = savedTheme.value;
+
+const isDarkMode = computed(() => theme.global.name.value === 'dark');
+const themeIcon = computed(() => (isDarkMode.value ? 'mdi-weather-sunny' : 'mdi-weather-night'));
+
+const toggleTheme = () => {
+  const newTheme = isDarkMode.value ? 'light' : 'dark';
+  theme.global.name.value = newTheme;
+  savedTheme.value = newTheme;
+};
+
+// Sync theme changes to storage
+watch(
+  () => theme.global.name.value,
+  (newTheme) => {
+    savedTheme.value = newTheme as 'light' | 'dark';
+  },
+);
+
 const items = [
   { text: 'Home', to: '/' },
   { text: 'Tasks', to: '/task' },
@@ -87,6 +113,9 @@ const items = [
   <VApp>
     <VAppBar>
       <VAppBarTitle>Daybook</VAppBarTitle>
+
+      <!-- Theme toggle button -->
+      <VBtn :icon="themeIcon" variant="text" class="mr-2" @click="toggleTheme" />
 
       <VBtn
         v-for="(item, i) in items"

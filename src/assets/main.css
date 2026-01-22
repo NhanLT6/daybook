@@ -1,1 +1,31 @@
 @import './base.css';
+
+/* V-Calendar dark theme overrides to match Vuetify */
+.v-theme--dark .vc-dark {
+  --vc-bg: #1e1e1e;
+  --vc-border: rgba(255, 255, 255, 0.12);
+  --vc-color: rgba(255, 255, 255, 0.87);
+  --vc-header-title-color: rgba(255, 255, 255, 0.87);
+  --vc-weekday-color: rgba(255, 255, 255, 0.6);
+  --vc-popover-content-bg: #2d2d2d;
+  --vc-time-picker-border: rgba(255, 255, 255, 0.12);
+  --vc-header-arrow-color: rgba(255, 255, 255, 0.6);
+  --vc-header-arrow-hover-bg: rgba(255, 255, 255, 0.1);
+  --vc-focus-ring: 0 0 0 2px rgba(76, 175, 80, 0.4);
+  --vc-nav-hover-bg: rgba(255, 255, 255, 0.1);
+  --vc-nav-title-color: rgba(255, 255, 255, 0.87);
+}
+
+/* V-Calendar custom primary color using Vuetify's theme */
+.vc-primary {
+  --vc-accent-50: rgba(76, 175, 80, 0.05);
+  --vc-accent-100: rgba(76, 175, 80, 0.1);
+  --vc-accent-200: rgba(76, 175, 80, 0.2);
+  --vc-accent-300: rgba(76, 175, 80, 0.35);
+  --vc-accent-400: rgba(76, 175, 80, 0.5);
+  --vc-accent-500: rgba(76, 175, 80, 0.65);
+  --vc-accent-600: rgba(76, 175, 80, 0.8);
+  --vc-accent-700: #4caf50;
+  --vc-accent-800: #388e3c;
+  --vc-accent-900: #2e7d32;
+}

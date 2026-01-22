@@ -7,12 +7,12 @@
 
 ## Tech Stack
 - **Frontend**: Vue 3 + TypeScript + Composition API
-- **UI Framework**: Vuetify 3 (Material Design)
-- **Build Tool**: Vite
-- **Package Manager**: **Yarn** (prioritized)
+- **UI Framework**: Vuetify 3 (Material Design) with dark theme support
+- **Build Tool**: Vite (code splitting configured in vite.config.ts)
+- **Package Manager**: **Yarn** (always use yarn over npm)
 - **State Management**: Pinia
 - **Testing**: Playwright (E2E)
-- **Deployment**: Vercel (free tier - optimized)
+- **Deployment**: Vercel (free tier, client-only app)
 
 ## Key Dependencies
 - **Vue Ecosystem**: vue, vue-router, pinia
@@ -22,33 +22,14 @@
 - **Forms**: vee-validate, yup
 - **HTTP**: axios
 
-## Development Commands (Yarn Priority)
+## Development Commands
 ```bash
-# Development
 yarn dev              # Start dev server
 yarn build            # Production build
-yarn preview          # Preview build locally
-
-# Quality Assurance
 yarn type-check       # TypeScript checking
 yarn lint             # ESLint with auto-fix
-yarn format           # Prettier formatting
-
-# Testing
 yarn test:e2e         # Run Playwright E2E tests
 ```
-
-## Vercel Optimization Features
-- **Code Splitting**: Configured in vite.config.ts with manual chunks:
-  - `vue-vendor`: Core Vue ecosystem
-  - `vuetify`: UI framework
-  - `chart`: Chart.js libraries
-  - `utils`: Utility libraries
-  - `forms`: Form validation
-  - `data`: File processing
-  - `calendar`: Calendar components
-- **Modern Compiler**: Uses Sass modern compiler API
-- **Tree Shaking**: Enabled via ES modules
 
 ## Environment Setup
 Required `.env` variables:
@@ -62,66 +43,41 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 ## Key Features
 - **Time Logging**: Individual and bulk time entry
 - **Xero Integration**: Automated work logging via Playwright
-- **Jira Integration**: Ticket sync with daily auto-cache (3-layer architecture: Vercel API for CORS bypass → jiraApi.ts for HTTP client → useJiraApi.ts for business logic)
+- **Jira Integration**: Ticket sync with daily auto-cache (Vercel API → jiraApi.ts → useJiraApi.ts)
 - **Calendar View**: Visual time tracking overview
 - **Data Export**: CSV export functionality
 - **Charts**: Visual time tracking with Chart.js
-- **Task Management**: Project and task organization
-- **File Processing**: CSV template handling
+- **Dark Theme**: Toggle in app toolbar, persisted to localStorage
 
 ## Important Notes
-- **Package Manager**: Always use `yarn` over `npm`
 - **Type Safety**: Full TypeScript coverage required
-- **E2E Testing**: Playwright tests for Xero integration
-- **Windows Focus**: PowerShell scripts for Windows automation
-- **File Handling**: Local file system integration for templates
-- **Performance**: Optimized for Vercel free tier limits
-- **State**: Pinia for centralized state management
-- **Styling**: Vuetify + custom CSS, SCSS support enabled
+- **Windows Focus**: PowerShell scripts preferred for automation
+- **ESLint Compliance**: Fix all ESLint errors before completing tasks
+- **Library Utilization**: Prioritize existing libraries over custom implementations
+- **Clean Up**: Remove unused imports and variables after modifications
 
 ## Code Conventions
 - Vue 3 Composition API with `<script setup>`
 - TypeScript interfaces in `/interfaces`
-- Composables for shared logic
-- Vuetify design system
+- Composables for shared logic in `/composables`
+- **PascalCase** for component files, camelCase for composables/utilities
 - ESLint + Prettier for code quality
-- **PascalCase** for component files and component names in templates
-- camelCase for composables and utilities
 
-### Comments Guidelines
-- **Add comments for each block of code when necessary** to explain functionality
-- **Template sections should have comments** for each layout block to identify structure faster
-- Keep comments concise and focused on explaining the "why" not the "what"
-- Use block comments for major sections, inline comments for complex logic
-- Avoid pollute code with unnecessary comments
+### Theming & Colors
+- **Use semantic colors**: `primary`, `secondary`, `accent` instead of hardcoded colors like `green-darken-3`
+- **Theme config**: Light/dark themes defined in `src/main.ts`
+- **Theme toggle**: `useTheme()` from Vuetify + `useStorage()` for persistence in `App.vue`
+- **v-calendar**: Uses `is-dark` prop + custom CSS variables (`.vc-primary`) to sync with Vuetify theme
+- **Chart.js**: Uses `useTheme()` + computed colors for grid, ticks, and legend
 
 ### Reactive State & Watchers
 - **Single Source of Truth**: Avoid multiple watchers competing over the same state
 - **Prefer `computed` over `watch + ref`**: Use computed properties with getter/setter for prop synchronization
-- **Combine related watchers**: Use single watch with multiple dependencies instead of separate watchers
-- **Explicit priority**: When watching multiple sources, use clear if/else to show precedence
-- **Use `defineModel()`**: Leverage Vue 3.4+ `defineModel()` for two-way binding (already used in `CalendarOverview`)
+- **Use `defineModel()`**: Leverage Vue 3.4+ `defineModel()` for two-way binding
 - **Controlled vs Uncontrolled**: Decide state ownership upfront - parent-controlled (props + events) or self-managed (internal state)
 
-## Deployment Considerations (Vercel Free Tier)
-- Build output optimized with chunk splitting
-- Environment variables configured in Vercel dashboard
-- Static file serving from `/public`
-- Client-side routing with Vue Router
-- No server-side dependencies (client-only app)
-
-## Development Best Practices
-- **Code Optimization**: Always optimize new code for performance and maintainability
-- **Clean Up**: Clean up code after modifications (remove unused imports, variables, etc.)
-- **ESLint Compliance**: Fix all ESLint errors before completing tasks
-- **Library Utilization**: Prioritize existing libraries over custom implementations
-- **Command Execution**: 
-  - Prefer PowerShell scripts over bash commands (Windows development environment)
-  - Always explain why a command is needed and what it will accomplish
-  - Apply explanations when asking for user permission to run commands
-
-# Important Instruction Reminders
-Do what has been asked; nothing more, nothing less.
-NEVER create files unless they're absolutely necessary for achieving your goal.
-ALWAYS prefer editing an existing file to creating a new one.
-**Update documentation or README files only when needed** - create or modify documentation when explicitly requested or when significant architectural changes require documentation updates.
+### Comments Guidelines
+- Add comments for code blocks when necessary to explain functionality
+- Template sections should have comments for layout blocks
+- Focus on explaining the "why" not the "what"
+- Avoid polluting code with unnecessary comments

@@ -82,7 +82,7 @@ const getColorHint = (minutes: number) => {
   const hours = dayjs.duration({ minutes }).asHours();
 
   if (hours >= 7.5 && hours <= 8) {
-    return 'green-darken-3';
+    return 'primary';
   }
 
   if (hours > 8) {
@@ -145,7 +145,7 @@ const readCsv = (file?: File) => {
 
 <template>
   <VCard class="log-list mb-4 elevation-0 border list-container">
-    <VCardTitle class="bg-white" style="position: sticky; top: 0; z-index: 1000">
+    <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle>Logs</VToolbarTitle>
 
@@ -188,7 +188,7 @@ const readCsv = (file?: File) => {
               <VBtn
                 prepend-icon="mdi-file-delimited-outline"
                 variant="tonal"
-                color="green-darken-3"
+                color="primary"
                 @click="emit('export')"
                 v-bind="props"
               >
@@ -198,14 +198,14 @@ const readCsv = (file?: File) => {
             Export Data to CSV file
           </VTooltip>
 
-          <!-- <VBtn icon="mdi-rocket-launch-outline" color="green-darken-3" @click="emit('export')" />-->
+          <!-- <VBtn icon="mdi-rocket-launch-outline" color="primary" @click="emit('export')" />-->
         </div>
       </VToolbar>
     </VCardTitle>
 
     <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
       <VCardText>
-        <div class="d-flex flex-column ga-2 py-4 align-center bg-grey-lighten-4 rounded text-disabled">
+        <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
           <VIcon icon="mdi-package-variant-closed" />
           <div class="text-subtitle-1">No data</div>
         </div>
@@ -223,8 +223,8 @@ const readCsv = (file?: File) => {
         </VExpansionPanelTitle>
 
         <VExpansionPanelText>
-          <VCard class="elevation-0 rounded-4">
-            <VDataTable :items="group.tasks" :headers="headers" class="bg-grey-lighten-4" hide-default-footer>
+          <VCard class="elevation-0 rounded-lg">
+            <VDataTable :items="group.tasks" :headers="headers" class="bg-container" hide-default-footer>
               <template #item.duration="{ item }">
                 {{ minutesToHourWithMinutes(item.duration) }}
               </template>

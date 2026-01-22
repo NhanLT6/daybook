@@ -219,7 +219,7 @@ watch(
               v-if="selectedDatesField.value.value?.length > 0"
               icon="mdi-close-circle-outline"
               variant="plain"
-              color="grey-darken-1"
+              color="secondary"
               size="small"
               @click="onClearSelection"
             >
@@ -288,7 +288,7 @@ watch(
         <VBtn
           class="flex-fill"
           variant="tonal"
-          color="green-darken-3"
+          color="primary"
           prepend-icon="mdi-content-save-outline"
           @click="onSave"
         >

@@ -195,7 +195,6 @@ const importCsv = async (file?: File) => {
 
 <template>
   <VRow>
-    <!-- <LoggedTimeWithChartView2 :current-month="currentMonth" /> -->
     <WorkTimeBarChart :current-month="currentMonth" />
   </VRow>
 
