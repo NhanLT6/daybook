@@ -34,6 +34,10 @@ const vuetify = createVuetify({
     VTooltip: {
       location: 'top',
     },
+    // Islands theme defaults - no gutters for clean spacing control
+    VRow: {
+      noGutters: true,
+    },
     // Islands theme defaults - rounded corners, no borders, flat appearance
     VCard: {
       rounded: 'lg',

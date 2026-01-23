@@ -111,7 +111,7 @@ const items = [
 
 <template>
   <VApp>
-    <VAppBar>
+    <VAppBar density="compact" class="elevation-0" color="page-background">
       <VAppBarTitle>Daybook</VAppBarTitle>
 
       <!-- Theme toggle button -->

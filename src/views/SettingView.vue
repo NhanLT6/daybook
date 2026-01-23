@@ -122,181 +122,183 @@ const handleSyncTickets = async (): Promise<void> => {
 </script>
 
 <template>
-  <VRow justify="start" class="align-stretch">
-    <!-- App Configuration Column -->
-    <VCol cols="12" md="6" lg="4" class="d-flex">
-      <VCard elevation="0" class="flex-grow-1">
-        <VCardTitle class="d-flex align-center" style="min-height: 64px"> App Configuration </VCardTitle>
-        <VCardText class="d-flex flex-column ga-2">
-          <!-- Date Display Format -->
-          <VSelect
-            v-model="settingsStore.dateDisplayFormat"
-            :items="settingsStore.dateFormatOptions"
-            label="Date Display Format"
-            item-title="label"
-            item-value="value"
-            persistent-hint
-            :hint="`Preview: ${dateFormatPreview}. Affects date formats in the interface only. Import/export formats remain unchanged.`"
-          >
-            <template #item="{ props, item }">
-              <VListItem v-bind="props" :subtitle="item.raw.example" />
-            </template>
-          </VSelect>
+  <div class="page-container">
+    <VRow justify="start" class="align-stretch">
+      <!-- App Configuration Column -->
+      <VCol cols="12" md="6" lg="4" class="d-flex">
+        <VCard elevation="0" class="flex-grow-1">
+          <VCardTitle class="d-flex align-center" style="min-height: 64px"> App Configuration </VCardTitle>
+          <VCardText class="d-flex flex-column ga-2">
+            <!-- Date Display Format -->
+            <VSelect
+              v-model="settingsStore.dateDisplayFormat"
+              :items="settingsStore.dateFormatOptions"
+              label="Date Display Format"
+              item-title="label"
+              item-value="value"
+              persistent-hint
+              :hint="`Preview: ${dateFormatPreview}. Affects date formats in the interface only. Import/export formats remain unchanged.`"
+            >
+              <template #item="{ props, item }">
+                <VListItem v-bind="props" :subtitle="item.raw.example" />
+              </template>
+            </VSelect>
 
-          <!-- First day of week -->
-          <VSelect
-            v-model="settingsStore.firstDayOfWeek"
-            :items="settingsStore.firstDayOfWeekOptions"
-            label="First day of week"
-            item-title="label"
-            item-value="value"
-            persistent-hint
-            hint="This option changes which day is the first day of the week in Calendar component"
-          >
-          </VSelect>
+            <!-- First day of week -->
+            <VSelect
+              v-model="settingsStore.firstDayOfWeek"
+              :items="settingsStore.firstDayOfWeekOptions"
+              label="First day of week"
+              item-title="label"
+              item-value="value"
+              persistent-hint
+              hint="This option changes which day is the first day of the week in Calendar component"
+            >
+            </VSelect>
 
-          <!-- Weekend days -->
-          <VSelect
-            v-model="selectedWeekendPattern"
-            :items="settingsStore.weekendPatterns"
-            label="Weekend days"
-            item-title="label"
-            return-object
-            persistent-hint
-            hint="This option changes which days are highlighted as weekend days in Calendar and affects time tracking calculations"
-          >
-            <template #item="{ props, item }">
-              <VListItem v-bind="props" :subtitle="item.raw.description" />
-            </template>
-          </VSelect>
+            <!-- Weekend days -->
+            <VSelect
+              v-model="selectedWeekendPattern"
+              :items="settingsStore.weekendPatterns"
+              label="Weekend days"
+              item-title="label"
+              return-object
+              persistent-hint
+              hint="This option changes which days are highlighted as weekend days in Calendar and affects time tracking calculations"
+            >
+              <template #item="{ props, item }">
+                <VListItem v-bind="props" :subtitle="item.raw.description" />
+              </template>
+            </VSelect>
 
-          <!-- Use Default Tasks -->
-          <VSwitch
-            v-model="settingsStore.useDefaultTasks"
-            label="Use Default Tasks"
-            persistent-hint
-            hint="When enabled, provides a default set of common tasks (Daily meeting, Code review, etc.) to help you get started quickly"
-            color="primary"
-          />
-        </VCardText>
-      </VCard>
-    </VCol>
-
-    <!-- Jira Integration Column -->
-    <VCol cols="12" md="6" lg="4" class="d-flex">
-      <VCard elevation="0" class="flex-grow-1">
-        <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
-          Jira Integration
-          <VSwitch v-model="settingsStore.jiraConfig.enabled" color="primary" hide-details density="compact" />
-        </VCardTitle>
-
-        <VCardText class="d-flex flex-column ga-2">
-          <!-- Security Warning -->
-          <VAlert type="warning" variant="tonal" density="compact" class="text-caption">
-            <strong>Security Warning:</strong> Your API token is saved in your browser. Anyone with access to your
-            computer can read it. Don't use this on shared or public computers. Use only on your personal device and
-            change your token often for better security.
-          </VAlert>
-
-          <VTextField
-            v-model="settingsStore.jiraConfig.email"
-            label="Email"
-            type="email"
-            placeholder="your-email@company.com"
-            :disabled="!settingsStore.jiraConfig.enabled"
-            :error-messages="settingsStore.jiraConfig.enabled ? emailField.errorMessage.value : undefined"
-            @blur="handleEmailBlur"
-          />
-
-          <VTextField
-            v-model="settingsStore.jiraConfig.domain"
-            label="Domain"
-            placeholder="your-company"
-            :disabled="!settingsStore.jiraConfig.enabled"
-            :error-messages="settingsStore.jiraConfig.enabled ? domainField.errorMessage.value : undefined"
-            @blur="domainField.handleBlur"
-            persistent-hint
-            hint="Your Jira subdomain only (e.g., 'acme' from 'acme.atlassian.net', not 'acme.com')"
-          />
-
-          <VTextField
-            v-model="settingsStore.jiraConfig.apiToken"
-            label="API Token"
-            :type="showApiToken ? 'text' : 'password'"
-            :disabled="!settingsStore.jiraConfig.enabled"
-            :error-messages="settingsStore.jiraConfig.enabled ? apiTokenField.errorMessage.value : undefined"
-            @blur="apiTokenField.handleBlur"
-            :append-inner-icon="showApiToken ? 'mdi-eye-off' : 'mdi-eye'"
-            @click:append-inner="showApiToken = !showApiToken"
-            clearable
-            persistent-hint
-          >
-            <template #details>
-              <div class="text-caption text-medium-emphasis">
-                Get your API token at
-                <a
-                  href="https://id.atlassian.com/manage-profile/security/api-tokens"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-primary text-decoration-none"
-                >
-                  Atlassian API Tokens
-                </a>
-              </div>
-            </template>
-          </VTextField>
-
-          <VTextField
-            v-model="settingsStore.jiraConfig.projectKey"
-            label="Project Key"
-            placeholder="ABC"
-            :disabled="!settingsStore.jiraConfig.enabled"
-            :error-messages="settingsStore.jiraConfig.enabled ? projectKeyField.errorMessage.value : undefined"
-            @blur="projectKeyField.handleBlur"
-            persistent-hint
-            hint="Your project key (e.g., 'ABC' from ticket 'ABC-123')"
-          />
-
-          <VTextField
-            v-model="settingsStore.jiraConfig.statuses"
-            label="Ticket Statuses"
-            placeholder="To Do;In Progress;Done"
-            :disabled="!settingsStore.jiraConfig.enabled"
-            :error-messages="settingsStore.jiraConfig.enabled ? statusesField.errorMessage.value : undefined"
-            @blur="statusesField.handleBlur"
-            persistent-hint
-            hint="Statuses to fetch, separated by semicolon (;). Example: To Do;In Progress;In Review;Done;QA"
-          />
-
-          <!-- Action Buttons -->
-          <div class="d-flex ga-2">
-            <VBtn
-              :disabled="!settingsStore.jiraConfig.enabled"
-              :loading="isTesting"
+            <!-- Use Default Tasks -->
+            <VSwitch
+              v-model="settingsStore.useDefaultTasks"
+              label="Use Default Tasks"
+              persistent-hint
+              hint="When enabled, provides a default set of common tasks (Daily meeting, Code review, etc.) to help you get started quickly"
               color="primary"
-              variant="tonal"
-              @click="testConnection"
-              class="flex-grow-1"
-            >
-              Test Connection
-            </VBtn>
+            />
+          </VCardText>
+        </VCard>
+      </VCol>
 
-            <VBtn
+      <!-- Jira Integration Column -->
+      <VCol cols="12" md="6" lg="4" class="d-flex">
+        <VCard elevation="0" class="flex-grow-1">
+          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
+            Jira Integration
+            <VSwitch v-model="settingsStore.jiraConfig.enabled" color="primary" hide-details density="compact" />
+          </VCardTitle>
+
+          <VCardText class="d-flex flex-column ga-2">
+            <!-- Security Warning -->
+            <VAlert type="warning" variant="tonal" density="compact" class="text-caption">
+              <strong>Security Warning:</strong> Your API token is saved in your browser. Anyone with access to your
+              computer can read it. Don't use this on shared or public computers. Use only on your personal device and
+              change your token often for better security.
+            </VAlert>
+
+            <VTextField
+              v-model="settingsStore.jiraConfig.email"
+              label="Email"
+              type="email"
+              placeholder="your-email@company.com"
               :disabled="!settingsStore.jiraConfig.enabled"
-              :loading="isSyncing"
-              color="success"
-              variant="tonal"
-              @click="handleSyncTickets"
-              class="flex-grow-1"
-              prepend-icon="mdi-sync"
+              :error-messages="settingsStore.jiraConfig.enabled ? emailField.errorMessage.value : undefined"
+              @blur="handleEmailBlur"
+            />
+
+            <VTextField
+              v-model="settingsStore.jiraConfig.domain"
+              label="Domain"
+              placeholder="your-company"
+              :disabled="!settingsStore.jiraConfig.enabled"
+              :error-messages="settingsStore.jiraConfig.enabled ? domainField.errorMessage.value : undefined"
+              @blur="domainField.handleBlur"
+              persistent-hint
+              hint="Your Jira subdomain only (e.g., 'acme' from 'acme.atlassian.net', not 'acme.com')"
+            />
+
+            <VTextField
+              v-model="settingsStore.jiraConfig.apiToken"
+              label="API Token"
+              :type="showApiToken ? 'text' : 'password'"
+              :disabled="!settingsStore.jiraConfig.enabled"
+              :error-messages="settingsStore.jiraConfig.enabled ? apiTokenField.errorMessage.value : undefined"
+              @blur="apiTokenField.handleBlur"
+              :append-inner-icon="showApiToken ? 'mdi-eye-off' : 'mdi-eye'"
+              @click:append-inner="showApiToken = !showApiToken"
+              clearable
+              persistent-hint
             >
-              Sync Tickets
-            </VBtn>
-          </div>
-        </VCardText>
-      </VCard>
-    </VCol>
-  </VRow>
+              <template #details>
+                <div class="text-caption text-medium-emphasis">
+                  Get your API token at
+                  <a
+                    href="https://id.atlassian.com/manage-profile/security/api-tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary text-decoration-none"
+                  >
+                    Atlassian API Tokens
+                  </a>
+                </div>
+              </template>
+            </VTextField>
+
+            <VTextField
+              v-model="settingsStore.jiraConfig.projectKey"
+              label="Project Key"
+              placeholder="ABC"
+              :disabled="!settingsStore.jiraConfig.enabled"
+              :error-messages="settingsStore.jiraConfig.enabled ? projectKeyField.errorMessage.value : undefined"
+              @blur="projectKeyField.handleBlur"
+              persistent-hint
+              hint="Your project key (e.g., 'ABC' from ticket 'ABC-123')"
+            />
+
+            <VTextField
+              v-model="settingsStore.jiraConfig.statuses"
+              label="Ticket Statuses"
+              placeholder="To Do;In Progress;Done"
+              :disabled="!settingsStore.jiraConfig.enabled"
+              :error-messages="settingsStore.jiraConfig.enabled ? statusesField.errorMessage.value : undefined"
+              @blur="statusesField.handleBlur"
+              persistent-hint
+              hint="Statuses to fetch, separated by semicolon (;). Example: To Do;In Progress;In Review;Done;QA"
+            />
+
+            <!-- Action Buttons -->
+            <div class="d-flex ga-2">
+              <VBtn
+                :disabled="!settingsStore.jiraConfig.enabled"
+                :loading="isTesting"
+                color="primary"
+                variant="tonal"
+                @click="testConnection"
+                class="flex-grow-1"
+              >
+                Test Connection
+              </VBtn>
+
+              <VBtn
+                :disabled="!settingsStore.jiraConfig.enabled"
+                :loading="isSyncing"
+                color="success"
+                variant="tonal"
+                @click="handleSyncTickets"
+                class="flex-grow-1"
+                prepend-icon="mdi-sync"
+              >
+                Sync Tickets
+              </VBtn>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+  </div>
 </template>
 
 <style scoped></style>

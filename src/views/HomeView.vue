@@ -201,15 +201,15 @@ const importCsv = async (file?: File) => {
       <WorkTimeBarChart :current-month="currentMonth" />
     </VRow>
 
-    <!-- Main Content Row - using flex layout -->
+    <!-- Main Content Row -->
     <div class="main-row">
-      <!-- Calendar Column -->
+      <!-- Calendar Column - Fixed width with stacked cards -->
       <div class="calendar-column">
         <CalendarOverview v-model="selectedDates" :single-date-mode="!!editingLog" @month-changed="onMonthChanged" />
         <EventList />
       </div>
 
-      <!-- Bulk Log Form Column -->
+      <!-- Bulk Log Form Column - Flexible width -->
       <div class="form-column">
         <VCard class="fill-height">
           <BulkLogForm
@@ -222,7 +222,7 @@ const importCsv = async (file?: File) => {
         </VCard>
       </div>
 
-      <!-- Log List Column - Scrollable -->
+      <!-- Log List Column - Fills remaining space, scrollable -->
       <div class="scrollable-island">
         <LogList
           :items="timeLogs"
