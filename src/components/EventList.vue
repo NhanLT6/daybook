@@ -7,7 +7,8 @@ import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { nagerDateFormat } from '@/common/DateFormat';
+import holidayImg from '@/assets/summer-holidays.png';
+import { nagerDateFormat, shortDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 
 // Generic event interface for all event types
@@ -15,6 +16,7 @@ export interface CalendarEvent {
   id: string;
   title: string;
   date: Date;
+  displayDate: string;
   type: 'holiday' | 'google' | 'custom';
   icon: string;
   color: string;
@@ -35,8 +37,9 @@ const holidayEvents = computed<CalendarEvent[]>(() => {
       id: `holiday-${holiday.date}`,
       title: holiday.localName,
       date: date.toDate(),
+      displayDate: dayjs(date).format(shortDateFormat),
       type: 'holiday',
-      icon: 'mdi-party-popper',
+      icon: '',
       color: 'accent',
     });
   }
@@ -66,49 +69,62 @@ const events = computed(() => {
     .sort((a, b) => dayjs(a.date).diff(dayjs(b.date)));
 });
 
-// Format date display
-const formatEventDate = (date: Date): string => {
-  const eventDate = dayjs(date);
-  const today = dayjs();
-  const diffDays = eventDate.diff(today.startOf('day'), 'day');
-
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays > 1 && diffDays <= 7) return `In ${diffDays} days`;
-  return eventDate.format('MMM D');
-};
-
 // Check if event is in the past
 const isPastEvent = (date: Date): boolean => {
   return dayjs(date).isBefore(dayjs(), 'day');
+};
+
+const onAddEvent = () => {
+  console.log('Add event');
 };
 </script>
 
 <template>
   <VCard v-if="events.length > 0" class="event-list">
-    <VCardText class="pa-3">
-      <!-- Header -->
-      <div class="d-flex align-center ga-2 mb-2">
-        <VIcon size="18" color="primary">mdi-calendar-star</VIcon>
-        <span class="text-body-2 font-weight-medium">Events</span>
-      </div>
+    <VCardTitle>
+      <VToolbar class="bg-transparent" density="compact">
+        <VToolbarTitle class="ms-0">Events</VToolbarTitle>
 
-      <!-- Events List -->
-      <div class="events-container">
-        <div
-          v-for="event in events"
-          :key="event.id"
-          class="event-item d-flex align-center ga-2 py-1"
-          :class="{ 'text-disabled': isPastEvent(event.date) }"
-        >
-          <VIcon :color="isPastEvent(event.date) ? 'disabled' : event.color" size="16">{{ event.icon }}</VIcon>
-          <span class="event-title text-body-2 flex-grow-1 text-truncate">{{ event.title }}</span>
-          <VChip size="x-small" variant="tonal" :color="isPastEvent(event.date) ? 'default' : event.color">
-            {{ formatEventDate(event.date) }}
-          </VChip>
+        <VSpacer />
+
+        <!-- Temporally disable add event button -->
+        <div class="d-none ga-2">
+          <!-- Add event-->
+          <VTooltip>
+            <template #activator="{ props }">
+              <VIconBtn icon="mdi-plus" icon-size="small" rounded="lg" @click="onAddEvent" v-bind="props" />
+            </template>
+
+            Add event
+          </VTooltip>
         </div>
-      </div>
-    </VCardText>
+      </VToolbar>
+    </VCardTitle>
+
+    <!-- Events List -->
+    <VList lines="two" density="compact">
+      <VListItem
+        v-for="event in events"
+        :key="event.id"
+        :class="{ 'text-disabled': isPastEvent(event.date) }"
+        :subtitle="event.displayDate"
+        :title="event.title"
+      >
+        <template v-slot:prepend>
+          <VAvatar v-if="event.type === 'holiday'" size="small" variant="tonal">
+            <VImg :src="holidayImg" alt="Holiday" />
+          </VAvatar>
+
+          <VAvatar v-if="event.type === 'custom'" size="small" variant="tonal">
+            <VIcon :icon="event.icon || 'mdi-account'" />
+          </VAvatar>
+
+          <VAvatar v-if="event.type === 'google'" size="small" variant="tonal">
+            <VIcon icon="mdi-calendar-account-outline" />
+          </VAvatar>
+        </template>
+      </VListItem>
+    </VList>
   </VCard>
 </template>
 
