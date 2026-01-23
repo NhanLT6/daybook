@@ -48,18 +48,10 @@ const selectedDateAttribute = computed(() => ({
   dates: selectedDates.value,
 }));
 
-// Weekend attribute - simplified to avoid date interval issues
-const weekendAttribute = computed(() => ({
-  key: 'weekend',
-  highlight: { color: 'gray', fillMode: 'light' },
-  dates: {
-    start: new Date(1900, 0, 1),
-    repeat: {
-      every: 'week',
-      weekdays: settingsStore.vCalendarWeekendDays,
-    },
-  },
-}));
+// Check if a day is a weekend based on settings
+const isWeekend = (weekday: number) => {
+  return settingsStore.vCalendarWeekendDays.includes(weekday);
+};
 
 // Holiday attributes - show all holidays without month filtering to avoid recursion
 const holidayAttributes = computed(() => {
@@ -75,12 +67,7 @@ const holidayAttributes = computed(() => {
     }));
 });
 
-const calendarAttrs = computed(() => [
-  todayAttribute.value,
-  selectedDateAttribute.value,
-  weekendAttribute.value,
-  ...holidayAttributes.value,
-]);
+const calendarAttrs = computed(() => [todayAttribute.value, selectedDateAttribute.value, ...holidayAttributes.value]);
 
 const onDayClick = (day: { date: Date }) => {
   const clickedDate = day.date;
@@ -150,6 +137,13 @@ const goToToday = async () => {
       @dayclick="onDayClick"
       @update:pages="onPageChange"
     >
+      <!-- Custom day content with weekend text color styling -->
+      <template #day-content="{ day }">
+        <span class="vc-day-content" :class="{ 'weekend-day': isWeekend(day.weekday) }" @click="onDayClick(day)">
+          {{ day.day }}
+        </span>
+      </template>
+
       <!-- Calendar footer with Today navigation button -->
       <template #footer>
         <div class="pa-2">
@@ -169,11 +163,18 @@ const goToToday = async () => {
   cursor: pointer;
 }
 
-:deep(.vc-day:hover) {
-  background-color: rgba(0, 0, 0, 0.04);
+/* Custom day content - match v-calendar's default centering */
+:deep(.vc-day-content) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
 
-:deep(.vc-dark .vc-day:hover) {
-  background-color: rgba(255, 255, 255, 0.08);
+/* Weekend day text color */
+.weekend-day {
+  color: rgb(var(--v-theme-primary));
 }
 </style>
