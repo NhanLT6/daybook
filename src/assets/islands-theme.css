@@ -1,0 +1,205 @@
+/* Islands Theme - JetBrains-inspired floating panel design */
+
+/* CSS Variables for Islands styling */
+:root {
+  --islands-radius: 12px;
+  --islands-radius-sm: 8px;
+  --islands-gap: 12px;
+}
+
+/* ===== Viewport Layout - Islands scroll internally ===== */
+
+/* Main content fills viewport height, allows scrolling on smaller screens */
+.v-main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 64px); /* Subtract app bar height */
+  overflow: hidden;
+}
+
+.v-main__wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Page container with consistent padding */
+.page-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--islands-gap);
+  gap: var(--islands-gap);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Main content row that fills remaining space */
+.main-row {
+  flex: 1;
+  min-height: 0; /* Allow flex children to shrink */
+  max-height: 100%; /* Prevent overflow */
+}
+
+/* Remove Vuetify gutters for rows inside page-container */
+.page-container .v-row {
+  margin: 0 !important;
+  gap: var(--islands-gap);
+}
+
+.page-container .v-row > .v-col {
+  padding: 0 !important;
+}
+
+/* Main row - flex container for columns */
+.main-row {
+  display: flex;
+  gap: var(--islands-gap);
+  align-items: stretch;
+}
+
+/* All columns share common flex properties */
+.main-row > div {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Calendar column: fixed width, auto height */
+.calendar-column {
+  flex: 0 0 auto;
+  width: 280px;
+  gap: var(--islands-gap);
+}
+
+/* Form column: grows to fill ~35% */
+.form-column {
+  flex: 1 1 300px;
+  max-width: 400px;
+}
+
+/* Logs column: fills remaining space */
+.scrollable-island {
+  flex: 2 1 400px;
+}
+
+/* Cards that should fill their container height and scroll */
+.v-card.fill-height {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Calendar column - consistent gap between calendar cards */
+.calendar-column {
+  gap: var(--islands-gap);
+}
+
+/* Scrollable island - for cards with long content */
+.scrollable-island {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.scrollable-island > .v-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scrollable-island .scroll-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Page background - darker than card surfaces for contrast */
+.v-application {
+  background-color: rgb(var(--v-theme-page-background)) !important;
+}
+
+/* Cards - floating islands with no borders */
+.v-card {
+  border: none !important;
+  background-color: rgb(var(--v-theme-surface)) !important;
+}
+
+/* Expansion Panels - seamless, no borders */
+.v-expansion-panels {
+  --v-expansion-panel-radius: var(--islands-radius);
+}
+
+.v-expansion-panel {
+  border: none !important;
+  margin-bottom: 0;
+}
+
+.v-expansion-panel::before {
+  box-shadow: none !important;
+}
+
+/* Keep subtle separator lines between expansion panels */
+.v-expansion-panel:not(:first-child)::after {
+  border-color: rgba(var(--v-theme-on-surface), 0.12) !important;
+}
+
+/* Expansion panel title hover state */
+.v-expansion-panel-title:hover {
+  background-color: rgba(var(--v-theme-on-surface), 0.04);
+}
+
+/* Data Tables - clean, borderless */
+.v-data-table {
+  background-color: transparent !important;
+  border-radius: var(--islands-radius-sm);
+}
+
+.v-data-table > .v-table__wrapper > table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Keep horizontal borders for readability */
+.v-data-table th,
+.v-data-table td {
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12) !important;
+}
+
+/* Dialogs - rounded corners */
+.v-dialog > .v-overlay__content > .v-card {
+  border-radius: var(--islands-radius) !important;
+}
+
+/* Toolbar within cards - blend seamlessly */
+.v-card .v-toolbar {
+  background-color: transparent !important;
+}
+
+/* Container backgrounds within cards */
+.bg-container {
+  border-radius: var(--islands-radius-sm);
+}
+
+/* Sticky card titles with proper background */
+.v-card-title.bg-surface {
+  background-color: rgb(var(--v-theme-surface)) !important;
+}
+
+/* Remove default card shadows for flat appearance */
+.v-card.elevation-0 {
+  box-shadow: none !important;
+}
+
+/* Smooth transitions for theme changes */
+.v-card,
+.v-expansion-panel,
+.v-data-table,
+.v-dialog {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}

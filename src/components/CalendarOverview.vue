@@ -4,8 +4,9 @@ import { computed, ref } from 'vue';
 import type { Holiday } from '@/apis/holidayApi';
 import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
 
-import { useStorage } from '@vueuse/core';
 import { useTheme } from 'vuetify';
+
+import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
@@ -81,48 +82,6 @@ const calendarAttrs = computed(() => [
   ...holidayAttributes.value,
 ]);
 
-// Next holiday (including today, next 30 days)
-const nextHoliday = computed(() => {
-  if (holidays.value.length === 0) return null;
-
-  const today = dayjs();
-  const in30Days = today.add(30, 'day');
-
-  const holiday = holidays.value
-    .map((holiday) => ({
-      ...holiday,
-      dayjs: dayjs(holiday.date, nagerDateFormat),
-      daysFromToday: dayjs(holiday.date, nagerDateFormat).diff(today, 'day'),
-    }))
-    .filter(
-      (holiday) => holiday.dayjs.isValid() && holiday.daysFromToday >= 0 && holiday.dayjs.isBefore(in30Days, 'day'),
-    )
-    .sort((a, b) => a.daysFromToday - b.daysFromToday)[0]; // Get the first (closest) holiday
-
-  return holiday || null;
-});
-
-const upcomingHolidaysDisplay = computed(() => {
-  if (!nextHoliday.value) return '';
-
-  const holiday = nextHoliday.value;
-
-  if (holiday.daysFromToday === 0) {
-    return `Today: ${holiday.localName}`;
-  } else {
-    let dateText: string;
-    if (holiday.daysFromToday === 1) {
-      dateText = 'Tomorrow';
-    } else if (holiday.daysFromToday <= 7) {
-      dateText = `In ${holiday.daysFromToday} days`;
-    } else {
-      dateText = holiday.dayjs.format('MMM D');
-    }
-
-    return `Next: ${holiday.localName} (${dateText})`;
-  }
-});
-
 const onDayClick = (day: { date: Date }) => {
   const clickedDate = day.date;
 
@@ -175,38 +134,32 @@ const goToToday = async () => {
 </script>
 
 <template>
-  <!-- Main calendar component with attributes and event handlers -->
-  <Calendar
-    ref="calendar"
-    view="monthly"
-    expanded
-    title-position="left"
-    color="primary"
-    :is-dark="isDark"
-    :first-day-of-week="settingsStore.vCalendarFirstDay"
-    :attributes="calendarAttrs"
-    @dayclick="onDayClick"
-    @update:pages="onPageChange"
-  >
-    <!-- Calendar footer with Today navigation button -->
-    <template #footer>
-      <div class="pa-2">
-        <VBtn block variant="tonal" color="primary" @click="goToToday">
-          <VIcon start>mdi-calendar-today</VIcon>
-          Today
-        </VBtn>
-      </div>
-    </template>
-  </Calendar>
-
-  <!-- Holidays Banner -->
-  <VCard v-if="upcomingHolidaysDisplay" class="elevation-0 mt-2" color="accent-light">
-    <VCardText class="d-flex align-center ga-2 py-3">
-      <VIcon color="accent" size="18">mdi-party-popper</VIcon>
-      <div class="text-body-2 text-accent holiday-banner-text">
-        {{ upcomingHolidaysDisplay }}
-      </div>
-    </VCardText>
+  <!-- Calendar Island -->
+  <VCard class="pa-2">
+    <!-- Main calendar component with attributes and event handlers -->
+    <Calendar
+      ref="calendar"
+      view="monthly"
+      expanded
+      title-position="left"
+      color="primary"
+      borderless
+      :is-dark="isDark"
+      :first-day-of-week="settingsStore.vCalendarFirstDay"
+      :attributes="calendarAttrs"
+      @dayclick="onDayClick"
+      @update:pages="onPageChange"
+    >
+      <!-- Calendar footer with Today navigation button -->
+      <template #footer>
+        <div class="pa-2">
+          <VBtn block variant="tonal" color="primary" @click="goToToday">
+            <VIcon start>mdi-calendar-today</VIcon>
+            Today
+          </VBtn>
+        </div>
+      </template>
+    </Calendar>
   </VCard>
 </template>
 
@@ -222,10 +175,5 @@ const goToToday = async () => {
 
 :deep(.vc-dark .vc-day:hover) {
   background-color: rgba(255, 255, 255, 0.08);
-}
-
-.holiday-banner-text {
-  line-height: 1.3;
-  word-break: break-word;
 }
 </style>

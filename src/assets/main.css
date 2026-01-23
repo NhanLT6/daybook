@@ -1,8 +1,9 @@
 @import './base.css';
+@import './islands-theme.css';
 
 /* V-Calendar dark theme overrides to match Vuetify */
 .v-theme--dark .vc-dark {
-  --vc-bg: #1e1e1e;
+  --vc-bg: transparent;
   --vc-border: rgba(255, 255, 255, 0.12);
   --vc-color: rgba(255, 255, 255, 0.87);
   --vc-header-title-color: rgba(255, 255, 255, 0.87);
@@ -14,6 +15,11 @@
   --vc-focus-ring: 0 0 0 2px rgba(76, 175, 80, 0.4);
   --vc-nav-hover-bg: rgba(255, 255, 255, 0.1);
   --vc-nav-title-color: rgba(255, 255, 255, 0.87);
+}
+
+/* V-Calendar light theme - transparent background to match VCard */
+.v-theme--light .vc-light {
+  --vc-bg: transparent;
 }
 
 /* V-Calendar custom primary color using Vuetify's theme */

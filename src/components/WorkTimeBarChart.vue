@@ -271,11 +271,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Chart container - Only visible on medium+ screens -->
-  <div class="d-none d-md-flex chart-container">
-    <!-- Chart.js canvas element -->
-    <canvas ref="chartCanvas"></canvas>
-  </div>
+  <!-- Chart Island - Only visible on medium+ screens -->
+  <VCol cols="12" class="d-none d-md-block">
+    <VCard class="pa-4">
+      <div class="chart-container">
+        <!-- Chart.js canvas element -->
+        <canvas ref="chartCanvas"></canvas>
+      </div>
+    </VCard>
+  </VCol>
 </template>
 
 <style scoped>

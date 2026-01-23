@@ -313,7 +313,7 @@ const onCollapseAll = () => {
     <!-- Main Content Area - Projects and Tasks Management -->
     <VRow>
       <VCol cols="12">
-        <VCard class="elevation-0 border">
+        <VCard>
           <VCardTitle>
             <VToolbar class="bg-transparent">
               <VIcon class="me-2" size="20">mdi-folder-outline</VIcon>

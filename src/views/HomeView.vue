@@ -4,6 +4,7 @@ import { ref, watchEffect } from 'vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import CalendarOverview from '@/components/CalendarOverview.vue';
 import LogList from '@/components/LogList.vue';
+import EventList from '@/components/EventList.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
 import type { Project } from '@/interfaces/Project';
@@ -194,39 +195,44 @@ const importCsv = async (file?: File) => {
 </script>
 
 <template>
-  <VRow>
-    <WorkTimeBarChart :current-month="currentMonth" />
-  </VRow>
+  <div class="page-container">
+    <!-- Chart Row -->
+    <VRow class="flex-grow-0">
+      <WorkTimeBarChart :current-month="currentMonth" />
+    </VRow>
 
-  <VRow>
-    <!-- Calendar and Total Hours - Visible on all screen sizes -->
-    <VCol cols="12" md="3" lg="3" class="d-flex flex-column ga-4">
-      <CalendarOverview v-model="selectedDates" :single-date-mode="!!editingLog" @month-changed="onMonthChanged" />
-    </VCol>
+    <!-- Main Content Row - using flex layout -->
+    <div class="main-row">
+      <!-- Calendar Column -->
+      <div class="calendar-column">
+        <CalendarOverview v-model="selectedDates" :single-date-mode="!!editingLog" @month-changed="onMonthChanged" />
+        <EventList />
+      </div>
 
-    <!-- Bulk Log Form -->
-    <VCol cols="12" md="4" lg="4">
-      <VCard class="elevation-0 border">
-        <BulkLogForm
+      <!-- Bulk Log Form Column -->
+      <div class="form-column">
+        <VCard class="fill-height">
+          <BulkLogForm
+            :selected-dates="selectedDates"
+            :editing-log="editingLog"
+            @submit="handleFormSubmit"
+            @cancel="onBulkCancel"
+            @clear-dates="onClearDates"
+          />
+        </VCard>
+      </div>
+
+      <!-- Log List Column - Scrollable -->
+      <div class="scrollable-island">
+        <LogList
+          :items="timeLogs"
           :selected-dates="selectedDates"
-          :editing-log="editingLog"
-          @submit="handleFormSubmit"
-          @cancel="onBulkCancel"
-          @clear-dates="onClearDates"
+          @edit-log="onEditLog"
+          @delete-log="onDeleteLog"
+          @import="importCsv"
+          @export="exportToCsv"
         />
-      </VCard>
-    </VCol>
-
-    <!-- Log List - Horizontally aligned on medium+ screens -->
-    <VCol cols="12" md="4" lg="5">
-      <LogList
-        :items="timeLogs"
-        :selected-dates="selectedDates"
-        @edit-log="onEditLog"
-        @delete-log="onDeleteLog"
-        @import="importCsv"
-        @export="exportToCsv"
-      />
-    </VCol>
-  </VRow>
+      </div>
+    </div>
+  </div>
 </template>

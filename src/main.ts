@@ -34,6 +34,21 @@ const vuetify = createVuetify({
     VTooltip: {
       location: 'top',
     },
+    // Islands theme defaults - rounded corners, no borders, flat appearance
+    VCard: {
+      rounded: 'lg',
+      elevation: 0,
+      flat: true,
+    },
+    VDialog: {
+      rounded: 'lg',
+    },
+    VExpansionPanels: {
+      rounded: 'lg',
+    },
+    VExpansionPanel: {
+      rounded: 'lg',
+    },
   },
   theme: {
     defaultTheme: 'light',
@@ -45,6 +60,9 @@ const vuetify = createVuetify({
           accent: '#7B1FA2', // purple-darken-2
           'accent-light': '#E1BEE7', // purple-lighten-4
           container: '#F5F5F5', // grey-lighten-4
+          // Islands theme colors - page background darker than card surfaces
+          surface: '#FFFFFF', // white surface for cards
+          'page-background': '#EBEEF1',
         },
       },
       dark: {
@@ -54,6 +72,9 @@ const vuetify = createVuetify({
           accent: '#CE93D8', // purple-lighten-3
           'accent-light': '#4A148C', // purple-darken-4
           container: '#424242', // grey-darken-3
+          // Islands theme colors - page background darker than card surfaces
+          surface: '#2D2D2D', // lighter surface for cards
+          'page-background': '#1E1E1E',
         },
       },
     },

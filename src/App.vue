@@ -128,10 +128,8 @@ const items = [
     </VAppBar>
 
     <VMain>
-      <div class="pa-4">
-        <Toaster position="bottom-center" rich-colors close-button />
-        <RouterView />
-      </div>
+      <Toaster position="bottom-center" rich-colors close-button />
+      <RouterView />
     </VMain>
   </VApp>
 </template>

@@ -144,7 +144,7 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="log-list mb-4 elevation-0 border list-container">
+  <VCard class="log-list d-flex flex-column">
     <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle>Logs</VToolbarTitle>
@@ -203,50 +203,61 @@ const readCsv = (file?: File) => {
       </VToolbar>
     </VCardTitle>
 
-    <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
-      <VCardText>
-        <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
-          <VIcon icon="mdi-package-variant-closed" />
-          <div class="text-subtitle-1">No data</div>
-        </div>
-      </VCardText>
-    </VCard>
+    <!-- Scrollable content area -->
+    <div class="scroll-content">
+      <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
+        <VCardText>
+          <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
+            <VIcon icon="mdi-package-variant-closed" />
+            <div class="text-subtitle-1">No data</div>
+          </div>
+        </VCardText>
+      </VCard>
 
-    <VExpansionPanels variant="accordion" v-model="openedPanels" multiple>
-      <VExpansionPanel v-for="group in loggedTimeByDates" :id="group.date" :key="group.date" :value="group.date">
-        <VExpansionPanelTitle>
-          <div class="me-2">{{ formatInternalDateForDisplay(group.date) }}</div>
+      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple>
+        <VExpansionPanel v-for="group in loggedTimeByDates" :id="group.date" :key="group.date" :value="group.date">
+          <VExpansionPanelTitle>
+            <div class="me-2">{{ formatInternalDateForDisplay(group.date) }}</div>
 
-          <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)">
-            {{ minutesToHourWithMinutes(group.durationSum) }}
-          </VChip>
-        </VExpansionPanelTitle>
+            <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)">
+              {{ minutesToHourWithMinutes(group.durationSum) }}
+            </VChip>
+          </VExpansionPanelTitle>
 
-        <VExpansionPanelText>
-          <VCard class="elevation-0 rounded-lg">
-            <VDataTable :items="group.tasks" :headers="headers" class="bg-container" hide-default-footer>
-              <template #item.duration="{ item }">
-                {{ minutesToHourWithMinutes(item.duration) }}
-              </template>
+          <VExpansionPanelText>
+            <VCard class="elevation-0 rounded-lg">
+              <VDataTable :items="group.tasks" :headers="headers" class="bg-container" hide-default-footer>
+                <template #item.duration="{ item }">
+                  {{ minutesToHourWithMinutes(item.duration) }}
+                </template>
 
-              <!--suppress VueUnrecognizedSlot -->
-              <template #item.actions="{ item }">
-                <div class="d-flex ga-2">
-                  <VBtn icon="mdi-pencil-outline" variant="text" size="sm" @click="onEditLog(item)" />
-                  <VBtn icon="mdi-trash-can-outline" variant="text" size="sm" @click="onDeleteLog(item)" />
-                </div>
-              </template>
-            </VDataTable>
-          </VCard>
-        </VExpansionPanelText>
-      </VExpansionPanel>
-    </VExpansionPanels>
+                <!--suppress VueUnrecognizedSlot -->
+                <template #item.actions="{ item }">
+                  <div class="d-flex ga-2">
+                    <VBtn icon="mdi-pencil-outline" variant="text" size="sm" @click="onEditLog(item)" />
+                    <VBtn icon="mdi-trash-can-outline" variant="text" size="sm" @click="onDeleteLog(item)" />
+                  </div>
+                </template>
+              </VDataTable>
+            </VCard>
+          </VExpansionPanelText>
+        </VExpansionPanel>
+      </VExpansionPanels>
+    </div>
   </VCard>
 </template>
 
 <style scoped>
-.list-container {
-  height: calc(100vh - 260px);
-  overflow-y: scroll;
+/* Card fills parent and uses flex layout */
+.log-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Scrollable content area */
+.scroll-content {
+  flex: 1;
+  overflow-y: auto;
 }
 </style>
