@@ -247,7 +247,6 @@ const onCollapseAll = () => {
       <VCard>
         <VCardTitle>
           <VToolbar class="bg-transparent">
-            <VIcon class="me-2" size="20">mdi-folder-outline</VIcon>
             <VToolbarTitle>{{ currentMode }}</VToolbarTitle>
           </VToolbar>
         </VCardTitle>
@@ -316,8 +315,7 @@ const onCollapseAll = () => {
         <VCard>
           <VCardTitle>
             <VToolbar class="bg-transparent">
-              <VIcon class="me-2" size="20">mdi-folder-outline</VIcon>
-              <VToolbarTitle>Projects & Tasks</VToolbarTitle>
+              <VToolbarTitle class="ms-0">Projects & Tasks</VToolbarTitle>
 
               <VSpacer />
 
@@ -341,7 +339,13 @@ const onCollapseAll = () => {
                 <!-- New Project button -->
                 <VTooltip>
                   <template #activator="{ props }">
-                    <VBtn variant="tonal" prepend-icon="mdi-plus-outline" @click="createNewProject" v-bind="props">
+                    <VBtn
+                      color="primary"
+                      variant="tonal"
+                      prepend-icon="mdi-plus"
+                      @click="createNewProject"
+                      v-bind="props"
+                    >
                       New Project
                     </VBtn>
                   </template>
@@ -386,20 +390,6 @@ const onCollapseAll = () => {
                     <VTooltip>
                       <template #activator="{ props }">
                         <VBtn
-                          icon="mdi-trash-can-outline"
-                          variant="text"
-                          size="x-small"
-                          @click.stop="confirmDeleteProject(projectTitle)"
-                          class="me-1"
-                          v-bind="props"
-                        />
-                      </template>
-                      Delete project{{ getTasksByProject(projectTitle).length > 0 ? ' and all its tasks' : '' }}
-                    </VTooltip>
-
-                    <VTooltip>
-                      <template #activator="{ props }">
-                        <VBtn
                           icon="mdi-pencil-outline"
                           variant="text"
                           size="x-small"
@@ -414,7 +404,21 @@ const onCollapseAll = () => {
                     <VTooltip>
                       <template #activator="{ props }">
                         <VBtn
-                          icon="mdi-plus-outline"
+                          icon="mdi-trash-can-outline"
+                          variant="text"
+                          size="x-small"
+                          @click.stop="confirmDeleteProject(projectTitle)"
+                          class="me-1"
+                          v-bind="props"
+                        />
+                      </template>
+                      Delete project{{ getTasksByProject(projectTitle).length > 0 ? ' and all its tasks' : '' }}
+                    </VTooltip>
+
+                    <VTooltip>
+                      <template #activator="{ props }">
+                        <VBtn
+                          icon="mdi-plus"
                           variant="text"
                           size="x-small"
                           @click.stop="createNewTask(projectTitle)"
@@ -449,6 +453,19 @@ const onCollapseAll = () => {
                             <VTooltip>
                               <template #activator="{ props }">
                                 <VBtn
+                                  icon="mdi-pencil-outline"
+                                  variant="text"
+                                  size="x-small"
+                                  @click.stop="editTask({ title: item.title, project: item.project })"
+                                  v-bind="props"
+                                />
+                              </template>
+                              Edit task name
+                            </VTooltip>
+
+                            <VTooltip>
+                              <template #activator="{ props }">
+                                <VBtn
                                   icon="mdi-trash-can-outline"
                                   variant="text"
                                   size="x-small"
@@ -458,19 +475,6 @@ const onCollapseAll = () => {
                                 />
                               </template>
                               Delete this task
-                            </VTooltip>
-
-                            <VTooltip>
-                              <template #activator="{ props }">
-                                <VBtn
-                                  icon="mdi-pencil-outline"
-                                  variant="text"
-                                  size="x-small"
-                                  @click.stop="editTask({ title: item.title, project: item.project })"
-                                  v-bind="props"
-                                />
-                              </template>
-                              Edit task name
                             </VTooltip>
                           </div>
                         </td>

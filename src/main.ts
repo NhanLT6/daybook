@@ -32,7 +32,7 @@ app.use(router);
 const vuetify = createVuetify({
   defaults: {
     VTooltip: {
-      location: 'top',
+      location: 'bottom',
     },
     // Islands theme defaults - no gutters for clean spacing control
     VRow: {

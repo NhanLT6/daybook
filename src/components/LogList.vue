@@ -147,7 +147,7 @@ const readCsv = (file?: File) => {
   <VCard class="log-list d-flex flex-column">
     <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
-        <VToolbarTitle>Logs</VToolbarTitle>
+        <VToolbarTitle class="ms-0">Logs</VToolbarTitle>
 
         <VSpacer />
 
@@ -208,14 +208,20 @@ const readCsv = (file?: File) => {
       <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
         <VCardText>
           <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
-            <VIcon icon="mdi-package-variant-closed" />
-            <div class="text-subtitle-1">No data</div>
+            <VIcon icon="mdi-package-variant-closed" class="text-disabled" />
+            <div class="text-subtitle-1 text-disabled">No data</div>
           </div>
         </VCardText>
       </VCard>
 
-      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple>
-        <VExpansionPanel v-for="group in loggedTimeByDates" :id="group.date" :key="group.date" :value="group.date">
+      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat>
+        <VExpansionPanel
+          v-for="group in loggedTimeByDates"
+          :id="group.date"
+          :key="group.date"
+          :value="group.date"
+          class="border-b-sm"
+        >
           <VExpansionPanelTitle>
             <div class="me-2">{{ formatInternalDateForDisplay(group.date) }}</div>
 
