@@ -48,10 +48,9 @@ const selectedDateAttribute = computed(() => ({
   dates: selectedDates.value,
 }));
 
-// Check if a day is a weekend based on settings
-const isWeekend = (weekday: number) => {
-  return settingsStore.vCalendarWeekendDays.includes(weekday);
-};
+// Wrapper classes that gate weekend-color CSS rules — only the weekday-N rules
+// matching a has-weekend-N class on the wrapper will apply
+const weekendClasses = computed(() => settingsStore.vCalendarWeekendDays.map((d) => `has-weekend-${d}`));
 
 // Holiday attributes - show all holidays without month filtering to avoid recursion
 const holidayAttributes = computed(() => {
@@ -126,6 +125,7 @@ const goToToday = async () => {
     <!-- Main calendar component with attributes and event handlers -->
     <Calendar
       ref="calendar"
+      :class="weekendClasses"
       view="monthly"
       expanded
       title-position="left"
@@ -137,13 +137,6 @@ const goToToday = async () => {
       @dayclick="onDayClick"
       @update:pages="onPageChange"
     >
-      <!-- Custom day content with weekend text color styling -->
-      <template #day-content="{ day }">
-        <span class="vc-day-content" :class="{ 'weekend-day': isWeekend(day.weekday) }" @click="onDayClick(day)">
-          {{ day.day }}
-        </span>
-      </template>
-
       <!-- Calendar footer with Today navigation button -->
       <template #footer>
         <div class="pa-2">
@@ -163,18 +156,14 @@ const goToToday = async () => {
   cursor: pointer;
 }
 
-/* Custom day content - match v-calendar's default centering */
-:deep(.vc-day-content) {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-}
-
-/* Weekend day text color */
-.weekend-day {
+/* Weekend day text color — only weekday-N rules matching a has-weekend-N class fire */
+:deep(.has-weekend-1 .vc-day.weekday-1 .vc-day-content),
+:deep(.has-weekend-2 .vc-day.weekday-2 .vc-day-content),
+:deep(.has-weekend-3 .vc-day.weekday-3 .vc-day-content),
+:deep(.has-weekend-4 .vc-day.weekday-4 .vc-day-content),
+:deep(.has-weekend-5 .vc-day.weekday-5 .vc-day-content),
+:deep(.has-weekend-6 .vc-day.weekday-6 .vc-day-content),
+:deep(.has-weekend-7 .vc-day.weekday-7 .vc-day-content) {
   color: rgb(var(--v-theme-primary));
 }
 </style>

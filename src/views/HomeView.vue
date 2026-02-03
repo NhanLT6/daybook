@@ -3,8 +3,8 @@ import { ref, watchEffect } from 'vue';
 
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import CalendarOverview from '@/components/CalendarOverview.vue';
-import LogList from '@/components/LogList.vue';
 import EventList from '@/components/EventList.vue';
+import LogList from '@/components/LogList.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
 import type { Project } from '@/interfaces/Project';
