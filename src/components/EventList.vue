@@ -173,9 +173,9 @@ const deleteEvent = (event: AppEvent) => {
 </script>
 
 <template>
-  <VCard class="event-list">
-    <!-- Header -->
-    <VCardTitle>
+  <VCard class="event-list d-flex flex-column">
+    <!-- Header — sticky so it stays visible while list scrolls -->
+    <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent" density="compact">
         <VToolbarTitle class="ms-0">Events</VToolbarTitle>
         <VSpacer />
@@ -190,42 +190,45 @@ const deleteEvent = (event: AppEvent) => {
       </VToolbar>
     </VCardTitle>
 
-    <!-- Empty state — mirrors LogList pattern, different icon -->
-    <VCardText v-if="filteredEvents.length === 0">
-      <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
-        <VIcon icon="mdi-calendar-blank-outline" class="text-disabled" />
-        <div class="text-subtitle-1 text-disabled">No events this month</div>
-      </div>
-    </VCardText>
+    <!-- Scrollable content area -->
+    <div class="scroll-content">
+      <!-- Empty state — mirrors LogList pattern, different icon -->
+      <VCardText v-if="filteredEvents.length === 0">
+        <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
+          <VIcon icon="mdi-calendar-blank-outline" class="text-disabled" />
+          <div class="text-subtitle-1 text-disabled">No events this month</div>
+        </div>
+      </VCardText>
 
-    <!-- Event list -->
-    <VList v-else lines="two" density="compact">
-      <VListItem
-        v-for="event in filteredEvents"
-        :key="event.id"
-        :class="{ 'text-disabled': isPastEvent(event.date) }"
-        :title="event.title"
-        :subtitle="formatEventDate(event)"
-      >
-        <!-- Avatar: holiday image vs custom icon -->
-        <template #prepend>
-          <VAvatar v-if="event.type === 'holiday'" size="small" variant="tonal">
-            <VImg :src="holidayImg" alt="Holiday" />
-          </VAvatar>
-          <VAvatar v-else size="small" variant="tonal">
-            <VIcon icon="mdi-calendar-check-outline" />
-          </VAvatar>
-        </template>
+      <!-- Event list -->
+      <VList v-else lines="two" density="compact">
+        <VListItem
+          v-for="event in filteredEvents"
+          :key="event.id"
+          :class="{ 'text-disabled': isPastEvent(event.date) }"
+          :title="event.title"
+          :subtitle="formatEventDate(event)"
+        >
+          <!-- Avatar: holiday image vs custom icon -->
+          <template #prepend>
+            <VAvatar v-if="event.type === 'holiday'" size="small" variant="tonal">
+              <VImg :src="holidayImg" alt="Holiday" />
+            </VAvatar>
+            <VAvatar v-else size="small" variant="tonal">
+              <VIcon icon="mdi-calendar-check-outline" />
+            </VAvatar>
+          </template>
 
-        <!-- Edit / delete — custom events only -->
-        <template v-if="event.type === 'custom'" #append>
-          <div class="d-flex ga-1">
-            <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(event)" />
-            <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(event)" />
-          </div>
-        </template>
-      </VListItem>
-    </VList>
+          <!-- Edit / delete — custom events only -->
+          <template v-if="event.type === 'custom'" #append>
+            <div class="d-flex ga-1">
+              <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(event)" />
+              <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(event)" />
+            </div>
+          </template>
+        </VListItem>
+      </VList>
+    </div>
 
     <!-- ─── Add / Edit Modal ──────────────────────────────────── -->
     <VDialog v-model="isModalOpen" max-width="400" persistent>
@@ -326,4 +329,17 @@ const deleteEvent = (event: AppEvent) => {
   </VCard>
 </template>
 
-<style scoped></style>
+<style scoped>
+/* Card fills remaining space in calendar-column and clips overflow */
+.event-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Scrollable content area below the sticky header */
+.scroll-content {
+  flex: 1;
+  overflow-y: auto;
+}
+</style>

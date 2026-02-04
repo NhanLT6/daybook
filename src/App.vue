@@ -29,9 +29,7 @@ const lastSeenVersion = useStorage('app-last-seen-version', '');
  */
 const autoFetchEvents = async () => {
   const currentYear = new Date().getFullYear();
-  const hasHolidaysThisYear = events.value.some(
-    (e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)),
-  );
+  const hasHolidaysThisYear = events.value.some((e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)));
 
   if (!hasHolidaysThisYear) {
     try {
