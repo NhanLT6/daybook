@@ -110,7 +110,7 @@ const onAddEvent = () => {
         :subtitle="event.displayDate"
         :title="event.title"
       >
-        <template v-slot:prepend>
+        <template #prepend>
           <VAvatar v-if="event.type === 'holiday'" size="small" variant="tonal">
             <VImg :src="holidayImg" alt="Holiday" />
           </VAvatar>

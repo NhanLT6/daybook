@@ -38,8 +38,18 @@ const emit = defineEmits<{
 }>();
 
 const projectColors = useProjectColors();
-const { allProjects, allTasks, myProjects, codeReviewDescriptions, getTasksByProject, initTeamWorkPreset } =
-  useWorkspace();
+
+const {
+  allProjects,
+  allTasks,
+  sortedProjectTitles,
+  pinProject,
+  unpinProject,
+  isPinned,
+  codeReviewDescriptions,
+  getTasksByProject,
+  initTeamWorkPreset,
+} = useWorkspace();
 
 // Initialize default tasks and projects on mount
 onMounted(() => {
@@ -233,17 +243,31 @@ watch(
       <VCombobox
         v-model="projectField.value.value"
         label="Project"
-        :items="myProjects.map((p) => p.title).sort()"
+        :items="sortedProjectTitles"
         :error-messages="errors.project"
         autocomplete="new-password"
         aria-autocomplete="list"
       >
         <template #item="{ props: itemProps, item }">
-          <VListItem v-bind="itemProps">
-            <template #prepend>
-              <VAvatar :color="projectColors.getProjectColor(item.value)" size="small" />
+          <VHover>
+            <template #default="{ isHovering, props: hoverProps }">
+              <VListItem v-bind="{ ...itemProps, ...hoverProps }">
+                <template #prepend>
+                  <VAvatar :color="projectColors.getProjectColor(item.value)" size="small" />
+                </template>
+
+                <template #append>
+                  <VBtn
+                    v-show="isHovering || isPinned(item.value)"
+                    :icon="isPinned(item.value) ? 'mdi-pin' : 'mdi-pin-outline'"
+                    variant="text"
+                    size="x-small"
+                    @click.stop="isPinned(item.value) ? unpinProject(item.value) : pinProject(item.value)"
+                  />
+                </template>
+              </VListItem>
             </template>
-          </VListItem>
+          </VHover>
         </template>
       </VCombobox>
 
@@ -285,13 +309,7 @@ watch(
       <div class="d-flex ga-2 mt-4">
         <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel-outline" @click="onCancel"> Cancel </VBtn>
 
-        <VBtn
-          class="flex-fill"
-          variant="tonal"
-          color="primary"
-          prepend-icon="mdi-content-save-outline"
-          @click="onSave"
-        >
+        <VBtn class="flex-fill" variant="tonal" color="primary" prepend-icon="mdi-content-save-outline" @click="onSave">
           {{ isEditMode ? 'Update Log' : `Save ${selectedDatesField.value.value?.length || 0} Logs` }}
         </VBtn>
       </div>

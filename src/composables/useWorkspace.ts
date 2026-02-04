@@ -14,6 +14,7 @@ import { uniq, uniqBy } from 'lodash';
 export function useWorkspace() {
   const allTasks = useStorage<Task[]>(storageKeys.tasks, []);
   const allProjects = useStorage<Project[]>(storageKeys.projects, []);
+  const pinnedProjects = useStorage<string[]>(storageKeys.pinnedProjects, []);
 
   const settingsStore = useSettingsStore();
   const { myJiraProjects, teamJiraProjects } = useJira();
@@ -58,6 +59,27 @@ export function useWorkspace() {
     return uniqBy(projects, (p) => p.title);
   });
 
+  // Pinned first (in pin order), then the rest alphabetically.
+  // Stale pins (titles no longer in myProjects) are silently excluded.
+  const sortedProjectTitles = computed(() => {
+    const titles = myProjects.value.map((p) => p.title);
+    const pinned = pinnedProjects.value.filter((t) => titles.includes(t));
+    const unpinned = titles.filter((t) => !pinned.includes(t)).sort();
+    return [...pinned, ...unpinned];
+  });
+
+  const pinProject = (title: string) => {
+    if (!pinnedProjects.value.includes(title)) {
+      pinnedProjects.value.push(title);
+    }
+  };
+
+  const unpinProject = (title: string) => {
+    pinnedProjects.value = pinnedProjects.value.filter((t) => t !== title);
+  };
+
+  const isPinned = (title: string): boolean => pinnedProjects.value.includes(title);
+
   /**
    * Get all tasks for a specific project
    * @param projectTitle - The project to get tasks for
@@ -86,6 +108,10 @@ export function useWorkspace() {
     teamWorkProjects,
 
     myProjects,
+    sortedProjectTitles,
+    pinProject,
+    unpinProject,
+    isPinned,
     getTasksByProject,
     codeReviewDescriptions,
 

@@ -9,6 +9,7 @@ export const storageKeys = {
   timeLogsOfCurrentMonth: `timeLogs-${currentMonth}`,
   tasks: `tasks-${currentMonth}`,
   projects: `projects-${currentMonth}`,
+  pinnedProjects: `pinnedProjects-${currentMonth}`,
   jiraProjects: `jiraProjects-${currentMonth}`,
   holidays: `holidays-${currentYear}`,
   settings: {
