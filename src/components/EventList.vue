@@ -32,6 +32,9 @@ const filteredEvents = computed<AppEvent[]>(() => {
 
 const isPastEvent = (date: string): boolean => dayjs(date).isBefore(dayjs(), 'day');
 
+// ─── Description tooltip — tracks which event's tooltip is open ─
+const activeDescriptionId = ref<string | null>(null);
+
 // ─── Modal state ─────────────────────────────────────────────
 const isModalOpen = ref(false);
 const editingEvent = ref<AppEvent | null>(null); // null = add mode
@@ -202,31 +205,59 @@ const deleteEvent = (event: AppEvent) => {
 
       <!-- Event list -->
       <VList v-else lines="two" density="compact">
-        <VListItem
-          v-for="event in filteredEvents"
-          :key="event.id"
-          :class="{ 'text-disabled': isPastEvent(event.date) }"
-          :title="event.title"
-          :subtitle="formatEventDate(event)"
-        >
-          <!-- Avatar: holiday image vs custom icon -->
-          <template #prepend>
-            <VAvatar v-if="event.type === 'holiday'" size="small" variant="tonal">
-              <VImg :src="holidayImg" alt="Holiday" />
-            </VAvatar>
-            <VAvatar v-else size="small" variant="tonal">
-              <VIcon icon="mdi-calendar-check-outline" />
-            </VAvatar>
-          </template>
+        <VHover v-for="event in filteredEvents" :key="event.id">
+          <template #default="{ isHovering, props: hoverProps }">
+            <VListItem
+              v-bind="hoverProps"
+              :class="{ 'text-disabled': isPastEvent(event.date) }"
+              :title="event.title"
+              :subtitle="formatEventDate(event)"
+            >
+              <!-- Avatar: holiday image vs custom icon -->
+              <template #prepend>
+                <VAvatar v-if="event.type === 'holiday'" size="small" variant="tonal">
+                  <VImg :src="holidayImg" alt="Holiday" />
+                </VAvatar>
+                <VAvatar v-else size="small" variant="tonal">
+                  <VIcon icon="mdi-calendar-check-outline" />
+                </VAvatar>
+              </template>
 
-          <!-- Edit / delete — custom events only -->
-          <template v-if="event.type === 'custom'" #append>
-            <div class="d-flex ga-1">
-              <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(event)" />
-              <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(event)" />
-            </div>
+              <!-- Append: edit/delete for custom events + description info icon -->
+              <template v-if="event.type === 'custom' || event.description" #append>
+                <div class="d-flex ga-1">
+                  <!-- Edit / delete — custom events only -->
+                  <template v-if="event.type === 'custom'">
+                    <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(event)" />
+                    <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(event)" />
+                  </template>
+
+                  <!-- Description info — visible on hover, click to open interactive tooltip -->
+                  <VTooltip
+                    v-if="event.description"
+                    :model-value="activeDescriptionId === event.id"
+                    :open-on-hover="false"
+                    interactive
+                    location="top"
+                    @update:model-value="activeDescriptionId = $event ? event.id : null"
+                  >
+                    <template #activator="{ props: tooltipProps }">
+                      <VIconBtn
+                        v-show="isHovering || activeDescriptionId === event.id"
+                        v-bind="tooltipProps"
+                        icon="mdi-information-outline"
+                        size="small"
+                        variant="text"
+                        @click.stop="activeDescriptionId = activeDescriptionId === event.id ? null : event.id"
+                      />
+                    </template>
+                    {{ event.description }}
+                  </VTooltip>
+                </div>
+              </template>
+            </VListItem>
           </template>
-        </VListItem>
+        </VHover>
       </VList>
     </div>
 
