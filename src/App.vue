@@ -3,19 +3,19 @@ import { computed, onMounted, watch } from 'vue';
 
 import { useJira } from '@/composables/useJira';
 
-import type { Holiday } from '@/apis/holidayApi';
+import type { AppEvent } from '@/interfaces/Event';
 
 import { useTheme } from 'vuetify';
 
 import { useStorage } from '@vueuse/core';
 
-import { fetchVnHolidays } from '@/apis/holidayApi';
+import { fetchHolidays } from '@/apis/holidayApi';
 import { storageKeys } from '@/common/storageKeys';
 import { RouterView, useRoute } from 'vue-router';
 import { toast, Toaster } from 'vue-sonner';
 
-// Initialize holidays for current year
-const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
+// Initialize events storage (holidays + custom events)
+const events = useStorage<AppEvent[]>(storageKeys.events, []);
 
 // Jira integration
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
@@ -24,16 +24,21 @@ const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
 const lastSeenVersion = useStorage('app-last-seen-version', '');
 
 /**
- * Auto-fetch VN holidays if not already cached for the current year
- * Runs once on app mount
+ * Auto-fetch VN holidays from Calendarific if not already cached for the current year.
+ * Merges into the events array — never overwrites custom events.
  */
-const autoFetchHolidays = async () => {
-  if (holidays.value.length === 0) {
+const autoFetchEvents = async () => {
+  const currentYear = new Date().getFullYear();
+  const hasHolidaysThisYear = events.value.some(
+    (e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)),
+  );
+
+  if (!hasHolidaysThisYear) {
     try {
-      holidays.value = await fetchVnHolidays();
+      const holidays = await fetchHolidays(currentYear);
+      events.value = [...events.value, ...holidays];
     } catch (error) {
-      console.warn('Failed to fetch holidays:', error);
-      holidays.value = [];
+      console.warn('Failed to fetch holidays from Calendarific:', error);
     }
   }
 };
@@ -71,7 +76,7 @@ const showReleaseNotification = () => {
 
 // Initialize data on app mount
 onMounted(async () => {
-  await autoFetchHolidays();
+  await autoFetchEvents();
   await autoSyncJiraTickets();
   showReleaseNotification();
 });

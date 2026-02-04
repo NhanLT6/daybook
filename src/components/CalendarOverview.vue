@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import type { Holiday } from '@/apis/holidayApi';
+import type { AppEvent } from '@/interfaces/Event';
 import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
 
 import { useTheme } from 'vuetify';
@@ -10,7 +10,6 @@ import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { nagerDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { useSettingsStore } from '@/stores/settings';
 
@@ -33,7 +32,7 @@ const settingsStore = useSettingsStore();
 // Template ref for calendar component
 const calendar = ref();
 
-const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
+const events = useStorage<AppEvent[]>(storageKeys.events, []);
 
 // Calendar attributes - static, not reactive to displayed month to avoid recursion
 const todayAttribute = computed(() => ({
@@ -52,21 +51,18 @@ const selectedDateAttribute = computed(() => ({
 // matching a has-weekend-N class on the wrapper will apply
 const weekendClasses = computed(() => settingsStore.vCalendarWeekendDays.map((d) => `has-weekend-${d}`));
 
-// Holiday attributes - show all holidays without month filtering to avoid recursion
-const holidayAttributes = computed(() => {
-  return holidays.value
-    .filter((holiday) => {
-      const holidayDate = dayjs(holiday.date, nagerDateFormat);
-      return holidayDate.isValid();
-    })
-    .map((holiday) => ({
-      dates: dayjs(holiday.date, nagerDateFormat).toDate(),
-      dot: { color: 'purple' },
-      popover: { label: holiday.localName },
+// Event attributes — holidays in deep-purple, custom events in indigo
+const eventAttributes = computed(() => {
+  return events.value
+    .filter((event) => dayjs(event.date).isValid())
+    .map((event) => ({
+      dates: dayjs(event.date).toDate(),
+      dot: { color: event.type === 'holiday' ? '#673AB7' : '#3F51B5' },
+      popover: { label: event.title },
     }));
 });
 
-const calendarAttrs = computed(() => [todayAttribute.value, selectedDateAttribute.value, ...holidayAttributes.value]);
+const calendarAttrs = computed(() => [todayAttribute.value, selectedDateAttribute.value, ...eventAttributes.value]);
 
 const onDayClick = (day: { date: Date }) => {
   const clickedDate = day.date;

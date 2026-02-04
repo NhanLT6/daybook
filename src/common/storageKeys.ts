@@ -1,9 +1,8 @@
-﻿import dayjs from 'dayjs';
+import dayjs from 'dayjs';
 
 import { yearAndMonthFormat } from '@/common/DateFormat';
 
 const currentMonth = dayjs().format(yearAndMonthFormat);
-const currentYear = dayjs().year();
 
 export const storageKeys = {
   timeLogsOfCurrentMonth: `timeLogs-${currentMonth}`,
@@ -11,12 +10,12 @@ export const storageKeys = {
   projects: `projects-${currentMonth}`,
   pinnedProjects: `pinnedProjects-${currentMonth}`,
   jiraProjects: `jiraProjects-${currentMonth}`,
-  holidays: `holidays-${currentYear}`,
+  events: 'events',
   settings: {
     projectColorMaps: 'projectColorMaps',
   },
   jira: {
     config: 'jiraConfig',
-    lastSyncDate: 'jiraLastSyncDate', // Stores the date of last auto-sync
+    lastSyncDate: 'jiraLastSyncDate',
   },
 };

@@ -1,20 +1,41 @@
-﻿// Public Holiday API integration
+import type { AppEvent } from '@/interfaces/Event';
+
 import { httpClient } from './httpClient';
 
-// Holiday interface based on Nager.Date API
-export interface Holiday {
-  date: string; // ISO date e.g. "2025-04-30"
-  localName: string; // Vietnamese name e.g. "Ngày Giải phóng"
-  name: string; // English name e.g. "Reunification Day"
-  countryCode: string; // "VN"
-  type: string; // "Public"
-  // other fields returned by the API are omitted for brevity
+// Calendarific API response shape (internal, not exported)
+interface CalendarificDate {
+  iso: string;
 }
 
-// Fetch Vietnam public holidays for a given year
-export async function fetchVnHolidays(year: number = new Date().getFullYear()): Promise<Holiday[]> {
-  const { data } = await httpClient.get<Holiday[]>(
-    `https://date.nager.at/api/v3/PublicHolidays/${year}/VN`,
-  );
-  return data;
+interface CalendarificHoliday {
+  id: string;
+  name: string;
+  description?: string;
+  date: CalendarificDate;
+}
+
+interface CalendarificResponse {
+  holidays: CalendarificHoliday[];
+}
+
+/**
+ * Fetch Vietnam holidays for a given year from Calendarific.
+ * Returns holidays mapped to AppEvent format.
+ */
+export async function fetchHolidays(year: number = new Date().getFullYear()): Promise<AppEvent[]> {
+  const { data } = await httpClient.get<CalendarificResponse>('https://api.calendarific.com/api/v1/holidays', {
+    params: {
+      api_key: import.meta.env.VITE_CALENDARIFIC_API_KEY,
+      country: 'VN',
+      year,
+    },
+  });
+
+  return data.holidays.map((holiday) => ({
+    id: `holiday-${holiday.date.iso}-${holiday.id}`,
+    title: holiday.name,
+    date: holiday.date.iso,
+    type: 'holiday' as const,
+    description: holiday.description,
+  }));
 }

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import type { Holiday } from '@/apis/holidayApi';
+import type { AppEvent } from '@/interfaces/Event';
 
 import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
 import holidayImg from '@/assets/summer-holidays.png';
-import { nagerDateFormat, shortDateFormat } from '@/common/DateFormat';
+import { shortDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 
 // Generic event interface for all event types
@@ -22,29 +22,29 @@ export interface CalendarEvent {
   color: string;
 }
 
-// Holidays from storage
-const holidays = useStorage<Holiday[]>(storageKeys.holidays, []);
+// Events from storage (holidays + custom events)
+const events = useStorage<AppEvent[]>(storageKeys.events, []);
 
-// Convert holidays to generic CalendarEvent format
-const holidayEvents = computed<CalendarEvent[]>(() => {
-  const events: CalendarEvent[] = [];
+// Convert AppEvents to generic CalendarEvent format
+const calendarEvents = computed<CalendarEvent[]>(() => {
+  const eventList: CalendarEvent[] = [];
 
-  for (const holiday of holidays.value) {
-    const date = dayjs(holiday.date, nagerDateFormat);
+  for (const event of events.value) {
+    const date = dayjs(event.date);
     if (!date.isValid()) continue;
 
-    events.push({
-      id: `holiday-${holiday.date}`,
-      title: holiday.localName,
+    eventList.push({
+      id: event.id,
+      title: event.title,
       date: date.toDate(),
       displayDate: dayjs(date).format(shortDateFormat),
-      type: 'holiday',
+      type: event.type === 'holiday' ? 'holiday' : 'custom',
       icon: '',
       color: 'accent',
     });
   }
 
-  return events;
+  return eventList;
 });
 
 // TODO: Add Google Calendar events in future
@@ -54,12 +54,12 @@ const holidayEvents = computed<CalendarEvent[]>(() => {
 // const customEvents = computed<CalendarEvent[]>(() => []);
 
 // Get events for current month and next month
-const events = computed(() => {
+const eventList = computed(() => {
   const startOfCurrentMonth = dayjs().startOf('month');
   const endOfNextMonth = dayjs().add(1, 'month').endOf('month');
 
   // Combine all event sources
-  const allEvents = [...holidayEvents.value];
+  const allEvents = [...calendarEvents.value];
 
   return allEvents
     .filter((event) => {
@@ -80,7 +80,7 @@ const onAddEvent = () => {
 </script>
 
 <template>
-  <VCard v-if="events.length > 0" class="event-list">
+  <VCard v-if="eventList.length > 0" class="event-list">
     <VCardTitle>
       <VToolbar class="bg-transparent" density="compact">
         <VToolbarTitle class="ms-0">Events</VToolbarTitle>
@@ -104,7 +104,7 @@ const onAddEvent = () => {
     <!-- Events List -->
     <VList lines="two" density="compact">
       <VListItem
-        v-for="event in events"
+        v-for="event in eventList"
         :key="event.id"
         :class="{ 'text-disabled': isPastEvent(event.date) }"
         :subtitle="event.displayDate"
