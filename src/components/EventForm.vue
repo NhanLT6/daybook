@@ -50,9 +50,7 @@ const startTimeField = useField<string>('startTime');
 const endTimeField = useField<string>('endTime');
 
 // ─── Date mode (single / range) ──────────────────────────────
-const dateMode = ref<'single' | 'range'>(
-  item?.endDate && item.endDate !== item.date ? 'range' : 'single',
-);
+const dateMode = ref<'single' | 'range'>(item?.endDate && item.endDate !== item.date ? 'range' : 'single');
 
 // Switching back to single clears end date
 watch(dateMode, (mode) => {
@@ -89,6 +87,9 @@ const displayDate = computed(() => {
   }
   return dayjs(dateField.value.value).format('MMM D');
 });
+
+// Title shown in the date picker
+const datePickerTitle = computed(() => displayDate.value);
 
 // Validation — end time must be after start time on same-day, non-all-day events
 const timeError = computed(() => {
@@ -138,7 +139,14 @@ const onCancelModifyEvent = () => {
       <VTextField v-model="titleField.value.value" label="Title" autofocus :error-messages="titleField.errors.value" />
 
       <!-- All day toggle — default ON -->
-      <VSwitch v-model="allDayField.value.value" label="All day" color="primary" density="compact" hide-details class="mb-3" />
+      <VSwitch
+        v-model="allDayField.value.value"
+        label="All day"
+        color="primary"
+        density="compact"
+        hide-details
+        class="mb-3"
+      />
 
       <!-- Date — trigger field opens a popover with single/range toggle + picker -->
       <VMenu v-model="isDatePickerOpen" :close-on-content-click="false">
@@ -166,7 +174,16 @@ const onCancelModifyEvent = () => {
             :multiple="dateMode === 'range' ? 'range' : false"
             hide-title
             @update:model-value="datePickerModel = $event"
-          />
+          >
+            <!-- Replace "2 selected" with actual date range, using Vuetify's transition -->
+            <template #header>
+              <VFadeTransition hide-on-leave>
+                <div :key="datePickerTitle" class="text-center pa-4">
+                  <div class="text-h5">{{ datePickerTitle }}</div>
+                </div>
+              </VFadeTransition>
+            </template>
+          </VDatePicker>
         </VSheet>
       </VMenu>
 
@@ -184,7 +201,11 @@ const onCancelModifyEvent = () => {
               flex-1
             />
           </template>
-          <VTimePicker v-model="startTimeField.value.value" format="24hr" @update:model-value="isStartTimeOpen = false" />
+          <VTimePicker
+            v-model="startTimeField.value.value"
+            format="24hr"
+            @update:model-value="isStartTimeOpen = false"
+          />
         </VMenu>
 
         <VMenu v-model="isEndTimeOpen" :close-on-content-click="false">

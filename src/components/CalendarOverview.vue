@@ -52,14 +52,29 @@ const selectedDateAttribute = computed(() => ({
 const weekendClasses = computed(() => settingsStore.vCalendarWeekendDays.map((d) => `has-weekend-${d}`));
 
 // Event attributes — holidays in deep-purple, custom events in indigo
+// For multi-day events, create dots for each day in the range
 const eventAttributes = computed(() => {
   return events.value
     .filter((event) => dayjs(event.date).isValid())
-    .map((event) => ({
-      dates: dayjs(event.date).toDate(),
-      dot: { color: event.type === 'holiday' ? '#673AB7' : '#3F51B5' },
-      popover: { label: event.title },
-    }));
+    .flatMap((event) => {
+      const startDate = dayjs(event.date);
+      const endDate = event.endDate ? dayjs(event.endDate) : startDate;
+      const dates: Date[] = [];
+
+      // Generate array of dates from start to end (inclusive)
+      let currentDate = startDate;
+      while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
+        dates.push(currentDate.toDate());
+        currentDate = currentDate.add(1, 'day');
+      }
+
+      // Create an attribute for each date in the range
+      return dates.map((date) => ({
+        dates: date,
+        dot: { color: event.type === 'holiday' ? '#673AB7' : '#3F51B5' },
+        popover: { label: event.title },
+      }));
+    });
 });
 
 const calendarAttrs = computed(() => [todayAttribute.value, selectedDateAttribute.value, ...eventAttributes.value]);
