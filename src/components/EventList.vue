@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
+
+import EventForm from '@/components/EventForm.vue';
 
 import type { AppEvent } from '@/interfaces/Event';
-
-import { nanoid } from 'nanoid';
 
 import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { storageKeys } from '@/common/storageKeys';
-import { formatEventDate } from '@/common/DateHelpers';
 import holidayImg from '@/assets/summer-holidays.png';
+import { formatEventDate } from '@/common/DateHelpers';
+import { storageKeys } from '@/common/storageKeys';
+import { nanoid } from 'nanoid';
 import { toast } from 'vue-sonner';
 
 // ─── Events from unified storage ─────────────────────────────
@@ -32,131 +33,37 @@ const filteredEvents = computed<AppEvent[]>(() => {
 
 const isPastEvent = (date: string): boolean => dayjs(date).isBefore(dayjs(), 'day');
 
-// ─── Description tooltip — tracks which event's tooltip is open ─
-const activeDescriptionId = ref<string | null>(null);
-
 // ─── Modal state ─────────────────────────────────────────────
 const isModalOpen = ref(false);
-const editingEvent = ref<AppEvent | null>(null); // null = add mode
-
-// Form fields
-const formTitle = ref('');
-const formDescription = ref('');
-const formAllDay = ref(true);
-const dateMode = ref<'single' | 'range'>('single');
-const formDate = ref(dayjs().format('YYYY-MM-DD'));
-const formEndDate = ref<string | null>(null);
-const formStartTime = ref('09:00');
-const formEndTime = ref('10:00');
-
-// Popover open states
-const isDatePickerOpen = ref(false);
-const isStartTimeOpen = ref(false);
-const isEndTimeOpen = ref(false);
-
-// ─── Computed ────────────────────────────────────────────────
-
-// VDatePicker model: string in single mode, [start, end] array in range mode
-const datePickerModel = computed({
-  get: () =>
-    dateMode.value === 'range' ? [formDate.value, formEndDate.value ?? formDate.value] : formDate.value,
-  set: (val) => {
-    if (dateMode.value === 'range') {
-      const arr = val as string[];
-      formDate.value = arr[0];
-      formEndDate.value = arr.length > 1 && arr[1] !== arr[0] ? arr[1] : null;
-    } else {
-      formDate.value = val as string;
-      formEndDate.value = null;
-    }
-  },
-});
-
-// Text shown in the date trigger field
-const displayDate = computed(() => {
-  if (formEndDate.value) {
-    return `${dayjs(formDate.value).format('MMM D')} – ${dayjs(formEndDate.value).format('MMM D')}`;
-  }
-  return dayjs(formDate.value).format('MMM D');
-});
-
-// Validation — title required; end time > start time on same day
-const titleError = computed(() => (!formTitle.value.trim() ? 'Title is required' : ''));
-const timeError = computed(() => {
-  if (formAllDay.value || formEndDate.value) return ''; // multi-day or all-day: no time conflict possible
-  return formStartTime.value >= formEndTime.value ? 'End time must be after start time' : '';
-});
-const hasError = computed(() => !!titleError.value || !!timeError.value);
-
-// ─── Watchers ────────────────────────────────────────────────
-
-// Switching back to single date clears the end date
-watch(dateMode, (newMode) => {
-  if (newMode === 'single') formEndDate.value = null;
-});
+const editingEvent = ref<AppEvent | null>(null);
 
 // ─── Actions ─────────────────────────────────────────────────
 
-const resetForm = () => {
-  formTitle.value = '';
-  formDescription.value = '';
-  formAllDay.value = true;
-  dateMode.value = 'single';
-  formDate.value = dayjs().format('YYYY-MM-DD');
-  formEndDate.value = null;
-  formStartTime.value = '09:00';
-  formEndTime.value = '10:00';
-};
-
 const openAddModal = () => {
   editingEvent.value = null;
-  resetForm();
   isModalOpen.value = true;
 };
 
 const openEditModal = (event: AppEvent) => {
   editingEvent.value = event;
-  formTitle.value = event.title;
-  formDescription.value = event.description ?? '';
-  formAllDay.value = !event.startTime;
-  formDate.value = event.date;
-
-  if (event.endDate && event.endDate !== event.date) {
-    dateMode.value = 'range';
-    formEndDate.value = event.endDate;
-  } else {
-    dateMode.value = 'single';
-    formEndDate.value = null;
-  }
-
-  formStartTime.value = event.startTime ?? '09:00';
-  formEndTime.value = event.endTime ?? '10:00';
   isModalOpen.value = true;
 };
 
-const saveEvent = () => {
-  if (hasError.value) return;
+const onCancelModifyEvent = () => {
+  isModalOpen.value = false;
+};
 
-  const event: AppEvent = {
-    id: editingEvent.value?.id ?? nanoid(),
-    title: formTitle.value.trim(),
-    date: formDate.value,
-    ...(formEndDate.value ? { endDate: formEndDate.value } : {}),
-    type: 'custom',
-    // VTimePicker may emit "HH:mm:ss" — slice to "HH:mm"
-    ...(formAllDay.value
-      ? {}
-      : {
-          startTime: formStartTime.value.slice(0, 5),
-          endTime: formEndTime.value.slice(0, 5),
-        }),
-    ...(formDescription.value.trim() ? { description: formDescription.value.trim() } : {}),
+const onSaveEvent = (event: AppEvent) => {
+  // Assign ID for new events
+  const savedEvent: AppEvent = {
+    ...event,
+    id: event.id || nanoid(),
   };
 
   if (editingEvent.value) {
-    events.value = events.value.map((e) => (e.id === event.id ? event : e));
+    events.value = events.value.map((e) => (e.id === savedEvent.id ? savedEvent : e));
   } else {
-    events.value = [...events.value, event];
+    events.value = [...events.value, savedEvent];
   }
 
   isModalOpen.value = false;
@@ -181,7 +88,9 @@ const deleteEvent = (event: AppEvent) => {
     <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent" density="compact">
         <VToolbarTitle class="ms-0">Events</VToolbarTitle>
+
         <VSpacer />
+
         <div class="d-flex ga-2">
           <VTooltip>
             <template #activator="{ props }">
@@ -215,40 +124,29 @@ const deleteEvent = (event: AppEvent) => {
             >
               <!-- Avatar: holiday image vs custom icon -->
               <template #prepend>
-                <VAvatar v-if="event.type === 'holiday'" size="small" variant="tonal">
-                  <VImg :src="holidayImg" alt="Holiday" />
-                </VAvatar>
-                <VAvatar v-else size="small" variant="tonal">
-                  <VIcon icon="mdi-calendar-check-outline" />
+                <VAvatar size="small" variant="tonal">
+                  <VImg v-if="event.type === 'holiday'" :src="holidayImg" alt="Holiday" />
+                  <VIcon v-else icon="mdi-account-outline" class="text-disabled" />
                 </VAvatar>
               </template>
 
-              <!-- Append: edit/delete for custom events + description info icon -->
               <template v-if="event.type === 'custom' || event.description" #append>
                 <div class="d-flex ga-1">
                   <!-- Edit / delete — custom events only -->
-                  <template v-if="event.type === 'custom'">
+                  <template v-if="event.type === 'custom' && isHovering">
                     <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(event)" />
                     <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(event)" />
                   </template>
 
-                  <!-- Description info — visible on hover, click to open interactive tooltip -->
-                  <VTooltip
-                    v-if="event.description"
-                    :model-value="activeDescriptionId === event.id"
-                    :open-on-hover="false"
-                    interactive
-                    location="top"
-                    @update:model-value="activeDescriptionId = $event ? event.id : null"
-                  >
+                  <!-- Description info -->
+                  <VTooltip v-if="event.description" max-width="300">
                     <template #activator="{ props: tooltipProps }">
                       <VIconBtn
-                        v-show="isHovering || activeDescriptionId === event.id"
+                        v-show="isHovering && event.description"
                         v-bind="tooltipProps"
                         icon="mdi-information-outline"
                         size="small"
                         variant="text"
-                        @click.stop="activeDescriptionId = activeDescriptionId === event.id ? null : event.id"
                       />
                     </template>
                     {{ event.description }}
@@ -261,101 +159,9 @@ const deleteEvent = (event: AppEvent) => {
       </VList>
     </div>
 
-    <!-- ─── Add / Edit Modal ──────────────────────────────────── -->
+    <!-- Add / Edit Modal -->
     <VDialog v-model="isModalOpen" max-width="400" persistent>
-      <VCard rounded="lg">
-        <VCardTitle>{{ editingEvent ? 'Edit Event' : 'Add Event' }}</VCardTitle>
-
-        <VCardText class="pb-0">
-          <!-- Title (only required field) -->
-          <VTextField
-            v-model="formTitle"
-            label="Title"
-            density="compact"
-            autofocus
-            :error-messages="titleError ? [titleError] : []"
-            class="mb-3"
-          />
-
-          <!-- All day toggle — default ON -->
-          <VSwitch v-model="formAllDay" label="All day" color="primary" density="compact" hide-details class="mb-3" />
-
-          <!-- Date — trigger field opens a popover with single/range toggle + picker -->
-          <VMenu v-model="isDatePickerOpen" :close-on-content-click="false">
-            <template #activator="{ props }">
-              <VTextField
-                v-bind="props"
-                :model-value="displayDate"
-                label="Date"
-                prepend-icon="mdi-calendar"
-                readonly
-                density="compact"
-                class="mb-3"
-              />
-            </template>
-            <VSheet rounded="lg" class="pa-2">
-              <!-- Single / Range toggle -->
-              <VBtnToggle v-model="dateMode" density="compact" rounded="lg" border class="mb-2 d-flex justify-center">
-                <VBtn value="single" size="small">Single</VBtn>
-                <VBtn value="range" size="small">Range</VBtn>
-              </VBtnToggle>
-
-              <!-- Date picker — range prop driven by toggle -->
-              <VDatePicker
-                :model-value="datePickerModel"
-                :range="dateMode === 'range'"
-                @update:model-value="datePickerModel = $event"
-              />
-            </VSheet>
-          </VMenu>
-
-          <!-- Time pickers — visible only when All Day is OFF -->
-          <div v-if="!formAllDay" class="d-flex ga-2 mb-3">
-            <VMenu v-model="isStartTimeOpen" :close-on-content-click="false">
-              <template #activator="{ props }">
-                <VTextField
-                  v-bind="props"
-                  :model-value="formStartTime"
-                  label="Start"
-                  prepend-icon="mdi-clock-start"
-                  readonly
-                  density="compact"
-                  flex-1
-                />
-              </template>
-              <VTimePicker v-model="formStartTime" format="24hr" @update:model-value="isStartTimeOpen = false" />
-            </VMenu>
-
-            <VMenu v-model="isEndTimeOpen" :close-on-content-click="false">
-              <template #activator="{ props }">
-                <VTextField
-                  v-bind="props"
-                  :model-value="formEndTime"
-                  label="End"
-                  prepend-icon="mdi-clock-end"
-                  readonly
-                  density="compact"
-                  flex-1
-                  :error-messages="timeError ? [timeError] : []"
-                />
-              </template>
-              <VTimePicker v-model="formEndTime" format="24hr" @update:model-value="isEndTimeOpen = false" />
-            </VMenu>
-          </div>
-
-          <!-- Description (optional) -->
-          <VTextField v-model="formDescription" label="Description" multiline rows="2" density="compact" />
-        </VCardText>
-
-        <!-- Modal actions -->
-        <VCardActions>
-          <VSpacer />
-          <VBtn variant="text" @click="isModalOpen = false">Cancel</VBtn>
-          <VBtn color="primary" variant="tonal" :disabled="hasError" @click="saveEvent">
-            {{ editingEvent ? 'Save' : 'Add' }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
+      <EventForm :item="editingEvent" @save-event="onSaveEvent" @cancel-modify-event="onCancelModifyEvent" />
     </VDialog>
   </VCard>
 </template>
