@@ -11,6 +11,7 @@ export const storageKeys = {
   pinnedProjects: `pinnedProjects-${currentMonth}`,
   jiraProjects: `jiraProjects-${currentMonth}`,
   events: 'events',
+  categories: 'categories',
   settings: {
     projectColorMaps: 'projectColorMaps',
   },
