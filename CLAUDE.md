@@ -48,6 +48,11 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Data Export**: CSV export functionality
 - **Charts**: Visual time tracking with Chart.js
 - **Dark Theme**: Toggle in app toolbar, persisted to localStorage
+- **Categories**: Optional project grouping (see `docs/features/categories.md`)
+
+## Feature Documentation
+Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.
+- `docs/features/categories.md` — Category grouping for projects, VCombobox grouping pattern, BulkLogForm category rules
 
 ## Important Notes
 - **Type Safety**: Full TypeScript coverage required

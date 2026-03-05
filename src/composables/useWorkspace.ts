@@ -1,5 +1,6 @@
 import { computed } from 'vue';
 
+import { useCategories } from '@/composables/useCategories';
 import { useJira } from '@/composables/useJira';
 
 import type { Project } from '@/interfaces/Project';
@@ -17,6 +18,7 @@ export function useWorkspace() {
   const pinnedProjects = useStorage<string[]>(storageKeys.pinnedProjects, []);
 
   const settingsStore = useSettingsStore();
+  const { getCategoryName } = useCategories();
   const { myJiraProjects, teamJiraProjects } = useJira();
 
   const teamWorkTasks = [
@@ -47,12 +49,18 @@ export function useWorkspace() {
   };
 
   /**
-   * Get all my projects (merged from user inputted, team work preset, and Jira)
+   * Get all my projects (merged from user inputted, team work preset, and Jira).
+   * Jira projects are assigned the default category from settings if not already set.
    */
   const myProjects = computed(() => {
+    const jiraCategoryId = settingsStore.jiraConfig.defaultCategoryId;
+
     const projects: Project[] = [
       ...allProjects.value,
-      ...myJiraProjects.value,
+      ...myJiraProjects.value.map((jp) => ({
+        title: jp.title,
+        categoryId: jiraCategoryId ?? undefined,
+      })),
       ...(settingsStore.useDefaultTasks ? teamWorkProjects : []),
     ];
 
@@ -66,6 +74,46 @@ export function useWorkspace() {
     const pinned = pinnedProjects.value.filter((t) => titles.includes(t));
     const unpinned = titles.filter((t) => !pinned.includes(t)).sort();
     return [...pinned, ...unpinned];
+  });
+
+  // For grouped VCombobox — flat array with injected subheader objects when categories are enabled.
+  // When categories are enabled, pinned projects are hoisted into a global "Pinned" section at the
+  // top (with their category shown as subtitle for context), then category groups follow with only
+  // unpinned projects. Empty groups are skipped automatically.
+  const sortedProjectItems = computed((): Array<{ title: string; header?: true; categoryName?: string }> => {
+    if (!settingsStore.useCategories) {
+      return sortedProjectTitles.value.map((title) => ({ title }));
+    }
+
+    const pinnedTitles = sortedProjectTitles.value.filter((t) => pinnedProjects.value.includes(t));
+    const unpinnedTitles = sortedProjectTitles.value.filter((t) => !pinnedProjects.value.includes(t));
+
+    const result: Array<{ title: string; header?: true; categoryName?: string }> = [];
+
+    // Pinned section at top
+    if (pinnedTitles.length > 0) {
+      result.push({ title: 'Pinned', header: true });
+      for (const title of pinnedTitles) {
+        const project = myProjects.value.find((p) => p.title === title);
+        result.push({ title, categoryName: getCategoryName(project?.categoryId) });
+      }
+    }
+
+    // Category groups (unpinned only; empty groups are naturally skipped)
+    const groups = new Map<string, string[]>();
+    for (const title of unpinnedTitles) {
+      const project = myProjects.value.find((p) => p.title === title);
+      const categoryName = getCategoryName(project?.categoryId);
+      if (!groups.has(categoryName)) groups.set(categoryName, []);
+      groups.get(categoryName)!.push(title);
+    }
+
+    for (const [categoryName, titles] of groups) {
+      result.push({ title: categoryName, header: true });
+      for (const title of titles) result.push({ title });
+    }
+
+    return result;
   });
 
   const pinProject = (title: string) => {
@@ -109,6 +157,7 @@ export function useWorkspace() {
 
     myProjects,
     sortedProjectTitles,
+    sortedProjectItems,
     pinProject,
     unpinProject,
     isPinned,

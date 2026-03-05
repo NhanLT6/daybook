@@ -72,7 +72,6 @@ const showReleaseNotification = () => {
   }
 };
 
-// Initialize data on app mount
 onMounted(async () => {
   await autoFetchEvents();
   await autoSyncJiraTickets();
@@ -97,7 +96,6 @@ const toggleTheme = () => {
   savedTheme.value = newTheme;
 };
 
-// Sync theme changes to storage
 watch(
   () => theme.global.name.value,
   (newTheme) => {
@@ -118,7 +116,7 @@ const items = [
       <VAppBarTitle>Daybook</VAppBarTitle>
 
       <!-- Theme toggle button -->
-      <VBtn :icon="themeIcon" variant="text" class="mr-2" @click="toggleTheme" />
+      <VBtn :icon="themeIcon" variant="text" class="mr-2" size="36" @click="toggleTheme" />
 
       <VBtn
         v-for="(item, i) in items"
