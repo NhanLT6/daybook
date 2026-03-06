@@ -19,7 +19,6 @@ import { useSettingsStore } from '@/stores/settings';
 import { nanoid } from 'nanoid';
 
 interface BulkLogFormData {
-  id?: string;
   selectedDates: Date[];
   project?: string;
   task?: string;
@@ -85,7 +84,6 @@ const validationSchema = object({
 });
 
 const emptyLog: BulkLogFormData = {
-  id: undefined,
   selectedDates: [],
   project: undefined,
   task: undefined,
@@ -194,7 +192,7 @@ const onSave = handleSubmit((values) => {
     allProjects.value.push({ title: values.project!, categoryId });
   }
 
-  const isTaskExisting = allTasks.value.map((t) => t.title).includes(values.task!);
+  const isTaskExisting = allTasks.value.some((t) => t.title === values.task!);
   if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
 
   resetForm();
@@ -227,6 +225,18 @@ const projectFilter = (_value: string, query: string, item?: { raw: unknown }) =
 // VCombobox can return the whole item object when items are objects — normalize to string
 const onProjectUpdate = (v: unknown) => {
   projectField.setValue(v && typeof v === 'object' ? (v as { title: string }).title : (v as string));
+};
+
+// Clear category in real-time while the user types a non-existing project name.
+// VCombobox may not emit update:model-value during typing, so we use @update:search
+// to handle the case where the user types something new and loses focus without selecting.
+const onProjectSearch = (searchText: string | null | undefined) => {
+  if (!settingsStore.useCategories || isEditMode.value) return;
+  if (!searchText) return;
+  const existingProject = myProjects.value.find((p) => p.title === searchText);
+  if (!existingProject) {
+    categoryNameField.setValue('', false);
+  }
 };
 
 const onCategoryUpdate = (v: unknown) => {
@@ -266,21 +276,16 @@ watch(
   { immediate: true, deep: true },
 );
 
-// In create mode: auto-fill (disabled) category when an existing project is selected,
-// or clear it when the project field is cleared/changed to a new project name
+// In create mode: auto-fill (disabled) category when an existing project is selected.
+// Clearing on new project names is handled by onProjectSearch (fires during typing).
 watch(
   () => projectField.value.value,
   (projectTitle) => {
     if (!settingsStore.useCategories || isEditMode.value) return;
-    // undefined means the field was cleared by resetForm — let resetForm own the category value
-    if (projectTitle === undefined) return;
     const existingProject = myProjects.value.find((p) => p.title === projectTitle);
     if (existingProject) {
       const catName = sortedCategories.value.find((c) => c.id === existingProject.categoryId)?.name ?? '';
       categoryNameField.setValue(catName, false);
-    } else {
-      // Project cleared or new name typed — reset category so no stale value remains
-      categoryNameField.setValue('', false);
     }
   },
 );
@@ -318,6 +323,7 @@ watch(
       <VCombobox
         :model-value="projectField.value.value"
         @update:model-value="onProjectUpdate"
+        @update:search="onProjectSearch"
         label="Project"
         :items="sortedProjectItems"
         item-title="title"

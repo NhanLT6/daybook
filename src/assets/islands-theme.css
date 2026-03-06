@@ -164,9 +164,9 @@
   background-color: transparent !important;
 }
 
-/* Container backgrounds within cards */
+/* Container backgrounds within cards — use Vuetify rounded-* utilities for border-radius at the call site */
 .bg-container {
-  border-radius: var(--islands-radius-sm);
+  background-color: rgba(var(--v-theme-on-surface), 0.05);
 }
 
 /* Sticky card titles with proper background */
