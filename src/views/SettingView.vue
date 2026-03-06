@@ -1,6 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import { useCategories } from '@/composables/useCategories';
 import { useJira } from '@/composables/useJira';
 
 import { useField, useForm } from 'vee-validate';
@@ -12,6 +13,7 @@ import { useSettingsStore } from '@/stores/settings';
 import { toast } from 'vue-sonner';
 
 const settingsStore = useSettingsStore();
+const { sortedCategories } = useCategories();
 
 const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJira();
 
@@ -89,13 +91,12 @@ const handleEmailBlur = () => {
   }
 };
 
-// Create a preview of current date format
 const dateFormatPreview = computed(() => {
   const today = dayjs();
   return today.format(settingsStore.dateDisplayFormat);
 });
 
-// Create a computed property for weekend display
+// Match weekend pattern by value (sorted comparison handles any order)
 const selectedWeekendPattern = computed({
   get: () => {
     // Find the pattern that matches current weekend days
@@ -123,13 +124,13 @@ const handleSyncTickets = async (): Promise<void> => {
 
 <template>
   <div class="page-container">
-    <VRow justify="start" class="align-stretch">
-      <!-- App Configuration Column -->
-      <VCol cols="12" md="6" lg="4" class="d-flex">
-        <VCard elevation="0" class="flex-grow-1">
-          <VCardTitle class="d-flex align-center" style="min-height: 64px"> App Configuration </VCardTitle>
+    <VRow>
+      <!-- App Configuration: two independent islands stacked in the column -->
+      <VCol cols="12" md="4" class="d-flex flex-column settings-col">
+        <!-- Date & Calendar island -->
+        <VCard elevation="0">
+          <VCardTitle>Date &amp; Calendar</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
-            <!-- Date Display Format -->
             <VSelect
               v-model="settingsStore.dateDisplayFormat"
               :items="settingsStore.dateFormatOptions"
@@ -144,7 +145,6 @@ const handleSyncTickets = async (): Promise<void> => {
               </template>
             </VSelect>
 
-            <!-- First day of week -->
             <VSelect
               v-model="settingsStore.firstDayOfWeek"
               :items="settingsStore.firstDayOfWeekOptions"
@@ -153,10 +153,8 @@ const handleSyncTickets = async (): Promise<void> => {
               item-value="value"
               persistent-hint
               hint="This option changes which day is the first day of the week in Calendar component"
-            >
-            </VSelect>
+            />
 
-            <!-- Weekend days -->
             <VSelect
               v-model="selectedWeekendPattern"
               :items="settingsStore.weekendPatterns"
@@ -170,8 +168,13 @@ const handleSyncTickets = async (): Promise<void> => {
                 <VListItem v-bind="props" :subtitle="item.raw.description" />
               </template>
             </VSelect>
+          </VCardText>
+        </VCard>
 
-            <!-- Use Default Tasks -->
+        <!-- Features island -->
+        <VCard elevation="0">
+          <VCardTitle>Features</VCardTitle>
+          <VCardText class="d-flex flex-column ga-2">
             <VSwitch
               v-model="settingsStore.useDefaultTasks"
               label="Use Default Tasks"
@@ -179,20 +182,28 @@ const handleSyncTickets = async (): Promise<void> => {
               hint="When enabled, provides a default set of common tasks (Daily meeting, Code review, etc.) to help you get started quickly"
               color="primary"
             />
+
+            <VSwitch
+              v-model="settingsStore.useCategories"
+              label="Enable Categories"
+              persistent-hint
+              hint="When enabled, projects can be grouped into categories for better organisation"
+              color="primary"
+            />
           </VCardText>
         </VCard>
       </VCol>
 
-      <!-- Jira Integration Column -->
-      <VCol cols="12" md="6" lg="4" class="d-flex">
-        <VCard elevation="0" class="flex-grow-1">
+      <!-- Jira Integration: single island -->
+      <VCol cols="12" md="4">
+        <VCard elevation="0">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             Jira Integration
             <VSwitch v-model="settingsStore.jiraConfig.enabled" color="primary" hide-details density="compact" />
           </VCardTitle>
 
           <VCardText class="d-flex flex-column ga-2">
-            <!-- Security Warning -->
+            <!-- Connection group -->
             <VAlert type="warning" variant="tonal" density="compact" class="text-caption">
               <strong>Security Warning:</strong> Your API token is saved in your browser. Anyone with access to your
               computer can read it. Don't use this on shared or public computers. Use only on your personal device and
@@ -269,7 +280,6 @@ const handleSyncTickets = async (): Promise<void> => {
               hint="Statuses to fetch, separated by semicolon (;). Example: To Do;In Progress;In Review;Done;QA"
             />
 
-            <!-- Action Buttons -->
             <div class="d-flex ga-2">
               <VBtn
                 :disabled="!settingsStore.jiraConfig.enabled"
@@ -294,6 +304,22 @@ const handleSyncTickets = async (): Promise<void> => {
                 Sync Tickets
               </VBtn>
             </div>
+
+            <!-- Divider between connection group and category group -->
+            <VDivider class="my-4" />
+
+            <!-- Category group -->
+            <VSelect
+              v-model="settingsStore.jiraConfig.defaultCategoryId"
+              :items="sortedCategories"
+              item-title="name"
+              item-value="id"
+              label="Default category for Jira tickets"
+              clearable
+              :disabled="!settingsStore.jiraConfig.enabled || !settingsStore.useCategories"
+              persistent-hint
+              hint="Jira tickets synced will be auto-assigned this category"
+            />
           </VCardText>
         </VCard>
       </VCol>
@@ -301,4 +327,16 @@ const handleSyncTickets = async (): Promise<void> => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+/* Allow settings content to scroll within the bounded island layout container.
+   Overrides the global overflow: hidden on .page-container so the app bar stays
+   fixed while only the settings area scrolls. */
+.page-container {
+  overflow-y: auto;
+}
+
+/* Stack the two App Config islands vertically with consistent gap */
+.settings-col {
+  gap: var(--islands-gap);
+}
+</style>

@@ -59,10 +59,10 @@ export const useSettingsStore = defineStore('settings', () => {
   // Weekend days configuration (dayjs day values: 0=Sunday, 1=Monday, etc.)
   const weekendDays = useStorage('weekendDays', [5, 6, 0]); // Default Fri, Sat, Sun
 
-  // Use default tasks setting
   const useDefaultTasks = useStorage('useDefaultTasks', true);
 
-  // Jira integration configuration
+  const useCategories = useStorage('useCategories', false);
+
   const jiraConfig = useStorage<JiraConfig>('jiraConfig', {
     enabled: false,
     domain: '',
@@ -92,6 +92,7 @@ export const useSettingsStore = defineStore('settings', () => {
     firstDayOfWeek,
     weekendDays,
     useDefaultTasks,
+    useCategories,
     jiraConfig,
     vCalendarFirstDay,
     vCalendarWeekendDays,

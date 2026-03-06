@@ -6,4 +6,5 @@ export interface JiraConfig {
   apiToken: string;
   projectKey: string;
   statuses: string; // Semi-colon separated list of statuses (e.g., "To Do;In Progress;Done")
+  defaultCategoryId?: string; // category auto-assigned to synced Jira tickets
 }
