@@ -195,7 +195,7 @@ const onSave = handleSubmit((values) => {
   const isTaskExisting = allTasks.value.some((t) => t.title === values.task!);
   if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
 
-  resetForm();
+  resetForm({ values: emptyLog });
 }, scrollToFirstError);
 
 const onCancel = () => {
