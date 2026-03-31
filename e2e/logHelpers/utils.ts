@@ -5,6 +5,14 @@ import { XeroConfig } from '../interfaces/xeroConfig.js';
 async function loginXero(page: Page, config: XeroConfig) {
   await page.goto('https://go.xero.com/app/!lep5g/projects/');
 
+  // Wait for navigation to settle — Xero may redirect to login if session expired
+  await page.waitForURL(/login\.xero\.com|\/projects\//, { timeout: 15000 });
+
+  if (page.url().includes('/projects/')) {
+    console.log('✅ Restored session — skipping login');
+    return;
+  }
+
   await page.getByPlaceholder('Email address').fill(config.userName);
   await page.getByPlaceholder('Password').fill(config.password);
 
@@ -31,6 +39,10 @@ async function loginXero(page: Page, config: XeroConfig) {
       throw new Error('2FA authentication failed or timed out. Please ensure you can complete 2FA within 2 minutes.');
     }
   }
+
+  // Save auth cookies so the next run can skip login
+  await page.context().storageState({ path: './auth-state.json' });
+  console.log('💾 Auth state saved');
 }
 
 async function filter200ProjectsPerPage(page: Page) {

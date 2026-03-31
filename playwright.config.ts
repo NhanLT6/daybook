@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import process from 'node:process';
 
 import { defineConfig } from '@playwright/test';
@@ -41,60 +42,25 @@ export default defineConfig({
     /* Only on CI systems run the tests headless */
     headless: !!process.env.CI,
     //viewport: null, // This will maximize the browser window
-    launchOptions: {
-      args: ['--start-maximized'],
-    },
   },
 
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
+      name: 'Google Chrome',
       use: {
-        // ...devices['Desktop Chrome'],
+        channel: 'chrome', // Use real Chrome to avoid bot detection
         viewport: null, // This will maximize the browser window
+        launchOptions: {
+          args: [
+            '--start-maximized',
+            '--disable-blink-features=AutomationControlled', // Hides navigator.webdriver from bot detection
+          ],
+        },
+        // Reuse saved auth cookies if available to avoid re-login and bot detection
+        storageState: fs.existsSync('./auth-state.json') ? './auth-state.json' : undefined,
       },
     },
-    // {
-    //   name: 'firefox',
-    //   use: {
-    //     ...devices['Desktop Firefox']
-    //   }
-    // },
-    // {
-    //   name: 'webkit',
-    //   use: {
-    //     ...devices['Desktop Safari']
-    //   }
-    // }
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: {
-    //     ...devices['Pixel 5'],
-    //   },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: {
-    //     ...devices['iPhone 12'],
-    //   },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: {
-    //     channel: 'msedge',
-    //   },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: {
-    //     channel: 'chrome',
-    //   },
-    // },
   ],
 
   /* Folder for test artifacts such as screenshots, videos, traces, etc. */

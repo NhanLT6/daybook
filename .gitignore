@@ -1,3 +1,6 @@
+# Xero auth session (contains sensitive cookies)
+auth-state.json
+
 # Logs
 logs
 *.log
