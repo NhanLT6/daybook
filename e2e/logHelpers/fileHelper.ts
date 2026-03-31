@@ -21,7 +21,7 @@ function getTaskEntries(filePath: string): TaskEntry[] {
     },
     transform: (value, field) => {
       if (field === 'date') return new Date(value);
-      if (field === 'duration') return parseFloat(value);
+      if (field === 'duration') return parseInt(value, 10);
       if (field === 'isLogged') return value.toLowerCase() === 'true';
       return value;
     },
@@ -47,7 +47,7 @@ function getAllTaskEntries(filePath: string): TaskEntry[] {
     },
     transform: (value, field) => {
       if (field === 'date') return new Date(value);
-      if (field === 'duration') return parseFloat(value);
+      if (field === 'duration') return parseInt(value, 10);
       if (field === 'isLogged') return value.toLowerCase() === 'true';
       return value;
     },

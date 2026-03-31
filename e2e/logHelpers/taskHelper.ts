@@ -2,7 +2,7 @@
 
 import { Page } from '@playwright/test';
 
-import { convertDecimalHourToHourMinutes } from './utils.js';
+import { convertMinutesToHourMinutes } from './utils.js';
 
 async function createTask(page: Page, taskName: string) {
   // Wait for the task list to be loaded
@@ -35,7 +35,7 @@ async function addTimeSpentToTask(page: Page, taskName: string, duration: number
   if (description) await page.getByLabel('Description(optional)').fill(description);
 
   // Duration
-  await page.locator('#duration').fill(convertDecimalHourToHourMinutes(duration));
+  await page.locator('#duration').fill(convertMinutesToHourMinutes(duration));
 
   // Date
   await page.getByPlaceholder('Choose a date').click();

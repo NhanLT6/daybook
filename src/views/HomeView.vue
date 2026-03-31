@@ -120,7 +120,7 @@ const exportToCsv = () => {
     Date: dayjs(log.date).format(templateDateFormat),
     Project: log.project,
     Task: log.task,
-    Duration: (log.duration / 60).toFixed(1),
+    Duration: log.duration,
     Description: log.description,
     IsLogged: false,
   }));
@@ -166,7 +166,7 @@ const importCsv = async (file?: File) => {
       date: log.date as string,
       project: log.project as string,
       task: log.task as string,
-      duration: (log.duration as number) * 60, // Template use hour, this app use minute
+      duration: log.duration as number,
       description: log.description as string,
     };
   });

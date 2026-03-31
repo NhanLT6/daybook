@@ -93,21 +93,16 @@ async function openDetailedTimeReport(page: Page, contactName: string) {
   await new Promise(() => {});
 }
 
-function convertDecimalHourToHourMinutes(decimalHours: number): string {
-  const hours = Math.floor(decimalHours);
-  const minutes = Math.round((decimalHours - hours) * 60);
+function convertMinutesToHourMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
 
-  return `${hours}:${minutes.toString().padStart(2, '0')}`;
-}
-
-function convertMinutesToDecimalHours(minutes: number): number {
-  return parseFloat((minutes / 60).toFixed(2));
+  return `${hours}:${mins.toString().padStart(2, '0')}`;
 }
 
 export {
   loginXero,
   filter200ProjectsPerPage,
   openDetailedTimeReport,
-  convertDecimalHourToHourMinutes,
-  convertMinutesToDecimalHours,
+  convertMinutesToHourMinutes,
 };
