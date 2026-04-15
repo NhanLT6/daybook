@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Panel Placement — Daybook Brainstorm</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #121212;
+    color: #e0e0e0;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; color: #fff; }
+  .subtitle { color: #9e9e9e; font-size: 14px; margin-bottom: 32px; }
+
+  .options { display: flex; flex-direction: column; gap: 24px; }
+
+  .option {
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .option:hover { border-color: #7c4dff; background: #1a1a2e; }
+  .option.selected { border-color: #7c4dff; background: #1e1e3f; }
+
+  .option-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .letter {
+    width: 32px; height: 32px;
+    background: #7c4dff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; color: #fff;
+    flex-shrink: 0;
+  }
+  .option-header h3 { font-size: 16px; font-weight: 600; color: #fff; }
+  .option-header .tag {
+    margin-left: auto;
+    font-size: 11px;
+    background: #333;
+    color: #aaa;
+    padding: 2px 8px;
+    border-radius: 99px;
+  }
+
+  /* App mockup styles */
+  .app-mock {
+    background: #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+    margin-bottom: 14px;
+  }
+  .app-topbar {
+    background: #1a1a1a;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    border-bottom: 1px solid #2a2a2a;
+    font-size: 11px;
+    color: #666;
+  }
+  .topbar-title { color: #aaa; font-weight: 600; margin-right: auto; }
+  .nav-item { padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+  .nav-item.active { background: #333; color: #e0e0e0; }
+  .app-body { display: flex; }
+
+  /* Option A: Dedicated Page */
+  .page-columns {
+    display: flex;
+    height: 140px;
+    padding: 8px;
+    gap: 8px;
+  }
+  .page-col {
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+  }
+  .page-col-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #555;
+    font-weight: 600;
+  }
+  .chat-placeholder {
+    flex: 1;
+    background: #2a2a2a;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 6px;
+    gap: 4px;
+  }
+  .bubble { height: 10px; border-radius: 4px; }
+  .bubble.user { background: #7c4dff; width: 60%; align-self: flex-end; }
+  .bubble.ai { background: #333; width: 75%; align-self: flex-start; }
+  .chat-input-bar {
+    height: 20px;
+    background: #333;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+  }
+  .chat-input-bar-inner {
+    flex: 1;
+    height: 6px;
+    background: #444;
+    border-radius: 3px;
+  }
+  .send-btn {
+    width: 12px; height: 12px;
+    background: #7c4dff;
+    border-radius: 2px;
+    margin-left: 4px;
+  }
+  .logs-preview {
+    width: 55%;
+    background: #1a1a1a;
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .log-row {
+    height: 10px;
+    background: #2a2a2a;
+    border-radius: 3px;
+  }
+  .full-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #1a1a1a;
+    border-radius: 6px;
+    padding: 8px;
+    gap: 4px;
+  }
+
+  /* Option B: Side drawer */
+  .home-columns {
+    display: flex;
+    height: 140px;
+    padding: 8px;
+    gap: 6px;
+  }
+  .col-block {
+    border-radius: 6px;
+    background: #242424;
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    gap: 4px;
+  }
+  .col-block-label {
+    font-size: 9px;
+    color: #555;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .col-rows { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+  .mini-row { height: 8px; background: #333; border-radius: 2px; }
+  .drawer-panel {
+    width: 36%;
+    border-radius: 6px;
+    background: #1a1a2e;
+    border: 1px solid #7c4dff55;
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    gap: 4px;
+  }
+  .drawer-label {
+    font-size: 9px;
+    color: #7c4dff;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  /* Option C: Global drawer / overlay */
+  .fab-container {
+    position: relative;
+  }
+  .home-overlay {
+    display: flex;
+    height: 140px;
+    padding: 8px;
+    gap: 6px;
+    position: relative;
+  }
+  .overlay-sheet {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    bottom: 8px;
+    width: 38%;
+    background: #1e1e3f;
+    border-radius: 6px;
+    border: 1px solid #7c4dff88;
+    box-shadow: -8px 0 24px #0008;
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    gap: 4px;
+    z-index: 2;
+  }
+  .overlay-label {
+    font-size: 9px;
+    color: #7c4dff;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .dimmed-col {
+    flex: 1;
+    border-radius: 6px;
+    background: #242424;
+    opacity: 0.4;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .fab {
+    position: absolute;
+    bottom: 14px;
+    right: 46%;
+    width: 22px; height: 22px;
+    background: #7c4dff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    color: #fff;
+    z-index: 3;
+    box-shadow: 0 2px 8px #7c4dff88;
+  }
+
+  .option-desc {
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+  .pros-cons {
+    display: flex;
+    gap: 16px;
+  }
+  .pros, .cons {
+    flex: 1;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .pros h4 { color: #69f0ae; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+  .cons h4 { color: #ff5252; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+  .pros li, .cons li { margin-left: 14px; color: #aaa; }
+
+  .selection-hint {
+    text-align: center;
+    margin-top: 32px;
+    font-size: 13px;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+
+<h1>Where should the AI Chat Panel live?</h1>
+<p class="subtitle">This is the most fundamental layout decision — everything else builds on it. Click an option to select it.</p>
+
+<div class="options">
+
+  <!-- Option A -->
+  <div class="option" onclick="this.classList.toggle('selected')">
+    <div class="option-header">
+      <div class="letter">A</div>
+      <h3>Dedicated "AI Assistant" page</h3>
+      <span class="tag">New nav item</span>
+    </div>
+
+    <!-- Mockup -->
+    <div class="app-mock">
+      <div class="app-topbar">
+        <span class="topbar-title">Daybook</span>
+        <span class="nav-item">Home</span>
+        <span class="nav-item">Tasks</span>
+        <span class="nav-item active">AI Assistant ✦</span>
+        <span class="nav-item">Settings</span>
+      </div>
+      <div class="page-columns">
+        <div class="full-chat">
+          <div class="page-col-label">Chat</div>
+          <div class="chat-placeholder">
+            <div class="bubble ai"></div>
+            <div class="bubble user"></div>
+            <div class="bubble ai" style="width:55%"></div>
+          </div>
+          <div class="chat-input-bar">
+            <div class="chat-input-bar-inner"></div>
+            <div class="send-btn"></div>
+          </div>
+        </div>
+        <div class="logs-preview">
+          <div class="page-col-label">Extracted Logs</div>
+          <div class="col-rows">
+            <div class="log-row"></div>
+            <div class="log-row" style="width:70%"></div>
+            <div class="log-row"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="option-desc">
+      A brand-new page in the nav bar. Full-screen layout gives the chat maximum space — split between the conversation on the left and extracted logs on the right. After reviewing, user can confirm and save the logs.
+    </p>
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Maximum space for chat UX</li>
+          <li>Clean separation from log entry</li>
+          <li>Easier to build & test in isolation</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Leaves Home view to chat</li>
+          <li>Extra navigation step</li>
+          <li>Chat history separated from logs</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="option" onclick="this.classList.toggle('selected')">
+    <div class="option-header">
+      <div class="letter">B</div>
+      <h3>Persistent right panel inside Home</h3>
+      <span class="tag">Your original idea</span>
+    </div>
+
+    <!-- Mockup -->
+    <div class="app-mock">
+      <div class="app-topbar">
+        <span class="topbar-title">Daybook</span>
+        <span class="nav-item active">Home</span>
+        <span class="nav-item">Tasks</span>
+        <span class="nav-item">Settings</span>
+      </div>
+      <div class="home-columns">
+        <div class="col-block" style="width:18%">
+          <div class="col-block-label">Calendar</div>
+          <div class="col-rows">
+            <div class="mini-row"></div>
+            <div class="mini-row" style="width:80%"></div>
+            <div class="mini-row"></div>
+            <div class="mini-row" style="width:60%"></div>
+            <div class="mini-row"></div>
+          </div>
+        </div>
+        <div class="col-block" style="width:22%">
+          <div class="col-block-label">Log Form</div>
+          <div class="col-rows">
+            <div class="mini-row"></div>
+            <div class="mini-row"></div>
+            <div class="mini-row" style="width:70%"></div>
+            <div class="mini-row"></div>
+          </div>
+        </div>
+        <div class="col-block" style="width:22%">
+          <div class="col-block-label">Log List</div>
+          <div class="col-rows">
+            <div class="mini-row"></div>
+            <div class="mini-row" style="width:80%"></div>
+            <div class="mini-row"></div>
+          </div>
+        </div>
+        <div class="drawer-panel">
+          <div class="drawer-label">✦ AI Chat</div>
+          <div class="chat-placeholder" style="flex:1; background:#1e1e1e">
+            <div class="bubble ai"></div>
+            <div class="bubble user"></div>
+          </div>
+          <div class="chat-input-bar" style="background:#2a2a2a">
+            <div class="chat-input-bar-inner"></div>
+            <div class="send-btn"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="option-desc">
+      The AI chat panel is always visible as a 4th column on the Home page, alongside Calendar, Log Form, and Log List. The chat sits right next to the log form — after AI extracts logs, user can click to auto-populate the form or save directly.
+    </p>
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>One-screen workflow (chat → save)</li>
+          <li>Log form is adjacent for quick review</li>
+          <li>Closest to your original vision</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Home gets crowded (4 columns)</li>
+          <li>Chat column must share screen space</li>
+          <li>May need to collapse on narrow screens</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option C -->
+  <div class="option" onclick="this.classList.toggle('selected')">
+    <div class="option-header">
+      <div class="letter">C</div>
+      <h3>Sliding overlay drawer (any page)</h3>
+      <span class="tag">Global + on demand</span>
+    </div>
+
+    <!-- Mockup -->
+    <div class="app-mock">
+      <div class="app-topbar">
+        <span class="topbar-title">Daybook</span>
+        <span class="nav-item active">Home</span>
+        <span class="nav-item">Tasks</span>
+        <span class="nav-item">Settings</span>
+        <span style="margin-left:auto;font-size:11px;color:#7c4dff;font-weight:700">✦ AI</span>
+      </div>
+      <div class="home-overlay">
+        <div class="dimmed-col" style="width:22%">
+          <div class="col-block-label" style="font-size:9px;color:#555;text-transform:uppercase">Calendar</div>
+        </div>
+        <div class="dimmed-col" style="width:27%">
+          <div class="col-block-label" style="font-size:9px;color:#555;text-transform:uppercase">Log Form</div>
+        </div>
+        <div class="dimmed-col" style="flex:1">
+          <div class="col-block-label" style="font-size:9px;color:#555;text-transform:uppercase">Log List</div>
+        </div>
+        <div class="overlay-sheet">
+          <div class="overlay-label">✦ AI Chat</div>
+          <div class="chat-placeholder" style="flex:1;background:#16163a">
+            <div class="bubble ai"></div>
+            <div class="bubble user"></div>
+            <div class="bubble ai" style="width:50%"></div>
+          </div>
+          <div class="chat-input-bar" style="background:#2a2a3a">
+            <div class="chat-input-bar-inner" style="background:#3a3a5a"></div>
+            <div class="send-btn"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="option-desc">
+      An AI button in the app bar toggles a slide-in drawer that overlays any page. The drawer can be opened from Home, Tasks, or anywhere. It dims the background but doesn't displace the layout — existing columns keep their full width.
+    </p>
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Available from any page</li>
+          <li>Doesn't compress existing layout</li>
+          <li>Standard app pattern (familiar UX)</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Covers content while open</li>
+          <li>Can't see log list &amp; chat simultaneously</li>
+          <li>Slightly more implementation work</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="selection-hint">Click an option above to select it, then reply in the terminal with your choice or thoughts.</p>
+
+</body>
+</html>
