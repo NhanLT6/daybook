@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue';
 
+import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import CalendarOverview from '@/components/CalendarOverview.vue';
 import EventList from '@/components/EventList.vue';
 import LogList from '@/components/LogList.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
+import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { TimeLog } from '@/interfaces/TimeLog';
@@ -192,10 +194,40 @@ const importCsv = async (file?: File) => {
 
   toast.success('Logs imported');
 };
+
+// Handle logs saved from the AI chat panel.
+// Each log has an explicit date, so save to the correct month bucket.
+const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
+  extractedLogs.forEach((log) => {
+    const logMonth = dayjs(log.date).month() + 1; // 1-based month number
+    const monthStorage = getTimeLogsForMonth(logMonth);
+    monthStorage.value.push({
+      id: nanoid(),
+      date: log.date,
+      project: log.project,
+      task: log.task,
+      duration: log.duration,
+      description: log.description,
+    });
+  });
+
+  // Refresh displayed timeLogs if any log belongs to the current month
+  const currentMonthStorage = getTimeLogsForMonth(currentMonth.value);
+  timeLogs.value = currentMonthStorage.value;
+
+  toast.success(`${extractedLogs.length} log${extractedLogs.length > 1 ? 's' : ''} saved`);
+};
 </script>
 
 <template>
   <div class="page-container">
+    <!-- AI Chat Panel (right side drawer) -->
+    <AiChatPanel
+      :projects="projects"
+      :tasks="tasks"
+      @save-logs="onAiSaveLogs"
+    />
+
     <!-- Chart Row -->
     <VRow class="flex-grow-0">
       <WorkTimeBarChart :current-month="currentMonth" />

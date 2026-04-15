@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // We test the pure helper functions directly.
 // IndexedDB functions are integration-tested via E2E.
