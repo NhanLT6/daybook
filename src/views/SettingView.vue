@@ -10,6 +10,7 @@ import * as yup from 'yup';
 import dayjs from 'dayjs';
 
 import { useSettingsStore } from '@/stores/settings';
+import { useServerSettings } from '@/composables/useServerSettings';
 import { toast } from 'vue-sonner';
 
 const settingsStore = useSettingsStore();
@@ -17,7 +18,18 @@ const { sortedCategories } = useCategories();
 
 const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJira();
 
+const { saveSettings } = useServerSettings();
 const showApiToken = ref(false);
+const showGeminiKey = ref(false);
+const isSavingSettings = ref(false);
+
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
+];
 
 const jiraValidationSchema = yup.object({
   email: yup.string().email('Please enter a valid email address').required('Email is required'),
@@ -109,6 +121,24 @@ const selectedWeekendPattern = computed({
     settingsStore.weekendDays = pattern.value;
   },
 });
+
+/**
+ * Save both Jira and Gemini config to the server.
+ * Called via an explicit Save button — settings are no longer auto-saved.
+ */
+const handleSaveCredentials = async () => {
+  isSavingSettings.value = true;
+  try {
+    const ok = await saveSettings({
+      jiraConfig: settingsStore.jiraConfig,
+      geminiConfig: settingsStore.geminiConfig,
+    });
+    if (ok) toast.success('Settings saved');
+    else toast.error('Failed to save settings');
+  } finally {
+    isSavingSettings.value = false;
+  }
+};
 
 const handleSyncTickets = async (): Promise<void> => {
   try {
@@ -322,6 +352,69 @@ const handleSyncTickets = async (): Promise<void> => {
             />
           </VCardText>
         </VCard>
+      </VCol>
+
+      <!-- AI Assistant section -->
+      <VCol cols="12" md="4">
+        <VCard elevation="0">
+          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
+            AI Assistant
+            <VSwitch v-model="settingsStore.geminiConfig.enabled" color="primary" hide-details density="compact" />
+          </VCardTitle>
+
+          <VCardText class="d-flex flex-column ga-2">
+            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
+              Your API key is stored securely on the server, tied to this browser. It cannot be read by others even if
+              they know your machine ID.
+            </VAlert>
+
+            <VTextField
+              v-model="settingsStore.geminiConfig.apiKey"
+              label="Gemini API Key"
+              :type="showGeminiKey ? 'text' : 'password'"
+              :disabled="!settingsStore.geminiConfig.enabled"
+              :append-inner-icon="showGeminiKey ? 'mdi-eye-off' : 'mdi-eye'"
+              @click:append-inner="showGeminiKey = !showGeminiKey"
+              clearable
+              persistent-hint
+            >
+              <template #details>
+                <div class="text-caption text-medium-emphasis">
+                  Get your key at
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary text-decoration-none"
+                  >
+                    Google AI Studio
+                  </a>
+                </div>
+              </template>
+            </VTextField>
+
+            <VCombobox
+              v-model="settingsStore.geminiConfig.model"
+              :items="GEMINI_MODELS"
+              label="Model"
+              :disabled="!settingsStore.geminiConfig.enabled"
+              persistent-hint
+              hint="Select a model or type a custom model ID"
+            />
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Save all server-side credentials -->
+      <VCol cols="12" class="d-flex justify-end pt-0">
+        <VBtn
+          color="primary"
+          :loading="isSavingSettings"
+          prepend-icon="mdi-content-save"
+          @click="handleSaveCredentials"
+        >
+          Save credentials
+        </VBtn>
       </VCol>
     </VRow>
   </div>
