@@ -45,7 +45,7 @@ No custom CSS breakpoint hacks. The drawer manages its own open/close state; on 
    - A **"Discard"** button
 5. User can send a follow-up message to correct the result ("DS-1234 was 1.5h not 2h"). The AI re-responds with an updated set of log cards, with changed fields visually highlighted.
 6. Clicking **Save** writes all logs in that bubble directly to the current month's localStorage store (same as BulkLogForm). A toast confirms success.
-7. Each AI response that contains logs has its own independent Save button. Old bubbles can still be saved after follow-ups.
+7. **Only the most recent AI message with logs has an active Save button.** When a new AI response containing logs arrives, the Save button in all prior AI messages is disabled — those logs are now superseded. This prevents accidentally saving stale data from a corrected exchange.
 
 ### Input Area
 
@@ -116,7 +116,7 @@ The frontend parses the JSON block out of the AI response to render log cards. T
 
 ### Model Selection
 
-Default model: `gemini-2.0-flash` (generous free tier, multimodal). User can change via the Settings page. The model name is stored in Vercel KV alongside the API key.
+Default model: `gemini-2.5-flash` (free tier, stable, multimodal). User can change via the Settings page. The model name is stored in Vercel KV alongside the API key.
 
 ---
 
@@ -211,12 +211,13 @@ Added as a third column card alongside Date & Calendar and Jira Integration.
 Fields:
 - **Enable AI Assistant** toggle
 - **API Key** — masked text field (same style as Jira token), with link to Google AI Studio
-- **Model** — combobox listing supported Gemini models:
-  - `gemini-2.0-flash` (default)
-  - `gemini-2.0-flash-lite`
-  - `gemini-1.5-pro`
-  - `gemini-1.5-flash`
-  - (user can type a custom model ID)
+- **Model** — combobox listing supported Gemini models (all have free tier):
+  - `gemini-2.5-flash` (default — stable, multimodal, generous free tier)
+  - `gemini-2.5-flash-lite` (lightest, cheapest)
+  - `gemini-2.5-pro` (highest quality, slower)
+  - `gemini-3.1-flash-lite-preview` (latest preview, free tier)
+  - `gemini-3-flash-preview` (latest flash preview, free tier)
+  - (user can type a custom model ID for future models)
 - Security warning (same pattern as Jira): key is stored server-side, tied to this browser/device.
 
 ### Jira section
@@ -227,6 +228,23 @@ UI unchanged. Under the hood, load/save goes through `/api/settings` instead of 
 
 ## 7. Composables & Component Structure
 
+### Vuetify-first principle
+
+Use Vuetify components wherever they reduce complexity. Custom components are only built when Vuetify has no equivalent. Specific mappings:
+
+- Chat panel wrapper → `v-navigation-drawer`
+- Message bubbles → `v-card` (with `rounded` and `color` props for user vs AI styling)
+- Log cards inside AI message → `v-card` with `variant="outlined"`
+- Save / Discard buttons → `v-btn`
+- Loading indicator → `v-progress-circular` or `v-skeleton-loader`
+- Text input → `v-textarea` (auto-grow)
+- File attach → `v-btn` + `<input type="file" hidden>`
+- Settings fields → `v-text-field`, `v-combobox`, `v-switch` (matching existing Settings page style)
+
+All component filenames use PascalCase, matching the existing codebase convention.
+
+### File layout
+
 ```
 src/
   composables/
@@ -235,7 +253,7 @@ src/
     useAiChat.ts          # Chat message state, POST /api/chat, log extraction
   components/
     AiChatPanel.vue       # v-navigation-drawer wrapper, input area, message list
-    AiChatMessage.vue     # Single message bubble (user or AI)
+    AiChatMessage.vue     # Single message bubble (user or AI variant)
     AiLogCard.vue         # Read-only log card rendered inside an AI message
   stores/
     settings.ts           # Extended: geminiConfig added, jiraConfig load/save updated
