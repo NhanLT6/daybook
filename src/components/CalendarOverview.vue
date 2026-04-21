@@ -17,8 +17,10 @@ import { useSettingsStore } from '@/stores/settings';
 const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === 'dark');
 
-const { singleDateMode = false } = defineProps<{
+const { singleDateMode = false, view = 'weekly', embedded = false } = defineProps<{
   singleDateMode?: boolean;
+  view?: 'weekly' | 'monthly';
+  embedded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -31,6 +33,8 @@ const settingsStore = useSettingsStore();
 
 // Template ref for calendar component
 const calendar = ref();
+
+const lastEmittedMonth = ref(new Date().getMonth() + 1);
 
 const events = useStorage<AppEvent[]>(storageKeys.events, []);
 
@@ -111,11 +115,13 @@ const onDayClick = (day: { date: Date }) => {
   // selectedDates is automatically synced with parent via v-model
 };
 
-// Handle calendar page navigation
+// Handle calendar page navigation — only emit when crossing into a new month
 const onPageChange = (pages: Page[]) => {
-  const newSelectedMonth = pages[0];
-  // Only emit month change, don't track internal state to avoid recursion
-  emit('monthChanged', newSelectedMonth.month);
+  const newMonth = pages[0].month;
+  if (newMonth !== lastEmittedMonth.value) {
+    lastEmittedMonth.value = newMonth;
+    emit('monthChanged', newMonth);
+  }
 };
 
 // Navigate to today using v-calendar's move API
@@ -131,13 +137,12 @@ const goToToday = async () => {
 </script>
 
 <template>
-  <!-- Calendar Island -->
-  <VCard class="pa-2">
-    <!-- Main calendar component with attributes and event handlers -->
+  <!-- Wrap in VCard for standalone use; render as plain div when embedded inside a parent card -->
+  <component :is="embedded ? 'div' : 'VCard'" :class="embedded ? '' : 'pa-2'">
     <Calendar
       ref="calendar"
       :class="weekendClasses"
-      view="monthly"
+      :view="view"
       expanded
       title-position="left"
       color="primary"
@@ -158,7 +163,7 @@ const goToToday = async () => {
         </div>
       </template>
     </Calendar>
-  </VCard>
+  </component>
 </template>
 
 <style scoped>
