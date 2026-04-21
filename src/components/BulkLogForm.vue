@@ -1,6 +1,8 @@
 ﻿<script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
+import CalendarOverview from '@/components/CalendarOverview.vue';
+
 import { useCategories } from '@/composables/useCategories';
 import { useProjectColors } from '@/composables/useProjectColors';
 import { useWorkspace } from '@/composables/useWorkspace';
@@ -27,15 +29,16 @@ interface BulkLogFormData {
   categoryName?: string;
 }
 
-const { selectedDates = [], editingLog } = defineProps<{
-  selectedDates?: Date[];
+const selectedDates = defineModel<Date[]>('selectedDates', { default: () => [] });
+
+const { editingLog } = defineProps<{
   editingLog?: TimeLog;
 }>();
 
 const emit = defineEmits<{
   submit: [logs: TimeLog[]];
   cancel: [];
-  clearDates: [];
+  monthChanged: [month: number];
 }>();
 
 const projectColors = useProjectColors();
@@ -116,32 +119,6 @@ const isCategoryDisabled = computed(() => {
   return myProjects.value.some((p) => p.title === projectTitle);
 });
 
-const selectedDatesText = computed(() => {
-  if (!selectedDatesField.value.value || selectedDatesField.value.value.length === 0) {
-    return '';
-  }
-
-  const dates = [...selectedDatesField.value.value].sort((a, b) => dayjs(a).diff(dayjs(b)));
-
-  // Use compact format for selected dates display (no year, space-efficient)
-  const formatCompact = (date: Date) => {
-    const d = dayjs(date);
-    // If it's the same year, show just "MMM D" (e.g. "Dec 25")
-    // If a different year, show "MMM D, YYYY" for clarity
-    if (d.isSame(dayjs(), 'year')) {
-      return d.format('MMM D');
-    }
-
-    return d.format('MMM D, YYYY');
-  };
-
-  if (dates.length === 1) {
-    return formatCompact(dates[0]);
-  }
-
-  return dates.map((date) => formatCompact(date)).join('; '); // Dates separated by semicolon
-});
-
 const formEl = ref<HTMLElement>();
 
 const scrollToFirstError = async () => {
@@ -196,21 +173,17 @@ const onSave = handleSubmit((values) => {
   if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
 
   resetForm({ values: emptyLog });
+  selectedDates.value = [];
 }, scrollToFirstError);
 
 const onCancel = () => {
-  resetForm({
-    values: {
-      ...emptyLog,
-      selectedDates: [],
-    },
-  });
+  resetForm({ values: { ...emptyLog, selectedDates: [] } });
+  selectedDates.value = [];
   emit('cancel');
 };
 
-const onClearSelection = () => {
-  selectedDatesField.setValue([]);
-  emit('clearDates');
+const onCalendarMonthChanged = (month: number) => {
+  emit('monthChanged', month);
 };
 
 // Filter for project dropdown: header items always show, regular items filtered by title
@@ -251,7 +224,7 @@ const onHourClick = (hour: number) => {
 
 // Single combined watch with clear priority
 watch(
-  () => ({ dates: selectedDates, editing: editingLog }),
+  () => ({ dates: selectedDates.value, editing: editingLog }),
   ({ dates, editing }) => {
     if (editing) {
       // Edit mode: Pre-populate form with log data, but allow date changes from calendar
@@ -294,31 +267,12 @@ watch(
 <template>
   <div class="pa-4">
     <form ref="formEl" class="d-flex flex-column ga-2" autocomplete="off">
-      <VTextarea
-        label="Selected Dates"
-        readonly
-        :model-value="selectedDatesText"
-        :error-messages="errors.selectedDates"
-        auto-grow
-        rows="1"
-        max-rows="3"
-      >
-        <template #append-inner>
-          <VFadeTransition>
-            <VBtn
-              v-if="selectedDatesField.value.value?.length > 0"
-              icon="mdi-close-circle-outline"
-              variant="plain"
-              color="secondary"
-              size="small"
-              @click="onClearSelection"
-            >
-              <VIcon size="18">mdi-close-circle-outline</VIcon>
-              <VTooltip activator="parent" location="top"> Clear selection </VTooltip>
-            </VBtn>
-          </VFadeTransition>
-        </template>
-      </VTextarea>
+      <CalendarOverview
+        v-model:selected-dates="selectedDates"
+        :single-date-mode="!!editingLog"
+        embedded
+        @month-changed="onCalendarMonthChanged"
+      />
 
       <VCombobox
         :model-value="projectField.value.value"
