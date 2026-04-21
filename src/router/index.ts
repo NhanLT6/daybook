@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('../views/TaskView.vue'),
     },
     {
+      path: '/events',
+      name: 'events',
+      component: () => import('../views/EventView.vue'),
+    },
+    {
       path: '/setting',
       name: 'setting',
       component: () => import('../views/SettingView.vue'),

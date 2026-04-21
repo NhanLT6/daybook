@@ -106,6 +106,7 @@ watch(
 const navItems = [
   { text: 'Home', to: '/' },
   { text: 'Tasks', to: '/task' },
+  { text: 'Events', to: '/events' },
   { text: 'Settings', to: '/setting' },
 ]
 
