@@ -3,8 +3,6 @@ import { ref, watchEffect } from 'vue';
 
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
-import CalendarOverview from '@/components/CalendarOverview.vue';
-import EventList from '@/components/EventList.vue';
 import LogList from '@/components/LogList.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
@@ -36,6 +34,7 @@ const monthStorages = new Map<string, ReturnType<typeof useStorage<TimeLog[]>>>(
 const selectedDates = ref<Date[]>([]);
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
 const editingLog = ref<TimeLog | undefined>(undefined);
+const tab = ref<'form' | 'ai'>('form');
 
 // Function to get or create storage for a specific month
 const getTimeLogsForMonth = (month: number) => {
@@ -96,10 +95,6 @@ const handleFormSubmit = (logs: TimeLog[]) => {
 const onBulkCancel = () => {
   selectedDates.value = [];
   editingLog.value = undefined;
-};
-
-const onClearDates = () => {
-  selectedDates.value = [];
 };
 
 const onEditLog = (log: TimeLog) => {
@@ -199,17 +194,32 @@ const importCsv = async (file?: File) => {
 // Each log has an explicit date, so save to the correct month bucket.
 const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
   extractedLogs.forEach((log) => {
-    const logMonth = dayjs(log.date).month() + 1; // 1-based month number
+    // AI returns YYYY-MM-DD; convert to the app's internal MM/DD/YYYY format
+    const date = dayjs(log.date, 'YYYY-MM-DD').format(shortDateFormat);
+    const logMonth = dayjs(log.date, 'YYYY-MM-DD').month() + 1; // 1-based month number
     const monthStorage = getTimeLogsForMonth(logMonth);
     monthStorage.value.push({
       id: nanoid(),
-      date: log.date,
+      date,
       project: log.project,
       task: log.task,
       duration: log.duration,
       description: log.description,
     });
   });
+
+  // Merge any new projects and tasks into the stored lists (same as importCsv)
+  projects.value = chain(extractedLogs)
+    .map((log) => ({ title: log.project }))
+    .concat(projects.value)
+    .uniqBy('title')
+    .value();
+
+  tasks.value = chain(extractedLogs)
+    .map((log) => ({ project: log.project, title: log.task }) satisfies Task)
+    .concat(tasks.value)
+    .uniqBy((value) => `${value.project}-${value.title}`)
+    .value();
 
   // Refresh displayed timeLogs if any log belongs to the current month
   const currentMonthStorage = getTimeLogsForMonth(currentMonth.value);
@@ -221,13 +231,6 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
 
 <template>
   <div class="page-container">
-    <!-- AI Chat Panel (right side drawer) -->
-    <AiChatPanel
-      :projects="projects"
-      :tasks="tasks"
-      @save-logs="onAiSaveLogs"
-    />
-
     <!-- Chart Row -->
     <VRow class="flex-grow-0">
       <WorkTimeBarChart :current-month="currentMonth" />
@@ -235,22 +238,36 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
 
     <!-- Main Content Row -->
     <div class="main-row">
-      <!-- Calendar Column - Fixed width with stacked cards -->
-      <div class="calendar-column">
-        <CalendarOverview v-model="selectedDates" :single-date-mode="!!editingLog" @month-changed="onMonthChanged" />
-        <EventList />
-      </div>
-
-      <!-- Bulk Log Form Column - Flexible width -->
+      <!-- Left panel: Form + AI Assistant tabs -->
       <div class="form-column">
-        <VCard class="fill-height">
-          <BulkLogForm
-            :selected-dates="selectedDates"
-            :editing-log="editingLog"
-            @submit="handleFormSubmit"
-            @cancel="onBulkCancel"
-            @clear-dates="onClearDates"
-          />
+        <VCard class="fill-height d-flex flex-column overflow-hidden">
+          <VTabs v-model="tab" density="compact" grow>
+            <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
+            <VTab value="ai" prepend-icon="mdi-creation">AI Assistant</VTab>
+          </VTabs>
+
+          <VTabsWindow v-model="tab" class="flex-grow-1 overflow-hidden">
+            <!-- Form tab: scrollable so sticky form-actions still works -->
+            <VTabsWindowItem value="form" class="fill-height overflow-y-auto">
+              <BulkLogForm
+                v-model:selected-dates="selectedDates"
+                :editing-log="editingLog"
+                @submit="handleFormSubmit"
+                @cancel="onBulkCancel"
+                @month-changed="onMonthChanged"
+              />
+            </VTabsWindowItem>
+
+            <!-- AI Assistant tab -->
+            <VTabsWindowItem value="ai" class="fill-height">
+              <AiChatPanel
+                inline
+                :projects="projects"
+                :tasks="tasks"
+                @save-logs="onAiSaveLogs"
+              />
+            </VTabsWindowItem>
+          </VTabsWindow>
         </VCard>
       </div>
 

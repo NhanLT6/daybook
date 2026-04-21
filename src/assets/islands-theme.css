@@ -63,17 +63,9 @@
   min-height: 0;
 }
 
-/* Calendar column: fixed width with stacked cards */
-.calendar-column {
-  flex: 0 0 auto;
-  width: 280px;
-  gap: var(--islands-gap);
-}
-
-/* Form column: flexible width */
+/* Form column: spans the combined old calendar + form width */
 .form-column {
-  flex: 1 1 300px;
-  max-width: 400px;
+  flex: 0 0 480px;
 }
 
 /* Logs column: fills remaining space */

@@ -3,11 +3,10 @@ import { computed, onMounted, watch } from 'vue'
 
 import { useJira } from '@/composables/useJira'
 import { useServerSettings } from '@/composables/useServerSettings'
-import { useUiStore } from '@/stores/ui'
 
 import type { AppEvent } from '@/interfaces/Event'
 
-import { useTheme, useDisplay } from 'vuetify'
+import { useTheme } from 'vuetify'
 
 import { useStorage } from '@vueuse/core'
 
@@ -21,10 +20,7 @@ const events = useStorage<AppEvent[]>(storageKeys.events, [])
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira()
 const lastSeenVersion = useStorage('app-last-seen-version', '')
 const settingsStore = useSettingsStore()
-const uiStore = useUiStore()
 const { loadSettings, migrateJiraFromLocalStorage } = useServerSettings()
-const { lgAndUp } = useDisplay()
-
 const autoFetchEvents = async () => {
   const currentYear = new Date().getFullYear()
   const hasHolidaysThisYear = events.value.some(
@@ -109,10 +105,6 @@ const navItems = [
   { text: 'Events', to: '/events' },
   { text: 'Settings', to: '/setting' },
 ]
-
-const isHomePage = computed(() => route.path === '/')
-// On large screens the panel is always visible; only show toggle on small screens
-const showAiToggle = computed(() => isHomePage.value && !lgAndUp.value)
 </script>
 
 <template>
@@ -121,16 +113,6 @@ const showAiToggle = computed(() => isHomePage.value && !lgAndUp.value)
       <VAppBarTitle>Daybook</VAppBarTitle>
 
       <VBtn :icon="themeIcon" variant="text" class="mr-2" size="36" @click="toggleTheme" />
-
-      <!-- AI chat panel toggle — small screens, Home page only -->
-      <VBtn
-        v-if="showAiToggle"
-        icon="mdi-creation"
-        variant="text"
-        class="mr-1"
-        size="36"
-        @click="uiStore.aiChatOpen = !uiStore.aiChatOpen"
-      />
 
       <VBtn
         v-for="(item, i) in navItems"
