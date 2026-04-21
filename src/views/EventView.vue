@@ -3,7 +3,7 @@ import EventList from '@/components/EventList.vue';
 </script>
 
 <template>
-  <VContainer fluid class="pa-4">
+  <VContainer>
     <EventList />
   </VContainer>
 </template>
