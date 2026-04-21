@@ -241,7 +241,7 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
       <!-- Left panel: Form + AI Assistant tabs -->
       <div class="form-column">
         <VCard class="fill-height d-flex flex-column overflow-hidden">
-          <VTabs v-model="tab" density="compact" grow>
+          <VTabs v-model="tab" density="compact" grow variant="inset">
             <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
             <VTab value="ai" prepend-icon="mdi-creation">AI Assistant</VTab>
           </VTabs>
