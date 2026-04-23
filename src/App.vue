@@ -21,18 +21,15 @@ const { syncTicketsToLocalStorage, shouldAutoSync } = useJira()
 const lastSeenVersion = useStorage('app-last-seen-version', '')
 const settingsStore = useSettingsStore()
 const { loadSettings, migrateJiraFromLocalStorage } = useServerSettings()
+
 const autoFetchEvents = async () => {
   const currentYear = new Date().getFullYear()
   const hasHolidaysThisYear = events.value.some(
     (e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)),
   )
   if (!hasHolidaysThisYear) {
-    try {
-      const holidays = await fetchHolidays(currentYear)
-      events.value = [...events.value, ...holidays]
-    } catch (error) {
-      console.warn('Failed to fetch holidays from Calendarific:', error)
-    }
+    const holidays = await fetchHolidays(currentYear)
+    events.value = [...events.value, ...holidays]
   }
 }
 
@@ -109,7 +106,7 @@ const navItems = [
 
 <template>
   <VApp>
-    <VAppBar density="compact" class="elevation-0" color="page-background">
+    <VAppBar density="compact" class="elevation-0" color="background">
       <VAppBarTitle>Daybook</VAppBarTitle>
 
       <VBtn :icon="themeIcon" variant="text" class="mr-2" size="36" @click="toggleTheme" />

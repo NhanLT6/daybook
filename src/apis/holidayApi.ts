@@ -1,7 +1,5 @@
 import type { AppEvent } from '@/interfaces/Event';
 
-import { isAxiosError } from 'axios';
-
 import { httpClient } from './httpClient';
 
 // Calendarific API response shape (internal, not exported)
@@ -23,12 +21,9 @@ interface CalendarificResponse {
 
 /**
  * Fetch Vietnam holidays for a given year from Calendarific.
- * Returns holidays mapped to AppEvent format.
- * Throws with a descriptive message on API errors (422 with error code/message).
+ * Returns holidays mapped to AppEvent format, or [] on any error.
  */
 export async function fetchHolidays(year: number = new Date().getFullYear()): Promise<AppEvent[]> {
-  let data: CalendarificResponse;
-
   try {
     const response = await httpClient.get<CalendarificResponse>('https://calendarific.com/api/v2/holidays', {
       params: {
@@ -37,22 +32,18 @@ export async function fetchHolidays(year: number = new Date().getFullYear()): Pr
         year,
       },
     });
-    data = response.data;
-  } catch (error) {
-    // Extract Calendarific-specific error message when available
-    if (isAxiosError(error) && error.response?.data?.response?.error) {
-      const { code, message } = error.response.data.response.error;
-      throw new Error(`Calendarific API error ${code}: ${message}`);
-    }
-    throw error;
-  }
+    const data = response.data;
 
-  // ID is not provided by Calendarific — derive deterministically from date + name
-  return (data.response.holidays ?? []).map((holiday) => ({
-    id: `holiday-${holiday.date.iso}-${holiday.name.toLowerCase().replace(/\s+/g, '-')}`,
-    title: holiday.name,
-    date: holiday.date.iso,
-    type: 'holiday' as const,
-    description: holiday.description,
-  }));
+    // ID is not provided by Calendarific — derive deterministically from date + name
+    return (data.response.holidays ?? []).map((holiday) => ({
+      id: `holiday-${holiday.date.iso}-${holiday.name.toLowerCase().replace(/\s+/g, '-')}`,
+      title: holiday.name,
+      date: holiday.date.iso,
+      type: 'holiday' as const,
+      description: holiday.description,
+    }));
+  } catch (error) {
+    console.error('Failed to fetch holidays from Calendarific:', error);
+    return [];
+  }
 }

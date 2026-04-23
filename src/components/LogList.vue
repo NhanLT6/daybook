@@ -32,6 +32,8 @@ const emit = defineEmits<{
 
 const { formatInternalDateForDisplay } = useDateDisplay();
 
+const scrollContentRef = ref<HTMLElement | null>(null);
+
 // Scroll to the selected date's expansion panel if it's outside viewport
 const scrollToSelectedDate = async (date: Date) => {
   if (!date) return;
@@ -46,8 +48,7 @@ const scrollToSelectedDate = async (date: Date) => {
 
   const rect = element.getBoundingClientRect();
 
-  // Find container and check whether the element is outside
-  const container = element.closest('.log-list');
+  const container = scrollContentRef.value;
   if (!container) return;
 
   const containerRect = container.getBoundingClientRect();
@@ -144,7 +145,7 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="log-list d-flex flex-column">
+  <VCard class="d-flex flex-column">
     <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle class="ms-0">Logs</VToolbarTitle>
@@ -204,7 +205,7 @@ const readCsv = (file?: File) => {
     </VCardTitle>
 
     <!-- Scrollable content area -->
-    <div class="scroll-content">
+    <div ref="scrollContentRef" class="scroll-content">
       <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
         <VCardText>
           <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
@@ -254,14 +255,6 @@ const readCsv = (file?: File) => {
 </template>
 
 <style scoped>
-/* Card fills parent and uses flex layout */
-.log-list {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* Scrollable content area */
 .scroll-content {
   flex: 1;
   overflow-y: auto;

@@ -153,7 +153,7 @@ const handleSyncTickets = async (): Promise<void> => {
 </script>
 
 <template>
-  <div class="page-container">
+  <div class="h-100 overflow-y-auto">
     <div class="settings-grid">
       <!-- App Configuration: two independent islands stacked in the column -->
       <div class="d-flex flex-column settings-col">
@@ -420,22 +420,16 @@ const handleSyncTickets = async (): Promise<void> => {
 </template>
 
 <style scoped>
-/* Allow settings content to scroll within the bounded island layout container. */
-.page-container {
-  overflow-y: auto;
-}
-
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--islands-gap);
-  padding: var(--islands-gap);
+  gap: 12px;
+  padding: 12px;
 }
-
 
 /* Stack the two App Config islands vertically with consistent gap */
 .settings-col {
-  gap: var(--islands-gap);
+  gap: 12px;
 }
 
 @media (max-width: 959px) {

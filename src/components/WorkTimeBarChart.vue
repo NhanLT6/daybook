@@ -5,8 +5,9 @@ import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
 
-import { useStorage } from '@vueuse/core';
 import { useTheme } from 'vuetify';
+
+import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
@@ -43,14 +44,12 @@ const projectColors = useProjectColors();
 const settingsStore = useSettingsStore();
 
 // Reactive computed properties for chart data
-const selectedMonth = computed(() =>
-  dayjs().month((currentMonth?.value ?? dayjs().month() + 1) - 1)
-);
+const selectedMonth = computed(() => dayjs().month((currentMonth?.value ?? dayjs().month() + 1) - 1));
 
 const daysInMonth = computed(() =>
   Array.from({ length: selectedMonth.value.daysInMonth() }, (_, i) =>
-    selectedMonth.value.startOf('month').add(i, 'day')
-  )
+    selectedMonth.value.startOf('month').add(i, 'day'),
+  ),
 );
 
 // Get time logs from storage (reactive to month changes)
@@ -77,7 +76,7 @@ const chartData = computed(() => {
             .filter((item) => item.date === d.format(shortDateFormat))
             .map((item) => round(item.duration / 60, 1))
             .sum()
-            .value()
+            .value(),
         ),
       }))
       .value();
@@ -94,7 +93,7 @@ const chartData = computed(() => {
             .filter((item) => item.date === d.format(shortDateFormat))
             .map((item) => round(item.duration / 60, 1))
             .sum()
-            .value()
+            .value(),
         ),
       }))
       .value();
@@ -128,11 +127,13 @@ const chartData = computed(() => {
     console.error('Chart data generation error:', error);
     return {
       labels: ['Error'],
-      datasets: [{
-        label: 'Error',
-        backgroundColor: '#f44336',
-        data: [0],
-      }],
+      datasets: [
+        {
+          label: 'Error',
+          backgroundColor: '#f44336',
+          data: [0],
+        },
+      ],
     };
   }
 });
@@ -174,15 +175,10 @@ const chartOptions = computed(() => ({
         generateLabels: (chart: Chart) => {
           const datasets = chart.data.datasets || [];
           return datasets.map((dataset, index) => ({
-            text: dataset.label && dataset.label.length > 20
-              ? `${dataset.label.substring(0, 20)}...`
-              : dataset.label || '',
-            fillStyle: Array.isArray(dataset.backgroundColor)
-              ? dataset.backgroundColor[0]
-              : dataset.backgroundColor,
-            strokeStyle: Array.isArray(dataset.borderColor)
-              ? dataset.borderColor[0]
-              : dataset.borderColor,
+            text:
+              dataset.label && dataset.label.length > 20 ? `${dataset.label.substring(0, 20)}...` : dataset.label || '',
+            fillStyle: Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor[0] : dataset.backgroundColor,
+            strokeStyle: Array.isArray(dataset.borderColor) ? dataset.borderColor[0] : dataset.borderColor,
             lineWidth: typeof dataset.borderWidth === 'number' ? dataset.borderWidth : 0,
             hidden: !chart.isDatasetVisible(index),
             datasetIndex: index,
@@ -240,7 +236,7 @@ watch(
   () => {
     updateChart();
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Watch for theme changes and update chart colors
@@ -272,14 +268,12 @@ onUnmounted(() => {
 
 <template>
   <!-- Chart Island - Only visible on medium+ screens -->
-  <VCol cols="12" class="d-none d-md-block">
-    <VCard class="pa-4">
-      <div class="chart-container">
-        <!-- Chart.js canvas element -->
-        <canvas ref="chartCanvas"></canvas>
-      </div>
-    </VCard>
-  </VCol>
+  <VCard class="pa-4">
+    <div class="chart-container">
+      <!-- Chart.js canvas element -->
+      <canvas ref="chartCanvas"></canvas>
+    </div>
+  </VCard>
 </template>
 
 <style scoped>

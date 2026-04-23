@@ -234,89 +234,111 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
 </script>
 
 <template>
-  <div class="page-container">
-    <!-- Chart Row -->
-    <VRow class="flex-grow-0">
-      <WorkTimeBarChart :current-month="currentMonth" />
-    </VRow>
+  <!-- Viewport-fill two-panel layout -->
+  <div class="home-layout">
+    <WorkTimeBarChart :current-month="currentMonth" class="flex-shrink-0" />
 
-    <!-- Main Content Row -->
-    <div class="main-row">
+    <div class="panels-row">
       <!-- Left panel: Form + AI Assistant tabs -->
-      <div class="form-column">
-        <VCard class="fill-height d-flex flex-column overflow-hidden">
-          <VTabs
-            v-model="tab"
-            density="compact"
-            class="ma-2"
-            inset
-            grow
-            :slider-color="tabSliderColor"
-            bg-color="surface"
-          >
-            <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
-            <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
-          </VTabs>
+      <VCard class="form-panel d-flex flex-column overflow-hidden">
+        <VTabs
+          v-model="tab"
+          density="compact"
+          class="ma-2"
+          inset
+          grow
+          :slider-color="tabSliderColor"
+          bg-color="surface"
+        >
+          <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
+          <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
+        </VTabs>
 
-          <VTabsWindow v-model="tab" class="flex-grow-1 overflow-hidden">
-            <!-- Form tab: scrollable so sticky form-actions still works -->
-            <VTabsWindowItem value="form" class="overflow-y-auto">
-              <BulkLogForm
-                v-model:selected-dates="selectedDates"
-                :editing-log="editingLog"
-                @submit="handleFormSubmit"
-                @cancel="onBulkCancel"
-                @month-changed="onMonthChanged"
-              />
-            </VTabsWindowItem>
+        <VTabsWindow v-model="tab">
+          <!-- Form tab: scrollable so sticky form-actions works -->
+          <VTabsWindowItem value="form" class="overflow-y-auto">
+            <BulkLogForm
+              v-model:selected-dates="selectedDates"
+              :editing-log="editingLog"
+              @submit="handleFormSubmit"
+              @cancel="onBulkCancel"
+              @month-changed="onMonthChanged"
+            />
+          </VTabsWindowItem>
 
-            <!-- AI Assistant tab -->
-            <VTabsWindowItem value="ai">
-              <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" />
-            </VTabsWindowItem>
-          </VTabsWindow>
-        </VCard>
-      </div>
+          <!-- AI Assistant tab -->
+          <VTabsWindowItem value="ai">
+            <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" />
+          </VTabsWindowItem>
+        </VTabsWindow>
+      </VCard>
 
-      <!-- Log List Column - Fills remaining space, scrollable -->
-      <div class="scrollable-island">
-        <LogList
-          :items="timeLogs"
-          :selected-dates="selectedDates"
-          @edit-log="onEditLog"
-          @delete-log="onDeleteLog"
-          @import="importCsv"
-          @export="exportToCsv"
-        />
-      </div>
+      <!-- Log list — layout controlled by HomeView via class inheritance -->
+      <LogList
+        class="flex-grow-1 overflow-hidden"
+        :items="timeLogs"
+        :selected-dates="selectedDates"
+        @edit-log="onEditLog"
+        @delete-log="onDeleteLog"
+        @import="importCsv"
+        @export="exportToCsv"
+      />
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Vuetify sets flex-grow: 1 on VTabs by default, stealing height from the window */
-.form-column :deep(.v-tabs) {
-  flex-grow: 0 !important;
-  flex-shrink: 0 !important;
-}
-
-/* height: inherit / height: 100% break when the flex parent's computed height is auto.
-   Use a pure flex chain instead so height propagates without percentages. */
-.form-column :deep(.v-tabs-window) {
-  display: flex !important;
-  flex-direction: column;
-  min-height: 0;
-}
-.form-column :deep(.v-tabs-window .v-window__container) {
-  flex: 1;
-  min-height: 0;
-}
-.form-column :deep(.v-tabs-window .v-window-item) {
-  height: auto !important; /* cancel Vuetify's fill-height: height: 100% !important */
-  flex: 1;
-  min-height: 0;
-  /* No !important — Vuetify's inline display:none on inactive items still wins */
+/* Viewport-fill two-panel layout */
+.home-layout {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  padding: 0 12px 12px;
+  gap: 12px;
+}
+
+.panels-row {
+  flex: 1;
+  min-height: 0; /* essential — Vuetify has no utility class for this */
+  display: flex;
+  gap: 12px;
+}
+
+.form-panel {
+  flex: 0 0 33.333%;
+  max-width: 33.333%;
+}
+
+/* VTabsWindow flex chain.
+   Vuetify's VWindow sets height:inherit on .v-window__container. Because VTabsWindow
+   only has a flex-allocated height (no explicit CSS height property), inherit resolves
+   to auto — collapsing the container and preventing overflow-y-auto from scrolling.
+   This chain fixes that without touching Vuetify internals globally. */
+.form-panel :deep(.v-tabs)                             { flex-grow: 0 !important; flex-shrink: 0 !important; }
+.form-panel :deep(.v-tabs-window)                      { flex: 1; display: flex !important; flex-direction: column; min-height: 0; }
+.form-panel :deep(.v-tabs-window .v-window__container) { height: auto !important; flex: 1; min-height: 0; }
+.form-panel :deep(.v-tabs-window .v-window-item)       { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* Mobile: panels stack vertically, .panels-row scrolls as a unit */
+@media (max-width: 959px) {
+  .panels-row {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .form-panel {
+    flex: none;
+    max-width: 100%;
+    overflow: visible !important;
+  }
+  /* Clear all overflow contexts so sticky buttons work against .panels-row */
+  .form-panel :deep(.v-card),
+  .form-panel :deep(.v-tabs-window),
+  .form-panel :deep(.v-tabs-window .v-window__container),
+  .form-panel :deep(.v-tabs-window .v-window-item) {
+    overflow: visible !important;
+    height: auto !important;
+    flex: none !important;
+  }
 }
 </style>

@@ -1,5 +1,83 @@
 @import './base.css';
-@import './islands-theme.css';
+
+/* VMain viewport height — allows child views to use height:100% to fill VMain.
+   Vuetify's .v-application__wrap uses min-height:100dvh (not a fixed height), so
+   without this, flex children can't establish a bounded scroll context.
+   --v-layout-top is set by VAppBar via Vuetify's layout composable. */
+.v-main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--v-layout-top, 48px));
+  overflow: hidden;
+}
+
+/* Container backgrounds within cards */
+.bg-container {
+  background-color: rgba(var(--v-theme-on-surface), 0.05);
+}
+
+/* Sticky card titles with proper background */
+.v-card-title.bg-surface {
+  background-color: rgb(var(--v-theme-surface)) !important;
+}
+
+/* Expansion panels — seamless, no borders */
+.v-expansion-panels {
+  --v-expansion-panel-radius: 12px;
+}
+
+.v-expansion-panel {
+  border: none !important;
+  margin-bottom: 0;
+}
+
+.v-expansion-panel::before {
+  box-shadow: none !important;
+}
+
+.v-expansion-panel:not(:first-child)::after {
+  border-color: rgba(var(--v-theme-on-surface), 0.12) !important;
+}
+
+.v-expansion-panel-title:hover {
+  background-color: rgba(var(--v-theme-on-surface), 0.04);
+}
+
+/* Data tables — clean, borderless */
+.v-data-table {
+  background-color: transparent !important;
+  border-radius: 8px;
+}
+
+.v-data-table > .v-table__wrapper > table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.v-data-table th,
+.v-data-table td {
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12) !important;
+}
+
+/* Dialogs — rounded corners */
+.v-dialog > .v-overlay__content > .v-card {
+  border-radius: 12px !important;
+}
+
+/* Toolbar within cards — blend seamlessly */
+.v-card .v-toolbar {
+  background-color: transparent !important;
+}
+
+/* Smooth transitions for theme changes */
+.v-card,
+.v-expansion-panel,
+.v-data-table,
+.v-dialog {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
 
 /* V-Calendar dark theme overrides to match Vuetify */
 .v-theme--dark .vc-dark {

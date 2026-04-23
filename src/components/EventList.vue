@@ -83,7 +83,7 @@ const deleteEvent = (event: AppEvent) => {
 </script>
 
 <template>
-  <VCard class="event-list d-flex flex-column">
+  <VCard class="d-flex flex-column">
     <!-- Header — sticky so it stays visible while list scrolls -->
     <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent" density="compact">
@@ -167,14 +167,6 @@ const deleteEvent = (event: AppEvent) => {
 </template>
 
 <style scoped>
-/* Card fills remaining space in calendar-column and clips overflow */
-.event-list {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* Scrollable content area below the sticky header */
 .scroll-content {
   flex: 1;
   overflow-y: auto;
