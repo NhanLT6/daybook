@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue';
+import { computed, ref, watchEffect } from 'vue';
 
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
@@ -10,6 +10,8 @@ import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { TimeLog } from '@/interfaces/TimeLog';
+
+import { useTheme } from 'vuetify';
 
 import { useStorage } from '@vueuse/core';
 
@@ -35,6 +37,8 @@ const selectedDates = ref<Date[]>([]);
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
 const editingLog = ref<TimeLog | undefined>(undefined);
 const tab = ref<'form' | 'ai'>('form');
+const theme = useTheme();
+const tabSliderColor = computed(() => (theme.global.current.value.dark ? '#2E3B2E' : '#E8F5E9'));
 
 // Function to get or create storage for a specific month
 const getTimeLogsForMonth = (month: number) => {
@@ -241,14 +245,22 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
       <!-- Left panel: Form + AI Assistant tabs -->
       <div class="form-column">
         <VCard class="fill-height d-flex flex-column overflow-hidden">
-          <VTabs v-model="tab" density="compact" grow variant="inset">
+          <VTabs
+            v-model="tab"
+            density="compact"
+            class="ma-2"
+            inset
+            grow
+            :slider-color="tabSliderColor"
+            bg-color="surface"
+          >
             <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
-            <VTab value="ai" prepend-icon="mdi-creation">AI Assistant</VTab>
+            <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
           </VTabs>
 
           <VTabsWindow v-model="tab" class="flex-grow-1 overflow-hidden">
             <!-- Form tab: scrollable so sticky form-actions still works -->
-            <VTabsWindowItem value="form" class="fill-height overflow-y-auto">
+            <VTabsWindowItem value="form" class="overflow-y-auto">
               <BulkLogForm
                 v-model:selected-dates="selectedDates"
                 :editing-log="editingLog"
@@ -259,13 +271,8 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
             </VTabsWindowItem>
 
             <!-- AI Assistant tab -->
-            <VTabsWindowItem value="ai" class="fill-height">
-              <AiChatPanel
-                inline
-                :projects="projects"
-                :tasks="tasks"
-                @save-logs="onAiSaveLogs"
-              />
+            <VTabsWindowItem value="ai">
+              <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" />
             </VTabsWindowItem>
           </VTabsWindow>
         </VCard>
@@ -285,3 +292,31 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Vuetify sets flex-grow: 1 on VTabs by default, stealing height from the window */
+.form-column :deep(.v-tabs) {
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+/* height: inherit / height: 100% break when the flex parent's computed height is auto.
+   Use a pure flex chain instead so height propagates without percentages. */
+.form-column :deep(.v-tabs-window) {
+  display: flex !important;
+  flex-direction: column;
+  min-height: 0;
+}
+.form-column :deep(.v-tabs-window .v-window__container) {
+  flex: 1;
+  min-height: 0;
+}
+.form-column :deep(.v-tabs-window .v-window-item) {
+  height: auto !important; /* cancel Vuetify's fill-height: height: 100% !important */
+  flex: 1;
+  min-height: 0;
+  /* No !important — Vuetify's inline display:none on inactive items still wins */
+  display: flex;
+  flex-direction: column;
+}
+</style>

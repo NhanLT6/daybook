@@ -154,9 +154,9 @@ const handleSyncTickets = async (): Promise<void> => {
 
 <template>
   <div class="page-container">
-    <VRow>
+    <div class="settings-grid">
       <!-- App Configuration: two independent islands stacked in the column -->
-      <VCol cols="12" md="4" class="d-flex flex-column settings-col">
+      <div class="d-flex flex-column settings-col">
         <!-- Date & Calendar island -->
         <VCard elevation="0">
           <VCardTitle>Date &amp; Calendar</VCardTitle>
@@ -222,10 +222,10 @@ const handleSyncTickets = async (): Promise<void> => {
             />
           </VCardText>
         </VCard>
-      </VCol>
+      </div>
 
       <!-- Jira Integration: single island -->
-      <VCol cols="12" md="4">
+      <div>
         <VCard elevation="0">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             Jira Integration
@@ -352,10 +352,10 @@ const handleSyncTickets = async (): Promise<void> => {
             />
           </VCardText>
         </VCard>
-      </VCol>
+      </div>
 
       <!-- AI Assistant section -->
-      <VCol cols="12" md="4">
+      <div>
         <VCard elevation="0">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             AI Assistant
@@ -401,35 +401,46 @@ const handleSyncTickets = async (): Promise<void> => {
               persistent-hint
               hint="Select a model or type a custom model ID"
             />
+
+            <div class="d-flex justify-end mt-2">
+              <VBtn
+                color="primary"
+                :loading="isSavingSettings"
+                prepend-icon="mdi-content-save"
+                @click="handleSaveCredentials"
+              >
+                Save credentials
+              </VBtn>
+            </div>
           </VCardText>
         </VCard>
-      </VCol>
-
-      <!-- Save all server-side credentials -->
-      <VCol cols="12" class="d-flex justify-end pt-0">
-        <VBtn
-          color="primary"
-          :loading="isSavingSettings"
-          prepend-icon="mdi-content-save"
-          @click="handleSaveCredentials"
-        >
-          Save credentials
-        </VBtn>
-      </VCol>
-    </VRow>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Allow settings content to scroll within the bounded island layout container.
-   Overrides the global overflow: hidden on .page-container so the app bar stays
-   fixed while only the settings area scrolls. */
+/* Allow settings content to scroll within the bounded island layout container. */
 .page-container {
   overflow-y: auto;
 }
 
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--islands-gap);
+  padding: var(--islands-gap);
+}
+
+
 /* Stack the two App Config islands vertically with consistent gap */
 .settings-col {
   gap: var(--islands-gap);
+}
+
+@media (max-width: 959px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

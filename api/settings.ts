@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { AuthError, verifyRequest } from './_lib/auth'
-import { getSettings, saveSettings } from './_lib/kv'
-import type { ServerSettings } from '../src/interfaces/ServerSettings'
+import { AuthError, verifyRequest } from './_lib/auth.js'
+import { getSettings, saveSettings } from './_lib/kv.js'
+import type { ServerSettings } from '../src/interfaces/ServerSettings.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS for local development

@@ -51,6 +51,7 @@
 .main-row {
   flex: 1;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--islands-gap);
   min-height: 0;
   align-items: stretch;
@@ -63,15 +64,44 @@
   min-height: 0;
 }
 
-/* Form column: spans the combined old calendar + form width */
+/* Form column: full-width on small screens, 1/3 on md+ */
 .form-column {
-  flex: 0 0 480px;
+  flex: 1 1 100%;
+  min-height: 480px;
 }
 
-/* Logs column: fills remaining space */
+@media (min-width: 960px) {
+  .form-column {
+    flex: 0 0 33.333%;
+    max-width: 33.333%;
+    min-height: 0;
+  }
+}
+
+/* Logs column: full-width on small screens, fills remaining space on md+ */
 .scrollable-island {
-  flex: 2 1 400px;
+  flex: 1 1 100%;
+  min-height: 320px;
   overflow: hidden;
+}
+
+@media (min-width: 960px) {
+  .scrollable-island {
+    flex: 2 1 400px;
+    min-height: 0;
+  }
+}
+
+/* Allow page to scroll when columns stack on small screens */
+@media (max-width: 959px) {
+  .page-container {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .main-row {
+    flex: 0 0 auto;
+  }
 }
 
 /* Cards that should fill their container height and scroll */

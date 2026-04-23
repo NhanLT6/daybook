@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { generateText } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import type { CoreMessage, ImagePart, TextPart } from 'ai'
-import { AuthError, verifyRequest } from './_lib/auth'
-import { getSettings } from './_lib/kv'
+import { AuthError, verifyRequest } from './_lib/auth.js'
+import { getSettings } from './_lib/kv.js'
 
 interface ChatApiRequest {
   // Messages in our own format — converted to CoreMessage inside this handler
@@ -37,6 +37,7 @@ ${taskList}
 When the user describes work they did (via text or screenshot), extract one or more time log entries.
 - Match project names to the known list where possible. If not found, use what the user said.
 - Match task names to the known list for that project where possible. If not found, use what the user said.
+- If no task is mentioned or cannot be determined, set task equal to the project name. This is the app's convention. Mention this briefly in your summary (e.g. "I used the project name as the task since none was specified.").
 - Resolve relative dates ("yesterday", "this morning", "last Friday") using today's date.
 - Duration must be in minutes (integer).
 - description is optional — use it for meaningful detail only.
