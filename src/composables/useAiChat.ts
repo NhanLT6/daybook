@@ -135,8 +135,7 @@ export function useAiChat() {
 
   const markUndone = (id: string) => {
     const existing = metadataMap.value.get(id) ?? {};
-    const { saveState: _saveState, ...rest } = existing;
-    metadataMap.value = new Map(metadataMap.value).set(id, rest);
+    metadataMap.value = new Map(metadataMap.value).set(id, { ...existing, saveState: undefined });
     savedLogsMessageId.value = null;
     latestLogsMessageId.value = id;
   };
