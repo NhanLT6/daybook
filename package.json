@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.63",
+    "@ai-sdk/vue": "^3.0.168",
     "@popperjs/core": "^2.11.8",
     "@upstash/redis": "^1.37.0",
     "@vercel/kv": "^3.0.0",
