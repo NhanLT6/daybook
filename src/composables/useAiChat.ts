@@ -1,10 +1,12 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
-import type { ChatMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
+import type { FileUIPart, TextUIPart, UIMessage } from 'ai';
 
-import { nanoid } from 'nanoid';
+import { Chat } from '@ai-sdk/vue';
+import { DefaultChatTransport } from 'ai';
 
 import { buildAuthHeaders } from './useCrypto';
 
@@ -27,14 +29,13 @@ export function stripJsonBlock(text: string): string {
   return text.replace(JSON_BLOCK_RE, '').trim();
 }
 
-// ── Image helpers ─────────────────────────────────────────────────────────
+// ── Image helper ──────────────────────────────────────────────────────────
 
 export async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      // Strip "data:image/png;base64," prefix — Gemini wants raw base64
       const base64 = dataUrl.split(',')[1];
       resolve({ base64, mimeType: file.type });
     };
@@ -46,123 +47,112 @@ export async function fileToBase64(file: File): Promise<{ base64: string; mimeTy
 // ── Composable ────────────────────────────────────────────────────────────
 
 export function useAiChat() {
-  const messages = ref<ChatMessage[]>([]);
-  const isLoading = ref(false);
   const error = ref<string | null>(null);
-  // Track the ID of the last AI message containing logs — only that one is saveable
   const latestLogsMessageId = ref<string | null>(null);
-  // Track the ID of the saved-but-still-undoable message (cleared when new message is sent)
   const savedLogsMessageId = ref<string | null>(null);
+
+  // App-specific metadata keyed by message id — SDK messages carry no app state
+  const metadataMap = ref(new Map<string, DaybookMessageMetadata>());
+
+  const chat = new Chat<DaybookUIMessage>({
+    transport: new DefaultChatTransport<DaybookUIMessage>({
+      headers: () => buildAuthHeaders(),
+    }),
+    onFinish: ({ messages: finished }) => {
+      const last = finished[finished.length - 1];
+      if (!last || last.role !== 'assistant') return;
+
+      const rawText = last.parts
+        .filter((p): p is TextUIPart => p.type === 'text')
+        .map((p) => p.text)
+        .join('');
+
+      const logs = parseLogsFromText(rawText);
+
+      metadataMap.value = new Map(metadataMap.value).set(last.id, {
+        timestamp: Date.now(),
+        ...(logs.length > 0 ? { extractedLogs: logs } : {}),
+      });
+
+      if (logs.length > 0) {
+        latestLogsMessageId.value = last.id;
+      }
+    },
+    onError: (err: Error) => {
+      error.value = err.message;
+    },
+  });
+
+  // Merge SDK messages with our app metadata
+  const messages = computed<DaybookUIMessage[]>(() =>
+    (chat.messages as UIMessage[]).map((m) => ({
+      ...m,
+      metadata: metadataMap.value.get(m.id),
+    })),
+  );
+
+  // True while request is in-flight or tokens are arriving
+  const isLoading = computed(() => chat.status === 'submitted' || chat.status === 'streaming');
 
   const sendMessage = async (text: string, attachedFile: File | null, projects: Project[], tasks: Task[]) => {
     if (!text.trim() && !attachedFile) return;
 
     error.value = null;
+    // Freeze the undo window — new message commits the previous save permanently
+    savedLogsMessageId.value = null;
 
-    // Build user message
-    let imageBase64: string | undefined;
-    let imageMimeType: string | undefined;
-    let imageDataUrl: string | undefined;
-
+    const fileParts: FileUIPart[] = [];
     if (attachedFile) {
-      const converted = await fileToBase64(attachedFile);
-      imageBase64 = converted.base64;
-      imageMimeType = converted.mimeType;
-      // Keep data URL for display in the user bubble
-      imageDataUrl = `data:${imageMimeType};base64,${imageBase64}`;
+      const { base64, mimeType } = await fileToBase64(attachedFile);
+      fileParts.push({
+        type: 'file',
+        mediaType: mimeType,
+        url: `data:${mimeType};base64,${base64}`,
+        filename: attachedFile.name,
+      });
     }
 
-    // Freeze any saved-but-undoable message — new message commits it permanently
-    if (savedLogsMessageId.value) {
-      savedLogsMessageId.value = null;
-    }
-
-    const userMessage: ChatMessage = {
-      id: nanoid(),
-      role: 'user',
-      content: text,
-      imageBase64: imageDataUrl,
-      timestamp: Date.now(),
-    };
-    messages.value.push(userMessage);
-    isLoading.value = true;
-
-    try {
-      const authHeaders = await buildAuthHeaders();
-
-      // Build message history in our simple format.
-      // The API handler converts to AI SDK CoreMessage format internally.
-      const allMessages = messages.value.map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      }));
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({
-          messages: allMessages,
+    await chat.sendMessage(
+      {
+        ...(text.trim() ? { text } : {}),
+        ...(fileParts.length > 0 ? { files: fileParts } : {}),
+      } as Parameters<typeof chat.sendMessage>[0],
+      {
+        body: {
           projects: projects.map((p) => p.title),
           tasks: tasks.map((t) => ({ project: t.project, title: t.title })),
           currentDate: new Date().toISOString().split('T')[0],
-          imageBase64,
-          imageMimeType,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(err.error ?? 'Request failed');
-      }
-
-      const { text: responseText } = await res.json();
-      const extractedLogs = parseLogsFromText(responseText);
-      const displayText = stripJsonBlock(responseText);
-
-      const aiMessage: ChatMessage = {
-        id: nanoid(),
-        role: 'assistant',
-        content: displayText,
-        extractedLogs: extractedLogs.length > 0 ? extractedLogs : undefined,
-        timestamp: Date.now(),
-      };
-      messages.value.push(aiMessage);
-
-      // This is now the only saveable message
-      if (extractedLogs.length > 0) {
-        latestLogsMessageId.value = aiMessage.id;
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Something went wrong';
-    } finally {
-      isLoading.value = false;
-    }
+        },
+      },
+    );
   };
 
   const markSaved = (id: string) => {
-    const msg = messages.value.find((m) => m.id === id);
-    if (msg) msg.saveState = 'saved';
+    const existing = metadataMap.value.get(id) ?? {};
+    metadataMap.value = new Map(metadataMap.value).set(id, { ...existing, saveState: 'saved' });
     savedLogsMessageId.value = id;
   };
 
   const markUndone = (id: string) => {
-    const msg = messages.value.find((m) => m.id === id);
-    if (msg) msg.saveState = undefined;
+    const existing = metadataMap.value.get(id) ?? {};
+    const { saveState: _saveState, ...rest } = existing;
+    metadataMap.value = new Map(metadataMap.value).set(id, rest);
     savedLogsMessageId.value = null;
     latestLogsMessageId.value = id;
   };
 
   const markDiscarded = (id: string) => {
-    const msg = messages.value.find((m) => m.id === id);
-    if (msg) msg.saveState = 'discarded';
+    const existing = metadataMap.value.get(id) ?? {};
+    metadataMap.value = new Map(metadataMap.value).set(id, {
+      ...existing,
+      saveState: 'discarded',
+    });
     if (latestLogsMessageId.value === id) latestLogsMessageId.value = null;
   };
 
   const clearMessages = () => {
-    messages.value = [];
+    chat.messages = [];
+    metadataMap.value = new Map();
     latestLogsMessageId.value = null;
     savedLogsMessageId.value = null;
     error.value = null;

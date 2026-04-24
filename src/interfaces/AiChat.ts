@@ -1,3 +1,5 @@
+import type { UIMessage } from 'ai';
+
 export interface ExtractedLog {
   project: string;
   task: string;
@@ -6,12 +8,11 @@ export interface ExtractedLog {
   description?: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string; // natural-language text part
-  imageBase64?: string; // base64 data URL for display (user messages only)
-  extractedLogs?: ExtractedLog[]; // parsed from AI response (assistant only)
-  timestamp: number;
-  saveState?: 'pending' | 'saved' | 'discarded'; // assistant messages with logs only
+export interface DaybookMessageMetadata {
+  extractedLogs?: ExtractedLog[];
+  saveState?: 'saved' | 'discarded';
+  timestamp?: number;
 }
+
+// Typed UIMessage used throughout this app
+export type DaybookUIMessage = UIMessage<DaybookMessageMetadata>;
