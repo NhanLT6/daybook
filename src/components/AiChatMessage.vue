@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import type { ChatMessage, ExtractedLog } from '@/interfaces/AiChat';
+import { computed } from 'vue';
+
+import { stripJsonBlock } from '@/composables/useAiChat';
+
+import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { FileUIPart, TextUIPart } from 'ai';
 
 import AiLogCard from './AiLogCard.vue';
 
 const props = defineProps<{
-  message: ChatMessage;
+  message: DaybookUIMessage;
   isSaveable: boolean;
   isUndoable: boolean;
   canRetry: boolean;
@@ -17,15 +22,28 @@ const emit = defineEmits<{
   retry: [];
 }>();
 
+const textPart = computed(() => props.message.parts.find((p): p is TextUIPart => p.type === 'text'));
+
+const filePart = computed(() => props.message.parts.find((p): p is FileUIPart => p.type === 'file'));
+
+// Strip JSON block only once logs have been extracted (i.e. streaming finished)
+const displayText = computed(() => {
+  const raw = textPart.value?.text ?? '';
+  return props.message.metadata?.extractedLogs !== undefined ? stripJsonBlock(raw) : raw;
+});
+
+const extractedLogs = computed(() => props.message.metadata?.extractedLogs);
+const saveState = computed(() => props.message.metadata?.saveState);
+
 const handleSave = () => {
-  if (props.message.extractedLogs?.length) {
-    emit('saveLogs', props.message.extractedLogs);
+  if (extractedLogs.value?.length) {
+    emit('saveLogs', extractedLogs.value);
   }
 };
 
 const copyMessage = () => {
-  if (props.message.content) {
-    navigator.clipboard.writeText(props.message.content);
+  if (displayText.value) {
+    navigator.clipboard.writeText(displayText.value);
   }
 };
 </script>
@@ -50,8 +68,8 @@ const copyMessage = () => {
         >
           <VCardText class="pa-3">
             <VImg
-              v-if="message.imageBase64"
-              :src="message.imageBase64"
+              v-if="filePart"
+              :src="filePart.url"
               rounded="lg"
               class="mb-2 position-relative"
               style="z-index: 1"
@@ -60,11 +78,11 @@ const copyMessage = () => {
               cover
             />
             <p
-              v-if="message.content"
+              v-if="displayText"
               class="text-body-2 mb-0 message-text"
               style="white-space: pre-wrap; word-break: break-word"
             >
-              {{ message.content }}
+              {{ displayText }}
             </p>
           </VCardText>
         </VCard>
@@ -96,41 +114,28 @@ const copyMessage = () => {
       :style="{ maxWidth: '88%' }"
     >
       <VCardText class="pa-3">
-        <!-- Image attachment -->
-        <VImg
-          v-if="message.imageBase64"
-          :src="message.imageBase64"
-          rounded="lg"
-          class="mb-2 position-relative"
-          style="z-index: 1"
-          width="200"
-          max-height="160"
-          cover
-        />
-
-        <!-- Message text -->
         <p
-          v-if="message.content"
+          v-if="displayText"
           class="text-body-2 mb-0 message-text"
           style="white-space: pre-wrap; word-break: break-word"
         >
-          {{ message.content }}
+          {{ displayText }}
         </p>
 
         <!-- Extracted log cards + action area -->
-        <template v-if="message.extractedLogs?.length">
+        <template v-if="extractedLogs?.length">
           <div class="d-flex flex-column ga-2 mt-3">
-            <AiLogCard v-for="(log, i) in message.extractedLogs" :key="i" :log="log" />
+            <AiLogCard v-for="(log, i) in extractedLogs" :key="i" :log="log" />
           </div>
 
           <div class="d-flex ga-2 justify-end mt-3">
             <!-- Discarded state -->
-            <template v-if="message.saveState === 'discarded'">
+            <template v-if="saveState === 'discarded'">
               <VChip size="small" prepend-icon="mdi-close-circle-outline" variant="tonal">Discarded</VChip>
             </template>
 
             <!-- Saved state: undo available or committed -->
-            <template v-else-if="message.saveState === 'saved'">
+            <template v-else-if="saveState === 'saved'">
               <VBtn size="small" color="primary" variant="tonal" :disabled="!isUndoable" @click="emit('undo')">
                 Undo
               </VBtn>
@@ -142,7 +147,7 @@ const copyMessage = () => {
                 Discard
               </VBtn>
               <VBtn size="small" color="primary" variant="tonal" :disabled="!isSaveable" @click="handleSave">
-                Save {{ message.extractedLogs.length }} log{{ message.extractedLogs.length > 1 ? 's' : '' }}
+                Save {{ extractedLogs.length }} log{{ extractedLogs.length > 1 ? 's' : '' }}
               </VBtn>
             </template>
           </div>

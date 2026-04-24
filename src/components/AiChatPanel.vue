@@ -6,6 +6,7 @@ import { useAiChat } from '@/composables/useAiChat';
 import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
+import type { TextUIPart } from 'ai';
 
 import { useRouter } from 'vue-router';
 
@@ -111,15 +112,17 @@ const handleSaveLogs = (messageId: string, logs: ExtractedLog[]) => {
 const handleUndo = (messageId: string) => {
   const msg = messages.value.find((m) => m.id === messageId);
   markUndone(messageId);
-  if (msg?.extractedLogs?.length) emit('undoLogs');
+  if (msg?.metadata?.extractedLogs?.length) emit('undoLogs');
 };
 
 const handleDiscard = (messageId: string) => {
   markDiscarded(messageId);
 };
 
-const handleRetry = async (messageText: string) => {
-  await sendMessage(messageText, null, props.projects, props.tasks);
+const handleRetry = async (messageId: string) => {
+  const msg = messages.value.find((m) => m.id === messageId);
+  const text = msg?.parts.find((p): p is TextUIPart => p.type === 'text')?.text ?? '';
+  await sendMessage(text, null, props.projects, props.tasks);
 };
 
 const clearError = () => {
@@ -146,12 +149,12 @@ const clearError = () => {
         :key="msg.id"
         :message="msg"
         :is-saveable="msg.id === latestLogsMessageId"
-        :is-undoable="msg.saveState === 'saved' && msg.id === savedLogsMessageId"
+        :is-undoable="msg.metadata?.saveState === 'saved' && msg.id === savedLogsMessageId"
         :can-retry="msg.id === lastUserMessageId && !!error"
         @save-logs="(logs) => handleSaveLogs(msg.id, logs)"
         @undo="() => handleUndo(msg.id)"
         @discard="() => handleDiscard(msg.id)"
-        @retry="() => handleRetry(msg.content)"
+        @retry="() => handleRetry(msg.id)"
       />
 
       <div v-if="isLoading" class="d-flex align-center ga-2">
