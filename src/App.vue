@@ -121,7 +121,7 @@ const navItems = [
       />
     </VAppBar>
 
-    <VMain>
+    <VMain style="overflow-y: auto">
       <Toaster position="bottom-center" rich-colors close-button />
       <RouterView />
       <NightSkyBackground v-if="isDarkMode" />

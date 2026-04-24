@@ -18,18 +18,10 @@ import { toast } from 'vue-sonner';
 // ─── Events from unified storage ─────────────────────────────
 const events = useStorage<AppEvent[]>(storageKeys.events, []);
 
-// Filter to current month + next month, sorted by date
-const filteredEvents = computed<AppEvent[]>(() => {
-  const startOfCurrentMonth = dayjs().startOf('month');
-  const endOfNextMonth = dayjs().add(1, 'month').endOf('month');
-
-  return events.value
-    .filter((event) => {
-      const eventDate = dayjs(event.date);
-      return eventDate.isSameOrAfter(startOfCurrentMonth, 'day') && eventDate.isSameOrBefore(endOfNextMonth, 'day');
-    })
-    .sort((a, b) => dayjs(a.date).diff(dayjs(b.date)));
-});
+// All events sorted chronologically
+const filteredEvents = computed<AppEvent[]>(() =>
+  [...events.value].sort((a, b) => dayjs(a.date).diff(dayjs(b.date))),
+);
 
 const isPastEvent = (date: string): boolean => dayjs(date).isBefore(dayjs(), 'day');
 
@@ -108,12 +100,12 @@ const deleteEvent = (event: AppEvent) => {
       <VCardText v-if="filteredEvents.length === 0">
         <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
           <VIcon icon="mdi-calendar-blank-outline" class="text-disabled" />
-          <div class="text-subtitle-1 text-disabled">No events this month</div>
+          <div class="text-subtitle-1 text-disabled">No events</div>
         </div>
       </VCardText>
 
       <!-- Event list -->
-      <VList v-else lines="two" density="compact">
+      <VList v-else lines="three" density="compact">
         <VHover v-for="event in filteredEvents" :key="event.id">
           <template #default="{ isHovering, props: hoverProps }">
             <VListItem
@@ -130,27 +122,16 @@ const deleteEvent = (event: AppEvent) => {
                 </VAvatar>
               </template>
 
-              <template v-if="event.type === 'custom' || event.description" #append>
+              <!-- Description as third line -->
+              <span v-if="event.description" class="text-caption text-medium-emphasis">{{ event.description }}</span>
+
+              <!-- Edit / delete — custom events only -->
+              <template v-if="event.type === 'custom'" #append>
                 <div class="d-flex ga-1">
-                  <!-- Edit / delete — custom events only -->
-                  <template v-if="event.type === 'custom' && isHovering">
+                  <template v-if="isHovering">
                     <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(event)" />
                     <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(event)" />
                   </template>
-
-                  <!-- Description info -->
-                  <VTooltip v-if="event.description" max-width="300">
-                    <template #activator="{ props: tooltipProps }">
-                      <VIconBtn
-                        v-show="isHovering && event.description"
-                        v-bind="tooltipProps"
-                        icon="mdi-information-outline"
-                        size="small"
-                        variant="text"
-                      />
-                    </template>
-                    {{ event.description }}
-                  </VTooltip>
                 </div>
               </template>
             </VListItem>
