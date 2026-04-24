@@ -4,8 +4,7 @@ import { computed, onMounted, watch } from 'vue';
 import { useJira } from '@/composables/useJira';
 import { useServerSettings } from '@/composables/useServerSettings';
 
-import DawnBackground from '@/components/DawnBackground.vue';
-import NightSkyBackground from '@/components/NightSkyBackground.vue';
+import AppBackground from '@/components/AppBackground.vue';
 
 import type { AppEvent } from '@/interfaces/Event';
 
@@ -124,8 +123,7 @@ const navItems = [
     <VMain style="overflow-y: auto">
       <Toaster position="bottom-center" rich-colors close-button />
       <RouterView />
-      <NightSkyBackground v-if="isDarkMode" />
-      <DawnBackground v-else />
+      <AppBackground />
     </VMain>
   </VApp>
 </template>

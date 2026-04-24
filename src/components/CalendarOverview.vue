@@ -17,14 +17,9 @@ import { useSettingsStore } from '@/stores/settings';
 const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === 'dark');
 
-const {
-  singleDateMode = false,
-  view = 'weekly',
-  embedded = false,
-} = defineProps<{
+const { singleDateMode = false, view = 'weekly' } = defineProps<{
   singleDateMode?: boolean;
   view?: 'weekly' | 'monthly';
-  embedded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -133,7 +128,7 @@ const goToToday = async () => {
 
 <template>
   <!-- Wrap in VCard for standalone use; render as plain div when embedded inside a parent card -->
-  <component :is="embedded ? 'div' : 'VCard'" :class="embedded ? '' : 'pa-2'">
+  <VCard class="mb-2">
     <Calendar
       ref="calendar"
       :class="weekendClasses"
@@ -170,7 +165,7 @@ const goToToday = async () => {
         </div>
       </template>
     </Calendar>
-  </component>
+  </VCard>
 </template>
 
 <style scoped>

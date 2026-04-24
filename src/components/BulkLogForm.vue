@@ -1,11 +1,11 @@
 ﻿<script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
-import CalendarOverview from '@/components/CalendarOverview.vue';
-
 import { useCategories } from '@/composables/useCategories';
 import { useProjectColors } from '@/composables/useProjectColors';
 import { useWorkspace } from '@/composables/useWorkspace';
+
+import CalendarOverview from '@/components/CalendarOverview.vue';
 
 import type { Task } from '@/interfaces/Task';
 import type { TimeLog } from '@/interfaces/TimeLog';
@@ -270,7 +270,6 @@ watch(
       <CalendarOverview
         v-model:selected-dates="selectedDates"
         :single-date-mode="!!editingLog"
-        embedded
         @month-changed="onCalendarMonthChanged"
       />
 
@@ -375,7 +374,7 @@ watch(
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
-      <div class="d-flex ga-2 mt-4 form-actions bg-surface">
+      <div class="d-flex ga-2 mt-4 form-actions">
         <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel-outline" @click="onCancel"> Cancel </VBtn>
 
         <VBtn class="flex-fill" variant="tonal" color="primary" prepend-icon="mdi-content-save-outline" @click="onSave">
