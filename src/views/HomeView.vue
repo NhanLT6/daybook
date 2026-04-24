@@ -194,23 +194,32 @@ const importCsv = async (file?: File) => {
   toast.success('Logs imported');
 };
 
+// Track IDs of the last AI-saved batch for undo support
+const lastAiSavedLogs = ref<Array<{ id: string; month: number }>>([]);
+
 // Handle logs saved from the AI chat panel.
 // Each log has an explicit date, so save to the correct month bucket.
 const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
+  const savedBatch: Array<{ id: string; month: number }> = [];
+
   extractedLogs.forEach((log) => {
     // AI returns YYYY-MM-DD; convert to the app's internal MM/DD/YYYY format
     const date = dayjs(log.date, 'YYYY-MM-DD').format(shortDateFormat);
     const logMonth = dayjs(log.date, 'YYYY-MM-DD').month() + 1; // 1-based month number
+    const id = nanoid();
     const monthStorage = getTimeLogsForMonth(logMonth);
     monthStorage.value.push({
-      id: nanoid(),
+      id,
       date,
       project: log.project,
       task: log.task,
       duration: log.duration,
       description: log.description,
     });
+    savedBatch.push({ id, month: logMonth });
   });
+
+  lastAiSavedLogs.value = savedBatch;
 
   // Merge any new projects and tasks into the stored lists (same as importCsv)
   projects.value = chain(extractedLogs)
@@ -230,6 +239,19 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
   timeLogs.value = currentMonthStorage.value;
 
   toast.success(`${extractedLogs.length} log${extractedLogs.length > 1 ? 's' : ''} saved`);
+};
+
+const onAiUndoLogs = () => {
+  lastAiSavedLogs.value.forEach(({ id, month }) => {
+    const monthStorage = getTimeLogsForMonth(month);
+    monthStorage.value = monthStorage.value.filter((log) => log.id !== id);
+  });
+  lastAiSavedLogs.value = [];
+
+  // Refresh displayed logs
+  timeLogs.value = getTimeLogsForMonth(currentMonth.value).value;
+
+  toast.info('Logs removed');
 };
 </script>
 
@@ -268,7 +290,7 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
 
           <!-- AI Assistant tab -->
           <VTabsWindowItem value="ai">
-            <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" />
+            <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" @undo-logs="onAiUndoLogs" />
           </VTabsWindowItem>
         </VTabsWindow>
       </VCard>
@@ -314,10 +336,27 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
    only has a flex-allocated height (no explicit CSS height property), inherit resolves
    to auto — collapsing the container and preventing overflow-y-auto from scrolling.
    This chain fixes that without touching Vuetify internals globally. */
-.form-panel :deep(.v-tabs)                             { flex-grow: 0 !important; flex-shrink: 0 !important; }
-.form-panel :deep(.v-tabs-window)                      { flex: 1; display: flex !important; flex-direction: column; min-height: 0; }
-.form-panel :deep(.v-tabs-window .v-window__container) { height: auto !important; flex: 1; min-height: 0; }
-.form-panel :deep(.v-tabs-window .v-window-item)       { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.form-panel :deep(.v-tabs) {
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+}
+.form-panel :deep(.v-tabs-window) {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+  min-height: 0;
+}
+.form-panel :deep(.v-tabs-window .v-window__container) {
+  height: auto !important;
+  flex: 1;
+  min-height: 0;
+}
+.form-panel :deep(.v-tabs-window .v-window-item) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 /* Mobile: panels stack vertically, .panels-row scrolls as a unit */
 @media (max-width: 959px) {

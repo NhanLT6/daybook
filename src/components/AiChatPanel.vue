@@ -2,11 +2,12 @@
 import { computed, nextTick, ref, watch } from 'vue';
 
 import { useAiChat } from '@/composables/useAiChat';
-import { useRouter } from 'vue-router';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
+
+import { useRouter } from 'vue-router';
 
 import AiChatMessage from './AiChatMessage.vue';
 
@@ -17,9 +18,20 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   saveLogs: [logs: ExtractedLog[]];
+  undoLogs: [];
 }>();
 
-const { messages, isLoading, error, latestLogsMessageId, sendMessage } = useAiChat();
+const {
+  messages,
+  isLoading,
+  error,
+  latestLogsMessageId,
+  savedLogsMessageId,
+  sendMessage,
+  markSaved,
+  markUndone,
+  markDiscarded,
+} = useAiChat();
 const router = useRouter();
 
 const isConfigError = computed(() => error.value?.includes('not configured') ?? false);
@@ -88,8 +100,26 @@ const removeAttachment = () => {
   if (fileInputRef.value) fileInputRef.value.value = '';
 };
 
-const handleSaveLogs = (logs: ExtractedLog[]) => {
+// ID of the last user message — used to show the retry button on error
+const lastUserMessageId = computed(() => [...messages.value].reverse().find((m) => m.role === 'user')?.id ?? null);
+
+const handleSaveLogs = (messageId: string, logs: ExtractedLog[]) => {
+  markSaved(messageId);
   emit('saveLogs', logs);
+};
+
+const handleUndo = (messageId: string) => {
+  const msg = messages.value.find((m) => m.id === messageId);
+  markUndone(messageId);
+  if (msg?.extractedLogs?.length) emit('undoLogs');
+};
+
+const handleDiscard = (messageId: string) => {
+  markDiscarded(messageId);
+};
+
+const handleRetry = async (messageText: string) => {
+  await sendMessage(messageText, null, props.projects, props.tasks);
 };
 
 const clearError = () => {
@@ -116,7 +146,12 @@ const clearError = () => {
         :key="msg.id"
         :message="msg"
         :is-saveable="msg.id === latestLogsMessageId"
-        @save-logs="handleSaveLogs"
+        :is-undoable="msg.saveState === 'saved' && msg.id === savedLogsMessageId"
+        :can-retry="msg.id === lastUserMessageId && !!error"
+        @save-logs="(logs) => handleSaveLogs(msg.id, logs)"
+        @undo="() => handleUndo(msg.id)"
+        @discard="() => handleDiscard(msg.id)"
+        @retry="() => handleRetry(msg.content)"
       />
 
       <div v-if="isLoading" class="d-flex align-center ga-2">
