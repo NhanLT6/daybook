@@ -146,7 +146,7 @@ const readCsv = (file?: File) => {
 
 <template>
   <VCard class="d-flex flex-column">
-    <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
+    <VCardTitle class="glass-header" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent">
         <VToolbarTitle class="ms-0">Logs</VToolbarTitle>
 

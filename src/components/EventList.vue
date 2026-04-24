@@ -85,7 +85,7 @@ const deleteEvent = (event: AppEvent) => {
 <template>
   <VCard class="d-flex flex-column">
     <!-- Header — sticky so it stays visible while list scrolls -->
-    <VCardTitle class="bg-surface" style="position: sticky; top: 0; z-index: 1000">
+    <VCardTitle class="glass-header" style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent" density="compact">
         <VToolbarTitle class="ms-0">Events</VToolbarTitle>
 
