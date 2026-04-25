@@ -183,7 +183,7 @@ const readCsv = (file?: File) => {
           <VTooltip>
             <template #activator="{ props }">
               <VBtn prepend-icon="mdi-export" variant="tonal" color="primary" @click="emit('export')" v-bind="props">
-                Export
+                <span class="d-none d-sm-inline">Export</span>
               </VBtn>
             </template>
             Export Data to CSV file
