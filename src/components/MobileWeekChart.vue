@@ -86,25 +86,27 @@ const maxDuration = computed(() => {
 </script>
 
 <template>
-  <div class="week-chart">
-    <div v-for="(day, i) in dayData" :key="day.dateStr" class="day-col" :class="{ 'day-today': day.isToday }">
-      <!-- Bar area: segments stack from bottom via column-reverse -->
-      <div class="bar-wrap">
-        <div
-          v-for="seg in day.segments"
-          :key="seg.project"
-          class="bar-seg"
-          :style="{
-            height: (seg.duration / maxDuration) * 100 + '%',
-            background: seg.color,
-          }"
-        />
-      </div>
+  <VCard class="pa-2">
+    <div class="week-chart">
+      <div v-for="(day, i) in dayData" :key="day.dateStr" class="day-col" :class="{ 'day-today': day.isToday }">
+        <!-- Bar area: segments stack from bottom via column-reverse -->
+        <div class="bar-wrap">
+          <div
+            v-for="seg in day.segments"
+            :key="seg.project"
+            class="bar-seg"
+            :style="{
+              height: (seg.duration / maxDuration) * 100 + '%',
+              background: seg.color,
+            }"
+          />
+        </div>
 
-      <!-- Day letter label -->
-      <div class="day-label">{{ dayLabels[i] }}</div>
+        <!-- Day letter label -->
+        <div class="day-label">{{ dayLabels[i] }}</div>
+      </div>
     </div>
-  </div>
+  </VCard>
 </template>
 
 <style scoped>

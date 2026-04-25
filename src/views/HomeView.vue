@@ -40,7 +40,7 @@ const editingLog = ref<TimeLog | undefined>(undefined);
 const tab = ref<'form' | 'ai'>('form');
 const theme = useTheme();
 const { smAndDown } = useDisplay();
-const tabSliderColor = computed(() => (theme.global.current.value.dark ? '#2E3B2E' : '#E8F5E9'));
+const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-darken-4' : 'green-lighten-2'));
 
 // Function to get or create storage for a specific month
 const getTimeLogsForMonth = (month: number) => {
@@ -266,23 +266,16 @@ const onAiUndoLogs = () => {
       :time-logs="timeLogs"
       :selected-dates="selectedDates"
       :current-month="currentMonth"
-      class="flex-shrink-0"
+      class="flex-shrink-0 mt-4"
     />
+
     <!-- Desktop: full month bar chart (unchanged) -->
     <WorkTimeBarChart v-else :current-month="currentMonth" class="flex-shrink-0" />
 
     <div class="panels-row">
       <!-- Left panel: Form + AI Assistant tabs -->
       <VCard class="form-panel d-flex flex-column overflow-hidden">
-        <VTabs
-          v-model="tab"
-          density="compact"
-          class="ma-2"
-          inset
-          grow
-          :slider-color="tabSliderColor"
-          bg-color="surface"
-        >
+        <VTabs v-model="tab" density="compact" class="ma-2" align-tabs="center" :slider-color="tabSliderColor">
           <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
           <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
         </VTabs>
