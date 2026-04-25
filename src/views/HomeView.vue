@@ -4,6 +4,7 @@ import { computed, ref, watchEffect } from 'vue';
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import LogList from '@/components/LogList.vue';
+import MobileWeekChart from '@/components/MobileWeekChart.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
@@ -11,7 +12,7 @@ import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { TimeLog } from '@/interfaces/TimeLog';
 
-import { useTheme } from 'vuetify';
+import { useDisplay, useTheme } from 'vuetify';
 
 import { useStorage } from '@vueuse/core';
 
@@ -38,6 +39,7 @@ const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based t
 const editingLog = ref<TimeLog | undefined>(undefined);
 const tab = ref<'form' | 'ai'>('form');
 const theme = useTheme();
+const { smAndDown } = useDisplay();
 const tabSliderColor = computed(() => (theme.global.current.value.dark ? '#2E3B2E' : '#E8F5E9'));
 
 // Function to get or create storage for a specific month
@@ -258,7 +260,16 @@ const onAiUndoLogs = () => {
 <template>
   <!-- Viewport-fill two-panel layout -->
   <div class="home-layout">
-    <WorkTimeBarChart :current-month="currentMonth" class="flex-shrink-0" />
+    <!-- Mobile: compact week strip chart driven by calendar selection -->
+    <MobileWeekChart
+      v-if="smAndDown"
+      :time-logs="timeLogs"
+      :selected-dates="selectedDates"
+      :current-month="currentMonth"
+      class="flex-shrink-0"
+    />
+    <!-- Desktop: full month bar chart (unchanged) -->
+    <WorkTimeBarChart v-else :current-month="currentMonth" class="flex-shrink-0" />
 
     <div class="panels-row">
       <!-- Left panel: Form + AI Assistant tabs -->
