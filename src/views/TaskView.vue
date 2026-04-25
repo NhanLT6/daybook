@@ -418,7 +418,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
                       @click="openAddCategory"
                       v-bind="props"
                     >
-                      New Category
+                      <span class="d-none d-sm-inline">New Category</span>
                     </VBtn>
                   </template>
                   Add a new category
@@ -434,7 +434,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
                       @click="createNewProject()"
                       v-bind="props"
                     >
-                      New Project
+                      <span class="d-none d-sm-inline">New Project</span>
                     </VBtn>
                   </template>
                   Create a new project
