@@ -186,13 +186,7 @@ const readCsv = (file?: File) => {
           <!-- Export to file -->
           <VTooltip>
             <template #activator="{ props }">
-              <VBtn
-                prepend-icon="mdi-file-delimited-outline"
-                variant="tonal"
-                color="primary"
-                @click="emit('export')"
-                v-bind="props"
-              >
+              <VBtn prepend-icon="mdi-export" variant="tonal" color="primary" @click="emit('export')" v-bind="props">
                 Export
               </VBtn>
             </template>

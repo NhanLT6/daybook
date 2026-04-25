@@ -367,14 +367,14 @@ watch(
         persistent-hint
       />
 
-      <div class="d-flex flex-wrap ga-2">
+      <div class="d-flex flex-wrap ga-2 mb-4">
         <VChip @click="onHourClick(0.25)">+15m</VChip>
         <VChip @click="onHourClick(0.5)">+30m</VChip>
         <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">+{{ hour }}h</VChip>
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
-      <div class="d-flex ga-2 mt-4 form-actions">
+      <div class="d-flex ga-2 pa-2 form-actions bg-container rounded-lg">
         <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel-outline" @click="onCancel"> Cancel </VBtn>
 
         <VBtn class="flex-fill" variant="tonal" color="primary" prepend-icon="mdi-content-save-outline" @click="onSave">

@@ -358,19 +358,33 @@ const onAiUndoLogs = () => {
   flex-direction: column;
 }
 
-/* Mobile: panels stack vertically, .panels-row scrolls as a unit */
+/* Mobile: switch to page-scroll layout so LogList is never clipped.
+   The height:100% constraint on .home-layout prevents LogList from showing
+   when panels stack — removing it lets the page scroll naturally instead. */
 @media (max-width: 959px) {
+  .home-layout {
+    height: auto;
+  }
+
   .panels-row {
     flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
+    flex: none;
+    overflow: visible;
   }
+
   .form-panel {
     flex: none;
     max-width: 100%;
     overflow: visible !important;
   }
-  /* Clear all overflow contexts so sticky buttons work against .panels-row */
+
+  /* LogList loses its flex-grow-1 source of height; give it an explicit viewport height */
+  .panels-row > :last-child {
+    flex: none !important;
+    height: 70vh;
+  }
+
+  /* Clear all overflow contexts so sticky form buttons work against page scroll */
   .form-panel :deep(.v-card),
   .form-panel :deep(.v-tabs-window),
   .form-panel :deep(.v-tabs-window .v-window__container),
