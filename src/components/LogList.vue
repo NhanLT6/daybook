@@ -172,13 +172,9 @@ const readCsv = (file?: File) => {
           <!-- Import from file -->
           <VTooltip>
             <template #activator="{ props }">
-              <SingleFilePicker
-                prepend-icon="mdi-import"
-                file-types=".csv"
-                @file-selected="readCsv"
-                text="Import"
-                v-bind="props"
-              />
+              <SingleFilePicker prepend-icon="mdi-import" file-types=".csv" @file-selected="readCsv" v-bind="props">
+                <span class="d-none d-sm-inline">Import</span>
+              </SingleFilePicker>
             </template>
             Import data from CSV template
           </VTooltip>
