@@ -8,7 +8,7 @@ import AppBackground from '@/components/AppBackground.vue';
 
 import type { AppEvent } from '@/interfaces/Event';
 
-import { useTheme } from 'vuetify';
+import { useDisplay, useTheme } from 'vuetify';
 
 import { useStorage } from '@vueuse/core';
 
@@ -74,6 +74,8 @@ onMounted(async () => {
 
 const route = useRoute();
 
+const { smAndDown } = useDisplay();
+
 // Theme toggle
 const theme = useTheme();
 const savedTheme = useStorage<'light' | 'dark'>('app-theme', 'light');
@@ -105,19 +107,34 @@ const navItems = [
 
 <template>
   <VApp>
-    <VAppBar density="compact" class="elevation-0" color="transparent">
+    <VAppBar density="compact" class="elevation-0" color="transparent" :extended="smAndDown" extension-height="44">
       <VAppBarTitle>Daybook</VAppBarTitle>
 
       <VBtn :icon="themeIcon" variant="text" class="mr-2" size="36" @click="toggleTheme" />
 
+      <!-- Desktop nav: inline (hidden on mobile) -->
       <VBtn
         v-for="(item, i) in navItems"
         :key="i"
         :active="item.to === route.path"
-        class="me-2 text-none"
+        class="me-2 text-none d-none d-sm-flex"
         v-bind="item"
         :to="item.to"
       />
+
+      <template #extension>
+        <!-- Mobile nav: scrollable row, only rendered when smAndDown -->
+        <div v-if="smAndDown" class="mobile-nav-scroll">
+          <VBtn
+            v-for="(item, i) in navItems"
+            :key="i"
+            :active="item.to === route.path"
+            class="me-1 text-none flex-shrink-0"
+            v-bind="item"
+            :to="item.to"
+          />
+        </div>
+      </template>
     </VAppBar>
 
     <VMain style="overflow-y: auto">
@@ -174,5 +191,18 @@ const navItems = [
   background: rgba(255, 255, 255, 0.72) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+/* Mobile nav scrollable row — hides scrollbar while keeping swipe scrolling */
+.mobile-nav-scroll {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  padding: 4px 12px 0;
+  gap: 4px;
+  scrollbar-width: none;
+}
+.mobile-nav-scroll::-webkit-scrollbar {
+  display: none;
 }
 </style>
