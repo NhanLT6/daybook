@@ -222,6 +222,49 @@ const handleSyncTickets = async (): Promise<void> => {
             />
           </VCardText>
         </VCard>
+
+        <!-- Background island -->
+        <VCard class="glass">
+          <VCardTitle>Background</VCardTitle>
+          <VCardText class="d-flex flex-column ga-2">
+            <VTextField
+              v-model="settingsStore.backgroundImageUrl"
+              label="Image URL"
+              placeholder="https://images.pexels.com/..."
+              clearable
+              persistent-hint
+              hint="Paste any public image URL. Leave empty to use the default animated background."
+              prepend-inner-icon="mdi-image-outline"
+            />
+
+            <VSelect
+              v-if="settingsStore.backgroundImageUrl"
+              v-model="settingsStore.backgroundImageMode"
+              :items="settingsStore.backgroundModeOptions"
+              label="Display Mode"
+              item-title="label"
+              item-value="value"
+              persistent-hint
+              :hint="
+                settingsStore.backgroundModeOptions.find((o) => o.value === settingsStore.backgroundImageMode)
+                  ?.description
+              "
+            />
+
+            <VSlider
+              v-model="settingsStore.backgroundBlur"
+              label="Glass Effect"
+              :min="0"
+              :max="1"
+              :step="0.1"
+              thumb-label
+              show-ticks="always"
+              color="primary"
+              persistent-hint
+              hint="Controls both blur and opacity of all glass surfaces. Higher = more readable over busy backgrounds, lower = more transparent."
+            />
+          </VCardText>
+        </VCard>
       </div>
 
       <!-- Jira Integration: single island -->

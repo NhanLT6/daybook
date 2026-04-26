@@ -69,18 +69,20 @@
   background-color: transparent !important;
 }
 
-/* Glassmorphism — opt-in via class="glass" */
+/* Glassmorphism — opt-in via class="glass".
+   Both blur and opacity are driven by the Glass Effect slider (0–1) in Settings.
+   --glass-blur and --glass-opacity-* are set together by App.vue. */
 .v-theme--light .glass {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, var(--glass-opacity-light, 0.83));
+  backdrop-filter: blur(var(--glass-blur, 25.6px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
   border: 1px solid rgba(255, 255, 255, 0.7) !important;
 }
 
 .v-theme--dark .glass {
-  background: rgba(28, 28, 28, 0.58) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77)) !important;
+  backdrop-filter: blur(var(--glass-blur, 25.6px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 

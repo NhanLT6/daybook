@@ -24,6 +24,18 @@ const lastSeenVersion = useStorage('app-last-seen-version', '');
 const settingsStore = useSettingsStore();
 const { loadSettings, migrateJiraFromLocalStorage } = useServerSettings();
 
+// Single source of truth for all glass visuals — one slider drives both blur and opacity.
+// opacity(light) = 0.48 + s*0.44 → 0.48 at 0, 0.83 at 0.8, 0.92 at 1.0
+// opacity(dark)  = 0.42 + s*0.44 → 0.42 at 0, 0.77 at 0.8, 0.86 at 1.0
+const glassStyle = computed(() => {
+  const s = settingsStore.backgroundBlur;
+  return {
+    '--glass-blur': `${s * 32}px`,
+    '--glass-opacity-light': `${0.48 + s * 0.44}`,
+    '--glass-opacity-dark': `${0.42 + s * 0.44}`,
+  };
+});
+
 const autoFetchEvents = async () => {
   const currentYear = new Date().getFullYear();
   const hasHolidaysThisYear = events.value.some((e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)));
@@ -106,33 +118,41 @@ const navItems = [
 </script>
 
 <template>
-  <VApp>
-    <VAppBar density="compact" class="elevation-0" color="transparent" :extended="smAndDown" extension-height="44">
-      <VAppBarTitle>Daybook</VAppBarTitle>
+  <VApp :style="glassStyle">
+    <VAppBar height="72" class="elevation-0" color="transparent" :extended="smAndDown" extension-height="56">
+      <!-- Centered glass pill: brand + theme toggle + nav (desktop) -->
+      <div class="dock-row">
+        <nav class="app-dock glass">
+          <span class="dock-brand">Daybook</span>
 
-      <VBtn :icon="themeIcon" variant="text" class="mr-2" size="36" @click="toggleTheme" />
+          <span class="dock-spacer" />
 
-      <!-- Desktop nav: inline (hidden on mobile) -->
-      <VBtn
-        v-for="(item, i) in navItems"
-        :key="i"
-        :active="item.to === route.path"
-        class="me-2 text-none d-none d-sm-flex"
-        v-bind="item"
-        :to="item.to"
-      />
+          <VBtn :icon="themeIcon" variant="text" size="small" @click="toggleTheme" />
 
-      <template #extension>
-        <!-- Mobile nav: scrollable row, only rendered when smAndDown -->
-        <div v-if="smAndDown" class="mobile-nav-scroll">
           <VBtn
             v-for="(item, i) in navItems"
             :key="i"
             :active="item.to === route.path"
-            class="me-1 text-none flex-shrink-0"
+            class="text-none d-none d-sm-flex"
             v-bind="item"
-            :to="item.to"
+            size="small"
           />
+        </nav>
+      </div>
+
+      <template #extension>
+        <!-- Mobile nav: scrollable glass pill in the extension slot -->
+        <div v-if="smAndDown" class="dock-row dock-row--ext">
+          <nav class="app-dock app-dock--scroll glass">
+            <VBtn
+              v-for="(item, i) in navItems"
+              :key="i"
+              :active="item.to === route.path"
+              class="text-none flex-shrink-0"
+              v-bind="item"
+              size="small"
+            />
+          </nav>
         </div>
       </template>
     </VAppBar>
@@ -157,24 +177,60 @@ const navItems = [
   background: transparent !important;
 }
 
-/* App bar — blends into the page, no visual separation from content */
+/* App bar — transparent shell; the glass dock inside handles visuals */
 .v-app-bar {
-  backdrop-filter: blur(18px) !important;
-  -webkit-backdrop-filter: blur(18px) !important;
   border-bottom: none !important;
   box-shadow: none !important;
 }
 
-/* Mobile nav scrollable row — hides scrollbar while keeping swipe scrolling */
-.mobile-nav-scroll {
-  display: flex;
+/* Strip VToolbar's built-in side padding so dock-row fills edge-to-edge */
+.v-app-bar .v-toolbar__content,
+.v-app-bar .v-toolbar__extension {
+  padding: 0 !important;
+}
+
+/* Dock layout */
+.dock-row {
   width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 6px 12px 6px;
+}
+
+.dock-row--ext {
+  padding: 0 16px 10px;
+}
+
+.app-dock {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.dock-brand {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* Pushes brand left, actions right */
+.dock-spacer {
+  flex: 1;
+}
+
+/* Mobile nav pill: scrollable, hides scrollbar */
+.app-dock--scroll {
+  max-width: calc(100vw - 32px);
   overflow-x: auto;
-  padding: 4px 12px 0;
-  gap: 4px;
   scrollbar-width: none;
 }
-.mobile-nav-scroll::-webkit-scrollbar {
+
+.app-dock--scroll::-webkit-scrollbar {
   display: none;
 }
 </style>
