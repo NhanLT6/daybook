@@ -145,9 +145,9 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="d-flex flex-column">
-    <VCardTitle class="glass-header" style="position: sticky; top: 0; z-index: 1000">
-      <VToolbar class="bg-transparent">
+  <VCard class="glass d-flex flex-column">
+    <VCardTitle style="position: sticky; top: 0; z-index: 1000">
+      <VToolbar>
         <VToolbarTitle class="ms-0">Logs</VToolbarTitle>
 
         <VSpacer />
@@ -172,9 +172,14 @@ const readCsv = (file?: File) => {
           <!-- Import from file -->
           <VTooltip>
             <template #activator="{ props }">
-              <SingleFilePicker prepend-icon="mdi-import" file-types=".csv" @file-selected="readCsv" v-bind="props">
-                <span class="d-none d-sm-inline">Import</span>
-              </SingleFilePicker>
+              <SingleFilePicker
+                file-types=".csv"
+                @file-selected="readCsv"
+                icon="mdi-import"
+                icon-size="small"
+                rounded="lg"
+                v-bind="props"
+              />
             </template>
             Import data from CSV template
           </VTooltip>

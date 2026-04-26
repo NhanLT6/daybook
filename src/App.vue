@@ -157,40 +157,12 @@ const navItems = [
   background: transparent !important;
 }
 
-/* Glassmorphism — dark mode */
-.v-theme--dark .v-card {
-  background: rgba(28, 28, 28, 0.58) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-}
-
-.v-theme--dark .glass-header {
-  background: rgba(28, 28, 28, 0.72) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
 /* App bar — blends into the page, no visual separation from content */
 .v-app-bar {
   backdrop-filter: blur(18px) !important;
   -webkit-backdrop-filter: blur(18px) !important;
   border-bottom: none !important;
   box-shadow: none !important;
-}
-
-/* Glassmorphism — light mode */
-.v-theme--light .v-card {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.7) !important;
-}
-
-.v-theme--light .glass-header {
-  background: rgba(255, 255, 255, 0.72) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
 }
 
 /* Mobile nav scrollable row — hides scrollbar while keeping swipe scrolling */

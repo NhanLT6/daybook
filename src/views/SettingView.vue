@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 
 import { useCategories } from '@/composables/useCategories';
 import { useJira } from '@/composables/useJira';
+import { useServerSettings } from '@/composables/useServerSettings';
 
 import { useField, useForm } from 'vee-validate';
 import * as yup from 'yup';
@@ -10,7 +11,6 @@ import * as yup from 'yup';
 import dayjs from 'dayjs';
 
 import { useSettingsStore } from '@/stores/settings';
-import { useServerSettings } from '@/composables/useServerSettings';
 import { toast } from 'vue-sonner';
 
 const settingsStore = useSettingsStore();
@@ -158,7 +158,7 @@ const handleSyncTickets = async (): Promise<void> => {
       <!-- App Configuration: two independent islands stacked in the column -->
       <div class="d-flex flex-column settings-col">
         <!-- Date & Calendar island -->
-        <VCard elevation="0">
+        <VCard class="glass">
           <VCardTitle>Date &amp; Calendar</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
             <VSelect
@@ -202,7 +202,7 @@ const handleSyncTickets = async (): Promise<void> => {
         </VCard>
 
         <!-- Features island -->
-        <VCard elevation="0">
+        <VCard class="glass">
           <VCardTitle>Features</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
             <VSwitch
@@ -226,7 +226,7 @@ const handleSyncTickets = async (): Promise<void> => {
 
       <!-- Jira Integration: single island -->
       <div>
-        <VCard elevation="0">
+        <VCard class="glass">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             Jira Integration
             <VSwitch v-model="settingsStore.jiraConfig.enabled" color="primary" hide-details density="compact" />
@@ -318,6 +318,7 @@ const handleSyncTickets = async (): Promise<void> => {
                 variant="tonal"
                 @click="testConnection"
                 class="flex-grow-1"
+                prepend-icon="mdi-test-tube"
               >
                 Test Connection
               </VBtn>
@@ -356,7 +357,7 @@ const handleSyncTickets = async (): Promise<void> => {
 
       <!-- AI Assistant section -->
       <div>
-        <VCard elevation="0">
+        <VCard class="glass">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             AI Assistant
             <VSwitch v-model="settingsStore.geminiConfig.enabled" color="primary" hide-details density="compact" />
@@ -405,8 +406,9 @@ const handleSyncTickets = async (): Promise<void> => {
             <div class="d-flex justify-end mt-2">
               <VBtn
                 color="primary"
+                variant="tonal"
                 :loading="isSavingSettings"
-                prepend-icon="mdi-content-save"
+                prepend-icon="mdi-content-save-outline"
                 @click="handleSaveCredentials"
               >
                 Save credentials

@@ -19,9 +19,7 @@ import { toast } from 'vue-sonner';
 const events = useStorage<AppEvent[]>(storageKeys.events, []);
 
 // All events sorted chronologically
-const filteredEvents = computed<AppEvent[]>(() =>
-  [...events.value].sort((a, b) => dayjs(a.date).diff(dayjs(b.date))),
-);
+const filteredEvents = computed<AppEvent[]>(() => [...events.value].sort((a, b) => dayjs(a.date).diff(dayjs(b.date))));
 
 const isPastEvent = (date: string): boolean => dayjs(date).isBefore(dayjs(), 'day');
 
@@ -75,9 +73,9 @@ const deleteEvent = (event: AppEvent) => {
 </script>
 
 <template>
-  <VCard class="d-flex flex-column">
+  <VCard class="glass d-flex flex-column">
     <!-- Header — sticky so it stays visible while list scrolls -->
-    <VCardTitle class="glass-header" style="position: sticky; top: 0; z-index: 1000">
+    <VCardTitle style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent" density="compact">
         <VToolbarTitle class="ms-0">Events</VToolbarTitle>
 
@@ -86,7 +84,16 @@ const deleteEvent = (event: AppEvent) => {
         <div class="d-flex ga-2">
           <VTooltip>
             <template #activator="{ props }">
-              <VIconBtn icon="mdi-plus" icon-size="small" rounded="lg" @click="openAddModal" v-bind="props" />
+              <VBtn
+                prepend-icon="mdi-plus"
+                icon-size="small"
+                color="primary"
+                variant="tonal"
+                @click="openAddModal"
+                v-bind="props"
+              >
+                New Event
+              </VBtn>
             </template>
             Add event
           </VTooltip>

@@ -366,7 +366,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
 
           <VTooltip>
             <template #activator="{ props }">
-              <VBtn variant="text" prepend-icon="mdi-cancel-outline" @click="onCancel" v-bind="props">Cancel</VBtn>
+              <VBtn variant="text" prepend-icon="mdi-cancel" @click="onCancel" v-bind="props">Cancel</VBtn>
             </template>
             Cancel editing and close dialog
           </VTooltip>
@@ -400,7 +400,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
     <!-- Main Content Area -->
     <VRow>
       <VCol cols="12">
-        <VCard>
+        <VCard class="glass">
           <VCardTitle>
             <VToolbar class="bg-transparent">
               <VToolbarTitle class="ms-0">Projects & Tasks</VToolbarTitle>
