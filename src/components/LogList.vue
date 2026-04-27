@@ -145,7 +145,7 @@ const readCsv = (file?: File) => {
 </script>
 
 <template>
-  <VCard class="glass d-flex flex-column">
+  <VCard class="glass-acrylic d-flex flex-column">
     <VCardTitle style="position: sticky; top: 0; z-index: 1000">
       <VToolbar>
         <VToolbarTitle class="ms-0">Logs</VToolbarTitle>
@@ -187,8 +187,19 @@ const readCsv = (file?: File) => {
           <!-- Export to file -->
           <VTooltip>
             <template #activator="{ props }">
-              <VBtn prepend-icon="mdi-export" variant="tonal" color="primary" @click="emit('export')" v-bind="props">
-                <span class="d-none d-sm-inline">Export</span>
+              <VBtn
+                prepend-icon="mdi-export"
+                variant="flat"
+                style="opacity: 1"
+                @click="emit('export')"
+                v-bind="props"
+                class="mt-1"
+              >
+                <template #prepend>
+                  <v-icon color="primary"></v-icon>
+                </template>
+
+                <span class="d-none d-sm-inline text-primary">Export</span>
               </VBtn>
             </template>
             Export Data to CSV file
@@ -210,7 +221,7 @@ const readCsv = (file?: File) => {
         </VCardText>
       </VCard>
 
-      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat>
+      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-2">
         <VExpansionPanel
           v-for="group in loggedTimeByDates"
           :id="group.date"

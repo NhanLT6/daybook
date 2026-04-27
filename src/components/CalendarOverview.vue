@@ -128,7 +128,7 @@ const goToToday = async () => {
 
 <template>
   <!-- Wrap in VCard for standalone use; render as plain div when embedded inside a parent card -->
-  <VCard class="glass mb-2">
+  <VCard class="mb-4">
     <Calendar
       ref="calendar"
       :class="weekendClasses"
@@ -146,6 +146,7 @@ const goToToday = async () => {
       <!-- Calendar footer: chips + Today button as a flat wrapping row -->
       <template #footer>
         <div class="pa-2 d-flex flex-wrap ga-1">
+          <VDivider></VDivider>
           <VChip v-for="(date, i) in selectedDates" :key="i" closable color="primary" @click:close="removeDate(date)">
             {{ dayjs(date).format('MMM D') }}
           </VChip>

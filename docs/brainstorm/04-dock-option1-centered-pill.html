@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dock Option 1 — Centered pill (macOS style)</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+
+      /* ── Mock backgrounds ── */
+      .demo-wrap {
+        position: relative;
+        width: 100%;
+        height: 400px;
+        overflow: hidden;
+        margin-bottom: 32px;
+      }
+      .demo-wrap::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url('https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg?auto=compress&cs=tinysrgb&w=1200');
+        background-size: cover;
+        background-position: center;
+      }
+      .demo-wrap.dark-mode::before {
+        filter: brightness(0.5);
+      }
+      .demo-wrap.plain-bg::before {
+        background-image: none;
+        background-color: #f0f4f8;
+      }
+
+      /* ── Shared page chrome ── */
+      .page {
+        padding: 32px;
+      }
+      h2 {
+        margin-bottom: 8px;
+        font-size: 1.1rem;
+        color: #333;
+      }
+      h3 {
+        margin-bottom: 4px;
+        font-size: 0.85rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .note {
+        font-size: 0.8rem;
+        color: #888;
+        margin-bottom: 20px;
+      }
+
+      /* ──────────────────────────────────────────
+     OPTION 1: Single centered pill
+  ────────────────────────────────────────── */
+
+      /* App bar container — fully transparent, just for height/positioning */
+      .app-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 72px;
+        display: flex;
+        align-items: flex-start; /* dock row aligns to top with padding */
+      }
+      .app-bar.has-extension {
+        height: 130px; /* 72 + 58 */
+      }
+
+      /* Centered dock row */
+      .dock-row {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        padding: 12px 16px 0;
+      }
+      .dock-row.ext-row {
+        padding: 0 16px 8px;
+        align-items: flex-end;
+        /* show at bottom of bar for extension */
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+
+      /* Glass pill */
+      .dock-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 5px 10px;
+        border-radius: 22px;
+        /* glass light */
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+      }
+      .dark-mode .dock-pill {
+        background: rgba(28, 28, 28, 0.65);
+        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
+      }
+      .dock-pill.scroll-pill {
+        max-width: calc(100% - 0px);
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .brand {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        padding: 4px 8px;
+        white-space: nowrap;
+        color: rgba(0, 0, 0, 0.82);
+        letter-spacing: 0.01em;
+      }
+      .dark-mode .brand {
+        color: rgba(255, 255, 255, 0.87);
+      }
+
+      .sep {
+        width: 1px;
+        height: 20px;
+        background: rgba(0, 0, 0, 0.2);
+        margin: 0 6px;
+        flex-shrink: 0;
+      }
+      .dark-mode .sep {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* Icon button */
+      .icon-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        color: rgba(0, 0, 0, 0.7);
+        transition: background 0.15s;
+      }
+      .icon-btn:hover {
+        background: rgba(0, 0, 0, 0.07);
+      }
+      .dark-mode .icon-btn {
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .dark-mode .icon-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* Nav link button */
+      .nav-btn {
+        padding: 6px 12px;
+        border-radius: 14px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: rgba(0, 0, 0, 0.7);
+        transition: background 0.15s;
+        white-space: nowrap;
+      }
+      .nav-btn:hover {
+        background: rgba(0, 0, 0, 0.07);
+      }
+      .nav-btn.active {
+        background: rgba(76, 175, 80, 0.15);
+        color: #2e7d32;
+      }
+      .dark-mode .nav-btn {
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .dark-mode .nav-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .dark-mode .nav-btn.active {
+        background: rgba(76, 175, 80, 0.2);
+        color: #81c784;
+      }
+
+      /* Some fake page content */
+      .fake-content {
+        position: absolute;
+        top: 80px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .fake-card {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-radius: 16px;
+        padding: 20px 28px;
+        width: 240px;
+        font-size: 0.875rem;
+        color: rgba(0, 0, 0, 0.8);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      }
+      .dark-mode .fake-card {
+        background: rgba(28, 28, 28, 0.7);
+        color: rgba(255, 255, 255, 0.87);
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .plain-bg .fake-card {
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      /* Mobile demo adjustments */
+      .mobile-demo .app-bar {
+        height: 130px;
+      }
+      .mobile-demo .fake-content {
+        top: 138px;
+      }
+      .mobile-demo .demo-wrap {
+        height: 480px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h2>Option 1 — Single centered pill (macOS / KDE style)</h2>
+      <p class="note">The entire nav lives inside one floating glass pill, centered horizontally. Clean and minimal.</p>
+
+      <!-- Desktop, light, image background -->
+      <h3>Desktop · Light · Custom background</h3>
+      <div class="demo-wrap">
+        <div class="app-bar">
+          <div class="dock-row">
+            <nav class="dock-pill">
+              <span class="brand">Daybook</span>
+              <span class="sep"></span>
+              <button class="icon-btn" title="Toggle theme">☀️</button>
+              <button class="nav-btn active">Home</button>
+              <button class="nav-btn">Tasks</button>
+              <button class="nav-btn">Events</button>
+              <button class="nav-btn">Settings</button>
+            </nav>
+          </div>
+        </div>
+        <div class="fake-content">
+          <div class="fake-card"><strong>Weekly Summary</strong><br />Mon — Fri · 40h logged</div>
+          <div class="fake-card"><strong>Today</strong><br />Daily standup · 0.5h</div>
+        </div>
+      </div>
+
+      <!-- Desktop, dark, image background -->
+      <h3>Desktop · Dark · Custom background</h3>
+      <div class="demo-wrap dark-mode">
+        <div class="app-bar dark-mode">
+          <div class="dock-row">
+            <nav class="dock-pill">
+              <span class="brand">Daybook</span>
+              <span class="sep"></span>
+              <button class="icon-btn" title="Toggle theme">🌙</button>
+              <button class="nav-btn active">Home</button>
+              <button class="nav-btn">Tasks</button>
+              <button class="nav-btn">Events</button>
+              <button class="nav-btn">Settings</button>
+            </nav>
+          </div>
+        </div>
+        <div class="fake-content dark-mode">
+          <div class="fake-card dark-mode"><strong>Weekly Summary</strong><br />Mon — Fri · 40h logged</div>
+          <div class="fake-card dark-mode"><strong>Today</strong><br />Daily standup · 0.5h</div>
+        </div>
+      </div>
+
+      <!-- Desktop, light, plain background -->
+      <h3>Desktop · Light · Plain background (no image)</h3>
+      <div class="demo-wrap plain-bg">
+        <div class="app-bar">
+          <div class="dock-row">
+            <nav class="dock-pill">
+              <span class="brand">Daybook</span>
+              <span class="sep"></span>
+              <button class="icon-btn">☀️</button>
+              <button class="nav-btn active">Home</button>
+              <button class="nav-btn">Tasks</button>
+              <button class="nav-btn">Events</button>
+              <button class="nav-btn">Settings</button>
+            </nav>
+          </div>
+        </div>
+        <div class="fake-content">
+          <div class="fake-card plain-bg"><strong>Weekly Summary</strong><br />Mon — Fri · 40h logged</div>
+          <div class="fake-card plain-bg"><strong>Today</strong><br />Daily standup · 0.5h</div>
+        </div>
+      </div>
+
+      <!-- Mobile, image background -->
+      <h3>Mobile · Light · Custom background (two-row dock)</h3>
+      <div class="demo-wrap mobile-demo" style="max-width: 390px">
+        <div class="app-bar has-extension">
+          <!-- Main row: brand + theme -->
+          <div class="dock-row">
+            <nav class="dock-pill">
+              <span class="brand">Daybook</span>
+              <span class="sep"></span>
+              <button class="icon-btn">☀️</button>
+            </nav>
+          </div>
+          <!-- Extension row: nav items -->
+          <div class="dock-row ext-row">
+            <nav class="dock-pill scroll-pill">
+              <button class="nav-btn active">Home</button>
+              <button class="nav-btn">Tasks</button>
+              <button class="nav-btn">Events</button>
+              <button class="nav-btn">Settings</button>
+            </nav>
+          </div>
+        </div>
+        <div class="fake-content" style="top: 138px">
+          <div class="fake-card"><strong>Weekly Summary</strong></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

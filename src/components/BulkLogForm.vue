@@ -368,13 +368,13 @@ watch(
       />
 
       <div class="d-flex flex-wrap ga-2 mb-4">
-        <VChip @click="onHourClick(0.25)">+15m</VChip>
-        <VChip @click="onHourClick(0.5)">+30m</VChip>
-        <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">+{{ hour }}h</VChip>
+        <VBtn class="rounded-xl" variant="flat" density="comfortable" @click="onHourClick(0.25)">+15m</VBtn>
+        <VBtn class="rounded-xl" variant="flat" density="comfortable"  @click="onHourClick(0.5)">+30m</VBtn>
+        <VBtn class="rounded-xl" variant="flat" density="comfortable"  v-for="hour in hours" :key="hour" @click="onHourClick(hour)">+{{ hour }}h</VBtn>
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
-      <VCard class="d-flex ga-2 pa-2 form-actions glass rounded-lg">
+      <VCard class="d-flex ga-2 pa-2 form-actions rounded-lg">
         <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel" @click="onCancel"> Cancel </VBtn>
 
         <VBtn class="flex-fill" variant="tonal" color="primary" prepend-icon="mdi-content-save-outline" @click="onSave">

@@ -1,26 +1,39 @@
-import { ref, computed } from 'vue'
-import { defineStore } from 'pinia'
-import { useStorage } from '@vueuse/core'
-import type { JiraConfig } from '@/interfaces/JiraConfig'
-import type { GeminiConfig } from '@/interfaces/ServerSettings'
-import { DEFAULT_GEMINI_CONFIG } from '@/interfaces/ServerSettings'
+import { computed, ref } from 'vue';
+
+import { DEFAULT_GEMINI_CONFIG } from '@/interfaces/ServerSettings';
+
+import type { JiraConfig } from '@/interfaces/JiraConfig';
+import type { GeminiConfig } from '@/interfaces/ServerSettings';
+
+import { useStorage } from '@vueuse/core';
+
+import { defineStore } from 'pinia';
 
 export interface DateFormatOption {
-  label: string
-  value: string
-  example: string
+  label: string;
+  value: string;
+  example: string;
 }
 
 export interface FirstDayOfWeekOption {
-  label: string
-  value: number // 0 = Sunday, 1 = Monday, etc.
+  label: string;
+  value: number; // 0 = Sunday, 1 = Monday, etc.
 }
 
 export interface WeekendPattern {
-  label: string
-  value: number[] // Array of dayjs day values
-  description: string
+  label: string;
+  value: number[]; // Array of dayjs day values
+  description: string;
 }
+
+export type BackgroundMode = 'cover' | 'contain' | 'fill' | 'tile';
+
+export const backgroundModeOptions: { label: string; value: BackgroundMode; description: string }[] = [
+  { label: 'Cover', value: 'cover', description: 'Fill screen, cropping if needed' },
+  { label: 'Contain', value: 'contain', description: 'Fit without cropping, may show bars' },
+  { label: 'Stretch', value: 'fill', description: 'Stretch to fill entire screen' },
+  { label: 'Tile', value: 'tile', description: 'Repeat as a pattern' },
+];
 
 export const dateFormatOptions: DateFormatOption[] = [
   { label: 'MM/DD/YYYY (US)', value: 'MM/DD/YYYY', example: '12/25/2024' },
@@ -29,7 +42,7 @@ export const dateFormatOptions: DateFormatOption[] = [
   { label: 'DD-MM-YYYY', value: 'DD-MM-YYYY', example: '25-12-2024' },
   { label: 'MM-DD-YYYY', value: 'MM-DD-YYYY', example: '12-25-2024' },
   { label: 'YYYY-MM-DD', value: 'YYYY-MM-DD', example: '2024-12-25' },
-]
+];
 
 export const firstDayOfWeekOptions: FirstDayOfWeekOption[] = [
   { label: 'Sunday', value: 0 },
@@ -39,7 +52,7 @@ export const firstDayOfWeekOptions: FirstDayOfWeekOption[] = [
   { label: 'Thursday', value: 4 },
   { label: 'Friday', value: 5 },
   { label: 'Saturday', value: 6 },
-]
+];
 
 export const weekendPatterns: WeekendPattern[] = [
   { label: 'Saturday & Sunday', value: [6, 0], description: 'Western standard (Sat-Sun)' },
@@ -48,7 +61,7 @@ export const weekendPatterns: WeekendPattern[] = [
   { label: 'Saturday only', value: [6], description: 'Single day weekend' },
   { label: 'Sunday only', value: [0], description: 'Single day weekend' },
   { label: 'No weekend', value: [], description: 'No designated weekend days' },
-]
+];
 
 const DEFAULT_JIRA_CONFIG: JiraConfig = {
   enabled: false,
@@ -57,48 +70,49 @@ const DEFAULT_JIRA_CONFIG: JiraConfig = {
   apiToken: '',
   projectKey: '',
   statuses: 'To Do;In Progress;In Review;Done;QA',
-}
+};
 
 export const useSettingsStore = defineStore('settings', () => {
   // ── Local preferences (stay in localStorage) ─────────────────────────
   // Date display format (for UI display only, not import/export)
-  const dateDisplayFormat = useStorage('dateDisplayFormat', 'MM/DD/YYYY')
+  const dateDisplayFormat = useStorage('dateDisplayFormat', 'MM/DD/YYYY');
 
   // First day of week for calendar (0 = Sunday, 1 = Monday, etc.)
   // v-calendar uses 1-7 where 1=Sunday, so we need to convert
-  const firstDayOfWeek = useStorage('firstDayOfWeek', 1) // Default Monday
+  const firstDayOfWeek = useStorage('firstDayOfWeek', 1); // Default Monday
 
   // Weekend days configuration (dayjs day values: 0=Sunday, 1=Monday, etc.)
-  const weekendDays = useStorage('weekendDays', [5, 6, 0]) // Default Fri, Sat, Sun
+  const weekendDays = useStorage('weekendDays', [5, 6, 0]); // Default Fri, Sat, Sun
 
-  const useDefaultTasks = useStorage('useDefaultTasks', true)
+  const useDefaultTasks = useStorage('useDefaultTasks', true);
 
-  const useCategories = useStorage('useCategories', false)
+  const useCategories = useStorage('useCategories', false);
+
+  const backgroundImageUrl = useStorage('backgroundImageUrl', '');
+  const backgroundImageMode = useStorage<BackgroundMode>('backgroundImageMode', 'cover');
+  // 0–1 normalized; maps to 0–24 px in the glass backdrop-filter
+  const backgroundBlur = useStorage('backgroundBlur', 0.8);
 
   // ── Server-managed credentials (populated via populateFromServer) ────
   // These are plain refs — not persisted in localStorage
-  const jiraConfig = ref<JiraConfig>({ ...DEFAULT_JIRA_CONFIG })
-  const geminiConfig = ref<GeminiConfig>({ ...DEFAULT_GEMINI_CONFIG })
+  const jiraConfig = ref<JiraConfig>({ ...DEFAULT_JIRA_CONFIG });
+  const geminiConfig = ref<GeminiConfig>({ ...DEFAULT_GEMINI_CONFIG });
 
   /**
    * Called from App.vue after /api/settings is fetched.
    * Replaces the in-memory jiraConfig and geminiConfig with server values.
    */
   function populateFromServer(serverJira: JiraConfig, serverGemini: GeminiConfig) {
-    jiraConfig.value = serverJira
-    geminiConfig.value = serverGemini
+    jiraConfig.value = serverJira;
+    geminiConfig.value = serverGemini;
   }
 
   // ── Computed ──────────────────────────────────────────────────────────
   // Convert our 0-6 value to v-calendar's 1-7 format
-  const vCalendarFirstDay = computed(() =>
-    firstDayOfWeek.value === 0 ? 1 : firstDayOfWeek.value + 1,
-  )
+  const vCalendarFirstDay = computed(() => (firstDayOfWeek.value === 0 ? 1 : firstDayOfWeek.value + 1));
 
   // Convert dayjs weekend days (0-6) to v-calendar format (1-7)
-  const vCalendarWeekendDays = computed(() =>
-    weekendDays.value.map((day) => (day === 0 ? 1 : day + 1)),
-  )
+  const vCalendarWeekendDays = computed(() => weekendDays.value.map((day) => (day === 0 ? 1 : day + 1)));
 
   return {
     dateDisplayFormat,
@@ -106,6 +120,9 @@ export const useSettingsStore = defineStore('settings', () => {
     weekendDays,
     useDefaultTasks,
     useCategories,
+    backgroundImageUrl,
+    backgroundImageMode,
+    backgroundBlur,
     jiraConfig,
     geminiConfig,
     populateFromServer,
@@ -114,5 +131,6 @@ export const useSettingsStore = defineStore('settings', () => {
     dateFormatOptions,
     firstDayOfWeekOptions,
     weekendPatterns,
-  }
-})
+    backgroundModeOptions,
+  };
+});
