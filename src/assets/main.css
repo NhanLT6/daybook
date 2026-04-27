@@ -131,6 +131,38 @@
   --vc-bg: transparent;
 }
 
+/* ── Custom scrollbar ────────────────────────────────────────────────────────
+   Thin, arrow-free scrollbar for Webkit/Blink browsers.
+   Firefox uses the `scrollbar-*` properties.
+   ──────────────────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--v-theme-on-surface), 0.2) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--v-theme-on-surface), 0.2);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--v-theme-on-surface), 0.4);
+}
+
+/* Make arrow buttons invisible — display:none is unreliable cross-browser */
+::-webkit-scrollbar-button {
+  background: transparent;
+}
+
 /* V-Calendar custom primary color using Vuetify's theme */
 .vc-primary {
   --vc-accent-50: rgba(76, 175, 80, 0.05);
