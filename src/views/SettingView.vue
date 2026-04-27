@@ -158,7 +158,7 @@ const handleSyncTickets = async (): Promise<void> => {
       <!-- App Configuration: two independent islands stacked in the column -->
       <div class="d-flex flex-column settings-col">
         <!-- Date & Calendar island -->
-        <VCard class="glass">
+        <VCard class="glass-acrylic">
           <VCardTitle>Date &amp; Calendar</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
             <VSelect
@@ -202,7 +202,7 @@ const handleSyncTickets = async (): Promise<void> => {
         </VCard>
 
         <!-- Features island -->
-        <VCard class="glass">
+        <VCard class="glass-acrylic">
           <VCardTitle>Features</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
             <VSwitch
@@ -224,7 +224,7 @@ const handleSyncTickets = async (): Promise<void> => {
         </VCard>
 
         <!-- Background island -->
-        <VCard class="glass">
+        <VCard class="glass-acrylic">
           <VCardTitle>Background</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
             <VTextField
@@ -269,7 +269,7 @@ const handleSyncTickets = async (): Promise<void> => {
 
       <!-- Jira Integration: single island -->
       <div>
-        <VCard class="glass">
+        <VCard class="glass-acrylic">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             Jira Integration
             <VSwitch v-model="settingsStore.jiraConfig.enabled" color="primary" hide-details density="compact" />
@@ -400,7 +400,7 @@ const handleSyncTickets = async (): Promise<void> => {
 
       <!-- AI Assistant section -->
       <div>
-        <VCard class="glass">
+        <VCard class="glass-acrylic">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             AI Assistant
             <VSwitch v-model="settingsStore.geminiConfig.enabled" color="primary" hide-details density="compact" />

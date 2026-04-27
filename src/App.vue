@@ -122,7 +122,7 @@ const navItems = [
     <VAppBar height="72" class="elevation-0" color="transparent" :extended="smAndDown" extension-height="56">
       <!-- Centered glass pill: brand + theme toggle + nav (desktop) -->
       <div class="dock-row">
-        <nav class="app-dock glass">
+        <nav class="app-dock glass-acrylic">
           <span class="dock-brand">Daybook</span>
 
           <span class="dock-spacer" />
@@ -143,7 +143,7 @@ const navItems = [
       <template #extension>
         <!-- Mobile nav: scrollable glass pill in the extension slot -->
         <div v-if="smAndDown" class="dock-row dock-row--ext">
-          <nav class="app-dock app-dock--scroll glass">
+          <nav class="app-dock app-dock--scroll glass-acrylic">
             <VBtn
               v-for="(item, i) in navItems"
               :key="i"

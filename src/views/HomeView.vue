@@ -274,7 +274,7 @@ const onAiUndoLogs = () => {
 
     <div class="panels-row">
       <!-- Left panel: Form + AI Assistant tabs -->
-      <VCard class="glass form-panel d-flex flex-column overflow-hidden">
+      <VCard class="glass-acrylic form-panel d-flex flex-column overflow-hidden">
         <VTabs v-model="tab" density="compact" class="ma-2" align-tabs="center" :slider-color="tabSliderColor">
           <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
           <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
