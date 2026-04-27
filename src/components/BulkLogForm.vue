@@ -374,7 +374,7 @@ watch(
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
-      <VCard class="d-flex ga-2 pa-2 form-actions glass rounded-lg">
+      <VCard class="d-flex ga-2 pa-2 form-actions rounded-lg">
         <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel" @click="onCancel"> Cancel </VBtn>
 
         <VBtn class="flex-fill" variant="tonal" color="primary" prepend-icon="mdi-content-save-outline" @click="onSave">

@@ -69,17 +69,24 @@
   background-color: transparent !important;
 }
 
-/* Glassmorphism — opt-in via class="glass".
-   Both blur and opacity are driven by the Glass Effect slider (0–1) in Settings.
-   --glass-blur and --glass-opacity-* are set together by App.vue. */
-.v-theme--light .glass {
+/* ── Glassmorphism ───────────────────────────────────────────────────────────
+   .glass-acrylic applies to panel-level VCards that sit directly on the
+   background. All other surfaces (nested cards, Vuetify controls) render
+   solid — no glass class needed.
+
+   --glass-blur and --glass-opacity-* are set on VApp by App.vue and driven
+   by the Glass Effect slider in Settings.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Acrylic — frosted panel */
+.v-theme--light .glass-acrylic {
   background: rgba(255, 255, 255, var(--glass-opacity-light, 0.83));
   backdrop-filter: blur(var(--glass-blur, 25.6px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
   border: 1px solid rgba(255, 255, 255, 0.7) !important;
 }
 
-.v-theme--dark .glass {
+.v-theme--dark .glass-acrylic {
   background: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77)) !important;
   backdrop-filter: blur(var(--glass-blur, 25.6px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));

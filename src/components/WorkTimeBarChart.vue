@@ -268,7 +268,7 @@ onUnmounted(() => {
 
 <template>
   <!-- Chart Island - Only visible on medium+ screens -->
-  <VCard class="glass-mica pa-4">
+  <VCard class="glass-acrylic pa-4">
     <div class="chart-container">
       <!-- Chart.js canvas element -->
       <canvas ref="chartCanvas"></canvas>

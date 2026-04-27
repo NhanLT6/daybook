@@ -86,7 +86,7 @@ const maxDuration = computed(() => {
 </script>
 
 <template>
-  <VCard class="glass-mica pa-2">
+  <VCard class="glass-acrylic pa-2">
     <div class="week-chart">
       <div v-for="(day, i) in dayData" :key="day.dateStr" class="day-col" :class="{ 'day-today': day.isToday }">
         <!-- Bar area: segments stack from bottom via column-reverse -->

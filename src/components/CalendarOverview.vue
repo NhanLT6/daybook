@@ -128,7 +128,7 @@ const goToToday = async () => {
 
 <template>
   <!-- Wrap in VCard for standalone use; render as plain div when embedded inside a parent card -->
-  <VCard class="glass mb-2">
+  <VCard class="mb-2">
     <Calendar
       ref="calendar"
       :class="weekendClasses"
