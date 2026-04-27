@@ -266,7 +266,7 @@ const onAiUndoLogs = () => {
       :time-logs="timeLogs"
       :selected-dates="selectedDates"
       :current-month="currentMonth"
-      class="flex-shrink-0 mt-4"
+      class="flex-shrink-0"
     />
 
     <!-- Desktop: full month bar chart (unchanged) -->
@@ -319,7 +319,7 @@ const onAiUndoLogs = () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0 12px 12px;
+  padding: 12px;
   gap: 12px;
 }
 

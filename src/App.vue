@@ -119,16 +119,18 @@ const navItems = [
 
 <template>
   <VApp :style="glassStyle">
-    <VAppBar height="72" class="elevation-0" color="transparent" :extended="smAndDown" extension-height="56">
-      <!-- Centered glass pill: brand + theme toggle + nav (desktop) -->
+    <VAppBar height="53" class="elevation-0" color="transparent">
+      <!-- Centered glass pill: brand + theme toggle + nav (desktop) / hamburger (mobile) -->
       <div class="dock-row">
         <nav class="app-dock glass-acrylic">
-          <span class="dock-brand">Daybook</span>
+          <RouterLink v-if="route.path !== '/'" to="/" class="dock-brand dock-brand--link">Daybook</RouterLink>
+          <span v-else class="dock-brand">Daybook</span>
 
           <span class="dock-spacer" />
 
-          <VBtn :icon="themeIcon" variant="text" size="small" @click="toggleTheme" />
+          <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
+          <!-- Desktop nav links -->
           <VBtn
             v-for="(item, i) in navItems"
             :key="i"
@@ -137,24 +139,27 @@ const navItems = [
             v-bind="item"
             size="small"
           />
+
+          <!-- Mobile hamburger menu -->
+          <VMenu v-if="smAndDown" location="bottom end" :offset="8">
+            <template #activator="{ props: menuProps }">
+              <VBtn icon="mdi-menu" variant="text" size="small" v-bind="menuProps" />
+            </template>
+
+            <VList class="glass-acrylic" rounded="lg" min-width="160">
+              <VListItem
+                v-for="(item, i) in navItems"
+                :key="i"
+                :to="item.to"
+                :active="item.to === route.path"
+                rounded="lg"
+              >
+                <VListItemTitle>{{ item.text }}</VListItemTitle>
+              </VListItem>
+            </VList>
+          </VMenu>
         </nav>
       </div>
-
-      <template #extension>
-        <!-- Mobile nav: scrollable glass pill in the extension slot -->
-        <div v-if="smAndDown" class="dock-row dock-row--ext">
-          <nav class="app-dock app-dock--scroll glass-acrylic">
-            <VBtn
-              v-for="(item, i) in navItems"
-              :key="i"
-              :active="item.to === route.path"
-              class="text-none flex-shrink-0"
-              v-bind="item"
-              size="small"
-            />
-          </nav>
-        </div>
-      </template>
     </VAppBar>
 
     <VMain style="overflow-y: auto">
@@ -167,7 +172,7 @@ const navItems = [
 
 <style>
 :root {
-  --header-height: 80px;
+  --header-height: 56px;
   --nv-root-top: var(--header-height);
 }
 
@@ -194,11 +199,7 @@ const navItems = [
   width: 100%;
   display: flex;
   justify-content: center;
-  padding: 6px 12px 6px;
-}
-
-.dock-row--ext {
-  padding: 0 16px 10px;
+  padding: 12px 12px 0;
 }
 
 .app-dock {
@@ -218,19 +219,19 @@ const navItems = [
   letter-spacing: 0.01em;
 }
 
+.dock-brand--link {
+  text-decoration: none;
+  color: inherit;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+
+.dock-brand--link:hover {
+  opacity: 0.7;
+}
+
 /* Pushes brand left, actions right */
 .dock-spacer {
   flex: 1;
-}
-
-/* Mobile nav pill: scrollable, hides scrollbar */
-.app-dock--scroll {
-  max-width: calc(100vw - 32px);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.app-dock--scroll::-webkit-scrollbar {
-  display: none;
 }
 </style>

@@ -153,7 +153,7 @@ const handleSyncTickets = async (): Promise<void> => {
 </script>
 
 <template>
-  <div class="h-100 overflow-y-auto">
+  <div class="h-100 overflow-y-auto overflow-x-hidden">
     <div class="settings-grid">
       <!-- App Configuration: two independent islands stacked in the column -->
       <div class="d-flex flex-column settings-col">
@@ -479,7 +479,7 @@ const handleSyncTickets = async (): Promise<void> => {
 
 @media (max-width: 959px) {
   .settings-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
