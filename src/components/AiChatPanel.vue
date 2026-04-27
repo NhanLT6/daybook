@@ -157,6 +157,7 @@ const clearError = () => {
         @retry="() => handleRetry(msg.id)"
       />
 
+      <!-- Loading message -->
       <div v-if="isLoading" class="d-flex align-center ga-2">
         <VAvatar size="28" color="primary" class="flex-shrink-0">
           <VIcon icon="mdi-creation" size="16" />
@@ -169,6 +170,7 @@ const clearError = () => {
         </VCard>
       </div>
 
+      <!-- Error message -->
       <div v-if="error" class="d-flex align-center ga-2">
         <VAvatar size="28" color="error" class="flex-shrink-0">
           <VIcon icon="mdi-alert-circle-outline" size="16" />

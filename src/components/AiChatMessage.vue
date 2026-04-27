@@ -59,8 +59,7 @@ const copyMessage = () => {
     <VHover v-if="message.role === 'user'" v-slot="{ isHovering, props: hoverProps }">
       <div v-bind="hoverProps" class="d-flex flex-column align-end">
         <VCard
-          color="primary"
-          variant="tonal"
+          variant="flat"
           :elevation="0"
           rounded="lg rounded-te-sm"
           class="message-card"
@@ -88,15 +87,24 @@ const copyMessage = () => {
         </VCard>
 
         <!-- Hover action row — visibility avoids d-flex !important overriding display:none, and keeps space to prevent content shift -->
-        <div :style="{ visibility: isHovering ? 'visible' : 'hidden' }" class="d-flex justify-end ga-1 mt-n4">
-          <VBtn icon="mdi-content-copy" size="small" variant="tonal" density="comfortable" @click="copyMessage" />
-          <VBtn
+        <div :style="{ visibility: isHovering ? 'visible' : 'hidden' }" class="d-flex justify-end ga-1 mt-n4 me-2">
+          <VIconBtn
+            icon="mdi-content-copy"
+            size="small"
+            variant="elevated"
+            density="comfortable"
+            v-tooltip="'Copy'"
+            @click="copyMessage"
+          />
+
+          <VIconBtn
             v-if="canRetry"
             icon="mdi-refresh"
+            icon-color="error"
             size="small"
-            variant="tonal"
+            variant="elevated"
             density="comfortable"
-            color="error"
+            v-tooltip="'Retry'"
             @click="emit('retry')"
           />
         </div>

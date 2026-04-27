@@ -146,7 +146,8 @@ const goToToday = async () => {
       <!-- Calendar footer: chips + Today button as a flat wrapping row -->
       <template #footer>
         <div class="pa-2 d-flex flex-wrap ga-1">
-          <VDivider></VDivider>
+          <VDivider v-if="selectedDates?.length > 0" class="my-2"></VDivider>
+
           <VChip v-for="(date, i) in selectedDates" :key="i" closable color="primary" @click:close="removeDate(date)">
             {{ dayjs(date).format('MMM D') }}
           </VChip>

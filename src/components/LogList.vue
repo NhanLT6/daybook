@@ -154,20 +154,22 @@ const readCsv = (file?: File) => {
 
         <div class="d-flex ga-2">
           <!-- Expand logs-->
-          <VTooltip>
-            <template #activator="{ props }">
-              <VIconBtn icon="mdi-arrow-expand" icon-size="small" rounded="lg" @click="onExpand" v-bind="props" />
-            </template>
-            Expand logs
-          </VTooltip>
+          <VIconBtn
+            icon="mdi-arrow-expand"
+            icon-size="small"
+            rounded="lg"
+            @click="onExpand"
+            v-tooltip="'Expand logs'"
+          />
 
           <!-- Collapse logs -->
-          <VTooltip>
-            <template #activator="{ props }">
-              <VIconBtn icon="mdi-arrow-collapse" icon-size="small" rounded="lg" @click="onCollapse" v-bind="props" />
-            </template>
-            Collapse logs
-          </VTooltip>
+          <VIconBtn
+            icon="mdi-arrow-collapse"
+            icon-size="small"
+            rounded="lg"
+            @click="onCollapse"
+            v-tooltip="'Collapse logs'"
+          />
 
           <!-- Import from file -->
           <VTooltip>
@@ -185,40 +187,32 @@ const readCsv = (file?: File) => {
           </VTooltip>
 
           <!-- Export to file -->
-          <VTooltip>
-            <template #activator="{ props }">
-              <VBtn
-                prepend-icon="mdi-export"
-                variant="flat"
-                style="opacity: 1"
-                @click="emit('export')"
-                v-bind="props"
-                class="mt-1"
-              >
-                <template #prepend>
-                  <v-icon color="primary"></v-icon>
-                </template>
-
-                <span class="d-none d-sm-inline text-primary">Export</span>
-              </VBtn>
+          <VBtn
+            prepend-icon="mdi-export"
+            variant="flat"
+            style="opacity: 1"
+            @click="emit('export')"
+            class="mt-1"
+            v-tooltip="'Export to CSV'"
+          >
+            <template #prepend>
+              <v-icon color="primary"></v-icon>
             </template>
-            Export Data to CSV file
-          </VTooltip>
 
-          <!-- <VBtn icon="mdi-rocket-launch-outline" color="primary" @click="emit('export')" />-->
+            <span class="d-none d-sm-inline text-primary">Export</span>
+          </VBtn>
         </div>
       </VToolbar>
     </VCardTitle>
 
     <!-- Scrollable content area -->
     <div ref="scrollContentRef" class="scroll-content">
-      <VCard v-if="loggedTimeByDates.length === 0" class="elevation-0">
-        <VCardText>
-          <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
-            <VIcon icon="mdi-package-variant-closed" class="text-disabled" />
-            <div class="text-subtitle-1 text-disabled">No data</div>
-          </div>
-        </VCardText>
+      <!-- No data -->
+      <VCard v-if="loggedTimeByDates.length === 0" class="ma-4">
+        <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
+          <VIcon icon="mdi-package-variant-closed" class="text-disabled" />
+          <div class="text-subtitle-1 text-disabled">No data</div>
+        </div>
       </VCard>
 
       <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-2">
