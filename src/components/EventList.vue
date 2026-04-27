@@ -73,7 +73,7 @@ const deleteEvent = (event: AppEvent) => {
 </script>
 
 <template>
-  <VCard class="glass d-flex flex-column">
+  <VCard class="glass-acrylic d-flex flex-column">
     <!-- Header — sticky so it stays visible while list scrolls -->
     <VCardTitle style="position: sticky; top: 0; z-index: 1000">
       <VToolbar class="bg-transparent" density="compact">

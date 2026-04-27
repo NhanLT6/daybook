@@ -93,6 +93,13 @@
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
+/* Vuetify inputs inside glass panels have near-transparent default backgrounds
+   that reveal the frosted blur. Force them to use the solid surface color so
+   they look the same as a VCard (which also uses --v-theme-surface). */
+.glass-acrylic .v-field {
+  background-color: rgb(var(--v-theme-surface)) !important;
+}
+
 /* Smooth transitions for theme changes */
 .v-card,
 .v-expansion-panel,

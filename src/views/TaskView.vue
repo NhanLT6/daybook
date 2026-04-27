@@ -400,7 +400,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
     <!-- Main Content Area -->
     <VRow>
       <VCol cols="12">
-        <VCard class="glass">
+        <VCard class="glass-acrylic">
           <VCardTitle>
             <VToolbar class="bg-transparent">
               <VToolbarTitle class="ms-0">Projects & Tasks</VToolbarTitle>

@@ -368,9 +368,9 @@ watch(
       />
 
       <div class="d-flex flex-wrap ga-2 mb-4">
-        <VChip @click="onHourClick(0.25)">+15m</VChip>
-        <VChip @click="onHourClick(0.5)">+30m</VChip>
-        <VChip v-for="hour in hours" :key="hour" @click="onHourClick(hour)">+{{ hour }}h</VChip>
+        <VBtn class="rounded-xl" variant="flat" density="comfortable" @click="onHourClick(0.25)">+15m</VBtn>
+        <VBtn class="rounded-xl" variant="flat" density="comfortable"  @click="onHourClick(0.5)">+30m</VBtn>
+        <VBtn class="rounded-xl" variant="flat" density="comfortable"  v-for="hour in hours" :key="hour" @click="onHourClick(hour)">+{{ hour }}h</VBtn>
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
