@@ -148,18 +148,26 @@ const goToToday = async () => {
         <div class="pa-2 d-flex flex-wrap ga-1">
           <VDivider v-if="selectedDates?.length > 0" class="my-2"></VDivider>
 
-          <VChip v-for="(date, i) in selectedDates" :key="i" closable color="primary" @click:close="removeDate(date)">
-            {{ dayjs(date).format('MMM D') }}
-          </VChip>
+          <TransitionGroup name="chip">
+            <VChip
+              v-for="date in selectedDates"
+              :key="date.getTime()"
+              closable
+              color="primary"
+              @click:close="removeDate(date)"
+            >
+              {{ dayjs(date).format('MMM D') }}
+            </VChip>
 
-          <VChip
-            v-if="selectedDates.length > 1"
-            color="error"
-            append-icon="mdi-close-circle"
-            @click="selectedDates = []"
-          >
-            Clear all
-          </VChip>
+            <VChip
+              v-if="selectedDates.length > 1"
+              color="error"
+              append-icon="mdi-close-circle"
+              @click="selectedDates = []"
+            >
+              Clear all
+            </VChip>
+          </TransitionGroup>
 
           <VBtn v-if="!isTodayVisible" variant="tonal" @click="goToToday" prepend-icon="mdi-calendar-today">
             Today
@@ -191,5 +199,24 @@ const goToToday = async () => {
 :deep(.has-weekend-6 .vc-day.weekday-6 .vc-day-content),
 :deep(.has-weekend-7 .vc-day.weekday-7 .vc-day-content) {
   color: rgb(var(--v-theme-primary));
+}
+
+/* Chip enter/leave transitions required by TransitionGroup */
+.chip-enter-active {
+  transition: all 0.2s ease-out;
+}
+
+.chip-leave-active {
+  transition: all 0.15s ease-in;
+}
+
+.chip-enter-from {
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+.chip-leave-to {
+  opacity: 0;
+  transform: scale(0.7);
 }
 </style>
