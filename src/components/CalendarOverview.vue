@@ -128,7 +128,9 @@ const goToToday = async () => {
 
 <template>
   <!-- Wrap in VCard for standalone use; render as plain div when embedded inside a parent card -->
-  <VCard class="mb-4">
+  <!-- overflow:visible so the popover isn't clipped; z-index:auto prevents this card from
+       creating a stacking context that would trap the popover below the form fields -->
+  <VCard class="mb-4" style="overflow: visible; z-index: auto">
     <Calendar
       ref="calendar"
       :class="weekendClasses"
