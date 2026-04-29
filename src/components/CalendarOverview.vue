@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import type { AppEvent } from '@/interfaces/Event';
 import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
@@ -17,13 +17,21 @@ import { useSettingsStore } from '@/stores/settings';
 const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === 'dark');
 
-const { singleDateMode = false, view = 'weekly' } = defineProps<{
-  singleDateMode?: boolean;
-  view?: 'weekly' | 'monthly';
-}>();
+type CalendarViewMode = 'weekly' | 'monthly';
+
+const props = withDefaults(
+  defineProps<{
+    singleDateMode?: boolean;
+    view?: CalendarViewMode;
+  }>(),
+  {
+    singleDateMode: false,
+  },
+);
 
 const emit = defineEmits<{
   monthChanged: [month: number];
+  'update:view': [view: CalendarViewMode];
 }>();
 
 const selectedDates = defineModel<Date[]>('selectedDates', { default: () => [] });
@@ -32,6 +40,7 @@ const settingsStore = useSettingsStore();
 
 // Template ref for calendar component
 const calendar = ref();
+const calendarView = useStorage<CalendarViewMode>(storageKeys.settings.calendarView, props.view ?? 'weekly');
 
 const lastEmittedMonth = ref(new Date().getMonth() + 1);
 const isTodayVisible = ref(true);
@@ -82,12 +91,35 @@ const eventAttributes = computed(() => {
 });
 
 const calendarAttrs = computed(() => [todayAttribute.value, selectedDateAttribute.value, ...eventAttributes.value]);
+const nextCalendarView = computed<CalendarViewMode>(() => (calendarView.value === 'weekly' ? 'monthly' : 'weekly'));
+const calendarViewButtonLabel = computed(() => (nextCalendarView.value === 'weekly' ? 'Week' : 'Month'));
+const calendarViewButtonIcon = computed(() =>
+  nextCalendarView.value === 'weekly' ? 'mdi-calendar-week' : 'mdi-calendar-month',
+);
+
+watch(
+  () => props.view,
+  (view) => {
+    if (view) {
+      calendarView.value = view;
+    }
+  },
+  { immediate: true },
+);
+
+watch(calendarView, (view) => {
+  emit('update:view', view);
+});
+
+const toggleCalendarView = () => {
+  calendarView.value = nextCalendarView.value;
+};
 
 const onDayClick = (day: { date: Date }) => {
   const clickedDate = day.date;
   const fmt = (d: Date) => dayjs(d).format('YYYY-MM-DD');
 
-  if (singleDateMode) {
+  if (props.singleDateMode) {
     const isSameDate = selectedDates.value.length === 1 && fmt(selectedDates.value[0]) === fmt(clickedDate);
     selectedDates.value = isSameDate ? [] : [clickedDate];
   } else {
@@ -130,11 +162,24 @@ const goToToday = async () => {
   <!-- Wrap in VCard for standalone use; render as plain div when embedded inside a parent card -->
   <!-- overflow:visible so the popover isn't clipped; z-index:auto prevents this card from
        creating a stacking context that would trap the popover below the form fields -->
-  <VCard class="mb-4" style="overflow: visible; z-index: auto">
+  <VCard class="calendar-overview-card mb-4" style="overflow: visible; z-index: auto">
+    <VBtn
+      class="calendar-view-toggle"
+      color="primary"
+      density="compact"
+      size="small"
+      variant="text"
+      :aria-label="`Switch to ${calendarViewButtonLabel} view`"
+      @click="toggleCalendarView"
+    >
+      <VIcon :icon="calendarViewButtonIcon" size="16" />
+      <span class="calendar-view-label">{{ calendarViewButtonLabel }}</span>
+    </VBtn>
+
     <Calendar
       ref="calendar"
       :class="weekendClasses"
-      :view="view"
+      :view="calendarView"
       expanded
       title-position="left"
       color="primary"
@@ -181,6 +226,24 @@ const goToToday = async () => {
 </template>
 
 <style scoped>
+.calendar-overview-card {
+  position: relative;
+}
+
+.calendar-view-toggle {
+  position: absolute;
+  top: 10px;
+  right: 78px;
+  z-index: 2;
+  min-width: 68px;
+  height: 30px;
+  padding-inline: 8px;
+}
+
+.calendar-view-toggle :deep(.v-btn__content) {
+  gap: 4px;
+}
+
 /* Calendar day interaction styles */
 :deep(.vc-day) {
   cursor: pointer;
@@ -220,5 +283,17 @@ const goToToday = async () => {
 .chip-leave-to {
   opacity: 0;
   transform: scale(0.7);
+}
+
+@media (max-width: 520px) {
+  .calendar-view-toggle {
+    right: 76px;
+    min-width: 34px;
+    padding-inline: 7px;
+  }
+
+  .calendar-view-label {
+    display: none;
+  }
 }
 </style>

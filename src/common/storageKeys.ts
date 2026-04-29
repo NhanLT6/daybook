@@ -13,6 +13,7 @@ export const storageKeys = {
   events: 'events',
   categories: 'categories',
   settings: {
+    calendarView: 'calendarView',
     projectColorMaps: 'projectColorMaps',
   },
   jira: {
