@@ -47,9 +47,9 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'Google Chrome',
+      name: 'Microsoft Edge',
       use: {
-        channel: 'chrome', // Use real Chrome to avoid bot detection
+        channel: 'msedge', // Use real Edge browser to avoid bot detection
         viewport: null, // This will maximize the browser window
         launchOptions: {
           args: [
