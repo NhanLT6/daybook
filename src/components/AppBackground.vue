@@ -1,5 +1,6 @@
 <template>
-  <div v-if="settingsStore.backgroundImageUrl" class="app-background-image" :style="imageStyle" />
+  <AppBackgroundVideo v-if="settingsStore.isBackgroundVideo" :src="settingsStore.backgroundUrl" />
+  <div v-else-if="settingsStore.backgroundUrl" class="app-background-image" :style="imageStyle" />
   <AppBackgroundParticles v-else />
 </template>
 
@@ -9,13 +10,14 @@ import { computed } from 'vue';
 import { useSettingsStore } from '@/stores/settings';
 
 import AppBackgroundParticles from './AppBackgroundParticles.vue';
+import AppBackgroundVideo from './AppBackgroundVideo.vue';
 
 const settingsStore = useSettingsStore();
 
 const imageStyle = computed(() => {
   const mode = settingsStore.backgroundImageMode;
   return {
-    backgroundImage: `url(${settingsStore.backgroundImageUrl})`,
+    backgroundImage: `url(${settingsStore.backgroundUrl})`,
     backgroundSize: mode === 'fill' ? '100% 100%' : mode === 'tile' ? 'auto' : mode,
     backgroundRepeat: mode === 'tile' ? 'repeat' : 'no-repeat',
     backgroundPosition: 'center',

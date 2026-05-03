@@ -228,17 +228,17 @@ const handleSyncTickets = async (): Promise<void> => {
           <VCardTitle>Background</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
             <VTextField
-              v-model="settingsStore.backgroundImageUrl"
-              label="Image URL"
-              placeholder="https://images.pexels.com/..."
+              v-model="settingsStore.backgroundUrl"
+              label="Background URL"
+              placeholder="https://www.pexels.com/download/video/... or https://images.pexels.com/..."
               clearable
               persistent-hint
-              hint="Paste any public image URL. Leave empty to use the default animated background."
+              hint="Paste any public image or video URL. Leave empty to use the default animated background."
               prepend-inner-icon="mdi-image-outline"
             />
 
             <VSelect
-              v-if="settingsStore.backgroundImageUrl"
+              v-if="settingsStore.backgroundUrl && !settingsStore.isBackgroundVideo"
               v-model="settingsStore.backgroundImageMode"
               :items="settingsStore.backgroundModeOptions"
               label="Display Mode"

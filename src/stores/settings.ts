@@ -88,10 +88,19 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const useCategories = useStorage('useCategories', false);
 
-  const backgroundImageUrl = useStorage('backgroundImageUrl', '');
+  const backgroundUrl = useStorage('backgroundUrl', '');
   const backgroundImageMode = useStorage<BackgroundMode>('backgroundImageMode', 'cover');
   // 0–1 normalized; maps to 0–24 px in the glass backdrop-filter
   const backgroundBlur = useStorage('backgroundBlur', 0.8);
+
+  const isBackgroundVideo = computed(() => {
+    const url = backgroundUrl.value.toLowerCase();
+    if (!url) return false;
+    if (/\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/.test(url)) return true;
+    if (url.includes('pexels.com/download/video/')) return true;
+    if (url.includes('videos.pexels.com')) return true;
+    return false;
+  });
 
   // ── Server-managed credentials (populated via populateFromServer) ────
   // These are plain refs — not persisted in localStorage
@@ -120,9 +129,10 @@ export const useSettingsStore = defineStore('settings', () => {
     weekendDays,
     useDefaultTasks,
     useCategories,
-    backgroundImageUrl,
+    backgroundUrl,
     backgroundImageMode,
     backgroundBlur,
+    isBackgroundVideo,
     jiraConfig,
     geminiConfig,
     populateFromServer,
