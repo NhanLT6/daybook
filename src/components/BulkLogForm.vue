@@ -95,7 +95,7 @@ const emptyLog: BulkLogFormData = {
   categoryName: undefined,
 };
 
-const { errors, handleSubmit, resetForm, setFieldValue } = useForm<BulkLogFormData>({
+const { errors, handleSubmit, resetForm, setFieldValue, submitCount } = useForm<BulkLogFormData>({
   initialValues: emptyLog,
   validationSchema,
   validateOnMount: false,
@@ -243,7 +243,7 @@ watch(
       });
     } else if (dates) {
       // Create mode: Sync with parent's selected dates
-      selectedDatesField.setValue(dates, false);
+      selectedDatesField.setValue(dates, submitCount.value > 0);
     }
   },
   { immediate: true, deep: true },
@@ -267,11 +267,17 @@ watch(
 <template>
   <div class="pa-4">
     <form ref="formEl" class="d-flex flex-column ga-2" autocomplete="off">
-      <CalendarOverview
-        v-model:selected-dates="selectedDates"
-        :single-date-mode="!!editingLog"
-        @month-changed="onCalendarMonthChanged"
-      />
+      <VInput class="calendar-date-field" :error-messages="errors.selectedDates">
+        <CalendarOverview
+          v-model:selected-dates="selectedDates"
+          :single-date-mode="!!editingLog"
+          @month-changed="onCalendarMonthChanged"
+        />
+
+        <template #message>
+          <span class="px-4">{{ errors.selectedDates }}</span>
+        </template>
+      </VInput>
 
       <VCombobox
         :model-value="projectField.value.value"
@@ -401,5 +407,10 @@ watch(
   position: sticky;
   bottom: 4px;
   padding-top: 8px;
+}
+
+.calendar-date-field :deep(.v-input__control),
+.calendar-date-field :deep(.calendar-overview-card) {
+  width: 100%;
 }
 </style>

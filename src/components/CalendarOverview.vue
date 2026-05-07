@@ -162,7 +162,7 @@ const goToToday = async () => {
   <!-- Wrap in VCard for standalone use; render as plain div when embedded inside a parent card -->
   <!-- overflow:visible so the popover isn't clipped; z-index:auto prevents this card from
        creating a stacking context that would trap the popover below the form fields -->
-  <VCard class="calendar-overview-card mb-4" style="overflow: visible; z-index: auto">
+  <VCard class="calendar-overview-card" style="overflow: visible; z-index: auto">
     <VBtn
       class="calendar-view-toggle"
       color="primary"
