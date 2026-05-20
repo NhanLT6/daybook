@@ -91,14 +91,14 @@ const { smAndDown } = useDisplay();
 // Theme toggle
 const theme = useTheme();
 const savedTheme = useStorage<'light' | 'dark'>('app-theme', 'light');
-theme.global.name.value = savedTheme.value;
+theme.change(savedTheme.value);
 
 const isDarkMode = computed(() => theme.global.name.value === 'dark');
 const themeIcon = computed(() => (isDarkMode.value ? 'mdi-weather-sunny' : 'mdi-weather-night'));
 
 const toggleTheme = () => {
   const newTheme = isDarkMode.value ? 'light' : 'dark';
-  theme.global.name.value = newTheme;
+  theme.change(newTheme);
   savedTheme.value = newTheme;
 };
 
