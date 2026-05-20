@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
@@ -14,7 +14,7 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 
 import { useDisplay, useTheme } from 'vuetify';
 
-import { useStorage } from '@vueuse/core';
+import { useNow, useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
@@ -34,9 +34,20 @@ const projects = useStorage<Project[]>(storageKeys.projects, []);
 // Storage map to keep track of different month storages
 const monthStorages = new Map<string, ReturnType<typeof useStorage<TimeLog[]>>>();
 
-const selectedDates = ref<Date[]>([]);
+const now = useNow({ interval: 60_000 });
+const todayDateStr = computed(() => dayjs(now.value).format('YYYY-MM-DD'));
+
+const selectedDates = ref<Date[]>([now.value]);
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
 const editingLog = ref<TimeLog | undefined>(undefined);
+
+// Auto-reset selected date when the calendar date changes at midnight
+watch(todayDateStr, () => {
+  if (!editingLog.value) {
+    selectedDates.value = [now.value];
+  }
+});
+
 const tab = ref<'form' | 'ai'>('form');
 const theme = useTheme();
 const { smAndDown } = useDisplay();
@@ -90,7 +101,7 @@ const saveBulkLogs = (logs: TimeLog[]) => {
     toast.success(`${logs.length} logs added`);
   }
 
-  selectedDates.value = [];
+  selectedDates.value = [now.value];
   editingLog.value = undefined;
 };
 
@@ -99,7 +110,7 @@ const handleFormSubmit = (logs: TimeLog[]) => {
 };
 
 const onBulkCancel = () => {
-  selectedDates.value = [];
+  selectedDates.value = [now.value];
   editingLog.value = undefined;
 };
 

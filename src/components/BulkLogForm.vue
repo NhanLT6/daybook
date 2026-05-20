@@ -173,12 +173,10 @@ const onSave = handleSubmit((values) => {
   if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
 
   resetForm({ values: emptyLog });
-  selectedDates.value = [];
 }, scrollToFirstError);
 
 const onCancel = () => {
-  resetForm({ values: { ...emptyLog, selectedDates: [] } });
-  selectedDates.value = [];
+  resetForm({ values: emptyLog });
   emit('cancel');
 };
 

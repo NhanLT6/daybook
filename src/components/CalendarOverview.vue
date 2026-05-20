@@ -6,7 +6,7 @@ import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
 
 import { useTheme } from 'vuetify';
 
-import { useStorage } from '@vueuse/core';
+import { useNow, useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
@@ -42,6 +42,8 @@ const settingsStore = useSettingsStore();
 const calendar = ref();
 const calendarView = useStorage<CalendarViewMode>(storageKeys.settings.calendarView, props.view ?? 'weekly');
 
+const now = useNow({ interval: 60_000 });
+
 const lastEmittedMonth = ref(new Date().getMonth() + 1);
 const isTodayVisible = ref(true);
 
@@ -50,13 +52,13 @@ const events = useStorage<AppEvent[]>(storageKeys.events, []);
 // Calendar attributes - static, not reactive to displayed month to avoid recursion
 const todayAttribute = computed(() => ({
   key: 'today',
-  highlight: { color: 'green', fillMode: 'light' },
-  dates: new Date(),
+  highlight: { color: 'green', fillMode: 'outline' },
+  dates: now.value,
 }));
 
 const selectedDateAttribute = computed(() => ({
   key: 'selected',
-  highlight: { color: 'green', fillMode: 'outline' },
+  highlight: { color: 'green', fillMode: 'solid' },
   dates: selectedDates.value,
 }));
 
