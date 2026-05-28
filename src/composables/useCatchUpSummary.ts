@@ -1,4 +1,4 @@
-import { onUnmounted, ref } from 'vue';
+import { ref } from 'vue';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
 
@@ -10,11 +10,10 @@ import { useSettingsStore } from '@/stores/settings';
 
 import { buildAuthHeaders } from './useCrypto';
 
-export type CatchUpState = 'greeting' | 'preparing' | 'ready' | 'unconfigured' | 'error';
+export type CatchUpState = 'greeting' | 'preparing' | 'ready' | 'error';
 
 const GREETING_MIN_MS = 1500;
 const PREPARING_MIN_MS = 1000;
-const AUTO_CLOSE_MS = 60 * 60 * 1000;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -143,8 +142,9 @@ export function useCatchUpSummary() {
     // Always show greeting for minimum time
     await sleep(GREETING_MIN_MS);
 
+    // Not configured: greet then silently dismiss — user will see greeting briefly
     if (!isConfigured) {
-      contentState.value = 'unconfigured';
+      dismiss();
       return;
     }
 
@@ -181,33 +181,21 @@ export function useCatchUpSummary() {
     }
   }
 
-  // ── Dismiss / auto-close timer ────────────────────────────────────────────
-
-  let autoCloseTimer: ReturnType<typeof setTimeout> | null = null;
+  // ── Visibility ────────────────────────────────────────────────────────────
 
   function dismiss() {
-    clearAutoCloseTimer();
     localStorage.setItem(storageKeys.catchUp.dismissedDate, today);
     isVisible.value = false;
   }
 
-  function startAutoCloseTimer() {
-    clearAutoCloseTimer();
-    autoCloseTimer = setTimeout(dismiss, AUTO_CLOSE_MS);
-  }
-
-  function clearAutoCloseTimer() {
-    if (autoCloseTimer) {
-      clearTimeout(autoCloseTimer);
-      autoCloseTimer = null;
-    }
+  function show() {
+    localStorage.removeItem(storageKeys.catchUp.dismissedDate);
+    isVisible.value = true;
   }
 
   async function retry() {
     await runFlow();
   }
-
-  onUnmounted(clearAutoCloseTimer);
 
   return {
     isVisible,
@@ -215,8 +203,7 @@ export function useCatchUpSummary() {
     summary,
     runFlow,
     dismiss,
-    startAutoCloseTimer,
-    clearAutoCloseTimer,
+    show,
     retry,
   };
 }
