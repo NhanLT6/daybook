@@ -10,7 +10,7 @@ import { getTaskEntries, saveTaskEntriesWithLoggedStatus } from './logHelpers/fi
 import { ProgressTracker } from './logHelpers/progressTracker.js';
 import { createOrOpenProject, goBackToAllProjects } from './logHelpers/projectHelper.js';
 import { addTimeSpentToTask, createTask } from './logHelpers/taskHelper.js';
-import { filter200ProjectsPerPage, loginXero } from './logHelpers/utils.js';
+import { convertMinutesToHourMinutes, filter200ProjectsPerPage, loginXero } from './logHelpers/utils.js';
 
 test.describe('Xero Work Logger', () => {
   // eslint-disable-next-line playwright/expect-expect
@@ -42,6 +42,7 @@ test.describe('Xero Work Logger', () => {
       const projectGroups = _.groupBy(taskEntries, (e) => e.project);
 
       for (const [projectName, tasksEntriesInProject] of Object.entries(projectGroups)) {
+        console.log(''); // blank line between projects
         await createOrOpenProject(page, config.contactName, projectName);
 
         // Create Tasks
@@ -52,7 +53,11 @@ test.describe('Xero Work Logger', () => {
           for (const entry of tasks) {
             await addTimeSpentToTask(page, entry.task, entry.duration, entry.date, entry.description);
             entry.isLogged = true;
-            progress.increment(); // Update progress after each successful log
+            const label = progress.increment();
+            const duration = convertMinutesToHourMinutes(entry.duration);
+            const date = dayjs(entry.date).format('YYYY-MM-DD');
+            const desc = entry.description ? ` · "${entry.description}"` : '';
+            console.log(`    ${label} ⏱  ${date} · ${duration}${desc}`);
           }
         }
 

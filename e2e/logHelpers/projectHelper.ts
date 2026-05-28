@@ -1,26 +1,34 @@
 ﻿import { Page } from '@playwright/test';
 
 async function createOrOpenProject(page: Page, contactName: string, projectName: string) {
-  // Wait for a project list to be loaded
-  await page.locator('div[data-automationid="list-view-list"]').waitFor({ state: 'visible' });
+  // When no projects exist Xero shows an empty state without the list element.
+  // Use a short timeout so we don't hang on that case.
+  const listVisible = await page
+    .locator('div[data-automationid="list-view-list"]')
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
 
-  // Check if Project exists
-  const projectElement = page
-    .locator('a[data-automationid="project-list-item"]')
-    .filter({
-      has: page.locator('div[data-automationid="project-item-project-name"]', { hasText: projectName }),
-    })
-    .filter({
-      has: page.locator('span[data-automationid="project-item-contact-name"]', { hasText: contactName }),
-    });
+  if (listVisible) {
+    // Check if Project exists
+    const projectElement = page
+      .locator('a[data-automationid="project-list-item"]')
+      .filter({
+        has: page.locator('div[data-automationid="project-item-project-name"]', { hasText: projectName }),
+      })
+      .filter({
+        has: page.locator('span[data-automationid="project-item-contact-name"]', { hasText: contactName }),
+      });
 
-  const isProjectExist = (await projectElement.count()) > 0;
-  if (isProjectExist) {
-    await openProject(page, contactName, projectName);
-    return;
+    if ((await projectElement.count()) > 0) {
+      console.log(`📁 Project "${projectName}" — already exists`);
+      await openProject(page, contactName, projectName);
+      return;
+    }
   }
 
-  // If project doesn't exist, create it
+  // Project not found (or list is empty) — create it
+  console.log(`📁 Project "${projectName}" — creating new`);
   await page.getByRole('button', { name: 'New project' }).click();
   await page.getByRole('button', { name: 'In progress' }).click();
 

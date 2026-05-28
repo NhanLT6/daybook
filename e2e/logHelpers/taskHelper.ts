@@ -11,8 +11,12 @@ async function createTask(page: Page, taskName: string) {
   const taskElements = page.locator('span[data-automationid="task-item-name-field"]', { hasText: taskName });
 
   const isTaskExist = (await taskElements.count()) > 0;
-  if (isTaskExist) return;
+  if (isTaskExist) {
+    console.log(`  📋 Task "${taskName}" — already exists`);
+    return;
+  }
 
+  console.log(`  📋 Task "${taskName}" — creating new`);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByRole('button', { name: 'Task' }).click();
 

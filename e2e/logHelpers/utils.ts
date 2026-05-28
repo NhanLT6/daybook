@@ -5,15 +5,22 @@ import { XeroConfig } from '../interfaces/xeroConfig.js';
 async function loginXero(page: Page, config: XeroConfig) {
   await page.goto('https://go.xero.com/app/!lep5g/projects/');
 
-  // Wait for navigation to settle — Xero may redirect to login if session expired
-  await page.waitForURL(/login\.xero\.com|\/projects\//, { timeout: 15000 });
+  // Xero may do a client-side JS redirect to login when the session is expired.
+  // Checking the URL immediately after goto is unreliable because the initial URL
+  // already matches /projects/ before the redirect fires. Instead, wait to see
+  // whether the login form actually appears on screen.
+  const emailInput = page.getByPlaceholder('Email address');
+  const isLoginPage = await emailInput
+    .waitFor({ state: 'visible', timeout: 15000 })
+    .then(() => true)
+    .catch(() => false);
 
-  if (page.url().includes('/projects/')) {
+  if (!isLoginPage) {
     console.log('✅ Restored session — skipping login');
     return;
   }
 
-  await page.getByPlaceholder('Email address').fill(config.userName);
+  await emailInput.fill(config.userName);
   await page.getByPlaceholder('Password').fill(config.password);
 
   await page.getByRole('button', { name: 'Log in' }).click();
