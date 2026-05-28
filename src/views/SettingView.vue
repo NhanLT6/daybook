@@ -220,6 +220,14 @@ const handleSyncTickets = async (): Promise<void> => {
               hint="When enabled, projects can be grouped into categories for better organisation"
               color="primary"
             />
+
+            <VSwitch
+              v-model="settingsStore.rememberLastSelectedDate"
+              label="Remember last selected date"
+              persistent-hint
+              hint="After saving a single-date log, that date is pre-selected for your next entry — as long as you continue within 3 minutes. Useful for logging multiple entries in one sitting."
+              color="primary"
+            />
           </VCardText>
         </VCard>
 

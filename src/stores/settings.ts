@@ -28,6 +28,11 @@ export interface WeekendPattern {
 
 export type BackgroundMode = 'cover' | 'contain' | 'fill' | 'tile';
 
+export interface RememberedDate {
+  date: string;    // ISO date string
+  savedAt: number; // Date.now() at save time
+}
+
 export const backgroundModeOptions: { label: string; value: BackgroundMode; description: string }[] = [
   { label: 'Cover', value: 'cover', description: 'Fill screen, cropping if needed' },
   { label: 'Contain', value: 'contain', description: 'Fit without cropping, may show bars' },
@@ -88,6 +93,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const useCategories = useStorage('useCategories', false);
 
+  const rememberLastSelectedDate = useStorage('rememberLastSelectedDate', false);
+  const lastSelectedDate = useStorage<RememberedDate | null>('lastSelectedDate', null);
+
   const backgroundUrl = useStorage('backgroundUrl', '');
   const backgroundImageMode = useStorage<BackgroundMode>('backgroundImageMode', 'cover');
   // 0–1 normalized; maps to 0–24 px in the glass backdrop-filter
@@ -129,6 +137,8 @@ export const useSettingsStore = defineStore('settings', () => {
     weekendDays,
     useDefaultTasks,
     useCategories,
+    rememberLastSelectedDate,
+    lastSelectedDate,
     backgroundUrl,
     backgroundImageMode,
     backgroundBlur,

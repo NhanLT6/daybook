@@ -19,6 +19,7 @@ import { useNow, useStorage } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { useSettingsStore } from '@/stores/settings';
 import { storageKeys } from '@/common/storageKeys';
 import { saveAs } from 'file-saver';
 import { camelCase, chain, toNumber, unionBy } from 'lodash';
@@ -37,14 +38,26 @@ const monthStorages = new Map<string, ReturnType<typeof useStorage<TimeLog[]>>>(
 const now = useNow({ interval: 60_000 });
 const todayDateStr = computed(() => dayjs(now.value).format('YYYY-MM-DD'));
 
-const selectedDates = ref<Date[]>([now.value]);
+const settingsStore = useSettingsStore();
+
+const REMEMBER_DATE_EXPIRY_MS = 3 * 60 * 1000;
+
+function getRememberedDate(): Date | null {
+  const stored = settingsStore.lastSelectedDate;
+  if (!settingsStore.rememberLastSelectedDate || !stored) return null;
+  if (Date.now() - stored.savedAt > REMEMBER_DATE_EXPIRY_MS) return null;
+  return new Date(stored.date);
+}
+
+const initialDate = getRememberedDate();
+const selectedDates = ref<Date[]>(initialDate ? [initialDate] : []);
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
 const editingLog = ref<TimeLog | undefined>(undefined);
 
-// Auto-reset selected date when the calendar date changes at midnight
+// Keep the calendar navigated to the current month for long-running tabs
 watch(todayDateStr, () => {
   if (!editingLog.value) {
-    selectedDates.value = [now.value];
+    currentMonth.value = dayjs().month() + 1;
   }
 });
 
@@ -101,7 +114,14 @@ const saveBulkLogs = (logs: TimeLog[]) => {
     toast.success(`${logs.length} logs added`);
   }
 
-  selectedDates.value = [now.value];
+  const isSingleCreate = !editingLog.value && logs.length === 1;
+  if (settingsStore.rememberLastSelectedDate && isSingleCreate && selectedDates.value[0]) {
+    settingsStore.lastSelectedDate = { date: selectedDates.value[0].toISOString(), savedAt: Date.now() };
+    selectedDates.value = [selectedDates.value[0]];
+  } else {
+    settingsStore.lastSelectedDate = null;
+    selectedDates.value = [];
+  }
   editingLog.value = undefined;
 };
 
@@ -110,7 +130,8 @@ const handleFormSubmit = (logs: TimeLog[]) => {
 };
 
 const onBulkCancel = () => {
-  selectedDates.value = [now.value];
+  const remembered = getRememberedDate();
+  selectedDates.value = remembered ? [remembered] : [];
   editingLog.value = undefined;
 };
 
