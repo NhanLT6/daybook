@@ -5,6 +5,7 @@ import { useJira } from '@/composables/useJira';
 import { useServerSettings } from '@/composables/useServerSettings';
 
 import AppBackground from '@/components/AppBackground.vue';
+import CatchUpWidget from '@/components/CatchUpWidget.vue';
 
 import type { AppEvent } from '@/interfaces/Event';
 
@@ -166,6 +167,7 @@ const navItems = [
       <Toaster position="bottom-center" rich-colors close-button />
       <RouterView />
       <AppBackground />
+      <CatchUpWidget />
     </VMain>
   </VApp>
 </template>

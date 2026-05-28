@@ -20,4 +20,9 @@ export const storageKeys = {
     config: 'jiraConfig',
     lastSyncDate: 'jiraLastSyncDate',
   },
+  catchUp: {
+    summary: (date: string) => `catchUpSummary-${date}`,
+    dismissedDate: 'catchUpDismissedDate',
+    lastFetchedAt: 'catchUpLastFetchedAt',
+  },
 };

@@ -96,6 +96,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const rememberLastSelectedDate = useStorage('rememberLastSelectedDate', false);
   const lastSelectedDate = useStorage<RememberedDate | null>('lastSelectedDate', null);
 
+  const catchUpEnabled = useStorage('catchUpEnabled', true);
+
   const backgroundUrl = useStorage('backgroundUrl', '');
   const backgroundImageMode = useStorage<BackgroundMode>('backgroundImageMode', 'cover');
   // 0–1 normalized; maps to 0–24 px in the glass backdrop-filter
@@ -139,6 +141,7 @@ export const useSettingsStore = defineStore('settings', () => {
     useCategories,
     rememberLastSelectedDate,
     lastSelectedDate,
+    catchUpEnabled,
     backgroundUrl,
     backgroundImageMode,
     backgroundBlur,

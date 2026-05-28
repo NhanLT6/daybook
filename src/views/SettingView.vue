@@ -228,6 +228,14 @@ const handleSyncTickets = async (): Promise<void> => {
               hint="After saving a single-date log, that date is pre-selected for your next entry — as long as you continue within 3 minutes. Useful for logging multiple entries in one sitting."
               color="primary"
             />
+
+            <VSwitch
+              v-model="settingsStore.catchUpEnabled"
+              label="Catch Up Widget"
+              persistent-hint
+              hint="Show a daily summary of recent logs when you open the app. Useful for morning standups."
+              color="primary"
+            />
           </VCardText>
         </VCard>
 
