@@ -11,8 +11,8 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
+import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { chain, sumBy } from 'lodash';
-import { toast } from 'vue-sonner';
 
 export interface LogListProps {
   items: TimeLog[];
@@ -31,6 +31,7 @@ const emit = defineEmits<{
 }>();
 
 const { formatInternalDateForDisplay } = useDateDisplay();
+const notificationCenter = useNotificationCenterStore();
 
 const scrollContentRef = ref<HTMLElement | null>(null);
 
@@ -128,14 +129,24 @@ const onEditLog = (log: TimeLog) => {
 };
 
 const onDeleteLog = (log: TimeLog) => {
-  toast.warning('Delete log?', {
-    action: {
-      label: 'Delete',
-      onClick: () => {
-        emit('deleteLog', log);
+  notificationCenter.confirm('Delete log?', {
+    message: `${log.project} · ${log.task}`,
+    actions: [
+      {
+        id: 'cancel',
+        label: 'Cancel',
+        closeOnComplete: true,
       },
-    },
-    duration: 20000,
+      {
+        id: 'delete',
+        label: 'Delete',
+        tone: 'danger',
+        closeOnComplete: true,
+        onClick: () => {
+          emit('deleteLog', log);
+        },
+      },
+    ],
   });
 };
 

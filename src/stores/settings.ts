@@ -29,7 +29,7 @@ export interface WeekendPattern {
 export type BackgroundMode = 'cover' | 'contain' | 'fill' | 'tile';
 
 export interface RememberedDate {
-  date: string;    // ISO date string
+  date: string; // ISO date string
   savedAt: number; // Date.now() at save time
 }
 
@@ -96,8 +96,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const rememberLastSelectedDate = useStorage('rememberLastSelectedDate', false);
   const lastSelectedDate = useStorage<RememberedDate | null>('lastSelectedDate', null);
 
-  const catchUpEnabled = useStorage('catchUpEnabled', true);
-
   const backgroundUrl = useStorage('backgroundUrl', '');
   const backgroundImageMode = useStorage<BackgroundMode>('backgroundImageMode', 'cover');
   // 0–1 normalized; maps to 0–24 px in the glass backdrop-filter
@@ -117,6 +115,15 @@ export const useSettingsStore = defineStore('settings', () => {
   const jiraConfig = ref<JiraConfig>({ ...DEFAULT_JIRA_CONFIG });
   const geminiConfig = ref<GeminiConfig>({ ...DEFAULT_GEMINI_CONFIG });
 
+  let resolveSettingsReady: (() => void) | null = null;
+  const settingsReadyPromise = new Promise<void>((resolve) => {
+    resolveSettingsReady = resolve;
+  });
+
+  function waitForSettings(): Promise<void> {
+    return settingsReadyPromise;
+  }
+
   /**
    * Called from App.vue after /api/settings is fetched.
    * Replaces the in-memory jiraConfig and geminiConfig with server values.
@@ -124,6 +131,7 @@ export const useSettingsStore = defineStore('settings', () => {
   function populateFromServer(serverJira: JiraConfig, serverGemini: GeminiConfig) {
     jiraConfig.value = serverJira;
     geminiConfig.value = serverGemini;
+    resolveSettingsReady?.();
   }
 
   // ── Computed ──────────────────────────────────────────────────────────
@@ -141,13 +149,13 @@ export const useSettingsStore = defineStore('settings', () => {
     useCategories,
     rememberLastSelectedDate,
     lastSelectedDate,
-    catchUpEnabled,
     backgroundUrl,
     backgroundImageMode,
     backgroundBlur,
     isBackgroundVideo,
     jiraConfig,
     geminiConfig,
+    waitForSettings,
     populateFromServer,
     vCalendarFirstDay,
     vCalendarWeekendDays,

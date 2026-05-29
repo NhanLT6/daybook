@@ -12,11 +12,12 @@ import dayjs from 'dayjs';
 import holidayImg from '@/assets/summer-holidays.png';
 import { formatEventDate } from '@/common/DateHelpers';
 import { storageKeys } from '@/common/storageKeys';
+import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { nanoid } from 'nanoid';
-import { toast } from 'vue-sonner';
 
 // ─── Events from unified storage ─────────────────────────────
 const events = useStorage<AppEvent[]>(storageKeys.events, []);
+const notificationCenter = useNotificationCenterStore();
 
 // All events sorted chronologically
 const filteredEvents = computed<AppEvent[]>(() => [...events.value].sort((a, b) => dayjs(a.date).diff(dayjs(b.date))));
@@ -60,14 +61,24 @@ const onSaveEvent = (event: AppEvent) => {
 };
 
 const deleteEvent = (event: AppEvent) => {
-  toast.warning('Delete event?', {
-    action: {
-      label: 'Delete',
-      onClick: () => {
-        events.value = events.value.filter((e) => e.id !== event.id);
+  notificationCenter.confirm('Delete event?', {
+    message: event.title,
+    actions: [
+      {
+        id: 'cancel',
+        label: 'Cancel',
+        closeOnComplete: true,
       },
-    },
-    duration: 20000,
+      {
+        id: 'delete',
+        label: 'Delete',
+        tone: 'danger',
+        closeOnComplete: true,
+        onClick: () => {
+          events.value = events.value.filter((e) => e.id !== event.id);
+        },
+      },
+    ],
   });
 };
 </script>

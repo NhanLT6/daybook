@@ -11,9 +11,10 @@ import * as yup from 'yup';
 import dayjs from 'dayjs';
 
 import { useSettingsStore } from '@/stores/settings';
-import { toast } from 'vue-sonner';
+import { useNotificationCenterStore } from '@/stores/notificationCenter';
 
 const settingsStore = useSettingsStore();
+const notificationCenter = useNotificationCenterStore();
 const { sortedCategories } = useCategories();
 
 const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJira();
@@ -133,8 +134,8 @@ const handleSaveCredentials = async () => {
       jiraConfig: settingsStore.jiraConfig,
       geminiConfig: settingsStore.geminiConfig,
     });
-    if (ok) toast.success('Settings saved');
-    else toast.error('Failed to save settings');
+    if (ok) notificationCenter.success('Settings saved');
+    else notificationCenter.error('Failed to save settings');
   } finally {
     isSavingSettings.value = false;
   }
@@ -143,10 +144,12 @@ const handleSaveCredentials = async () => {
 const handleSyncTickets = async (): Promise<void> => {
   try {
     const { fetched, saved } = await syncTicketsToLocalStorage();
-    toast.success(`Fetched ${fetched} ticket(s), saved ${saved} new ticket(s)`);
+    notificationCenter.success('Jira tickets synced', {
+      message: `Fetched ${fetched} ticket(s), saved ${saved} new ticket(s)`,
+    });
   } catch (error) {
-    toast.error('Failed to sync Jira tickets', {
-      description: error instanceof Error ? error.message : 'Unknown error occurred',
+    notificationCenter.error('Failed to sync Jira tickets', {
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
     });
   }
 };
@@ -226,14 +229,6 @@ const handleSyncTickets = async (): Promise<void> => {
               label="Remember last selected date"
               persistent-hint
               hint="After saving a single-date log, that date is pre-selected for your next entry — as long as you continue within 3 minutes. Useful for logging multiple entries in one sitting."
-              color="primary"
-            />
-
-            <VSwitch
-              v-model="settingsStore.catchUpEnabled"
-              label="Catch Up Widget"
-              persistent-hint
-              hint="Show a daily summary of recent logs when you open the app. Useful for morning standups."
               color="primary"
             />
           </VCardText>

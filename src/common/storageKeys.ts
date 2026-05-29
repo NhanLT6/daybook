@@ -25,4 +25,8 @@ export const storageKeys = {
     dismissedDate: 'catchUpDismissedDate',
     lastFetchedAt: 'catchUpLastFetchedAt',
   },
+  notifications: {
+    greetingFirstSeenAt: 'notificationGreetingFirstSeenAt',
+    greetingLastShownAt: 'notificationGreetingLastShownAt',
+  },
 };

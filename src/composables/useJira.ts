@@ -10,9 +10,9 @@ import dayjs from 'dayjs';
 import { fetchJiraTickets, testJiraConnection as testJiraConnectionApi } from '@/apis/jiraApi';
 import { shortDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
+import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { differenceBy } from 'lodash';
-import { toast } from 'vue-sonner';
 
 export function useJira() {
   // Separate loading states for different operations (TanStack Query style)
@@ -26,6 +26,7 @@ export function useJira() {
   const jiraProjects = useStorage<JiraProject[]>(storageKeys.jiraProjects, []);
 
   const { jiraConfig } = useSettingsStore();
+  const notificationCenter = useNotificationCenterStore();
 
   const transformTicketToJiraProject = (ticket: JiraTicket): JiraProject => ({
     title: `${ticket.key} ${ticket.summary}`,
@@ -86,13 +87,13 @@ export function useJira() {
     try {
       const result = await testJiraConnectionApi(jiraConfig);
       if (result.success) {
-        toast.success(result.message);
+        notificationCenter.success(result.message);
       } else {
-        toast.error(result.message);
+        notificationCenter.error(result.message);
       }
     } catch (error) {
-      toast.error('Connection test failed', {
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+      notificationCenter.error('Connection test failed', {
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
       });
     } finally {
       isTesting.value = false;

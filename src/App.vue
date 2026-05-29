@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 
+import { useCatchUpSummary } from '@/composables/useCatchUpSummary';
+import { useGreetingNotifications } from '@/composables/useGreetingNotifications';
 import { useJira } from '@/composables/useJira';
 import { useServerSettings } from '@/composables/useServerSettings';
 
 import AppBackground from '@/components/AppBackground.vue';
-import CatchUpWidget from '@/components/CatchUpWidget.vue';
+import NotificationIsland from '@/components/NotificationIsland.vue';
 
 import type { AppEvent } from '@/interfaces/Event';
 
@@ -15,15 +17,19 @@ import { useStorage } from '@vueuse/core';
 
 import { fetchHolidays } from '@/apis/holidayApi';
 import { storageKeys } from '@/common/storageKeys';
+import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { RouterView, useRoute } from 'vue-router';
-import { toast, Toaster } from 'vue-sonner';
 
 const events = useStorage<AppEvent[]>(storageKeys.events, []);
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
+const { prepareCatchUp } = useCatchUpSummary();
+const { startGreetingNotifications } = useGreetingNotifications();
 const lastSeenVersion = useStorage('app-last-seen-version', '');
 const settingsStore = useSettingsStore();
+const notificationCenter = useNotificationCenterStore();
 const { loadSettings, migrateJiraFromLocalStorage } = useServerSettings();
+let stopGreetingNotifications: (() => void) | undefined;
 
 // Single source of truth for all glass visuals — one slider drives both blur and opacity.
 // opacity(light) = 0.48 + s*0.44 → 0.48 at 0, 0.83 at 0.8, 0.92 at 1.0
@@ -50,10 +56,12 @@ const autoSyncJiraTickets = async () => {
   if (shouldAutoSync()) {
     try {
       const { fetched, saved } = await syncTicketsToLocalStorage();
-      toast.success(`Fetched ${fetched} ticket(s), saved ${saved} new ticket(s)`);
+      notificationCenter.success('Jira tickets synced', {
+        message: `Fetched ${fetched} ticket(s), saved ${saved} new ticket(s)`,
+      });
     } catch (error) {
-      toast.error('Auto-sync Jira tickets failed', {
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+      notificationCenter.error('Auto-sync Jira tickets failed', {
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
       });
     }
   }
@@ -61,7 +69,10 @@ const autoSyncJiraTickets = async () => {
 
 const showReleaseNotification = () => {
   if (lastSeenVersion.value !== __APP_VERSION__) {
-    toast.info('New Update', { description: __COMMIT_MESSAGE__, duration: 10000 });
+    notificationCenter.info('New Update', {
+      message: __COMMIT_MESSAGE__,
+      autoDismissMs: 10000,
+    });
     lastSeenVersion.value = __APP_VERSION__;
   }
 };
@@ -79,10 +90,16 @@ const initServerSettings = async () => {
 };
 
 onMounted(async () => {
+  stopGreetingNotifications = startGreetingNotifications();
   await initServerSettings();
+  void prepareCatchUp();
   await autoFetchEvents();
   await autoSyncJiraTickets();
   showReleaseNotification();
+});
+
+onUnmounted(() => {
+  stopGreetingNotifications?.();
 });
 
 const route = useRoute();
@@ -127,6 +144,8 @@ const navItems = [
           <RouterLink v-if="route.path !== '/'" to="/" class="dock-brand dock-brand--link">Daybook</RouterLink>
           <span v-else class="dock-brand">Daybook</span>
 
+          <NotificationIsland />
+
           <span class="dock-spacer" />
 
           <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
@@ -164,10 +183,8 @@ const navItems = [
     </VAppBar>
 
     <VMain style="overflow-y: auto">
-      <Toaster position="bottom-center" rich-colors close-button />
       <RouterView />
       <AppBackground />
-      <CatchUpWidget />
     </VMain>
   </VApp>
 </template>
@@ -188,16 +205,19 @@ const navItems = [
 .v-app-bar {
   border-bottom: none !important;
   box-shadow: none !important;
+  overflow: visible !important;
 }
 
 /* Strip VToolbar's built-in side padding so dock-row fills edge-to-edge */
 .v-app-bar .v-toolbar__content,
 .v-app-bar .v-toolbar__extension {
   padding: 0 !important;
+  overflow: visible !important;
 }
 
 /* Dock layout */
 .dock-row {
+  position: relative;
   width: 100%;
   display: flex;
   justify-content: center;
@@ -205,12 +225,14 @@ const navItems = [
 }
 
 .app-dock {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
   gap: 2px;
   padding: 4px 8px;
   border-radius: 8px;
+  overflow: visible;
 }
 
 .dock-brand {

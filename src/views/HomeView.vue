@@ -21,11 +21,11 @@ import dayjs from 'dayjs';
 import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { useSettingsStore } from '@/stores/settings';
 import { storageKeys } from '@/common/storageKeys';
+import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { saveAs } from 'file-saver';
 import { camelCase, chain, toNumber, unionBy } from 'lodash';
 import { nanoid } from 'nanoid';
 import { parse, unparse } from 'papaparse';
-import { toast } from 'vue-sonner';
 
 // Use dynamic storage that updates with month changes
 const timeLogs = ref<TimeLog[]>([]);
@@ -39,6 +39,7 @@ const now = useNow({ interval: 60_000 });
 const todayDateStr = computed(() => dayjs(now.value).format('YYYY-MM-DD'));
 
 const settingsStore = useSettingsStore();
+const notificationCenter = useNotificationCenterStore();
 
 const REMEMBER_DATE_EXPIRY_MS = 3 * 60 * 1000;
 
@@ -91,6 +92,8 @@ const onMonthChanged = (month: number) => {
 
 const saveBulkLogs = (logs: TimeLog[]) => {
   const monthStorage = getTimeLogsForMonth(currentMonth.value);
+  let addedCount = 0;
+  let updatedCount = 0;
 
   // Handle both create and update based on log ID
   logs.forEach((log) => {
@@ -99,19 +102,23 @@ const saveBulkLogs = (logs: TimeLog[]) => {
     if (existingIndex !== -1) {
       // Update existing log
       monthStorage.value[existingIndex] = log;
-      toast.success('Log updated');
+      updatedCount += 1;
     } else {
       // Add new log
       monthStorage.value.push(log);
+      addedCount += 1;
     }
   });
 
   // Update the reactive timeLogs ref as well
   timeLogs.value = monthStorage.value;
 
-  // Show success message for bulk add (not for single update)
-  if (logs.length > 1 || !logs.some((log) => monthStorage.value.findIndex((item) => item.id === log.id) !== -1)) {
-    toast.success(`${logs.length} logs added`);
+  if (updatedCount) {
+    notificationCenter.success(updatedCount === 1 ? 'Log updated' : `${updatedCount} logs updated`);
+  }
+
+  if (addedCount) {
+    notificationCenter.success(addedCount === 1 ? 'Log added' : `${addedCount} logs added`);
   }
 
   const isSingleCreate = !editingLog.value && logs.length === 1;
@@ -146,7 +153,7 @@ const onDeleteLog = (log: TimeLog) => {
   monthStorage.value = monthStorage.value.filter((item: TimeLog) => item !== log);
   // Update the reactive timeLogs ref as well
   timeLogs.value = monthStorage.value;
-  toast.success('Log deleted');
+  notificationCenter.success('Log deleted');
 };
 
 const exportToCsv = () => {
@@ -187,7 +194,9 @@ const importCsv = async (file?: File) => {
 
   if (result.errors.length) {
     result.errors.map((e) => {
-      toast.error(e.message);
+      notificationCenter.error('Import failed', {
+        message: e.message,
+      });
       console.error(e);
     });
 
@@ -225,7 +234,7 @@ const importCsv = async (file?: File) => {
     .uniqBy((value) => `${value.project}-${value.title}`)
     .value();
 
-  toast.success('Logs imported');
+  notificationCenter.success('Logs imported');
 };
 
 // Track IDs of the last AI-saved batch for undo support
@@ -272,7 +281,7 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
   const currentMonthStorage = getTimeLogsForMonth(currentMonth.value);
   timeLogs.value = currentMonthStorage.value;
 
-  toast.success(`${extractedLogs.length} log${extractedLogs.length > 1 ? 's' : ''} saved`);
+  notificationCenter.success(`${extractedLogs.length} log${extractedLogs.length > 1 ? 's' : ''} saved`);
 };
 
 const onAiUndoLogs = () => {
@@ -285,7 +294,7 @@ const onAiUndoLogs = () => {
   // Refresh displayed logs
   timeLogs.value = getTimeLogsForMonth(currentMonth.value).value;
 
-  toast.info('Logs removed');
+  notificationCenter.info('Logs removed');
 };
 </script>
 
