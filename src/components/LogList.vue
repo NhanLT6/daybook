@@ -236,10 +236,10 @@ const readCsv = (file?: File) => {
         >
           <VExpansionPanelTitle>
             <div class="me-2 d-flex align-center ga-2">
-              <span class="text-caption text-medium-emphasis">{{
+              <span class="text-caption text-medium-emphasis" style="min-width: 36px">{{
                 dayjs(group.date, shortDateFormat).format('ddd').toUpperCase()
               }}</span>
-              <span class="font-weight-bold">{{ formatInternalDateForDisplay(group.date) }}</span>
+              <span class="font-weight-bold" style="min-width: 110px">{{ formatInternalDateForDisplay(group.date) }}</span>
             </div>
 
             <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)" variant="text">
