@@ -297,26 +297,39 @@ onUnmounted(() => {
 <template>
   <VCard class="glass-acrylic">
     <!-- Header -->
-    <div class="pa-4 pb-2">
-      <div class="text-body-1 font-weight-bold">{{ selectedMonth.format('MMMM YYYY') }}</div>
-      <div class="text-caption text-medium-emphasis">Hours logged per day · stacked by project</div>
+    <VCardTitle>
+      <VToolbar>
+        <VToolbarTitle class="ms-0">
+          <div>{{ selectedMonth.format('MMMM YYYY') }}</div>
+          <div class="text-caption text-medium-emphasis font-weight-regular">
+            Hours logged per day · stacked by project
+          </div>
+        </VToolbarTitle>
+      </VToolbar>
+    </VCardTitle>
 
-      <!-- TODAY / THIS WEEK — current month only -->
-      <div v-if="isCurrentMonth" class="d-flex ga-4 mt-2">
-        <div class="d-flex align-baseline ga-1">
-          <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(todayMinutes) }}</span>
-          <span class="text-caption text-medium-emphasis">TODAY</span>
-        </div>
-        <div class="d-flex align-baseline ga-1">
-          <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(thisWeekMinutes) }}</span>
-          <span class="text-caption text-medium-emphasis">THIS WEEK</span>
-        </div>
-      </div>
-    </div>
+    <!-- Stats + Chart card -->
+    <div class="px-4 pb-4">
+      <VCard>
+        <div class="pa-4">
+          <!-- TODAY / THIS WEEK — current month only -->
+          <div v-if="isCurrentMonth" class="d-flex ga-4 mb-2">
+            <div class="d-flex align-baseline ga-1">
+              <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(todayMinutes) }}</span>
+              <span class="text-caption text-medium-emphasis">TODAY</span>
+            </div>
+            <div class="d-flex align-baseline ga-1">
+              <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(thisWeekMinutes) }}</span>
+              <span class="text-caption text-medium-emphasis">THIS WEEK</span>
+            </div>
+          </div>
 
-    <!-- Chart -->
-    <div class="chart-container px-4 pb-4">
-      <canvas ref="chartCanvas"></canvas>
+          <!-- Chart -->
+          <div class="chart-container">
+            <canvas ref="chartCanvas"></canvas>
+          </div>
+        </div>
+      </VCard>
     </div>
   </VCard>
 </template>

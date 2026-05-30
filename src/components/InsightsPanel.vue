@@ -130,86 +130,92 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 </script>
 
 <template>
-  <VCard class="d-flex flex-column overflow-hidden">
+  <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
     <!-- Header -->
     <VCardTitle>
       <VToolbar>
-        <VToolbarTitle class="ms-0">Insights</VToolbarTitle>
-        <VSpacer />
-        <span class="text-caption text-medium-emphasis me-4">{{ monthLabel }}</span>
+        <VToolbarTitle class="ms-0">
+          <div>Insights</div>
+          <div class="text-caption text-medium-emphasis font-weight-regular">{{ monthLabel }}</div>
+        </VToolbarTitle>
       </VToolbar>
     </VCardTitle>
 
     <!-- Scrollable body -->
-    <div class="overflow-y-auto flex-grow-1 pa-4">
+    <div class="overflow-y-auto flex-grow-1 px-4 pb-4 d-flex flex-column ga-3">
       <!-- Total hours -->
-      <div class="mb-3">
-        <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(totalMinutes) }}</div>
-        <!-- Delta vs last month -->
-        <div v-if="deltaLabel" class="text-caption" :class="`text-${deltaColor}`">
-          {{ deltaLabel }}
-        </div>
-      </div>
-
-      <!-- Days logged -->
-      <div class="mb-5">
-        <div class="text-overline text-medium-emphasis mb-1">Days logged</div>
-        <div class="text-body-2 mb-1">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
-        <VProgressLinear
-          :model-value="daysProgress"
-          color="primary"
-          bg-color="rgba(var(--v-theme-on-surface), 0.08)"
-          rounded
-          height="6"
-        />
-      </div>
-
-      <!-- Time by project -->
-      <div v-if="projectBreakdown.length > 0">
-        <div class="text-overline text-medium-emphasis mb-2">Time by project</div>
-
-        <div class="d-flex flex-column ga-3">
-          <div v-for="item in projectBreakdown" :key="item.project">
-            <!-- Row 1: dot + name + hours (pct) -->
-            <div class="d-flex align-center ga-2 mb-1">
-              <span
-                class="flex-shrink-0"
-                :style="{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: getProjectColor(item.project),
-                }"
-              />
-              <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
-              <span class="text-caption text-medium-emphasis flex-shrink-0">
-                {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
-              </span>
-            </div>
-            <!-- Row 2: progress bar -->
-            <VProgressLinear
-              :model-value="item.pct"
-              :color="getProjectColor(item.project)"
-              bg-color="rgba(var(--v-theme-on-surface), 0.08)"
-              rounded
-              height="5"
-            />
+      <VCard>
+        <div class="pa-4">
+          <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(totalMinutes) }}</div>
+          <div v-if="deltaLabel" class="text-caption" :class="`text-${deltaColor}`">
+            {{ deltaLabel }}
           </div>
         </div>
+      </VCard>
 
-        <!-- +N more -->
-        <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2">
-          +{{ extraProjectCount }} more
+      <!-- Days logged -->
+      <VCard>
+        <div class="pa-4">
+          <div class="text-overline text-medium-emphasis mb-1">Days logged</div>
+          <div class="text-body-2 mb-2">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
+          <VProgressLinear
+            :model-value="daysProgress"
+            color="primary"
+            bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+            rounded
+            height="6"
+          />
         </div>
-      </div>
+      </VCard>
 
-      <!-- Focus line -->
-      <template v-if="uniqueProjectCount >= 2">
-        <VDivider class="my-5" />
-        <div class="text-caption text-medium-emphasis">
-          {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
+      <!-- Time by project -->
+      <VCard v-if="projectBreakdown.length > 0">
+        <div class="pa-4">
+          <div class="text-overline text-medium-emphasis mb-2">Time by project</div>
+
+          <div class="d-flex flex-column ga-3">
+            <div v-for="item in projectBreakdown" :key="item.project">
+              <!-- Row 1: dot + name + hours (pct) -->
+              <div class="d-flex align-center ga-2 mb-1">
+                <span
+                  class="flex-shrink-0"
+                  :style="{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: getProjectColor(item.project),
+                  }"
+                />
+                <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
+                <span class="text-caption text-medium-emphasis flex-shrink-0">
+                  {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
+                </span>
+              </div>
+              <!-- Row 2: progress bar -->
+              <VProgressLinear
+                :model-value="item.pct"
+                :color="getProjectColor(item.project)"
+                bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+                rounded
+                height="5"
+              />
+            </div>
+          </div>
+
+          <!-- +N more -->
+          <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2">
+            +{{ extraProjectCount }} more
+          </div>
+
+          <!-- Focus line -->
+          <template v-if="uniqueProjectCount >= 2">
+            <VDivider class="mt-4 mb-3" />
+            <div class="text-caption text-medium-emphasis">
+              {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
+            </div>
+          </template>
         </div>
-      </template>
+      </VCard>
     </div>
   </VCard>
 </template>

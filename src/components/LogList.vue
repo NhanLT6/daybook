@@ -226,7 +226,7 @@ const readCsv = (file?: File) => {
         </div>
       </VCard>
 
-      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-2">
+      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-4 pt-2 pe-2">
         <VExpansionPanel
           v-for="group in loggedTimeByDates"
           :id="group.date"
