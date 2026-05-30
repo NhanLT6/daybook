@@ -309,7 +309,7 @@ onUnmounted(() => {
     </VCardTitle>
 
     <!-- Stats + Chart card -->
-    <div class="px-4 pb-4">
+    <div class="px-2 pb-2">
       <VCard>
         <div class="pa-4">
           <!-- TODAY / THIS WEEK — current month only -->

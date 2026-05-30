@@ -263,7 +263,7 @@ watch(
 </script>
 
 <template>
-  <div class="pa-4">
+  <VCard class="pa-2 ma-2 overflow-visible">
     <form ref="formEl" class="d-flex flex-column ga-2" autocomplete="off">
       <VInput class="calendar-date-field" :error-messages="errors.selectedDates">
         <CalendarOverview
@@ -372,10 +372,22 @@ watch(
       />
 
       <div class="d-flex flex-wrap ga-2 mb-4">
-        <VBtn class="rounded-xl elevation-1" variant="flat" density="comfortable" @click="onHourClick(0.25)">+15m</VBtn>
-        <VBtn class="rounded-xl elevation-1" variant="flat" density="comfortable" @click="onHourClick(0.5)">+30m</VBtn>
         <VBtn
-          class="rounded-xl elevation-1"
+          class="rounded-xl elevation-1 font-weight-regular"
+          variant="flat"
+          density="comfortable"
+          @click="onHourClick(0.25)"
+          >+15m</VBtn
+        >
+        <VBtn
+          class="rounded-xl elevation-1 font-weight-regular"
+          variant="flat"
+          density="comfortable"
+          @click="onHourClick(0.5)"
+          >+30m</VBtn
+        >
+        <VBtn
+          class="rounded-xl elevation-1 font-weight-regular"
           variant="flat"
           density="comfortable"
           v-for="hour in hours"
@@ -395,7 +407,7 @@ watch(
         </VBtn>
       </VCard>
     </form>
-  </div>
+  </VCard>
 </template>
 
 <style scoped>

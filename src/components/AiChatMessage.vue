@@ -59,11 +59,12 @@ const copyMessage = () => {
     <VHover v-if="message.role === 'user'" v-slot="{ isHovering, props: hoverProps }">
       <div v-bind="hoverProps" class="d-flex flex-column align-end">
         <VCard
-          variant="flat"
+          color="primary"
+          variant="tonal"
           :elevation="0"
           rounded="lg rounded-te-sm"
           class="message-card"
-          :style="{ maxWidth: '88%' }"
+          :style="{ maxWidth: '88%', minWidth: '3rem' }"
         >
           <VCardText class="pa-3">
             <VImg

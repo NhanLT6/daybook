@@ -198,20 +198,15 @@ const readCsv = (file?: File) => {
           </VTooltip>
 
           <!-- Export to file -->
-          <VBtn
-            prepend-icon="mdi-export"
-            variant="flat"
-            style="opacity: 1"
+          <VIconBtn
+            icon="mdi-export"
+            icon-size="small"
+            rounded="lg"
+            color="primary"
+            variant="tonal"
             @click="emit('export')"
-            class="mt-1"
             v-tooltip="'Export to CSV'"
-          >
-            <template #prepend>
-              <v-icon color="primary"></v-icon>
-            </template>
-
-            <span class="d-none d-sm-inline text-primary">Export</span>
-          </VBtn>
+          />
         </div>
       </VToolbar>
     </VCardTitle>
@@ -226,7 +221,7 @@ const readCsv = (file?: File) => {
         </div>
       </VCard>
 
-      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-4 pt-2 pe-2">
+      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-2 pt-2 pe-2">
         <VExpansionPanel
           v-for="group in loggedTimeByDates"
           :id="group.date"
@@ -236,10 +231,12 @@ const readCsv = (file?: File) => {
         >
           <VExpansionPanelTitle>
             <div class="me-2 d-flex align-center ga-2">
-              <span class="text-caption text-medium-emphasis" style="min-width: 36px">{{
-                dayjs(group.date, shortDateFormat).format('ddd').toUpperCase()
-              }}</span>
-              <span class="font-weight-bold" style="min-width: 110px">{{ formatInternalDateForDisplay(group.date) }}</span>
+              <span class="text-caption text-medium-emphasis" style="min-width: 36px">
+                {{ dayjs(group.date, shortDateFormat).format('ddd').toUpperCase() }}
+              </span>
+              <span class="font-weight-bold" style="min-width: 110px">
+                {{ formatInternalDateForDisplay(group.date) }}
+              </span>
             </div>
 
             <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)" variant="text">

@@ -131,7 +131,7 @@ const clearError = () => {
 </script>
 
 <template>
-  <div class="d-flex flex-column" style="flex: 1; min-height: 0">
+  <VCard class="ma-2 d-flex flex-column overflow-hidden" style="flex: 1; min-height: 0">
     <!-- Messages area -->
     <div class="messages-area pa-3 d-flex flex-column ga-3 flex-grow-1 overflow-y-auto">
       <div
@@ -261,7 +261,7 @@ const clearError = () => {
         </VTextarea>
       </div>
     </div>
-  </div>
+  </VCard>
 </template>
 
 <style scoped>

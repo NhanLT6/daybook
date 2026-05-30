@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { useProjectColors } from '@/composables/useProjectColors';
+
 import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
-import { sumBy, uniqBy } from 'lodash';
 
-import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { yearAndMonthFormat } from '@/common/DateFormat';
-import { useProjectColors } from '@/composables/useProjectColors';
+import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useSettingsStore } from '@/stores/settings';
+import { sumBy, uniqBy } from 'lodash';
 
 const props = defineProps<{
   timeLogs: TimeLog[];
@@ -25,7 +26,9 @@ const totalMinutes = computed(() => sumBy(props.timeLogs, 'duration'));
 
 const currentMonthKey = computed(() => {
   // currentMonth is 1-based; convert to 0-based for dayjs
-  return dayjs().month(props.currentMonth - 1).format(yearAndMonthFormat);
+  return dayjs()
+    .month(props.currentMonth - 1)
+    .format(yearAndMonthFormat);
 });
 
 const lastMonthKey = computed(() => {
@@ -74,11 +77,7 @@ const workdaysInMonth = computed(() => {
   return count;
 });
 
-const daysProgress = computed(() =>
-  workdaysInMonth.value > 0 ? (daysLogged.value / workdaysInMonth.value) * 100 : 0,
-);
-
-
+const daysProgress = computed(() => (workdaysInMonth.value > 0 ? (daysLogged.value / workdaysInMonth.value) * 100 : 0));
 
 // ── Project breakdown ─────────────────────────────────────────────────────────
 
@@ -121,9 +120,7 @@ const extraProjectCount = computed(() => Math.max(0, uniqueProjectCount.value - 
 
 // ── Month label ───────────────────────────────────────────────────────────────
 
-const monthLabel = computed(() =>
-  dayjs(currentMonthKey.value, yearAndMonthFormat).format('MMM YYYY'),
-);
+const monthLabel = computed(() => dayjs(currentMonthKey.value, yearAndMonthFormat).format('MMM YYYY'));
 
 // Truncate project names at 16 chars
 const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len) + '…' : str);
@@ -142,7 +139,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
     </VCardTitle>
 
     <!-- Scrollable body -->
-    <div class="overflow-y-auto flex-grow-1 px-4 pb-4 d-flex flex-column ga-3">
+    <div class="overflow-y-auto flex-grow-1 px-2 pb-2 d-flex flex-column ga-3">
       <!-- Total hours -->
       <VCard>
         <div class="pa-4">
@@ -158,13 +155,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
         <div class="pa-4">
           <div class="text-overline text-medium-emphasis mb-1">Days logged</div>
           <div class="text-body-2 mb-2">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
-          <VProgressLinear
-            :model-value="daysProgress"
-            color="primary"
-            bg-color="rgba(var(--v-theme-on-surface), 0.08)"
-            rounded
-            height="6"
-          />
+          <VProgressLinear :model-value="daysProgress" bg-color="rgba(var(--v-theme-on-surface), 0.08)" rounded />
         </div>
       </VCard>
 
@@ -219,4 +210,3 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
     </div>
   </VCard>
 </template>
-
