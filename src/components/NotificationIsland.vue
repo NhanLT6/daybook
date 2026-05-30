@@ -2,36 +2,21 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import type { NotificationAction, NotificationItem, NotificationKind } from '@/stores/notificationCenter';
-import type { TimeLog } from '@/interfaces/TimeLog';
 
-import dayjs from 'dayjs';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { storeToRefs } from 'pinia';
 import { useTheme } from 'vuetify';
 
-import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
-import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
-import { onClickOutside, useStorage } from '@vueuse/core';
+import { onClickOutside } from '@vueuse/core';
 
 const notificationCenter = useNotificationCenterStore();
 const { activeItem, isExpanded, queueCount, sortedItems } = storeToRefs(notificationCenter);
 const theme = useTheme();
 const isDarkMode = computed(() => theme.global.current.value.dark);
 
-const currentMonthLogs = useStorage<TimeLog[]>(`timeLogs-${dayjs().format(yearAndMonthFormat)}`, []);
-
 const rootEl = ref<HTMLElement>();
-const todayLoggedText = computed(() => {
-  const todayShort = dayjs().format(shortDateFormat);
-  const todayIso = dayjs().format('YYYY-MM-DD');
-  const total = currentMonthLogs.value
-    .filter((log) => log.date === todayShort || log.date === todayIso)
-    .reduce((sum, log) => sum + log.duration, 0);
-
-  return `${minutesToHourWithMinutes(total)} logged today`;
-});
 
 const innerEl = ref<HTMLElement>();
 const dims = ref<{ width: number; height: number } | null>(null);
@@ -117,7 +102,7 @@ function iconFor(kind?: NotificationKind): string {
 }
 
 function compactText(item: NotificationItem | null): string {
-  if (!item) return todayLoggedText.value;
+  if (!item) return 'All done';
   return item.message ? `${item.title}` : item.title;
 }
 

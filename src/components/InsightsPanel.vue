@@ -78,12 +78,7 @@ const daysProgress = computed(() =>
   workdaysInMonth.value > 0 ? (daysLogged.value / workdaysInMonth.value) * 100 : 0,
 );
 
-const daysProgressColor = computed(() => {
-  const pct = daysProgress.value;
-  if (pct >= 80) return 'primary';
-  if (pct >= 50) return 'warning';
-  return 'error';
-});
+
 
 // ── Project breakdown ─────────────────────────────────────────────────────────
 
@@ -135,19 +130,20 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 </script>
 
 <template>
-  <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
+  <VCard class="d-flex flex-column overflow-hidden">
     <!-- Header -->
-    <div class="d-flex align-center justify-space-between pa-4 pb-2">
-      <span class="text-overline text-medium-emphasis">Insights</span>
-      <span class="text-caption text-medium-emphasis">{{ monthLabel }}</span>
-    </div>
-
-    <VDivider />
+    <VCardTitle>
+      <VToolbar>
+        <VToolbarTitle class="ms-0">Insights</VToolbarTitle>
+        <VSpacer />
+        <span class="text-caption text-medium-emphasis me-4">{{ monthLabel }}</span>
+      </VToolbar>
+    </VCardTitle>
 
     <!-- Scrollable body -->
     <div class="overflow-y-auto flex-grow-1 pa-4">
       <!-- Total hours -->
-      <div class="mb-1">
+      <div class="mb-3">
         <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(totalMinutes) }}</div>
         <!-- Delta vs last month -->
         <div v-if="deltaLabel" class="text-caption" :class="`text-${deltaColor}`">
@@ -156,12 +152,12 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       </div>
 
       <!-- Days logged -->
-      <div class="mb-3 mt-3">
+      <div class="mb-5">
         <div class="text-overline text-medium-emphasis mb-1">Days logged</div>
         <div class="text-body-2 mb-1">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
         <VProgressLinear
           :model-value="daysProgress"
-          :color="daysProgressColor"
+          color="primary"
           bg-color="rgba(var(--v-theme-on-surface), 0.08)"
           rounded
           height="6"
@@ -172,47 +168,32 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       <div v-if="projectBreakdown.length > 0">
         <div class="text-overline text-medium-emphasis mb-2">Time by project</div>
 
-        <div class="d-flex flex-column ga-2">
-          <div
-            v-for="item in projectBreakdown"
-            :key="item.project"
-            class="d-flex align-center ga-2"
-          >
-            <!-- Colored dot -->
-            <span
-              class="flex-shrink-0"
-              :style="{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                backgroundColor: getProjectColor(item.project),
-              }"
-            />
-
-            <!-- Project name -->
-            <span class="text-body-2 text-truncate" style="width: 100px">
-              {{ truncate(item.project) }}
-            </span>
-
-            <!-- Progress bar -->
+        <div class="d-flex flex-column ga-3">
+          <div v-for="item in projectBreakdown" :key="item.project">
+            <!-- Row 1: dot + name + hours (pct) -->
+            <div class="d-flex align-center ga-2 mb-1">
+              <span
+                class="flex-shrink-0"
+                :style="{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: getProjectColor(item.project),
+                }"
+              />
+              <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
+              <span class="text-caption text-medium-emphasis flex-shrink-0">
+                {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
+              </span>
+            </div>
+            <!-- Row 2: progress bar -->
             <VProgressLinear
               :model-value="item.pct"
               :color="getProjectColor(item.project)"
               bg-color="rgba(var(--v-theme-on-surface), 0.08)"
               rounded
-              height="6"
-              class="flex-grow-1"
+              height="5"
             />
-
-            <!-- Hours -->
-            <span class="text-caption text-medium-emphasis flex-shrink-0" style="width: 38px; text-align: right">
-              {{ minutesToHourWithMinutes(item.minutes) }}
-            </span>
-
-            <!-- Pct -->
-            <span class="text-caption text-medium-emphasis flex-shrink-0" style="width: 30px; text-align: right">
-              {{ item.pct }}%
-            </span>
           </div>
         </div>
 
@@ -224,7 +205,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 
       <!-- Focus line -->
       <template v-if="uniqueProjectCount >= 2">
-        <VDivider class="my-3" />
+        <VDivider class="my-5" />
         <div class="text-caption text-medium-emphasis">
           {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
         </div>

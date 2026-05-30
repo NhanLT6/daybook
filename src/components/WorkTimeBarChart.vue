@@ -12,6 +12,7 @@ import { useStorage } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
 import { chain, round } from 'lodash';
@@ -60,6 +61,31 @@ const timeLogsStorage = computed(() => {
 
 // Use external timeLogs prop if provided, otherwise use storage
 const timeLogs = computed(() => props.timeLogs ?? timeLogsStorage.value.value);
+
+// Header stats — only shown when viewing the current month
+const isCurrentMonth = computed(() => (currentMonth?.value ?? dayjs().month() + 1) === dayjs().month() + 1);
+
+const todayStr = computed(() => dayjs().format(shortDateFormat));
+
+const weekStartDate = computed(() => {
+  const today = dayjs();
+  const diff = (today.day() - settingsStore.firstDayOfWeek + 7) % 7;
+  return today.subtract(diff, 'day').startOf('day');
+});
+
+const todayMinutes = computed(() =>
+  timeLogs.value.filter((log) => log.date === todayStr.value).reduce((sum, log) => sum + log.duration, 0),
+);
+
+const thisWeekMinutes = computed(() => {
+  const weekStart = weekStartDate.value;
+  return timeLogs.value
+    .filter((log) => {
+      const d = dayjs(log.date, shortDateFormat);
+      return d.isValid() && !d.isBefore(weekStart) && !d.isAfter(dayjs().endOf('day'));
+    })
+    .reduce((sum, log) => sum + log.duration, 0);
+});
 
 // Chart data computed property (automatically reactive to props and storage changes)
 const chartData = computed(() => {
@@ -143,7 +169,7 @@ const chartOptions = computed(() => ({
     x: {
       stacked: true,
       grid: {
-        color: chartColors.value.gridColor,
+        display: false,
       },
       ticks: {
         color: chartColors.value.tickColor,
@@ -170,6 +196,8 @@ const chartOptions = computed(() => ({
   plugins: {
     legend: {
       display: true,
+      position: 'bottom' as const,
+      align: 'start' as const,
       labels: {
         color: chartColors.value.legendColor,
         generateLabels: (chart: Chart) => {
@@ -267,10 +295,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Chart Island - Only visible on medium+ screens -->
-  <VCard class="glass-acrylic pa-4">
-    <div class="chart-container">
-      <!-- Chart.js canvas element -->
+  <VCard class="glass-acrylic">
+    <!-- Header -->
+    <div class="pa-4 pb-2">
+      <div class="text-body-1 font-weight-bold">{{ selectedMonth.format('MMMM YYYY') }}</div>
+      <div class="text-caption text-medium-emphasis">Hours logged per day · stacked by project</div>
+
+      <!-- TODAY / THIS WEEK — current month only -->
+      <div v-if="isCurrentMonth" class="d-flex ga-4 mt-2">
+        <div class="d-flex align-baseline ga-1">
+          <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(todayMinutes) }}</span>
+          <span class="text-caption text-medium-emphasis">TODAY</span>
+        </div>
+        <div class="d-flex align-baseline ga-1">
+          <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(thisWeekMinutes) }}</span>
+          <span class="text-caption text-medium-emphasis">THIS WEEK</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-container px-4 pb-4">
       <canvas ref="chartCanvas"></canvas>
     </div>
   </VCard>

@@ -235,9 +235,14 @@ const readCsv = (file?: File) => {
           class="border-b-sm"
         >
           <VExpansionPanelTitle>
-            <div class="me-2">{{ formatInternalDateForDisplay(group.date) }}</div>
+            <div class="me-2 d-flex align-center ga-2">
+              <span class="text-caption text-medium-emphasis">{{
+                dayjs(group.date, shortDateFormat).format('ddd').toUpperCase()
+              }}</span>
+              <span class="font-weight-bold">{{ formatInternalDateForDisplay(group.date) }}</span>
+            </div>
 
-            <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)">
+            <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)" variant="text">
               {{ minutesToHourWithMinutes(group.durationSum) }}
             </VChip>
           </VExpansionPanelTitle>
