@@ -93,7 +93,7 @@ interface ProjectBreakdownItem {
   pct: number;
 }
 
-const projectBreakdown = computed((): ProjectBreakdownItem[] => {
+const allProjectsSorted = computed((): ProjectBreakdownItem[] => {
   const total = totalMinutes.value;
   if (total === 0) return [];
 
@@ -108,14 +108,12 @@ const projectBreakdown = computed((): ProjectBreakdownItem[] => {
       minutes,
       pct: Math.round((minutes / total) * 100),
     }))
-    .sort((a, b) => b.minutes - a.minutes)
-    .slice(0, 6);
+    .sort((a, b) => b.minutes - a.minutes);
 });
 
-const uniqueProjectCount = computed(() => {
-  const projects = new Set(props.timeLogs.map((l) => l.project));
-  return projects.size;
-});
+const projectBreakdown = computed(() => allProjectsSorted.value.slice(0, 6));
+
+const uniqueProjectCount = computed(() => allProjectsSorted.value.length);
 
 const top2Pct = computed(() => {
   const total = totalMinutes.value;
@@ -192,7 +190,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
             />
 
             <!-- Project name -->
-            <span class="text-body-2 text-truncate flex-shrink-0" style="width: 100px">
+            <span class="text-body-2 text-truncate" style="width: 100px">
               {{ truncate(item.project) }}
             </span>
 
@@ -235,16 +233,3 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
   </VCard>
 </template>
 
-<style scoped>
-.v-theme--light .glass-acrylic {
-  background: rgba(255, 255, 255, var(--glass-opacity-light, 0.83));
-  backdrop-filter: blur(var(--glass-blur, 25.6px));
-  border: 1px solid rgba(255, 255, 255, 0.7) !important;
-}
-
-.v-theme--dark .glass-acrylic {
-  background: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77)) !important;
-  backdrop-filter: blur(var(--glass-blur, 25.6px));
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-}
-</style>
