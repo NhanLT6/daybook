@@ -3,6 +3,7 @@ import { computed, ref, watch, watchEffect } from 'vue';
 
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
+import InsightsPanel from '@/components/InsightsPanel.vue';
 import LogList from '@/components/LogList.vue';
 import MobileWeekChart from '@/components/MobileWeekChart.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
@@ -19,9 +20,9 @@ import { useNow, useStorage } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
-import { useSettingsStore } from '@/stores/settings';
 import { storageKeys } from '@/common/storageKeys';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
+import { useSettingsStore } from '@/stores/settings';
 import { saveAs } from 'file-saver';
 import { camelCase, chain, toNumber, unionBy } from 'lodash';
 import { nanoid } from 'nanoid';
@@ -64,7 +65,7 @@ watch(todayDateStr, () => {
 
 const tab = ref<'form' | 'ai'>('form');
 const theme = useTheme();
-const { smAndDown } = useDisplay();
+const { smAndDown, lgAndUp } = useDisplay();
 const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-darken-4' : 'green-lighten-2'));
 
 // Function to get or create storage for a specific month
@@ -299,48 +300,49 @@ const onAiUndoLogs = () => {
 </script>
 
 <template>
-  <!-- Viewport-fill two-panel layout -->
+  <!-- Three-column layout: form | chart+logs | insights (lg+) -->
   <div class="home-layout">
-    <!-- Mobile: compact week strip chart driven by calendar selection -->
-    <MobileWeekChart
-      v-if="smAndDown"
-      :time-logs="timeLogs"
-      :selected-dates="selectedDates"
-      :current-month="currentMonth"
-      class="flex-shrink-0"
-    />
+    <!-- Left panel: Form + AI Assistant tabs -->
+    <VCard class="glass-acrylic form-panel d-flex flex-column overflow-hidden">
+      <VTabs v-model="tab" density="compact" class="ma-2" align-tabs="center" :slider-color="tabSliderColor">
+        <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
+        <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
+      </VTabs>
 
-    <!-- Desktop: full month bar chart (unchanged) -->
-    <WorkTimeBarChart v-else :current-month="currentMonth" class="flex-shrink-0" />
+      <VTabsWindow v-model="tab">
+        <!-- Form tab: scrollable so sticky form-actions works -->
+        <VTabsWindowItem value="form" class="overflow-y-auto">
+          <BulkLogForm
+            v-model:selected-dates="selectedDates"
+            :editing-log="editingLog"
+            @submit="handleFormSubmit"
+            @cancel="onBulkCancel"
+            @month-changed="onMonthChanged"
+          />
+        </VTabsWindowItem>
 
-    <div class="panels-row">
-      <!-- Left panel: Form + AI Assistant tabs -->
-      <VCard class="glass-acrylic form-panel d-flex flex-column overflow-hidden">
-        <VTabs v-model="tab" density="compact" class="ma-2" align-tabs="center" :slider-color="tabSliderColor">
-          <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
-          <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
-        </VTabs>
+        <!-- AI Assistant tab -->
+        <VTabsWindowItem value="ai">
+          <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" @undo-logs="onAiUndoLogs" />
+        </VTabsWindowItem>
+      </VTabsWindow>
+    </VCard>
 
-        <VTabsWindow v-model="tab">
-          <!-- Form tab: scrollable so sticky form-actions works -->
-          <VTabsWindowItem value="form" class="overflow-y-auto">
-            <BulkLogForm
-              v-model:selected-dates="selectedDates"
-              :editing-log="editingLog"
-              @submit="handleFormSubmit"
-              @cancel="onBulkCancel"
-              @month-changed="onMonthChanged"
-            />
-          </VTabsWindowItem>
+    <!-- Middle column: chart stacked above log list -->
+    <div class="content-column">
+      <!-- Mobile: compact week strip chart driven by calendar selection -->
+      <MobileWeekChart
+        v-if="smAndDown"
+        :time-logs="timeLogs"
+        :selected-dates="selectedDates"
+        :current-month="currentMonth"
+        class="flex-shrink-0"
+      />
 
-          <!-- AI Assistant tab -->
-          <VTabsWindowItem value="ai">
-            <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" @undo-logs="onAiUndoLogs" />
-          </VTabsWindowItem>
-        </VTabsWindow>
-      </VCard>
+      <!-- Desktop: full month bar chart -->
+      <WorkTimeBarChart v-else :current-month="currentMonth" class="flex-shrink-0" />
 
-      <!-- Log list — layout controlled by HomeView via class inheritance -->
+      <!-- Log list -->
       <LogList
         class="flex-grow-1 overflow-hidden"
         :items="timeLogs"
@@ -351,29 +353,45 @@ const onAiUndoLogs = () => {
         @export="exportToCsv"
       />
     </div>
+
+    <!-- Right panel: Insights — visible on large screens only -->
+    <InsightsPanel
+      v-if="lgAndUp"
+      class="insights-panel"
+      :time-logs="timeLogs"
+      :current-month="currentMonth"
+    />
   </div>
 </template>
 
 <style scoped>
-/* Viewport-fill two-panel layout */
+/* Three-column viewport-fill layout: form | content | insights */
 .home-layout {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100%;
   padding: 12px;
   gap: 12px;
 }
 
-.panels-row {
+/* Left panel: fixed-width form column */
+.form-panel {
+  flex: 0 0 450px;
+}
+
+/* Middle column: chart on top, log list fills remaining height */
+.content-column {
   flex: 1;
-  min-height: 0; /* essential — Vuetify has no utility class for this */
+  min-width: 0;
+  min-height: 0;
   display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.form-panel {
-  flex: 0 0 33.333%;
-  max-width: 33.333%;
+/* Right panel: fixed-width insights column (only rendered on lg+) */
+.insights-panel {
+  flex: 0 0 320px;
 }
 
 /* VTabsWindow flex chain.
@@ -403,28 +421,25 @@ const onAiUndoLogs = () => {
   flex-direction: column;
 }
 
-/* Mobile: switch to page-scroll layout so LogList is never clipped.
-   The height:100% constraint on .home-layout prevents LogList from showing
-   when panels stack — removing it lets the page scroll naturally instead. */
+/* Mobile: switch to page-scroll stacked layout */
 @media (max-width: 959px) {
   .home-layout {
-    height: auto;
-  }
-
-  .panels-row {
     flex-direction: column;
-    flex: none;
-    overflow: visible;
+    height: auto;
   }
 
   .form-panel {
     flex: none;
-    max-width: 100%;
     overflow: visible !important;
   }
 
+  .content-column {
+    flex: none;
+    overflow: visible;
+  }
+
   /* LogList loses its flex-grow-1 source of height; give it an explicit viewport height */
-  .panels-row > :last-child {
+  .content-column > :last-child {
     flex: none !important;
     height: 70vh;
   }
