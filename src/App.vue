@@ -69,9 +69,12 @@ const autoSyncJiraTickets = async () => {
 
 const showReleaseNotification = () => {
   if (lastSeenVersion.value !== __APP_VERSION__) {
-    notificationCenter.info('New Update', {
+    notificationCenter.enqueue({
+      kind: 'info',
+      title: 'New Update',
       message: __COMMIT_MESSAGE__,
       autoDismissMs: 10000,
+      expandOnEnqueue: true,
     });
     lastSeenVersion.value = __APP_VERSION__;
   }

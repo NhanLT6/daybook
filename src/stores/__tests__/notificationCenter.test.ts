@@ -101,6 +101,33 @@ describe('notificationCenter store', () => {
     expect(store.isExpanded).toBe(true);
   });
 
+  it.each(['greeting', 'warning', 'error'] as const)(
+    'opens the island when a %s notification is enqueued',
+    (kind) => {
+      const store = useNotificationCenterStore();
+
+      store.enqueue({ kind, title: 'Test' });
+
+      expect(store.isExpanded).toBe(true);
+    },
+  );
+
+  it('opens the island when expandOnEnqueue is true regardless of kind', () => {
+    const store = useNotificationCenterStore();
+
+    store.enqueue({ kind: 'info', title: 'New Update', expandOnEnqueue: true });
+
+    expect(store.isExpanded).toBe(true);
+  });
+
+  it('does not open the island for passive kinds without expandOnEnqueue', () => {
+    const store = useNotificationCenterStore();
+
+    store.enqueue({ kind: 'info', title: 'FYI' });
+
+    expect(store.isExpanded).toBe(false);
+  });
+
   it('runs actions and closes items on completion', async () => {
     const store = useNotificationCenterStore();
     const onClick = vi.fn();

@@ -137,6 +137,7 @@ Confirm notifications are the interactive replacement for delete confirmation to
 Rules:
 
 - Enqueueing a `confirm` item immediately expands the island.
+- See also: auto-expansion rules shared with other kinds in the Island UI Behavior section.
 - Confirm items do not auto-dismiss.
 - Confirm items do not show the quick dismiss icon.
 - Clicking outside the island while a confirm is active dismisses the confirm and is treated as cancel.
@@ -184,7 +185,9 @@ Compact state:
 
 Expanded state:
 
-- Opens on compact click/tap or when a confirm is enqueued.
+- Opens on compact click/tap or when an auto-expanding notification is enqueued.
+- Auto-expanding kinds: `confirm`, `greeting`, `warning`, `error`. These expand immediately on enqueue because they require user attention.
+- Any notification can also opt in by passing `expandOnEnqueue: true` to `enqueue` directly (used by the "New Update" release notification, which keeps `info` kind but needs prominence).
 - Grows downward from the compact slot so it does not get clipped by the top viewport edge.
 - Uses one panel containing a vertical list, not separate floating toast cards.
 - Shows the `Notifications` header only when more than one notification is listed.

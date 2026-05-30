@@ -38,6 +38,7 @@ export interface NotificationItem {
 type NotificationInput = Omit<NotificationItem, 'id' | 'createdAt'> & {
   id?: string;
   createdAt?: number;
+  expandOnEnqueue?: boolean;
 };
 
 export type NotificationOptions = Omit<NotificationInput, 'kind' | 'title'>;
@@ -61,6 +62,7 @@ const DEFAULT_AUTO_DISMISS_MS: Partial<Record<NotificationKind, number>> = {
 };
 
 const PERSISTENT_KINDS = new Set<NotificationKind>(['activity', 'catchup', 'confirm', 'error']);
+const AUTO_EXPAND_KINDS = new Set<NotificationKind>(['confirm', 'greeting', 'warning', 'error']);
 
 export const useNotificationCenterStore = defineStore('notificationCenter', () => {
   const items = ref<NotificationItem[]>([]);
@@ -137,7 +139,7 @@ export const useNotificationCenterStore = defineStore('notificationCenter', () =
       items.value = [...items.value, item];
     }
     scheduleAutoDismiss(item);
-    if (item.kind === 'confirm') isExpanded.value = true;
+    if (AUTO_EXPAND_KINDS.has(item.kind) || input.expandOnEnqueue) isExpanded.value = true;
     return item.id;
   }
 
