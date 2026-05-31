@@ -11,20 +11,38 @@ import { useTheme } from 'vuetify';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { onClickOutside } from '@vueuse/core';
 
+const IDLE_HIDE_DELAY = 5000;
+// 55% into the 300 ms sling-in is the overshoot peak — fire expand here so the
+// bounce energy carries directly into the panel opening.
+const EXPAND_TRIGGER_MS = 165;
+
 const notificationCenter = useNotificationCenterStore();
 const { activeItem, isExpanded, queueCount, sortedItems } = storeToRefs(notificationCenter);
 const theme = useTheme();
 const isDarkMode = computed(() => theme.global.current.value.dark);
 
 const rootEl = ref<HTMLElement>();
-
 const innerEl = ref<HTMLElement>();
 const dims = ref<{ width: number; height: number } | null>(null);
 const ready = ref(false);
 let resizeObserver: ResizeObserver | null = null;
 
+// True while the sling-in animation is playing. Forces compact rendering so the
+// shell always slings in as a pill regardless of store expanded state.
+const isEnteringActive = ref(false);
+
+// True during the 5 s idle window after the queue empties.
+const isInIdleWindow = ref(false);
+let hideTimerId: ReturnType<typeof setTimeout> | null = null;
+
+const isVisible = computed(() => queueCount.value > 0 || isExpanded.value || isInIdleWindow.value);
+
+// Use this instead of isExpanded in the template so content stays compact
+// during the sling-in even when the store already has expanded = true.
+const effectiveExpanded = computed(() => !isEnteringActive.value && isExpanded.value);
+
 const contentKey = computed(() => {
-  if (isExpanded.value) return `expanded-${sortedItems.value.map((item) => item.id).join('-') || 'empty'}`;
+  if (effectiveExpanded.value) return `expanded-${sortedItems.value.map((item) => item.id).join('-') || 'empty'}`;
   return `compact-${activeItem.value?.id ?? 'idle'}-${queueCount.value}`;
 });
 
@@ -40,12 +58,91 @@ const shellStyle = computed(() =>
 function measure() {
   const el = innerEl.value;
   if (!el) return;
-
   const width = el.offsetWidth;
   const height = el.offsetHeight;
   if (dims.value?.width === width && dims.value.height === height) return;
-
   dims.value = { width, height };
+}
+
+function startHideTimer() {
+  if (hideTimerId !== null) clearTimeout(hideTimerId);
+  isInIdleWindow.value = true;
+  hideTimerId = setTimeout(() => {
+    isInIdleWindow.value = false;
+    hideTimerId = null;
+  }, IDLE_HIDE_DELAY);
+}
+
+function cancelHideTimer() {
+  if (hideTimerId !== null) {
+    clearTimeout(hideTimerId);
+    hideTimerId = null;
+  }
+  isInIdleWindow.value = false;
+}
+
+// Collapse and start idle timer when queue empties; cancel timer when queue fills.
+watch([queueCount, isExpanded], ([count, expanded]) => {
+  if (count === 0 && expanded) {
+    notificationCenter.toggleExpanded(false);
+  } else if (count === 0 && !expanded) {
+    startHideTimer();
+  } else {
+    cancelHideTimer();
+  }
+});
+
+function onEnter(el: Element, done: () => void) {
+  const shell = el as HTMLElement;
+  const needsExpand = isExpanded.value;
+  isEnteringActive.value = true;
+
+  nextTick(() => {
+    measure();
+
+    const animation = shell.animate(
+      [
+        { transform: 'translateX(-50%) scale(0.04)', opacity: '0' },
+        { transform: 'translateX(-50%) scale(1.12)', opacity: '1', offset: 0.55 },
+        { transform: 'translateX(-50%) scale(0.97)', offset: 0.78 },
+        { transform: 'translateX(-50%) scale(1)', opacity: '1' },
+      ],
+      { duration: 300, easing: 'linear', fill: 'forwards' },
+    );
+
+    if (needsExpand) {
+      // At the overshoot peak, switch to expanded content and let the CSS
+      // width/height transition carry the panel open.
+      setTimeout(() => {
+        ready.value = true;
+        isEnteringActive.value = false;
+        nextTick(measure);
+      }, EXPAND_TRIGGER_MS);
+    }
+
+    animation.onfinish = () => {
+      animation.cancel();
+      if (!needsExpand) isEnteringActive.value = false;
+      ready.value = true;
+      done();
+    };
+  });
+}
+
+function onLeave(el: Element, done: () => void) {
+  const shell = el as HTMLElement;
+  ready.value = false;
+
+  const animation = shell.animate(
+    [
+      { transform: 'translateX(-50%) scale(1)', opacity: '1' },
+      { transform: 'translateX(-50%) scale(1.05)', opacity: '1', offset: 0.3 },
+      { transform: 'translateX(-50%) scale(0.04)', opacity: '0' },
+    ],
+    { duration: 220, easing: 'linear', fill: 'forwards' },
+  );
+
+  animation.onfinish = done;
 }
 
 function toggleIsland() {
@@ -63,16 +160,15 @@ function closeIslandFromOutside() {
     notificationCenter.toggleExpanded(false);
     return;
   }
-
   closeIsland();
 }
 
 function onShellClick() {
-  if (!isExpanded.value) toggleIsland();
+  if (!effectiveExpanded.value) toggleIsland();
 }
 
 function onShellKeydown(event: KeyboardEvent) {
-  if (isExpanded.value) return;
+  if (effectiveExpanded.value) return;
   if (event.target !== event.currentTarget) return;
   if (event.key !== 'Enter' && event.key !== ' ') return;
   event.preventDefault();
@@ -103,7 +199,7 @@ function iconFor(kind?: NotificationKind): string {
 
 function compactText(item: NotificationItem | null): string {
   if (!item) return 'All done';
-  return item.message ? `${item.title}` : item.title;
+  return item.title;
 }
 
 function canQuickDismiss(item: NotificationItem): boolean {
@@ -126,7 +222,7 @@ function renderMarkdown(markdown: unknown): string {
 }
 
 watch(
-  [contentKey, isExpanded, queueCount],
+  [contentKey, effectiveExpanded, queueCount],
   () => {
     nextTick(measure);
   },
@@ -134,17 +230,15 @@ watch(
 );
 
 onMounted(() => {
-  nextTick(() => {
-    measure();
-    ready.value = true;
-  });
-
+  nextTick(measure);
   resizeObserver = new ResizeObserver(measure);
   if (innerEl.value) resizeObserver.observe(innerEl.value);
 });
 
 onUnmounted(() => {
   resizeObserver?.disconnect();
+  cancelHideTimer();
+  isEnteringActive.value = false;
 });
 
 onClickOutside(rootEl, () => {
@@ -154,33 +248,35 @@ onClickOutside(rootEl, () => {
 
 <template>
   <div ref="rootEl" class="notification-island-anchor" :class="{ 'notification-island-anchor--dark': isDarkMode }">
-    <div class="notification-slot" aria-hidden="true" />
+    <div v-if="isVisible" class="notification-slot" aria-hidden="true" />
 
-    <div
-      class="notification-shell"
-      :class="{
-        'notification-shell--ready': ready,
-        'notification-shell--expanded': isExpanded,
-        'notification-shell--idle': !activeItem && !isExpanded,
-      }"
-      :data-kind="activeItem?.kind ?? 'idle'"
-      :style="shellStyle"
-      :role="isExpanded ? undefined : 'button'"
-      :tabindex="isExpanded ? undefined : 0"
-      :aria-expanded="isExpanded"
-      aria-label="Notifications"
-      @click="onShellClick"
-      @keydown="onShellKeydown"
-    >
-      <div ref="innerEl" class="notification-inner">
-        <div class="notification-content" :key="contentKey">
-          <div v-if="!isExpanded" class="island-compact">
-            <VIcon :icon="iconFor(activeItem?.kind)" size="16" class="island-glyph" />
-            <span class="island-compact-text">{{ compactText(activeItem) }}</span>
-            <span v-if="queueCount > 1" class="island-count">{{ queueCount }}</span>
-          </div>
+    <Transition :css="false" @enter="onEnter" @leave="onLeave">
+      <div
+        v-if="isVisible"
+        class="notification-shell"
+        :class="{
+          'notification-shell--ready': ready,
+          'notification-shell--expanded': effectiveExpanded,
+          'notification-shell--idle': !activeItem && !effectiveExpanded,
+        }"
+        :data-kind="activeItem?.kind ?? 'idle'"
+        :style="shellStyle"
+        :role="effectiveExpanded ? undefined : 'button'"
+        :tabindex="effectiveExpanded ? undefined : 0"
+        :aria-expanded="effectiveExpanded"
+        aria-label="Notifications"
+        @click="onShellClick"
+        @keydown="onShellKeydown"
+      >
+        <div ref="innerEl" class="notification-inner">
+          <div class="notification-content" :key="contentKey">
+            <div v-if="!effectiveExpanded" class="island-compact">
+              <VIcon :icon="iconFor(activeItem?.kind)" size="16" class="island-glyph" />
+              <span class="island-compact-text">{{ compactText(activeItem) }}</span>
+              <span v-if="queueCount > 1" class="island-count">{{ queueCount }}</span>
+            </div>
 
-          <section v-else class="island-panel" @click.stop>
+            <section v-else class="island-panel" @click.stop>
             <header v-if="sortedItems.length > 1" class="island-panel-header">
               <div class="island-panel-title">
                 Notifications
@@ -240,6 +336,7 @@ onClickOutside(rootEl, () => {
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 </template>
 
@@ -268,10 +365,10 @@ onClickOutside(rootEl, () => {
 
 .notification-slot {
   position: absolute;
-  top: -16px;
+  top: -15px;
   left: 0;
   width: 196px;
-  height: 32px;
+  height: 30px;
   border-radius: 999px;
   transform: translateX(-50%);
   pointer-events: none;
@@ -279,7 +376,7 @@ onClickOutside(rootEl, () => {
 
 .notification-shell {
   position: absolute;
-  top: -16px;
+  top: -15px;
   left: 0;
   overflow: hidden;
   cursor: pointer;
@@ -352,7 +449,7 @@ onClickOutside(rootEl, () => {
   align-items: center;
   justify-content: center;
   width: 196px;
-  height: 32px;
+  height: 30px;
   gap: 9px;
   padding: 6px 15px;
   white-space: nowrap;

@@ -170,6 +170,14 @@ notificationCenter.confirm('Delete log?', {
 
 ## Island UI Behavior
 
+Visibility:
+
+- The island is hidden when the queue is empty and the idle window has expired. It is not an always-visible element.
+- The island becomes visible the moment any notification is enqueued.
+- When the queue empties, a **5-second idle window** begins. The island remains visible during this window showing the compact idle state ("All done"). If a new notification arrives during the window the timer cancels and the island stays visible. After the window expires the island hides with the sling-out animation.
+- If the island is expanded when the queue empties, it collapses first, then the idle window starts.
+- Clicking to expand while the idle window is running cancels the timer. Closing the expanded panel restarts a fresh 5-second window.
+
 Compact state:
 
 - Rendered in the center of the header dock.
@@ -178,7 +186,7 @@ Compact state:
   - light: `--glass-opacity-light`
   - dark: `--glass-opacity-dark`
   - blur: `--glass-blur`
-- Shows today's logged time when idle.
+- Shows idle text ("All done") during the idle window when no items are queued.
 - Shows active notification title when there are queued items.
 - Shows a count chip only when more than one item is queued.
 - No hover expansion.
@@ -193,6 +201,30 @@ Expanded state:
 - Shows the `Notifications` header only when more than one notification is listed.
 - Uses minimal item styling: no item borders and no panel divider.
 - Panel close icon is intentionally absent. Outside click handles collapse or confirm cancel.
+
+## Island Animations
+
+The island uses a sling-bounce animation for appear and disappear. All animations are driven by the Web Animations API via Vue `<Transition :css="false">` JS hooks so the scale and width/height transitions can be orchestrated independently.
+
+**Sling-in** (island appears from hidden):
+- Scale from `0.04` → overshoots to `1.12` at 55% → dips to `0.97` → settles at `1.0`.
+- Duration: 300 ms. Easing: `linear` (curve baked into keyframe stops).
+- Single bounce. Plays for all notification kinds.
+
+**Sling-out** (island hides after idle window):
+- Scale `1.0` → brief outward blip `1.05` at 30% → shrinks to `0.04`, opacity fades to 0.
+- Duration: 220 ms.
+
+**Expanding entry** — auto-expanding notifications (confirm, error, greeting, warning, or `expandOnEnqueue: true`) that arrive while the island is hidden:
+- The island slings in to the compact pill shape first (same 300 ms sling-in animation).
+- At **55% into the sling-in (≈ 165 ms)**, the width/height expand transition fires. This is the moment the scale hits its overshoot peak, so the bounce energy carries directly into the panel opening.
+- Expand transition: `width 280 ms cubic-bezier(0.34,1.4,0.56,1)`, `height 280 ms` same curve, `border-radius 220 ms ease`.
+- If an auto-expanding notification arrives while the island is **already visible** (compact), the existing compact→expanded transition plays unchanged — no sling involved.
+
+**Implementation notes:**
+- `effectiveExpanded` is a local computed in `NotificationIsland.vue` that returns `false` while the entry animation is in progress, so the template renders compact content during the sling-in regardless of store state. This ensures the sling always starts from a pill shape.
+- The `ready` flag (which gates width/height CSS transitions) is no longer set in `onMounted`. The `@enter` hook owns it: set to `true` at 165 ms for expanding entries, or on animation finish for normal entries.
+- The `notification-slot` and `notification-shell` are both gated by `v-if="isVisible"`. Only the shell has a `<Transition>` wrapper; the slot appears/disappears instantly.
 
 ## Greeting Behavior
 
