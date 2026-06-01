@@ -48,7 +48,12 @@ function getRememberedDate(): Date | null {
   const stored = settingsStore.lastSelectedDate;
   if (!settingsStore.rememberLastSelectedDate || !stored) return null;
   if (Date.now() - stored.savedAt > REMEMBER_DATE_EXPIRY_MS) return null;
-  return new Date(stored.date);
+  const date = new Date(stored.date);
+  if (isNaN(date.getTime())) {
+    settingsStore.lastSelectedDate = null;
+    return null;
+  }
+  return date;
 }
 
 const initialDate = getRememberedDate();
