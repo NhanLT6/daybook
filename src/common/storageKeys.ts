@@ -23,7 +23,6 @@ export const storageKeys = {
   catchUp: {
     summary: (date: string) => `catchUpSummary-${date}`,
     dismissedDate: 'catchUpDismissedDate',
-    lastFetchedAt: 'catchUpLastFetchedAt',
   },
   notifications: {
     greetingFirstSeenAt: 'notificationGreetingFirstSeenAt',

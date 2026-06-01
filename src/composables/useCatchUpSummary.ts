@@ -48,30 +48,7 @@ function readLogs(monthKey: string): TimeLog[] {
   }
 }
 
-function getLogsForSummary(): TimeLog[] {
-  const today = dayjs().startOf('day');
-  const lastFetchedAt = localStorage.getItem(storageKeys.catchUp.lastFetchedAt);
-
-  let fromDate: dayjs.Dayjs | null = null;
-
-  if (lastFetchedAt) {
-    fromDate = dayjs(lastFetchedAt).startOf('day');
-  } else {
-    // Scan backwards up to 14 days for the most recent day with logs.
-    for (let i = 1; i <= 14; i++) {
-      const d = dayjs().subtract(i, 'day').startOf('day');
-      const monthKey = `timeLogs-${d.format(yearAndMonthFormat)}`;
-      const logs = readLogs(monthKey);
-      if (logs.some((log) => parseLogDate(log.date)?.isSame(d, 'day'))) {
-        fromDate = d;
-        break;
-      }
-    }
-  }
-
-  if (!fromDate?.isValid()) return [];
-
-  const rangeStart = fromDate;
+function collectLogsFromDate(rangeStart: dayjs.Dayjs, today: dayjs.Dayjs): TimeLog[] {
   const allLogs: TimeLog[] = [];
   let cursor = rangeStart.startOf('month');
   const endMonth = today.startOf('month');
@@ -90,6 +67,31 @@ function getLogsForSummary(): TimeLog[] {
   }
 
   return allLogs;
+}
+
+function getLogsForSummary(): TimeLog[] {
+  const today = dayjs().startOf('day');
+
+  // Scan all stored log months newest-first. Find the latest weekday before today
+  // that has entries — that becomes the standup anchor. collectLogsFromDate then
+  // sweeps from that anchor to today, naturally picking up any weekend work in between.
+  const logMonthKeys = Object.keys(localStorage)
+    .filter((key) => /^timeLogs-\d{4}-\d{2}$/.test(key))
+    .sort()
+    .reverse();
+
+  for (const monthKey of logMonthKeys) {
+    const logs = readLogs(monthKey);
+
+    const anchor = logs
+      .map((log) => parseLogDate(log.date)?.startOf('day'))
+      .filter((d): d is dayjs.Dayjs => !!d?.isValid() && d.isBefore(today) && d.day() !== 0 && d.day() !== 6)
+      .sort((a, b) => b.valueOf() - a.valueOf())[0];
+
+    if (anchor) return collectLogsFromDate(anchor, today);
+  }
+
+  return [];
 }
 
 async function callStandupApi(today: string): Promise<string | null> {
@@ -125,7 +127,6 @@ async function callStandupApi(today: string): Promise<string | null> {
   const response = await httpClient.post<{ markdown: string }>('/api/standup', { entries, today }, { headers });
 
   localStorage.setItem(storageKeys.catchUp.summary(today), response.data.markdown);
-  localStorage.setItem(storageKeys.catchUp.lastFetchedAt, new Date().toISOString());
 
   return response.data.markdown;
 }

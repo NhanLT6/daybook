@@ -73,7 +73,7 @@ const showReleaseNotification = () => {
       kind: 'info',
       title: 'New Update',
       message: __COMMIT_MESSAGE__,
-      autoDismissMs: 10000,
+      autoDismissMs: 5000,
       expandOnEnqueue: true,
     });
     lastSeenVersion.value = __APP_VERSION__;

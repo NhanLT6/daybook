@@ -39,9 +39,9 @@ Here are their time log entries grouped by date:
 
 ${entriesText}
 
-Summarize in 2-3 groups max. Short past-tense bullets, 1 line each, max 3 bullets per group.
-Group by project or theme across dates.
-If there are entries for today (${today}), put them in a final "Today" group (present tense).
+Summarize weekday entries in 2-3 groups max, grouped by project or theme across dates. Short past-tense bullets, 1 line each, max 3 bullets per group.
+If there are Saturday or Sunday entries, collect all weekend work into a single "## Weekend" group placed after the weekday groups.
+If there are entries for today (${today}), put them in a final "## Today" group (present tense).
 No intro or outro. Return only markdown using: ## Group Name, then - bullet.`;
 }
 
