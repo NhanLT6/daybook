@@ -5,7 +5,7 @@ import { DEFAULT_GEMINI_CONFIG } from '@/interfaces/ServerSettings';
 import type { JiraConfig } from '@/interfaces/JiraConfig';
 import type { GeminiConfig } from '@/interfaces/ServerSettings';
 
-import { useStorage } from '@vueuse/core';
+import { StorageSerializers, useStorage } from '@vueuse/core';
 
 import { defineStore } from 'pinia';
 
@@ -94,7 +94,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const useCategories = useStorage('useCategories', false);
 
   const rememberLastSelectedDate = useStorage('rememberLastSelectedDate', false);
-  const lastSelectedDate = useStorage<RememberedDate | null>('lastSelectedDate', null);
+  const lastSelectedDate = useStorage<RememberedDate | null>('lastSelectedDate', null, undefined, {
+    serializer: StorageSerializers.object,
+  });
 
   const backgroundUrl = useStorage('backgroundUrl', '');
   const backgroundImageMode = useStorage<BackgroundMode>('backgroundImageMode', 'cover');
