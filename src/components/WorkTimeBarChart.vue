@@ -200,6 +200,7 @@ const chartOptions = computed(() => ({
       align: 'start' as const,
       labels: {
         color: chartColors.value.legendColor,
+        usePointStyle: true,
         generateLabels: (chart: Chart) => {
           const datasets = chart.data.datasets || [];
           return datasets.map((dataset, index) => ({
@@ -211,6 +212,7 @@ const chartOptions = computed(() => ({
             hidden: !chart.isDatasetVisible(index),
             datasetIndex: index,
             fontColor: chartColors.value.legendColor,
+            pointStyle: 'circle' as const,
           }));
         },
       },
