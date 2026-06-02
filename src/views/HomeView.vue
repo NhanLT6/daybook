@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, watchEffect } from 'vue';
+import { computed, onUnmounted, ref, watch, watchEffect } from 'vue';
 
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
@@ -21,6 +21,7 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
+import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { saveAs } from 'file-saver';
@@ -42,22 +43,32 @@ const todayDateStr = computed(() => dayjs(now.value).format('YYYY-MM-DD'));
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
 
-const REMEMBER_DATE_EXPIRY_MS = 3 * 60 * 1000;
+const readRememberedDate = () =>
+  getRememberedDate(settingsStore.lastSelectedDate, settingsStore.rememberLastSelectedDate);
 
-function getRememberedDate(): Date | null {
-  const stored = settingsStore.lastSelectedDate;
-  if (!settingsStore.rememberLastSelectedDate || !stored) return null;
-  if (Date.now() - stored.savedAt > REMEMBER_DATE_EXPIRY_MS) return null;
-  const date = new Date(stored.date);
-  if (isNaN(date.getTime())) {
+let autoDeselectTimer: ReturnType<typeof setTimeout> | null = null;
+
+const startAutoDeselectTimer = (delayMs: number) => {
+  if (autoDeselectTimer) clearTimeout(autoDeselectTimer);
+  autoDeselectTimer = setTimeout(() => {
+    selectedDates.value = [];
     settingsStore.lastSelectedDate = null;
-    return null;
-  }
-  return date;
-}
+    autoDeselectTimer = null;
+  }, delayMs);
+};
 
-const initialDate = getRememberedDate();
+onUnmounted(() => {
+  if (autoDeselectTimer) clearTimeout(autoDeselectTimer);
+});
+
+const initialDate = readRememberedDate();
 const selectedDates = ref<Date[]>(initialDate ? [initialDate] : []);
+
+// Resume the auto-deselect timer for remaining window when loading a remembered date
+if (initialDate && settingsStore.lastSelectedDate) {
+  const remaining = REMEMBER_DATE_EXPIRY_MS - (Date.now() - settingsStore.lastSelectedDate.savedAt);
+  if (remaining > 0) startAutoDeselectTimer(remaining);
+}
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
 const editingLog = ref<TimeLog | undefined>(undefined);
 
@@ -130,20 +141,17 @@ const saveBulkLogs = (logs: TimeLog[]) => {
   const isSingleCreate = !editingLog.value && logs.length === 1;
   if (settingsStore.rememberLastSelectedDate && isSingleCreate && selectedDates.value[0]) {
     settingsStore.lastSelectedDate = { date: selectedDates.value[0].toISOString(), savedAt: Date.now() };
-    selectedDates.value = [selectedDates.value[0]];
+    startAutoDeselectTimer(REMEMBER_DATE_EXPIRY_MS);
   } else {
+    if (autoDeselectTimer) { clearTimeout(autoDeselectTimer); autoDeselectTimer = null; }
     settingsStore.lastSelectedDate = null;
     selectedDates.value = [];
   }
   editingLog.value = undefined;
 };
 
-const handleFormSubmit = (logs: TimeLog[]) => {
-  saveBulkLogs(logs);
-};
-
 const onBulkCancel = () => {
-  const remembered = getRememberedDate();
+  const remembered = readRememberedDate();
   selectedDates.value = remembered ? [remembered] : [];
   editingLog.value = undefined;
 };
@@ -320,7 +328,7 @@ const onAiUndoLogs = () => {
           <BulkLogForm
             v-model:selected-dates="selectedDates"
             :editing-log="editingLog"
-            @submit="handleFormSubmit"
+            @submit="saveBulkLogs"
             @cancel="onBulkCancel"
             @month-changed="onMonthChanged"
           />
