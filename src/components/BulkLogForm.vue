@@ -172,7 +172,9 @@ const onSave = handleSubmit((values) => {
   const isTaskExisting = allTasks.value.some((t) => t.title === values.task!);
   if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
 
-  resetForm({ values: emptyLog });
+  // Use current parent selectedDates so vee-validate stays in sync when the
+  // remember-last-date feature keeps the parent value unchanged after save.
+  resetForm({ values: { ...emptyLog, selectedDates: selectedDates.value } });
 }, scrollToFirstError);
 
 const onCancel = () => {
