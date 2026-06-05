@@ -189,7 +189,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 
       <!-- Days logged -->
       <div>
-        <div class="text-overline text-medium-emphasis" style="margin: 0 0 -0.5rem 0.5rem">Days logged</div>
+        <div class="text-overline text-medium-emphasis ms-2">Days logged</div>
         <VCard>
           <div class="pa-4">
             <div class="text-body-2 mb-2">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
@@ -200,7 +200,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 
       <!-- Time by project -->
       <div v-if="projectBreakdown.length > 0">
-        <div class="text-overline text-medium-emphasis" style="margin: 0 0 -0.5rem 0.5rem">Time by project</div>
+        <div class="text-overline text-medium-emphasis ms-2">Time by project</div>
         <VCard>
           <div class="pa-4">
             <div class="d-flex flex-column ga-3">
