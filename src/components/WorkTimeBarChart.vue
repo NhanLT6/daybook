@@ -307,15 +307,10 @@ onUnmounted(() => {
             Hours logged per day · stacked by project
           </div>
         </VToolbarTitle>
-      </VToolbar>
-    </VCardTitle>
-
-    <!-- Stats + Chart card -->
-    <div class="px-2 pb-2">
-      <VCard>
-        <div class="pa-4">
-          <!-- TODAY / THIS WEEK — current month only -->
-          <div v-if="isCurrentMonth" class="d-flex ga-4 mb-2">
+        <!-- TODAY / THIS WEEK — right side of header, current month only -->
+        <template v-if="isCurrentMonth">
+          <VSpacer />
+          <div class="d-flex ga-4 me-2">
             <div class="d-flex align-baseline ga-1">
               <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(todayMinutes) }}</span>
               <span class="text-caption text-medium-emphasis">TODAY</span>
@@ -325,7 +320,14 @@ onUnmounted(() => {
               <span class="text-caption text-medium-emphasis">THIS WEEK</span>
             </div>
           </div>
+        </template>
+      </VToolbar>
+    </VCardTitle>
 
+    <!-- Chart card -->
+    <div class="px-2 pb-2">
+      <VCard>
+        <div class="pa-4">
           <!-- Chart -->
           <div class="chart-container">
             <canvas ref="chartCanvas"></canvas>

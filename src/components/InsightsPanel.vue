@@ -7,7 +7,7 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
 
-import { yearAndMonthFormat } from '@/common/DateFormat';
+import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useSettingsStore } from '@/stores/settings';
 import { sumBy, uniqBy } from 'lodash';
@@ -35,30 +35,66 @@ const lastMonthKey = computed(() => {
   return dayjs(currentMonthKey.value, yearAndMonthFormat).subtract(1, 'month').format(yearAndMonthFormat);
 });
 
-const lastMonthTotal = computed(() => {
-  // Read prior-month logs directly from localStorage (read-only, no need to reactify)
-  const raw = localStorage.getItem(`timeLogs-${lastMonthKey.value}`);
-  if (!raw) return 0;
-  try {
-    const logs: TimeLog[] = JSON.parse(raw);
-    return sumBy(logs, 'duration');
-  } catch {
-    return 0;
-  }
+// Week-over-week delta
+const weekStartDate = computed(() => {
+  const today = dayjs();
+  const diff = (today.day() - settingsStore.firstDayOfWeek + 7) % 7;
+  return today.subtract(diff, 'day').startOf('day');
 });
 
-const delta = computed(() => totalMinutes.value - lastMonthTotal.value);
+const thisWeekMinutes = computed(() => {
+  const weekStart = weekStartDate.value;
+  const today = dayjs().endOf('day');
+  return sumBy(
+    props.timeLogs.filter((log) => {
+      const d = dayjs(log.date, shortDateFormat);
+      return d.isValid() && !d.isBefore(weekStart) && !d.isAfter(today);
+    }),
+    'duration',
+  );
+});
+
+const lastWeekMinutes = computed(() => {
+  const lastWeekStart = weekStartDate.value.subtract(7, 'day');
+  const lastWeekEnd = weekStartDate.value.subtract(1, 'day').endOf('day');
+  // Read from both current and previous month in case the week spans a month boundary
+  let total = 0;
+  for (const key of [currentMonthKey.value, lastMonthKey.value]) {
+    const raw = localStorage.getItem(`timeLogs-${key}`);
+    if (!raw) continue;
+    try {
+      const logs: TimeLog[] = JSON.parse(raw);
+      total += sumBy(
+        logs.filter((log) => {
+          const d = dayjs(log.date, shortDateFormat);
+          return d.isValid() && !d.isBefore(lastWeekStart) && !d.isAfter(lastWeekEnd);
+        }),
+        'duration',
+      );
+    } catch {
+      // ignore malformed storage
+    }
+  }
+  return total;
+});
+
+const delta = computed(() => thisWeekMinutes.value - lastWeekMinutes.value);
 
 const deltaLabel = computed(() => {
-  if (lastMonthTotal.value === 0) return null;
-  const sign = delta.value >= 0 ? '+' : '-';
-  return `${sign}${minutesToHourWithMinutes(Math.abs(delta.value))} vs last month`;
+  if (lastWeekMinutes.value === 0) return null;
+  return `${minutesToHourWithMinutes(Math.abs(delta.value))} vs last week`;
 });
 
-const deltaColor = computed(() => {
+const deltaIcon = computed(() => {
+  if (delta.value > 0) return 'mdi-chevron-up';
+  if (delta.value < 0) return 'mdi-chevron-down';
+  return null;
+});
+
+const deltaIconColor = computed(() => {
   if (delta.value > 0) return 'success';
   if (delta.value < 0) return 'error';
-  return 'medium-emphasis';
+  return '';
 });
 
 // ── Days logged ───────────────────────────────────────────────────────────────
@@ -144,69 +180,73 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       <VCard>
         <div class="pa-4">
           <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(totalMinutes) }}</div>
-          <div v-if="deltaLabel" class="text-caption" :class="`text-${deltaColor}`">
+          <div v-if="deltaLabel" class="d-flex align-center ga-1 text-caption text-medium-emphasis mt-1">
+            <VIcon v-if="deltaIcon" :color="deltaIconColor" :icon="deltaIcon" size="14" />
             {{ deltaLabel }}
           </div>
         </div>
       </VCard>
 
       <!-- Days logged -->
-      <VCard>
-        <div class="pa-4">
-          <div class="text-overline text-medium-emphasis mb-1">Days logged</div>
-          <div class="text-body-2 mb-2">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
-          <VProgressLinear :model-value="daysProgress" bg-color="rgba(var(--v-theme-on-surface), 0.08)" rounded />
-        </div>
-      </VCard>
+      <div>
+        <div class="text-overline text-medium-emphasis" style="margin: 0 0 -0.5rem 0.5rem">Days logged</div>
+        <VCard>
+          <div class="pa-4">
+            <div class="text-body-2 mb-2">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
+            <VProgressLinear :model-value="daysProgress" bg-color="rgba(var(--v-theme-on-surface), 0.08)" rounded />
+          </div>
+        </VCard>
+      </div>
 
       <!-- Time by project -->
-      <VCard v-if="projectBreakdown.length > 0">
-        <div class="pa-4">
-          <div class="text-overline text-medium-emphasis mb-2">Time by project</div>
-
-          <div class="d-flex flex-column ga-3">
-            <div v-for="item in projectBreakdown" :key="item.project">
-              <!-- Row 1: dot + name + hours (pct) -->
-              <div class="d-flex align-center ga-2 mb-1">
-                <span
-                  class="flex-shrink-0"
-                  :style="{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: getProjectColor(item.project),
-                  }"
+      <div v-if="projectBreakdown.length > 0">
+        <div class="text-overline text-medium-emphasis" style="margin: 0 0 -0.5rem 0.5rem">Time by project</div>
+        <VCard>
+          <div class="pa-4">
+            <div class="d-flex flex-column ga-3">
+              <div v-for="item in projectBreakdown" :key="item.project">
+                <!-- Row 1: dot + name + hours (pct) -->
+                <div class="d-flex align-center ga-2 mb-1">
+                  <span
+                    class="flex-shrink-0"
+                    :style="{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: getProjectColor(item.project),
+                    }"
+                  />
+                  <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
+                  <span class="text-caption text-medium-emphasis flex-shrink-0">
+                    {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
+                  </span>
+                </div>
+                <!-- Row 2: progress bar -->
+                <VProgressLinear
+                  :model-value="item.pct"
+                  :color="getProjectColor(item.project)"
+                  bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+                  rounded
+                  height="5"
                 />
-                <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
-                <span class="text-caption text-medium-emphasis flex-shrink-0">
-                  {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
-                </span>
               </div>
-              <!-- Row 2: progress bar -->
-              <VProgressLinear
-                :model-value="item.pct"
-                :color="getProjectColor(item.project)"
-                bg-color="rgba(var(--v-theme-on-surface), 0.08)"
-                rounded
-                height="5"
-              />
             </div>
-          </div>
 
-          <!-- +N more -->
-          <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2">
-            +{{ extraProjectCount }} more
-          </div>
-
-          <!-- Focus line -->
-          <template v-if="uniqueProjectCount >= 2">
-            <VDivider class="mt-4 mb-3" />
-            <div class="text-caption text-medium-emphasis">
-              {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
+            <!-- +N more -->
+            <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2">
+              +{{ extraProjectCount }} more
             </div>
-          </template>
-        </div>
-      </VCard>
+
+            <!-- Focus line -->
+            <template v-if="uniqueProjectCount >= 2">
+              <VDivider class="mt-4 mb-3" />
+              <div class="text-caption text-medium-emphasis">
+                {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
+              </div>
+            </template>
+          </div>
+        </VCard>
+      </div>
     </div>
   </VCard>
 </template>
