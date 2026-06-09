@@ -133,16 +133,13 @@ function onLeave(el: Element, done: () => void) {
   const shell = el as HTMLElement;
   ready.value = false;
 
-  const animation = shell.animate(
-    [
-      { transform: 'translateX(-50%) scale(1)', opacity: '1' },
-      { transform: 'translateX(-50%) scale(1.05)', opacity: '1', offset: 0.3 },
-      { transform: 'translateX(-50%) scale(0.04)', opacity: '0' },
-    ],
-    { duration: 220, easing: 'linear', fill: 'forwards' },
-  );
-
-  animation.onfinish = done;
+  // Animation is defined in CSS (.notification-shell--leaving). We only trigger
+  // it and report completion. animationend also bubbles up from the inner text
+  // fade, so finish on the shell's own animation.
+  shell.classList.add('notification-shell--leaving');
+  shell.addEventListener('animationend', (event) => {
+    if (event.target === shell) done();
+  });
 }
 
 function toggleIsland() {
@@ -415,6 +412,56 @@ onClickOutside(rootEl, () => {
   box-shadow: none;
   backdrop-filter: blur(var(--glass-blur, 25.6px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
+}
+
+/* Leave: text dismisses first, then the empty pill squishes to a circle and fades. */
+.notification-shell--leaving {
+  pointer-events: none;
+  animation: island-shell-leave 720ms linear forwards;
+}
+
+.notification-shell--leaving .notification-inner {
+  animation: island-text-leave 150ms ease-out forwards;
+}
+
+/* border-radius 50% = 98px/15px in element space; after scaleX(0.153) the
+   visual radius is ~15px on each axis — a perfect circle. */
+@keyframes island-shell-leave {
+  0% {
+    transform: translateX(-50%) scale(1);
+    border-radius: 999px;
+    opacity: 1;
+  }
+  /* hold the pill until the text has exited, then squish */
+  28% {
+    transform: translateX(-50%) scale(1);
+    border-radius: 999px;
+    opacity: 1;
+    animation-timing-function: ease-out;
+  }
+  /* hold the circle so the two-step feel is clear */
+  54% {
+    transform: translateX(-50%) scaleX(0.153) scaleY(1);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+  78% {
+    transform: translateX(-50%) scaleX(0.153) scaleY(1);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(-50%) scaleX(0.153) scaleY(1);
+    border-radius: 50%;
+    opacity: 0;
+  }
+}
+
+@keyframes island-text-leave {
+  to {
+    transform: translateY(-6px) scale(0.96);
+    opacity: 0;
+  }
 }
 
 .notification-inner {
