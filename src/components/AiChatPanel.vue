@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+
+import dayjs from 'dayjs';
 
 import { useAiChat } from '@/composables/useAiChat';
+import { fetchCatchUpItems, onCatchUpView } from '@/composables/useCatchUpSummary';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
@@ -32,6 +35,7 @@ const {
   markSaved,
   markUndone,
   markDiscarded,
+  injectCatchUp,
 } = useAiChat();
 const router = useRouter();
 
@@ -128,88 +132,132 @@ const handleRetry = async (messageId: string) => {
 const clearError = () => {
   error.value = null;
 };
+
+const isCatchUpLoading = ref(false);
+
+const handleCatchUp = async () => {
+  if (isCatchUpLoading.value || isLoading.value) return;
+  isCatchUpLoading.value = true;
+  try {
+    const items = await fetchCatchUpItems(dayjs().format('YYYY-MM-DD'));
+    if (items?.length) {
+      injectCatchUp(items);
+    } else {
+      error.value = 'No recent logs to summarize.';
+    }
+  } catch (err) {
+    const axiosErr = err as { response?: { data?: { error?: string } } };
+    error.value = axiosErr.response?.data?.error ?? (err instanceof Error ? err.message : 'Failed to load catch-up.');
+  } finally {
+    isCatchUpLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  const off = onCatchUpView((items) => {
+    injectCatchUp(items);
+  });
+  onUnmounted(off);
+});
 </script>
 
 <template>
   <VCard class="ma-2 d-flex flex-column overflow-hidden" style="flex: 1; min-height: 0">
-    <!-- Messages area -->
-    <div class="messages-area pa-3 d-flex flex-column ga-3 flex-grow-1 overflow-y-auto">
+    <!-- Messages wrapper: positioned context so floating button doesn't scroll -->
+    <div class="messages-wrapper">
+      <!-- Scrollable messages area -->
       <div
-        v-if="!messages.length && !error"
-        class="d-flex flex-column align-center justify-center text-center"
-        style="min-height: 200px"
+        class="messages-area pa-3 d-flex flex-column ga-3 overflow-y-auto"
+        :class="{ 'drag-over': isDragOver }"
+        @dragover.prevent="isDragOver = true"
+        @dragleave="isDragOver = false"
+        @drop.prevent="handleDrop"
       >
-        <VIcon icon="mdi-creation" size="36" color="primary" class="mb-3" opacity="0.5" />
-        <p class="text-body-2 text-medium-emphasis mb-1">Describe your work or paste a screenshot</p>
-        <p class="text-caption text-disabled">e.g. "DS-1234 for 2h this morning"</p>
+        <div
+          v-if="!messages.length && !error"
+          class="d-flex flex-column align-center justify-center text-center"
+          style="min-height: 200px"
+        >
+          <VIcon icon="mdi-creation" size="36" color="primary" class="mb-3" opacity="0.5" />
+          <p class="text-body-2 text-medium-emphasis mb-1">Describe your work or paste a screenshot</p>
+          <p class="text-caption text-disabled">e.g. "DS-1234 for 2h this morning"</p>
+        </div>
+
+        <AiChatMessage
+          v-for="msg in messages"
+          :key="msg.id"
+          :message="msg"
+          :is-saveable="msg.id === latestLogsMessageId"
+          :is-undoable="msg.metadata?.saveState === 'saved' && msg.id === savedLogsMessageId"
+          :can-retry="msg.id === lastUserMessageId && !!error"
+          @save-logs="(logs) => handleSaveLogs(msg.id, logs)"
+          @undo="() => handleUndo(msg.id)"
+          @discard="() => handleDiscard(msg.id)"
+          @retry="() => handleRetry(msg.id)"
+        />
+
+        <!-- Loading message -->
+        <div v-if="isLoading" class="d-flex align-center ga-2">
+          <VAvatar size="28" color="primary" class="flex-shrink-0">
+            <VIcon icon="mdi-creation" size="16" />
+          </VAvatar>
+          <VCard color="container" variant="elevated" elevation="0" rounded="lg rounded-ts-sm" class="pa-3">
+            <div class="d-flex ga-1 align-center">
+              <VProgressCircular size="14" width="2" indeterminate color="primary" />
+              <span class="text-caption text-medium-emphasis ml-1">Thinking…</span>
+            </div>
+          </VCard>
+        </div>
+
+        <!-- Error message -->
+        <div v-if="error" class="d-flex align-center ga-2">
+          <VAvatar size="28" color="error" class="flex-shrink-0">
+            <VIcon icon="mdi-alert-circle-outline" size="16" />
+          </VAvatar>
+          <VCard color="error" variant="tonal" elevation="0" rounded="lg rounded-ts-sm" style="max-width: 88%">
+            <VCardText class="pa-3 d-flex align-center ga-2">
+              <!-- Config error: render "Settings" as a clickable link, no dismiss button -->
+              <template v-if="isConfigError">
+                <span class="text-body-2 mb-0">
+                  AI Assistant is not configured. Add your Gemini API key in
+                  <a class="error-link" @click.prevent="router.push('/setting')">Settings</a>.
+                </span>
+              </template>
+              <template v-else>
+                <span class="text-body-2 mb-0">{{ error }}</span>
+                <VBtn
+                  icon="mdi-close"
+                  size="x-small"
+                  variant="text"
+                  color="error"
+                  class="flex-shrink-0"
+                  @click="clearError"
+                />
+              </template>
+            </VCardText>
+          </VCard>
+        </div>
+
+        <div ref="messagesEndRef" />
       </div>
 
-      <AiChatMessage
-        v-for="msg in messages"
-        :key="msg.id"
-        :message="msg"
-        :is-saveable="msg.id === latestLogsMessageId"
-        :is-undoable="msg.metadata?.saveState === 'saved' && msg.id === savedLogsMessageId"
-        :can-retry="msg.id === lastUserMessageId && !!error"
-        @save-logs="(logs) => handleSaveLogs(msg.id, logs)"
-        @undo="() => handleUndo(msg.id)"
-        @discard="() => handleDiscard(msg.id)"
-        @retry="() => handleRetry(msg.id)"
-      />
-
-      <!-- Loading message -->
-      <div v-if="isLoading" class="d-flex align-center ga-2">
-        <VAvatar size="28" color="primary" class="flex-shrink-0">
-          <VIcon icon="mdi-creation" size="16" />
-        </VAvatar>
-        <VCard color="container" variant="elevated" elevation="0" rounded="lg rounded-ts-sm" class="pa-3">
-          <div class="d-flex ga-1 align-center">
-            <VProgressCircular size="14" width="2" indeterminate color="primary" />
-            <span class="text-caption text-medium-emphasis ml-1">Thinking…</span>
-          </div>
-        </VCard>
-      </div>
-
-      <!-- Error message -->
-      <div v-if="error" class="d-flex align-center ga-2">
-        <VAvatar size="28" color="error" class="flex-shrink-0">
-          <VIcon icon="mdi-alert-circle-outline" size="16" />
-        </VAvatar>
-        <VCard color="error" variant="tonal" elevation="0" rounded="lg rounded-ts-sm" style="max-width: 88%">
-          <VCardText class="pa-3 d-flex align-center ga-2">
-            <!-- Config error: render "Settings" as a clickable link, no dismiss button -->
-            <template v-if="isConfigError">
-              <span class="text-body-2 mb-0">
-                AI Assistant is not configured. Add your Gemini API key in
-                <a class="error-link" @click.prevent="router.push('/setting')">Settings</a>.
-              </span>
-            </template>
-            <template v-else>
-              <span class="text-body-2 mb-0">{{ error }}</span>
-              <VBtn
-                icon="mdi-close"
-                size="x-small"
-                variant="text"
-                color="error"
-                class="flex-shrink-0"
-                @click="clearError"
-              />
-            </template>
-          </VCardText>
-        </VCard>
-      </div>
-
-      <div ref="messagesEndRef" />
+      <!-- Floating catch-up button — anchored to wrapper, never scrolls with messages -->
+      <VBtn
+        class="catchup-fab"
+        size="small"
+        variant="tonal"
+        color="primary"
+        prepend-icon="mdi-history"
+        :loading="isCatchUpLoading"
+        :disabled="isLoading"
+        @click="handleCatchUp"
+      >
+        Catch up
+      </VBtn>
     </div>
 
     <!-- Input area (sticky at bottom) -->
-    <div
-      class="input-area pa-3 border-t"
-      :class="{ 'drag-over': isDragOver }"
-      @dragover.prevent="isDragOver = true"
-      @dragleave="isDragOver = false"
-      @drop.prevent="handleDrop"
-    >
+    <div class="input-area pa-3 border-t">
       <div v-if="attachedPreview" class="mb-2 position-relative" style="width: fit-content">
         <VImg :src="attachedPreview" width="80" height="60" cover rounded="lg" />
 
@@ -265,10 +313,25 @@ const clearError = () => {
 </template>
 
 <style scoped>
+.messages-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .messages-area {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 8px;
+}
+
+.catchup-fab {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 1;
 }
 
 .border-t {
@@ -279,7 +342,7 @@ const clearError = () => {
   transition: background-color 0.15s ease;
 }
 
-.input-area.drag-over {
+.drag-over {
   background-color: rgba(var(--v-theme-primary), 0.08);
 }
 
