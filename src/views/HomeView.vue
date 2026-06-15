@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch, watchEffect } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue';
 
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
@@ -22,6 +22,7 @@ import dayjs from 'dayjs';
 import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
+import { onCatchUpView } from '@/composables/useCatchUpSummary';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { saveAs } from 'file-saver';
@@ -59,6 +60,13 @@ const startAutoDeselectTimer = (delayMs: number) => {
 
 onUnmounted(() => {
   if (autoDeselectTimer) clearTimeout(autoDeselectTimer);
+});
+
+onMounted(() => {
+  const off = onCatchUpView(() => {
+    tab.value = 'ai';
+  });
+  onUnmounted(off);
 });
 
 const initialDate = readRememberedDate();
@@ -334,8 +342,8 @@ const onAiUndoLogs = () => {
           />
         </VTabsWindowItem>
 
-        <!-- AI Assistant tab -->
-        <VTabsWindowItem value="ai">
+        <!-- AI Assistant tab — eager keeps AiChatPanel mounted so onCatchUpView fires immediately -->
+        <VTabsWindowItem value="ai" eager>
           <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" @undo-logs="onAiUndoLogs" />
         </VTabsWindowItem>
       </VTabsWindow>
