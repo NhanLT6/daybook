@@ -1,3 +1,4 @@
+import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { TimeLog } from '@/interfaces/TimeLog';
 import type { GeminiConfig } from '@/interfaces/ServerSettings';
 
@@ -15,6 +16,9 @@ import { buildAuthHeaders } from './useCrypto';
 dayjs.extend(customParseFormat);
 
 const SETTINGS_WAIT_FALLBACK_MS = 5000;
+const HOURS_PER_DAY = 8; // for the "Xd Yh" effort metric
+const LONG_RUNNING_THRESHOLD_MINUTES = 15 * 60; // 15h accumulated effort
+const LOOKBACK_WORKING_DAYS = 15; // rolling window for accumulation (~3 weeks)
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -24,6 +28,109 @@ function formatDuration(minutes: number): string {
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
+}
+
+function hashString(value: string): string {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) + hash + value.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function deriveItemId(project: string): string {
+  return hashString(project);
+}
+
+export function formatEffort(minutes: number): string {
+  const totalHours = Math.round(minutes / 60);
+  const days = Math.floor(totalHours / HOURS_PER_DAY);
+  const hours = totalHours % HOURS_PER_DAY;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (!parts.length) parts.push('0h');
+  return parts.join(' ');
+}
+
+export interface CatchUpItem {
+  id: string;
+  project: string;
+  logs: { task: string; description?: string; duration: number }[];
+  windowMinutes: number;
+  accumulatedMinutes: number;
+  ongoing: boolean;
+}
+
+export type { CatchUpRenderItem };
+
+// ── Notification → Chat bridge (module-level singleton, no reactive signal) ──
+
+type CatchUpViewHandler = (items: CatchUpRenderItem[]) => void;
+const viewHandlers = new Set<CatchUpViewHandler>();
+
+export function onCatchUpView(handler: CatchUpViewHandler): () => void {
+  viewHandlers.add(handler);
+  return () => viewHandlers.delete(handler);
+}
+
+export function triggerCatchUpView(items: CatchUpRenderItem[]): void {
+  viewHandlers.forEach((h) => h(items));
+}
+
+export function markCatchUpViewed(date = dayjs().format('YYYY-MM-DD')): void {
+  localStorage.setItem(storageKeys.catchUp.dismissedDate, date);
+}
+
+export function buildCatchUpItems(didLogs: TimeLog[], accumulated: Map<string, number>): CatchUpItem[] {
+  const byProject = new Map<string, TimeLog[]>();
+  for (const log of didLogs) {
+    if (!byProject.has(log.project)) byProject.set(log.project, []);
+    byProject.get(log.project)!.push(log);
+  }
+
+  const ranked = Array.from(byProject.entries()).map(([project, logs]) => {
+    const windowMinutes = logs.reduce((sum, l) => sum + l.duration, 0);
+    const accumulatedMinutes = accumulated.get(project) ?? windowMinutes;
+    const latest = logs.reduce((max, l) => (l.date > max ? l.date : max), '');
+    const item: CatchUpItem = {
+      id: deriveItemId(project),
+      project,
+      logs: logs.map((l) => ({ task: l.task, description: l.description, duration: l.duration })),
+      windowMinutes,
+      accumulatedMinutes,
+      ongoing: accumulatedMinutes >= LONG_RUNNING_THRESHOLD_MINUTES,
+    };
+    return { item, latest };
+  });
+
+  ranked.sort((a, b) => {
+    const byMinutes = b.item.windowMinutes - a.item.windowMinutes;
+    if (byMinutes !== 0) return byMinutes;
+    if (b.latest > a.latest) return 1;
+    if (b.latest < a.latest) return -1;
+    return 0;
+  });
+
+  return ranked.map((r) => r.item);
+}
+
+export function accumulateMinutesByProject(logs: TimeLog[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const log of logs) {
+    totals.set(log.project, (totals.get(log.project) ?? 0) + log.duration);
+  }
+  return totals;
+}
+
+export function applyLines(items: CatchUpItem[], lines: { id: string; text: string }[]): CatchUpRenderItem[] {
+  const textById = new Map(lines.map((l) => [l.id, l.text]));
+  return items.map((item) => ({
+    project: item.project,
+    text: textById.get(item.id) ?? item.project,
+    ongoing: item.ongoing,
+    effortLabel: item.ongoing ? formatEffort(item.accumulatedMinutes) : undefined,
+  }));
 }
 
 function parseLogDate(value: string): dayjs.Dayjs | null {
@@ -69,6 +176,22 @@ function collectLogsFromDate(rangeStart: dayjs.Dayjs, today: dayjs.Dayjs): TimeL
   return allLogs;
 }
 
+function workingDaysAgo(from: dayjs.Dayjs, workingDays: number): dayjs.Dayjs {
+  let cursor = from;
+  let counted = 0;
+  while (counted < workingDays) {
+    cursor = cursor.subtract(1, 'day');
+    const dow = cursor.day();
+    if (dow !== 0 && dow !== 6) counted += 1;
+  }
+  return cursor;
+}
+
+function collectAccumulationLogs(today: dayjs.Dayjs): TimeLog[] {
+  const rangeStart = workingDaysAgo(today, LOOKBACK_WORKING_DAYS);
+  return collectLogsFromDate(rangeStart, today);
+}
+
 function getLogsForSummary(): TimeLog[] {
   const today = dayjs().startOf('day');
 
@@ -94,41 +217,46 @@ function getLogsForSummary(): TimeLog[] {
   return [];
 }
 
-async function callStandupApi(today: string): Promise<string | null> {
-  const logs = getLogsForSummary();
+async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null> {
+  const didLogs = getLogsForSummary();
+  if (!didLogs.length) return null;
 
-  if (!logs.length) return null;
+  const accumulated = accumulateMinutesByProject(collectAccumulationLogs(dayjs(today).startOf('day')));
+  const items = buildCatchUpItems(didLogs, accumulated);
+  if (!items.length) return null;
 
-  const byDate = new Map<string, TimeLog[]>();
-  for (const log of logs) {
-    const parsedDate = parseLogDate(log.date);
-    if (!parsedDate) continue;
-    const dateKey = parsedDate.format('YYYY-MM-DD');
-    if (!byDate.has(dateKey)) byDate.set(dateKey, []);
-    byDate.get(dateKey)!.push(log);
-  }
-
-  const entries = Array.from(byDate.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, dateLogs]) => ({
-      date,
-      dayOfWeek: dayjs(date).format('dddd'),
-      logs: dateLogs.map((log) => ({
-        project: log.project,
-        task: log.task,
-        duration: formatDuration(log.duration),
-        description: log.description,
-      })),
-    }));
-
-  if (!entries.length) return null;
+  const requestItems = items.map((item) => ({
+    id: item.id,
+    project: item.project,
+    logs: item.logs.map((l) => ({
+      task: l.task,
+      description: l.description,
+      duration: formatDuration(l.duration),
+    })),
+  }));
 
   const headers = await buildAuthHeaders();
-  const response = await httpClient.post<{ markdown: string }>('/api/standup', { entries, today }, { headers });
+  const response = await httpClient.post<{ lines: { id: string; text: string }[] }>(
+    '/api/standup',
+    { items: requestItems, today },
+    { headers },
+  );
 
-  localStorage.setItem(storageKeys.catchUp.summary(today), response.data.markdown);
+  const rendered = applyLines(items, response.data.lines ?? []);
+  localStorage.setItem(storageKeys.catchUp.summary(today), JSON.stringify(rendered));
+  return rendered;
+}
 
-  return response.data.markdown;
+export async function fetchCatchUpItems(date: string): Promise<CatchUpRenderItem[] | null> {
+  const cached = localStorage.getItem(storageKeys.catchUp.summary(date));
+  if (cached) {
+    try {
+      return JSON.parse(cached) as CatchUpRenderItem[];
+    } catch {
+      // corrupt cache — fall through to fresh call
+    }
+  }
+  return callStandupApi(date);
 }
 
 export function isGeminiAvailable(config: GeminiConfig): boolean {
@@ -152,11 +280,11 @@ export function useCatchUpSummary() {
     notificationCenter.dismiss(`catchup-${date}`);
   }
 
-  function enqueueCatchUp(summary: string, date = today()) {
+  function enqueueCatchUp(items: CatchUpRenderItem[], date = today()) {
     notificationCenter.catchup('Catch-up', {
       id: `catchup-${date}`,
       persistent: true,
-      payload: { markdown: summary },
+      payload: { items },
       actions: [
         {
           id: 'dismiss',
@@ -184,12 +312,16 @@ export function useCatchUpSummary() {
 
       const cached = localStorage.getItem(storageKeys.catchUp.summary(date));
       if (cached) {
-        enqueueCatchUp(cached, date);
-        return;
+        try {
+          enqueueCatchUp(JSON.parse(cached) as CatchUpRenderItem[], date);
+          return;
+        } catch {
+          // Corrupt cache: ignore and fall through to a fresh call below.
+        }
       }
 
-      const summary = await callStandupApi(date);
-      if (summary) enqueueCatchUp(summary, date);
+      const items = await callStandupApi(date);
+      if (items?.length) enqueueCatchUp(items, date);
     } catch {
       // Foundation phase: catch-up failures do not create user-facing notifications.
     } finally {
