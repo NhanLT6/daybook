@@ -2,7 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { UIMessage } from 'ai';
 
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { convertToModelMessages, streamText } from 'ai';
+import { convertToModelMessages, streamText, tool } from 'ai';
+import { z } from 'zod';
 
 import { AuthError, verifyRequest } from './_lib/auth.js';
 import { getSettings } from './_lib/kv.js';
@@ -13,6 +14,22 @@ interface ChatApiRequest {
   tasks: Array<{ project: string; title: string }>;
   currentDate: string;
 }
+
+const extractLogsTool = tool({
+  description:
+    "Extract one or more time log entries from the user's message. Call this whenever the user describes work they did (via text or screenshot).",
+  parameters: z.object({
+    logs: z.array(
+      z.object({
+        project: z.string().describe('Project name, matched to known projects where possible'),
+        task: z.string().describe('Task name; use project name if no task is mentioned'),
+        date: z.string().describe('ISO date YYYY-MM-DD, resolved from relative references using today'),
+        duration: z.number().int().positive().describe('Duration in minutes'),
+        description: z.string().optional().describe('Optional extra detail'),
+      }),
+    ),
+  }),
+});
 
 function buildSystemPrompt(
   projects: string[],
@@ -30,25 +47,16 @@ The user's known projects are: ${projectList}
 The user's known tasks per project:
 ${taskList}
 
-When the user describes work they did (via text or screenshot), extract one or more time log entries.
+When the user describes work they did (via text or screenshot), call the extractLogs tool with the extracted entries.
 - Match project names to the known list where possible. If not found, use what the user said.
 - Match task names to the known list for that project where possible. If not found, use what the user said.
-- If no task is mentioned or cannot be determined, set task equal to the project name. This is the app's convention. Mention this briefly in your summary (e.g. "I used the project name as the task since none was specified.").
+- If no task is mentioned or cannot be determined, set task equal to the project name. This is the app's convention. Mention this briefly in your text reply (e.g. "I used the project name as the task since none was specified.").
 - Resolve relative dates ("yesterday", "this morning", "last Friday") using today's date.
 - Duration must be in minutes (integer).
 - description is optional — use it for meaningful detail only.
+- Do NOT include a JSON block in your text response. Use the extractLogs tool instead.
 
-ALWAYS respond in this exact format:
-
-<natural language summary, 1-2 sentences>
-
-\`\`\`json
-[
-  { "project": "...", "task": "...", "date": "YYYY-MM-DD", "duration": 90, "description": "..." }
-]
-\`\`\`
-
-If you cannot find any time log data in the message, respond conversationally and ask for clarification. Do NOT include the JSON block in that case.`;
+If you cannot find any time log data in the message, reply conversationally and ask for clarification. Do NOT call extractLogs in that case.`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -81,6 +89,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       model: google(settings.geminiConfig.model),
       system: buildSystemPrompt(body.projects, body.tasks, body.currentDate),
       messages: await convertToModelMessages(body.messages),
+      tools: { extractLogs: extractLogsTool },
+      maxSteps: 1,
     });
 
     // Stream to Node.js ServerResponse using the AI SDK helper
