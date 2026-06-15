@@ -4,7 +4,7 @@ import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
-import type { DynamicToolUIPart, FileUIPart, TextUIPart, UIMessage } from 'ai';
+import type { DynamicToolUIPart, FileUIPart, UIMessage } from 'ai';
 
 import { Chat } from '@ai-sdk/vue';
 import { DefaultChatTransport } from 'ai';

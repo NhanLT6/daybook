@@ -3,8 +3,9 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import type { NotificationAction, NotificationItem, NotificationKind } from '@/stores/notificationCenter';
 
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
+import type { CatchUpRenderItem } from '@/composables/useCatchUpSummary';
+import { markCatchUpViewed, triggerCatchUpView } from '@/composables/useCatchUpSummary';
+
 import { storeToRefs } from 'pinia';
 import { useTheme } from 'vuetify';
 
@@ -213,9 +214,12 @@ function actionVariant(action: NotificationAction): 'text' | 'tonal' {
   return action.tone === 'default' || !action.tone ? 'text' : 'tonal';
 }
 
-function renderMarkdown(markdown: unknown): string {
-  if (typeof markdown !== 'string') return '';
-  return DOMPurify.sanitize(marked(markdown) as string);
+function onCatchUpItemClick(item: NotificationItem) {
+  const items = (item.payload?.items as CatchUpRenderItem[] | undefined) ?? [];
+  if (!items.length) return;
+  triggerCatchUpView(items);
+  notificationCenter.dismiss(item.id);
+  markCatchUpViewed();
 }
 
 watch(
@@ -282,7 +286,14 @@ onClickOutside(rootEl, () => {
             </header>
 
             <div v-if="sortedItems.length" class="island-list">
-              <article v-for="item in sortedItems" :key="item.id" class="island-item" :data-kind="item.kind">
+              <article
+                v-for="item in sortedItems"
+                :key="item.id"
+                class="island-item"
+                :class="{ 'island-item--clickable': item.kind === 'catchup' }"
+                :data-kind="item.kind"
+                @click="item.kind === 'catchup' ? onCatchUpItemClick(item) : undefined"
+              >
                 <div class="island-item-head">
                   <span class="island-item-icon">
                     <VIcon :icon="iconFor(item.kind)" size="17" />
@@ -301,14 +312,13 @@ onClickOutside(rootEl, () => {
                     size="x-small"
                     variant="text"
                     aria-label="Dismiss notification"
-                    @click="notificationCenter.dismiss(item.id)"
+                    @click.stop="notificationCenter.dismiss(item.id)"
                   />
                 </div>
 
-                <div v-if="item.kind === 'catchup'" class="island-markdown" v-html="renderMarkdown(item.payload?.markdown)" />
-                <p v-else-if="item.description" class="island-description">{{ item.description }}</p>
+                <p v-if="item.description && item.kind !== 'catchup'" class="island-description">{{ item.description }}</p>
 
-                <div v-if="item.actions?.length" class="island-actions">
+                <div v-if="item.actions?.length" class="island-actions" @click.stop>
                   <VBtn
                     v-for="action in item.actions"
                     :key="action.id"
@@ -579,6 +589,16 @@ onClickOutside(rootEl, () => {
   background: transparent;
 }
 
+.island-item--clickable {
+  cursor: pointer;
+  border-radius: 7px;
+  transition: background 0.12s ease;
+}
+
+.island-item--clickable:hover {
+  background: rgba(var(--v-theme-on-surface), 0.04);
+}
+
 .island-item-head {
   display: flex;
   align-items: center;
@@ -650,36 +670,6 @@ onClickOutside(rootEl, () => {
   font-weight: 600;
 }
 
-.island-markdown {
-  margin-top: 8px;
-  color: var(--island-text);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.island-markdown :deep(h1),
-.island-markdown :deep(h2),
-.island-markdown :deep(h3) {
-  margin: 10px 0 5px;
-  color: var(--island-text);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.island-markdown :deep(h1:first-child),
-.island-markdown :deep(h2:first-child),
-.island-markdown :deep(h3:first-child) {
-  margin-top: 0;
-}
-
-.island-markdown :deep(ul) {
-  margin: 5px 0 0;
-  padding-left: 18px;
-}
-
-.island-markdown :deep(li) {
-  margin-bottom: 3px;
-}
 
 .notification-island-anchor--dark {
   --island-header-bg: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77));
