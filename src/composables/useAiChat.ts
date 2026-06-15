@@ -1,33 +1,15 @@
 import { computed, ref } from 'vue';
 
+import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
-import type { FileUIPart, TextUIPart, UIMessage } from 'ai';
+import type { DynamicToolUIPart, FileUIPart, TextUIPart, UIMessage } from 'ai';
 
 import { Chat } from '@ai-sdk/vue';
 import { DefaultChatTransport } from 'ai';
 
 import { buildAuthHeaders } from './useCrypto';
-
-// ── Pure helpers (exported for unit tests) ────────────────────────────────
-
-const JSON_BLOCK_RE = /```json\s*([\s\S]*?)\s*```/;
-
-export function parseLogsFromText(text: string): ExtractedLog[] {
-  const match = text.match(JSON_BLOCK_RE);
-  if (!match) return [];
-  try {
-    const parsed = JSON.parse(match[1]);
-    return Array.isArray(parsed) ? (parsed as ExtractedLog[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function stripJsonBlock(text: string): string {
-  return text.replace(JSON_BLOCK_RE, '').trim();
-}
 
 // ── Image helper ──────────────────────────────────────────────────────────
 
@@ -62,16 +44,19 @@ export function useAiChat() {
       const last = finished[finished.length - 1];
       if (!last || last.role !== 'assistant') return;
 
-      const rawText = last.parts
-        .filter((p): p is TextUIPart => p.type === 'text')
-        .map((p) => p.text)
-        .join('');
+      // Find extractLogs dynamic tool invocation from the AI SDK
+      const toolPart = last.parts.find(
+        (p) =>
+          p.type === 'dynamic-tool' &&
+          (p as DynamicToolUIPart).toolName === 'extractLogs' &&
+          (p as DynamicToolUIPart).state === 'input-available',
+      ) as (DynamicToolUIPart & { state: 'input-available' }) | undefined;
 
-      const logs = parseLogsFromText(rawText);
+      const logs = (toolPart?.input as { logs?: ExtractedLog[] })?.logs ?? [];
 
       metadataMap.value = new Map(metadataMap.value).set(last.id, {
         timestamp: Date.now(),
-        ...(logs.length > 0 ? { extractedLogs: logs } : {}),
+        ...(logs.length > 0 ? { tool: 'extractLogs' as const, extractedLogs: logs } : {}),
       });
 
       if (logs.length > 0) {
@@ -149,6 +134,27 @@ export function useAiChat() {
     if (latestLogsMessageId.value === id) latestLogsMessageId.value = null;
   };
 
+  const injectCatchUp = (items: CatchUpRenderItem[]) => {
+    const id = `catchup-${Date.now()}`;
+    // Plain-text bullet list for AI conversation context (follow-up questions)
+    const text = items
+      .map((i) => `• ${i.text}${i.effortLabel ? ` · ${i.effortLabel}` : ''}`)
+      .join('\n');
+
+    const syntheticMsg = {
+      id,
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text }],
+      content: text,
+    };
+    chat.messages = [...chat.messages, syntheticMsg as unknown as DaybookUIMessage];
+    metadataMap.value = new Map(metadataMap.value).set(id, {
+      timestamp: Date.now(),
+      tool: 'catchUp' as const,
+      catchUpItems: items,
+    });
+  };
+
   const clearMessages = () => {
     chat.messages = [];
     metadataMap.value = new Map();
@@ -167,6 +173,7 @@ export function useAiChat() {
     markSaved,
     markUndone,
     markDiscarded,
+    injectCatchUp,
     clearMessages,
   };
 }

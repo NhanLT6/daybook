@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { stripJsonBlock } from '@/composables/useAiChat';
-
 import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { FileUIPart, TextUIPart } from 'ai';
 
 import AiLogCard from './AiLogCard.vue';
@@ -26,14 +25,11 @@ const textPart = computed(() => props.message.parts.find((p): p is TextUIPart =>
 
 const filePart = computed(() => props.message.parts.find((p): p is FileUIPart => p.type === 'file'));
 
-// Strip JSON block only once logs have been extracted (i.e. streaming finished)
-const displayText = computed(() => {
-  const raw = textPart.value?.text ?? '';
-  return props.message.metadata?.extractedLogs !== undefined ? stripJsonBlock(raw) : raw;
-});
+const displayText = computed(() => textPart.value?.text ?? '');
 
 const extractedLogs = computed(() => props.message.metadata?.extractedLogs);
 const saveState = computed(() => props.message.metadata?.saveState);
+const catchUpItems = computed<CatchUpRenderItem[] | undefined>(() => props.message.metadata?.catchUpItems);
 
 const handleSave = () => {
   if (extractedLogs.value?.length) {
@@ -131,6 +127,19 @@ const copyMessage = () => {
           {{ displayText }}
         </p>
 
+        <!-- Catch-up standup list -->
+        <ul v-if="catchUpItems?.length" class="catchup-list">
+          <li
+            v-for="(entry, idx) in catchUpItems"
+            :key="idx"
+            class="catchup-item"
+            :class="{ 'is-ongoing': entry.ongoing }"
+          >
+            {{ entry.text
+            }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
+          </li>
+        </ul>
+
         <!-- Extracted log cards + action area -->
         <template v-if="extractedLogs?.length">
           <div class="d-flex flex-column ga-2 mt-3">
@@ -169,5 +178,39 @@ const copyMessage = () => {
 <style scoped>
 .message-card {
   word-break: break-word;
+}
+
+.catchup-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.catchup-item {
+  position: relative;
+  padding-left: 16px;
+  margin-bottom: 4px;
+}
+
+.catchup-item::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(140, 140, 140, 0.6);
+}
+
+.catchup-item.is-ongoing::before {
+  background: #f5b301;
+}
+
+.catchup-effort {
+  color: rgba(140, 140, 140, 0.85);
+  font-variant-numeric: tabular-nums;
 }
 </style>
