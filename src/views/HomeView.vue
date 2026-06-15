@@ -137,6 +137,7 @@ const saveBulkLogs = (logs: TimeLog[]) => {
 
   // Update the reactive timeLogs ref as well
   timeLogs.value = monthStorage.value;
+  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
 
   if (updatedCount) {
     notificationCenter.success(updatedCount === 1 ? 'Log updated' : `${updatedCount} logs updated`);
@@ -175,6 +176,7 @@ const onDeleteLog = (log: TimeLog) => {
   monthStorage.value = monthStorage.value.filter((item: TimeLog) => item !== log);
   // Update the reactive timeLogs ref as well
   timeLogs.value = monthStorage.value;
+  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
   notificationCenter.success('Log deleted');
 };
 
@@ -242,6 +244,7 @@ const importCsv = async (file?: File) => {
   monthStorage.value = unionBy(dataWithIds, monthStorage.value, 'id');
   // Update the reactive timeLogs ref as well
   timeLogs.value = monthStorage.value;
+  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
 
   // Extract Projects and Tasks
   projects.value = chain(dataWithIds)
@@ -302,6 +305,7 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
   // Refresh displayed timeLogs if any log belongs to the current month
   const currentMonthStorage = getTimeLogsForMonth(currentMonth.value);
   timeLogs.value = currentMonthStorage.value;
+  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
 
   notificationCenter.success(`${extractedLogs.length} log${extractedLogs.length > 1 ? 's' : ''} saved`);
 };
@@ -315,6 +319,7 @@ const onAiUndoLogs = () => {
 
   // Refresh displayed logs
   timeLogs.value = getTimeLogsForMonth(currentMonth.value).value;
+  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
 
   notificationCenter.info('Logs removed');
 };

@@ -6,43 +6,57 @@ import { generateText } from 'ai';
 import { AuthError, verifyRequest } from './_lib/auth.js';
 import { getSettings } from './_lib/kv.js';
 
-interface LogEntry {
-  project: string;
+interface RequestLog {
   task: string;
-  duration: string;
   description?: string;
+  duration: string;
 }
 
-interface DayEntry {
-  date: string;
-  dayOfWeek: string;
-  logs: LogEntry[];
+interface RequestItem {
+  id: string;
+  project: string;
+  logs: RequestLog[];
 }
 
 interface StandupRequest {
-  entries: DayEntry[];
+  items: RequestItem[];
   today: string;
 }
 
-function buildPrompt(entries: DayEntry[], today: string): string {
-  const entriesText = entries
+function buildPrompt(items: RequestItem[], today: string): string {
+  const itemsText = items
     .map(
-      (e) =>
-        `${e.date} (${e.dayOfWeek})\n${e.logs
-          .map((l) => `  ${l.project} / ${l.task} / ${l.duration}${l.description ? ` — ${l.description}` : ''}`)
+      (it) =>
+        `id: ${it.id}\nproject: ${it.project}\n${it.logs
+          .map((l) => `  - ${l.task}${l.description ? `: ${l.description}` : ''} (${l.duration})`)
           .join('\n')}`,
     )
     .join('\n\n');
 
-  return `You are helping a developer review their recent work for a standup.
-Here are their time log entries grouped by date:
+  return `You are helping a developer recap recent work for a standup. Today is ${today}.
+Each block below is one project the developer worked on. "id" is a reference key, "project" is the display label. The indented sub-lines are tasks/notes done under it.
 
-${entriesText}
+${itemsText}
 
-Summarize weekday entries in 2-3 groups max, grouped by project or theme across dates. Short past-tense bullets, 1 line each, max 3 bullets per group.
-If there are Saturday or Sunday entries, collect all weekend work into a single "## Weekend" group placed after the weekday groups.
-If there are entries for today (${today}), put them in a final "## Today" group (present tense).
-No intro or outro. Return only markdown using: ## Group Name, then - bullet.`;
+For each block, write ONE concise past-tense sentence describing what was done, merging the sub-lines.
+Start the sentence with the "project" value exactly as given — do not include the "id" value in the sentence text.
+Return STRICT JSON only — no markdown, no code fences, no extra prose:
+{"lines":[{"id":"<id>","text":"<sentence>"}]}
+with exactly one entry per block, echoing each block's "id" value unchanged.`;
+}
+
+function parseLines(raw: string): { id: string; text: string }[] {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim();
+  try {
+    const parsed = JSON.parse(cleaned) as { lines?: { id: string; text: string }[] };
+    return Array.isArray(parsed.lines) ? parsed.lines : [];
+  } catch {
+    return [];
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -71,10 +85,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { text } = await generateText({
       model: google(settings.geminiConfig.model),
-      prompt: buildPrompt(body.entries, body.today),
+      prompt: buildPrompt(body.items, body.today),
     });
 
-    return res.json({ markdown: text });
+    return res.json({ lines: parseLines(text) });
   } catch (err) {
     if (err instanceof AuthError) {
       return res.status(err.status).json({ error: err.message });

@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
-import dayjs from 'dayjs';
-
 import { useAiChat } from '@/composables/useAiChat';
 import { fetchCatchUpItems, onCatchUpView } from '@/composables/useCatchUpSummary';
 
@@ -139,7 +137,7 @@ const handleCatchUp = async () => {
   if (isCatchUpLoading.value || isLoading.value) return;
   isCatchUpLoading.value = true;
   try {
-    const items = await fetchCatchUpItems(dayjs().format('YYYY-MM-DD'));
+    const items = await fetchCatchUpItems();
     if (items?.length) {
       injectCatchUp(items);
     } else {
@@ -244,15 +242,19 @@ onMounted(() => {
       <!-- Floating catch-up button — anchored to wrapper, never scrolls with messages -->
       <VBtn
         class="catchup-fab"
+        :class="{ 'catchup-fab--loading': isCatchUpLoading }"
         size="small"
         variant="tonal"
         color="primary"
-        prepend-icon="mdi-history"
-        :loading="isCatchUpLoading"
         :disabled="isLoading"
         @click="handleCatchUp"
       >
-        Catch up
+        <!-- Icon and spinner share the same fixed-size slot; CSS cross-fades between them -->
+        <span class="fab-icon-area">
+          <VProgressCircular class="fab-spinner" size="14" width="2" indeterminate />
+          <VIcon class="fab-icon" icon="mdi-history" size="small" />
+        </span>
+        <span class="fab-label">Catch up</span>
       </VBtn>
     </div>
 
@@ -332,6 +334,49 @@ onMounted(() => {
   bottom: 12px;
   right: 12px;
   z-index: 1;
+  min-width: 0 !important;
+  overflow: hidden;
+}
+
+/* Fixed-size slot that holds icon and spinner stacked on top of each other */
+.catchup-fab .fab-icon-area {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.catchup-fab .fab-spinner,
+.catchup-fab .fab-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.18s ease;
+}
+
+/* Default: icon visible, spinner hidden */
+.catchup-fab .fab-spinner { opacity: 0; }
+.catchup-fab .fab-icon { opacity: 1; }
+
+/* Loading: spinner visible, icon hidden */
+.catchup-fab--loading .fab-spinner { opacity: 1; }
+.catchup-fab--loading .fab-icon { opacity: 0; }
+
+/* Label collapses like the notification island's idle shrink */
+.catchup-fab .fab-label {
+  max-width: 80px;
+  overflow: hidden;
+  white-space: nowrap;
+  margin-left: 6px;
+  transition:
+    max-width 0.24s cubic-bezier(0.4, 1.02, 0.5, 1),
+    margin-left 0.24s ease;
+}
+
+.catchup-fab--loading .fab-label {
+  max-width: 0;
+  margin-left: 0;
 }
 
 .border-t {

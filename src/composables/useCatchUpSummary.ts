@@ -217,6 +217,36 @@ function getLogsForSummary(): TimeLog[] {
   return [];
 }
 
+// ── Summary cache (single key, keyed by logsLastModified timestamp) ──────────
+
+interface SummaryCache {
+  key: string;
+  items: CatchUpRenderItem[];
+}
+
+function getCachedSummary(): CatchUpRenderItem[] | null {
+  const key = localStorage.getItem(storageKeys.logsLastModified);
+  if (!key) return null;
+  const raw = localStorage.getItem(storageKeys.catchUp.summaries);
+  if (!raw) return null;
+  try {
+    const cache = JSON.parse(raw) as SummaryCache;
+    return cache.key === key ? cache.items : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedSummary(items: CatchUpRenderItem[]): void {
+  let key = localStorage.getItem(storageKeys.logsLastModified);
+  if (!key) {
+    // Seed the key so cache is usable until the user next saves a log
+    key = Date.now().toString();
+    localStorage.setItem(storageKeys.logsLastModified, key);
+  }
+  localStorage.setItem(storageKeys.catchUp.summaries, JSON.stringify({ key, items } satisfies SummaryCache));
+}
+
 async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null> {
   const didLogs = getLogsForSummary();
   if (!didLogs.length) return null;
@@ -243,20 +273,14 @@ async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null
   );
 
   const rendered = applyLines(items, response.data.lines ?? []);
-  localStorage.setItem(storageKeys.catchUp.summary(today), JSON.stringify(rendered));
+  setCachedSummary(rendered);
   return rendered;
 }
 
-export async function fetchCatchUpItems(date: string): Promise<CatchUpRenderItem[] | null> {
-  const cached = localStorage.getItem(storageKeys.catchUp.summary(date));
-  if (cached) {
-    try {
-      return JSON.parse(cached) as CatchUpRenderItem[];
-    } catch {
-      // corrupt cache — fall through to fresh call
-    }
-  }
-  return callStandupApi(date);
+export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {
+  const cached = getCachedSummary();
+  if (cached) return cached;
+  return callStandupApi(dayjs().format('YYYY-MM-DD'));
 }
 
 export function isGeminiAvailable(config: GeminiConfig): boolean {
@@ -284,6 +308,7 @@ export function useCatchUpSummary() {
     notificationCenter.catchup('Catch-up', {
       id: `catchup-${date}`,
       persistent: true,
+      message: 'Ready · click to view in Chat',
       payload: { items },
       actions: [
         {
@@ -310,14 +335,10 @@ export function useCatchUpSummary() {
         return;
       }
 
-      const cached = localStorage.getItem(storageKeys.catchUp.summary(date));
+      const cached = getCachedSummary();
       if (cached) {
-        try {
-          enqueueCatchUp(JSON.parse(cached) as CatchUpRenderItem[], date);
-          return;
-        } catch {
-          // Corrupt cache: ignore and fall through to a fresh call below.
-        }
+        enqueueCatchUp(cached, date);
+        return;
       }
 
       const items = await callStandupApi(date);

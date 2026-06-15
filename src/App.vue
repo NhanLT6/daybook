@@ -151,7 +151,7 @@ const navItems = [
 
           <span class="dock-spacer" />
 
-          <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
+<VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
           <!-- Desktop nav links -->
           <VBtn

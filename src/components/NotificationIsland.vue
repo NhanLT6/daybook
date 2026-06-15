@@ -301,7 +301,7 @@ onClickOutside(rootEl, () => {
 
                   <div class="island-item-copy">
                     <div class="island-item-title">{{ item.title }}</div>
-                    <div v-if="item.kind !== 'catchup' && item.message" class="island-item-message">
+                    <div v-if="item.message" class="island-item-message">
                       {{ item.message }}
                     </div>
                   </div>

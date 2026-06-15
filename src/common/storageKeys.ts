@@ -21,9 +21,10 @@ export const storageKeys = {
     lastSyncDate: 'jiraLastSyncDate',
   },
   catchUp: {
-    summary: (date: string) => `catchUpSummary-${date}`,
+    summaries: 'catchupSummaries',
     dismissedDate: 'catchUpDismissedDate',
   },
+  logsLastModified: 'daybookLogsLastModified',
   notifications: {
     greetingFirstSeenAt: 'notificationGreetingFirstSeenAt',
     greetingLastShownAt: 'notificationGreetingLastShownAt',
