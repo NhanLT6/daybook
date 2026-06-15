@@ -27,6 +27,7 @@ const filePart = computed(() => props.message.parts.find((p): p is FileUIPart =>
 
 const displayText = computed(() => textPart.value?.text ?? '');
 
+const tool = computed(() => props.message.metadata?.tool);
 const extractedLogs = computed(() => props.message.metadata?.extractedLogs);
 const saveState = computed(() => props.message.metadata?.saveState);
 const catchUpItems = computed<CatchUpRenderItem[] | undefined>(() => props.message.metadata?.catchUpItems);
@@ -119,16 +120,17 @@ const copyMessage = () => {
       :style="{ maxWidth: '88%' }"
     >
       <VCardText class="pa-3">
+        <!-- Plain text (conversational or streaming) — hidden for catchUp (text is AI context only) -->
         <p
-          v-if="displayText"
+          v-if="displayText && tool !== 'catchUp'"
           class="text-body-2 mb-0 message-text"
           style="white-space: pre-wrap; word-break: break-word"
         >
           {{ displayText }}
         </p>
 
-        <!-- Catch-up standup list -->
-        <ul v-if="catchUpItems?.length" class="catchup-list">
+        <!-- catchUp tool result -->
+        <ul v-if="tool === 'catchUp' && catchUpItems?.length" class="catchup-list">
           <li
             v-for="(entry, idx) in catchUpItems"
             :key="idx"
@@ -140,8 +142,8 @@ const copyMessage = () => {
           </li>
         </ul>
 
-        <!-- Extracted log cards + action area -->
-        <template v-if="extractedLogs?.length">
+        <!-- extractLogs tool result + action area -->
+        <template v-if="tool === 'extractLogs' && extractedLogs?.length">
           <div class="d-flex flex-column ga-2 mt-3">
             <AiLogCard v-for="(log, i) in extractedLogs" :key="i" :log="log" />
           </div>
