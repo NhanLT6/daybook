@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, toRefs, watch } from 'vue';
 
 import { useProjectColors } from '@/composables/useProjectColors';
@@ -33,6 +33,7 @@ const chartColors = computed(() => ({
 const props = defineProps<{
   currentMonth?: number; // 1-based month, default to current month
   timeLogs?: TimeLog[]; // External time logs for reactivity
+  selectedProject?: string | null;
 }>();
 
 const { currentMonth } = toRefs(props);
@@ -90,7 +91,6 @@ const thisWeekMinutes = computed(() => {
 // Chart data computed property (automatically reactive to props and storage changes)
 const chartData = computed(() => {
   try {
-    // Process logs by project
     const loggedDataSet = chain(timeLogs.value)
       .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
       .groupBy((l) => l.project)
@@ -107,7 +107,15 @@ const chartData = computed(() => {
       }))
       .value();
 
-    // Weekend/invalid data
+    // Filtered view: show only the selected project
+    if (props.selectedProject) {
+      return {
+        labels: daysInMonth.value.map((d) => d.format('DD')),
+        datasets: loggedDataSet.filter((ds) => ds.label === props.selectedProject),
+      };
+    }
+
+    // Default view: all projects + invalid data + remaining
     const invalidDataSet = chain(timeLogs.value)
       .filter((log) => settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
       .groupBy(() => 'Invalid Data')
@@ -124,7 +132,6 @@ const chartData = computed(() => {
       }))
       .value();
 
-    // Remaining hours (8-hour target minus logged hours)
     const remainingData = daysInMonth.value.map((d) => {
       const isWeekend = settingsStore.weekendDays.includes(d.day());
       if (isWeekend) return 0;
@@ -153,13 +160,7 @@ const chartData = computed(() => {
     console.error('Chart data generation error:', error);
     return {
       labels: ['Error'],
-      datasets: [
-        {
-          label: 'Error',
-          backgroundColor: '#f44336',
-          data: [0],
-        },
-      ],
+      datasets: [{ label: 'Error', backgroundColor: '#f44336', data: [0] }],
     };
   }
 });
@@ -178,7 +179,7 @@ const chartOptions = computed(() => ({
     y: {
       stacked: true,
       beginAtZero: true,
-      max: 8, // 8-hour workday target
+      ...(props.selectedProject ? {} : { max: 8 }),
       grid: {
         color: chartColors.value.gridColor,
       },
