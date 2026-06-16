@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, toRefs, watch } from 'vue';
 
 import { useProjectColors } from '@/composables/useProjectColors';
@@ -91,6 +91,7 @@ const thisWeekMinutes = computed(() => {
 // Chart data computed property (automatically reactive to props and storage changes)
 const chartData = computed(() => {
   try {
+    // Build per-project datasets (weekend logs excluded)
     const loggedDataSet = chain(timeLogs.value)
       .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
       .groupBy((l) => l.project)
