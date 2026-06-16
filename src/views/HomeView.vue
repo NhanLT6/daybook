@@ -78,6 +78,7 @@ if (initialDate && settingsStore.lastSelectedDate) {
   if (remaining > 0) startAutoDeselectTimer(remaining);
 }
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
+const selectedProject = ref<string | null>(null);
 const editingLog = ref<TimeLog | undefined>(undefined);
 
 // Keep the calendar navigated to the current month for long-running tabs
@@ -366,7 +367,7 @@ const onAiUndoLogs = () => {
       />
 
       <!-- Desktop: full month bar chart -->
-      <WorkTimeBarChart v-else :current-month="currentMonth" class="flex-shrink-0" />
+      <WorkTimeBarChart v-else :current-month="currentMonth" :selected-project="selectedProject" class="flex-shrink-0" />
 
       <!-- Log list -->
       <LogList
@@ -386,6 +387,7 @@ const onAiUndoLogs = () => {
       class="insights-panel"
       :time-logs="timeLogs"
       :current-month="currentMonth"
+      v-model:selected-project="selectedProject"
     />
   </div>
 </template>
