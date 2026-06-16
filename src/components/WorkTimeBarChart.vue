@@ -91,8 +91,12 @@ const thisWeekMinutes = computed(() => {
 // Chart data computed property (automatically reactive to props and storage changes)
 const chartData = computed(() => {
   try {
-    // Build per-project datasets (weekend logs excluded)
-    const loggedDataSet = chain(timeLogs.value)
+    // Build per-project datasets (weekend logs excluded); pre-filter when a project is selected
+    const logsForDataset = props.selectedProject
+      ? timeLogs.value.filter((log) => log.project === props.selectedProject)
+      : timeLogs.value;
+
+    const loggedDataSet = chain(logsForDataset)
       .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
       .groupBy((l) => l.project)
       .map((logsByProject, projectName) => ({
@@ -112,7 +116,7 @@ const chartData = computed(() => {
     if (props.selectedProject) {
       return {
         labels: daysInMonth.value.map((d) => d.format('DD')),
-        datasets: loggedDataSet.filter((ds) => ds.label === props.selectedProject),
+        datasets: loggedDataSet,
       };
     }
 
@@ -180,7 +184,7 @@ const chartOptions = computed(() => ({
     y: {
       stacked: true,
       beginAtZero: true,
-      ...(props.selectedProject ? {} : { max: 8 }),
+      max: props.selectedProject ? undefined : 8,
       grid: {
         color: chartColors.value.gridColor,
       },
@@ -249,20 +253,20 @@ const initializeChart = () => {
   }
 };
 
-// Update chart when data changes
-const updateChart = () => {
+// Update chart — pass 'none' to skip animation (e.g. theme changes)
+const updateChart = (mode?: 'none') => {
   if (!chartInstance) return;
 
   try {
     chartInstance.data = chartData.value;
     chartInstance.options = chartOptions.value;
-    chartInstance.update('none');
+    chartInstance.update(mode);
   } catch (error) {
     console.error('Chart update failed:', error);
   }
 };
 
-// Watch for data changes and update chart automatically
+// Watch for data changes and update chart automatically (animated)
 watch(
   () => chartData.value,
   () => {
@@ -271,9 +275,9 @@ watch(
   { deep: true },
 );
 
-// Watch for theme changes and update chart colors
+// Watch for theme changes and update chart colors (no animation)
 watch(isDark, () => {
-  updateChart();
+  updateChart('none');
 });
 
 // Expose updateChart method for parent components

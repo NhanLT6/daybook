@@ -166,6 +166,21 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 const onProjectClick = (project: string) => {
   selectedProject.value = selectedProject.value === project ? null : project;
 };
+
+const getProjectRowStyle = (project: string) => {
+  const isSelected = selectedProject.value === project;
+  const color = getProjectColor(project);
+  return {
+    cursor: 'pointer',
+    borderRadius: '8px',
+    paddingInline: '4px',
+    paddingBlock: isSelected ? '6px' : undefined,
+    margin: '0 -4px',
+    border: `1.5px solid ${isSelected ? color : 'transparent'}`,
+    backgroundColor: isSelected ? `${color}1A` : undefined,
+    transition: 'background-color 0.15s, padding 0.15s',
+  };
+};
 </script>
 
 <template>
@@ -213,15 +228,7 @@ const onProjectClick = (project: string) => {
               <div
                 v-for="item in projectBreakdown"
                 :key="item.project"
-                :style="{
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                  paddingInline: '4px',
-                  margin: '0 -4px',
-                  borderLeft: `3px solid ${selectedProject === item.project ? getProjectColor(item.project) : 'transparent'}`,
-                  backgroundColor: selectedProject === item.project ? `${getProjectColor(item.project)}1A` : undefined,
-                  transition: 'background-color 0.15s',
-                }"
+                :style="getProjectRowStyle(item.project)"
                 @click="onProjectClick(item.project)"
               >
                 <!-- Row 1: dot + name + hours (pct) -->
