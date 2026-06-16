@@ -17,6 +17,8 @@ const props = defineProps<{
   currentMonth: number;
 }>();
 
+const selectedProject = defineModel<string | null>('selectedProject', { default: null });
+
 const settingsStore = useSettingsStore();
 const { getProjectColor } = useProjectColors();
 
@@ -160,6 +162,10 @@ const monthLabel = computed(() => dayjs(currentMonthKey.value, yearAndMonthForma
 
 // Truncate project names at 16 chars
 const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len) + '…' : str);
+
+const onProjectClick = (project: string) => {
+  selectedProject.value = selectedProject.value === project ? null : project;
+};
 </script>
 
 <template>
@@ -204,7 +210,20 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
         <VCard>
           <div class="pa-4">
             <div class="d-flex flex-column ga-3">
-              <div v-for="item in projectBreakdown" :key="item.project">
+              <div
+                v-for="item in projectBreakdown"
+                :key="item.project"
+                :style="{
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                  paddingInline: '4px',
+                  margin: '0 -4px',
+                  borderLeft: `3px solid ${selectedProject === item.project ? getProjectColor(item.project) : 'transparent'}`,
+                  backgroundColor: selectedProject === item.project ? `${getProjectColor(item.project)}1A` : undefined,
+                  transition: 'background-color 0.15s',
+                }"
+                @click="onProjectClick(item.project)"
+              >
                 <!-- Row 1: dot + name + hours (pct) -->
                 <div class="d-flex align-center ga-2 mb-1">
                   <span
