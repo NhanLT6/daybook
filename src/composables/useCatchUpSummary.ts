@@ -350,9 +350,20 @@ export function useCatchUpSummary() {
     }
   }
 
+  function startCatchUpNotifications(): () => void {
+    void prepareCatchUp();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void prepareCatchUp();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }
+
   return {
-    prepareCatchUp,
     dismissCatchUp,
     enqueueCatchUp,
+    startCatchUpNotifications,
   };
 }

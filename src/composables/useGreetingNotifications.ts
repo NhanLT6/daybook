@@ -30,7 +30,7 @@ export function useGreetingNotifications() {
 
     notificationCenter.greeting(title, {
       id: 'greeting',
-      message: reason === 'first-visit' ? 'Ready to log your day?' : 'Back at it?',
+      message: reason === 'first-visit' ? 'Ready to log your day?' : undefined,
     });
 
     localStorage.setItem(storageKeys.notifications.greetingLastShownAt, String(now));

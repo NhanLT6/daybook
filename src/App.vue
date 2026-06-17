@@ -23,13 +23,14 @@ import { RouterView, useRoute } from 'vue-router';
 
 const events = useStorage<AppEvent[]>(storageKeys.events, []);
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
-const { prepareCatchUp } = useCatchUpSummary();
+const { startCatchUpNotifications } = useCatchUpSummary();
 const { startGreetingNotifications } = useGreetingNotifications();
 const lastSeenVersion = useStorage('app-last-seen-version', '');
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
 const { loadSettings, migrateJiraFromLocalStorage } = useServerSettings();
 let stopGreetingNotifications: (() => void) | undefined;
+let stopCatchUpNotifications: (() => void) | undefined;
 
 // Single source of truth for all glass visuals — one slider drives both blur and opacity.
 // opacity(light) = 0.48 + s*0.44 → 0.48 at 0, 0.83 at 0.8, 0.92 at 1.0
@@ -95,7 +96,7 @@ const initServerSettings = async () => {
 onMounted(async () => {
   stopGreetingNotifications = startGreetingNotifications();
   await initServerSettings();
-  void prepareCatchUp();
+  stopCatchUpNotifications = startCatchUpNotifications();
   await autoFetchEvents();
   await autoSyncJiraTickets();
   showReleaseNotification();
@@ -103,6 +104,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopGreetingNotifications?.();
+  stopCatchUpNotifications?.();
 });
 
 const route = useRoute();
