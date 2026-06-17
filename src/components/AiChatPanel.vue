@@ -214,12 +214,9 @@ onMounted(() => {
           </VAvatar>
           <VCard color="error" variant="tonal" elevation="0" rounded="lg rounded-ts-sm" style="max-width: 88%">
             <VCardText class="pa-3 d-flex align-center ga-2">
-              <!-- Config error: render "Settings" as a clickable link, no dismiss button -->
+              <!-- Config error: no dismiss button — the error won't go away until the server is configured -->
               <template v-if="isConfigError">
-                <span class="text-body-2 mb-0">
-                  AI Assistant is not configured. Add your Gemini API key in
-                  <a class="error-link" @click.prevent="router.push('/setting')">Settings</a>.
-                </span>
+                <span class="text-body-2 mb-0">AI is not available on this deployment.</span>
               </template>
               <template v-else>
                 <span class="text-body-2 mb-0">{{ error }}</span>

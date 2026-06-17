@@ -90,7 +90,7 @@ const initServerSettings = async () => {
   if (!serverSettings) return; // silently fail — server may be unreachable locally
 
   const jiraConfig = await migrateJiraFromLocalStorage(settingsStore.jiraConfig, serverSettings);
-  settingsStore.populateFromServer(jiraConfig, serverSettings.geminiConfig);
+  settingsStore.populateFromServer(jiraConfig, serverSettings.aiConfig);
 };
 
 onMounted(async () => {
@@ -263,4 +263,5 @@ const navItems = [
 .dock-spacer {
   flex: 1;
 }
+
 </style>

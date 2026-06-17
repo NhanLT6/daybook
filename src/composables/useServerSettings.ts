@@ -3,6 +3,9 @@ import { buildAuthHeaders } from './useCrypto'
 import type { ServerSettings } from '@/interfaces/ServerSettings'
 import type { JiraConfig } from '@/interfaces/JiraConfig'
 
+// Shape of the PUT body — only jira is user-configurable; aiConfig comes from server env vars.
+type SavePayload = { jiraConfig: JiraConfig }
+
 const isLoading = ref(false)
 const isLoaded = ref(false)
 const error = ref<string | null>(null)
@@ -36,13 +39,13 @@ export function useServerSettings() {
     }
   }
 
-  const saveSettings = async (settings: ServerSettings): Promise<boolean> => {
+  const saveSettings = async (payload: SavePayload): Promise<boolean> => {
     isLoading.value = true
     error.value = null
     try {
       const res = await apiFetch('/api/settings', {
         method: 'PUT',
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Settings save failed: ${res.status}`)
       return true
@@ -70,11 +73,7 @@ export function useServerSettings() {
       // Only migrate if the local config has actual data
       if (!localConfig.email && !localConfig.apiToken) return serverSettings.jiraConfig
 
-      const merged: ServerSettings = {
-        ...serverSettings,
-        jiraConfig: localConfig,
-      }
-      await saveSettings(merged)
+      await saveSettings({ jiraConfig: localConfig })
       localStorage.removeItem('jiraConfig')
       return localConfig
     } catch {

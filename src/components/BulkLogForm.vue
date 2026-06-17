@@ -83,7 +83,7 @@ const validationSchema = object({
   task: string().required('Required'),
   duration: number().required('Required').min(1, 'Must be greater than 0'),
   description: string(),
-  categoryName: string().optional(),
+  categoryName: string().typeError('Please enter a category name').optional(),
 });
 
 const emptyLog: BulkLogFormData = {
@@ -213,7 +213,8 @@ const onProjectSearch = (searchText: string | null | undefined) => {
 };
 
 const onCategoryUpdate = (v: unknown) => {
-  categoryNameField.setValue(v && typeof v === 'object' ? (v as { name: string }).name : (v as string));
+  const name = v == null ? '' : typeof v === 'object' ? (v as { name: string }).name : (v as string);
+  categoryNameField.setValue(name);
 };
 
 const onHourClick = (hour: number) => {

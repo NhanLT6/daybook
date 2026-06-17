@@ -3,7 +3,6 @@ import dotenv from 'dotenv'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { JiraConfig } from '../../src/interfaces/JiraConfig.js'
-import type { GeminiConfig, ServerSettings } from '../../src/interfaces/ServerSettings.js'
 
 // vercel dev doesn't reliably inject .env.development.local into the function
 // runtime, so we load it explicitly. dotenv skips vars already in process.env.
@@ -24,20 +23,16 @@ const DEFAULT_JIRA_CONFIG: JiraConfig = {
   statuses: 'To Do;In Progress;In Review;Done;QA',
 }
 
-const DEFAULT_GEMINI_CONFIG: GeminiConfig = {
-  enabled: false,
-  apiKey: '',
-  model: 'gemini-2.5-flash',
+// Stored shape may include legacy geminiConfig from before env-var migration — ignore it.
+interface StoredSettings {
+  jiraConfig?: JiraConfig
 }
 
-export async function getSettings(machineId: string): Promise<ServerSettings> {
-  const stored = await redis.get<ServerSettings>(settingsKey(machineId))
-  return stored ?? {
-    geminiConfig: DEFAULT_GEMINI_CONFIG,
-    jiraConfig: DEFAULT_JIRA_CONFIG,
-  }
+export async function getJiraConfig(machineId: string): Promise<JiraConfig> {
+  const stored = await redis.get<StoredSettings>(settingsKey(machineId))
+  return stored?.jiraConfig ?? DEFAULT_JIRA_CONFIG
 }
 
-export async function saveSettings(machineId: string, settings: ServerSettings): Promise<void> {
-  await redis.set(settingsKey(machineId), settings)
+export async function saveJiraConfig(machineId: string, jiraConfig: JiraConfig): Promise<void> {
+  await redis.set(settingsKey(machineId), { jiraConfig })
 }

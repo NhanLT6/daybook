@@ -1,12 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { UIMessage } from 'ai';
 
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { convertToModelMessages, streamText, tool } from 'ai';
 import { z } from 'zod';
 
 import { AuthError, verifyRequest } from './_lib/auth.js';
-import { getSettings } from './_lib/kv.js';
+import { isAiEnabled, requireAiModel } from './_lib/ai.js';
 
 interface ChatApiRequest {
   messages: UIMessage[];
@@ -75,18 +74,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
-    const settings = await getSettings(machineId);
-    if (!settings.geminiConfig.enabled || !settings.geminiConfig.apiKey) {
-      return res.status(400).json({
-        error: 'AI Assistant is not configured. Add your Gemini API key in Settings.',
-      });
+    if (!isAiEnabled()) {
+      return res.status(400).json({ error: 'AI is not configured on this deployment.' });
     }
 
     const body = req.body as ChatApiRequest;
-    const google = createGoogleGenerativeAI({ apiKey: settings.geminiConfig.apiKey });
 
     const result = streamText({
-      model: google(settings.geminiConfig.model),
+      model: requireAiModel(),
       system: buildSystemPrompt(body.projects, body.tasks, body.currentDate),
       messages: await convertToModelMessages(body.messages),
       tools: { extractLogs: extractLogsTool },
@@ -100,6 +95,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(err.status).json({ error: err.message });
     }
     console.error('Chat error:', err);
-    return res.status(500).json({ error: 'AI request failed. Check your API key in Settings.' });
+    return res.status(500).json({ error: 'AI request failed. Check the server configuration.' });
   }
 }

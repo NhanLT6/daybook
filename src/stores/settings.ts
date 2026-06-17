@@ -1,9 +1,9 @@
 import { computed, ref } from 'vue';
 
-import { DEFAULT_GEMINI_CONFIG } from '@/interfaces/ServerSettings';
+import { DEFAULT_AI_CONFIG } from '@/interfaces/ServerSettings';
 
 import type { JiraConfig } from '@/interfaces/JiraConfig';
-import type { GeminiConfig } from '@/interfaces/ServerSettings';
+import type { AiConfig } from '@/interfaces/ServerSettings';
 
 import { StorageSerializers, useStorage } from '@vueuse/core';
 
@@ -115,7 +115,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // ── Server-managed credentials (populated via populateFromServer) ────
   // These are plain refs — not persisted in localStorage
   const jiraConfig = ref<JiraConfig>({ ...DEFAULT_JIRA_CONFIG });
-  const geminiConfig = ref<GeminiConfig>({ ...DEFAULT_GEMINI_CONFIG });
+  const aiConfig = ref<AiConfig>({ ...DEFAULT_AI_CONFIG });
 
   let resolveSettingsReady: (() => void) | null = null;
   const settingsReadyPromise = new Promise<void>((resolve) => {
@@ -128,11 +128,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /**
    * Called from App.vue after /api/settings is fetched.
-   * Replaces the in-memory jiraConfig and geminiConfig with server values.
+   * Replaces the in-memory jiraConfig and aiConfig with server values.
    */
-  function populateFromServer(serverJira: JiraConfig, serverGemini: GeminiConfig) {
+  function populateFromServer(serverJira: JiraConfig, serverAi: AiConfig) {
     jiraConfig.value = serverJira;
-    geminiConfig.value = serverGemini;
+    aiConfig.value = serverAi;
     resolveSettingsReady?.();
   }
 
@@ -156,7 +156,7 @@ export const useSettingsStore = defineStore('settings', () => {
     backgroundBlur,
     isBackgroundVideo,
     jiraConfig,
-    geminiConfig,
+    aiConfig,
     waitForSettings,
     populateFromServer,
     vCalendarFirstDay,

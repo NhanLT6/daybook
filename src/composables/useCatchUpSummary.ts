@@ -1,6 +1,6 @@
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { TimeLog } from '@/interfaces/TimeLog';
-import type { GeminiConfig } from '@/interfaces/ServerSettings';
+import type { AiConfig } from '@/interfaces/ServerSettings';
 
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
@@ -283,12 +283,12 @@ export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {
   return callStandupApi(dayjs().format('YYYY-MM-DD'));
 }
 
-export function isGeminiAvailable(config: GeminiConfig): boolean {
-  return config.enabled && !!config.apiKey;
+export function isAiAvailable(config: AiConfig): boolean {
+  return config.enabled;
 }
 
-export function shouldSkipCatchUp(today: string, dismissedDate: string | null, geminiConfig: GeminiConfig): boolean {
-  return dismissedDate === today || !isGeminiAvailable(geminiConfig);
+export function shouldSkipCatchUp(today: string, dismissedDate: string | null, aiConfig: AiConfig): boolean {
+  return dismissedDate === today || !isAiAvailable(aiConfig);
 }
 
 export function useCatchUpSummary() {
@@ -331,7 +331,7 @@ export function useCatchUpSummary() {
       await Promise.race([settingsStore.waitForSettings(), sleep(SETTINGS_WAIT_FALLBACK_MS)]);
 
       const date = today();
-      if (shouldSkipCatchUp(date, localStorage.getItem(storageKeys.catchUp.dismissedDate), settingsStore.geminiConfig)) {
+      if (shouldSkipCatchUp(date, localStorage.getItem(storageKeys.catchUp.dismissedDate), settingsStore.aiConfig)) {
         return;
       }
 

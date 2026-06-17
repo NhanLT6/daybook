@@ -21,16 +21,7 @@ const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJ
 
 const { saveSettings } = useServerSettings();
 const showApiToken = ref(false);
-const showGeminiKey = ref(false);
 const isSavingSettings = ref(false);
-
-const GEMINI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-2.5-pro',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3-flash-preview',
-];
 
 const jiraValidationSchema = yup.object({
   email: yup.string().email('Please enter a valid email address').required('Email is required'),
@@ -123,17 +114,10 @@ const selectedWeekendPattern = computed({
   },
 });
 
-/**
- * Save both Jira and Gemini config to the server.
- * Called via an explicit Save button — settings are no longer auto-saved.
- */
 const handleSaveCredentials = async () => {
   isSavingSettings.value = true;
   try {
-    const ok = await saveSettings({
-      jiraConfig: settingsStore.jiraConfig,
-      geminiConfig: settingsStore.geminiConfig,
-    });
+    const ok = await saveSettings({ jiraConfig: settingsStore.jiraConfig });
     if (ok) notificationCenter.success('Settings saved');
     else notificationCenter.error('Failed to save settings');
   } finally {
@@ -288,10 +272,9 @@ const handleSyncTickets = async (): Promise<void> => {
 
           <VCardText class="d-flex flex-column ga-2">
             <!-- Connection group -->
-            <VAlert type="warning" variant="tonal" density="compact" class="text-caption">
-              <strong>Security Warning:</strong> Your API token is saved in your browser. Anyone with access to your
-              computer can read it. Don't use this on shared or public computers. Use only on your personal device and
-              change your token often for better security.
+            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
+              Your API token is stored securely on the server, tied to this browser. It cannot be read by others even if
+              they know your machine ID.
             </VAlert>
 
             <VTextField
@@ -404,57 +387,6 @@ const handleSyncTickets = async (): Promise<void> => {
               :disabled="!settingsStore.jiraConfig.enabled || !settingsStore.useCategories"
               persistent-hint
               hint="Jira tickets synced will be auto-assigned this category"
-            />
-          </VCardText>
-        </VCard>
-      </div>
-
-      <!-- AI Assistant section -->
-      <div>
-        <VCard class="glass-acrylic">
-          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
-            AI Assistant
-            <VSwitch v-model="settingsStore.geminiConfig.enabled" color="primary" hide-details density="compact" />
-          </VCardTitle>
-
-          <VCardText class="d-flex flex-column ga-2">
-            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
-              Your API key is stored securely on the server, tied to this browser. It cannot be read by others even if
-              they know your machine ID.
-            </VAlert>
-
-            <VTextField
-              v-model="settingsStore.geminiConfig.apiKey"
-              label="Gemini API Key"
-              :type="showGeminiKey ? 'text' : 'password'"
-              :disabled="!settingsStore.geminiConfig.enabled"
-              :append-inner-icon="showGeminiKey ? 'mdi-eye-off' : 'mdi-eye'"
-              @click:append-inner="showGeminiKey = !showGeminiKey"
-              clearable
-              persistent-hint
-            >
-              <template #details>
-                <div class="text-caption text-medium-emphasis">
-                  Get your key at
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-primary text-decoration-none"
-                  >
-                    Google AI Studio
-                  </a>
-                </div>
-              </template>
-            </VTextField>
-
-            <VCombobox
-              v-model="settingsStore.geminiConfig.model"
-              :items="GEMINI_MODELS"
-              label="Model"
-              :disabled="!settingsStore.geminiConfig.enabled"
-              persistent-hint
-              hint="Select a model or type a custom model ID"
             />
 
             <div class="d-flex justify-end mt-2">

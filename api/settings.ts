@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { AuthError, verifyRequest } from './_lib/auth.js'
-import { getSettings, saveSettings } from './_lib/kv.js'
-import type { ServerSettings } from '../src/interfaces/ServerSettings.js'
+import { isAiEnabled } from './_lib/ai.js'
+import { getJiraConfig, saveJiraConfig } from './_lib/kv.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS for local development
@@ -20,13 +20,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     if (req.method === 'GET') {
-      const settings = await getSettings(machineId)
-      return res.status(200).json(settings)
+      const jiraConfig = await getJiraConfig(machineId)
+      const aiConfig = {
+        enabled: isAiEnabled(),
+        model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+      }
+      return res.status(200).json({ jiraConfig, aiConfig })
     }
 
     if (req.method === 'PUT') {
-      const settings = req.body as ServerSettings
-      await saveSettings(machineId, settings)
+      const { jiraConfig } = req.body as { jiraConfig: Parameters<typeof saveJiraConfig>[1] }
+      await saveJiraConfig(machineId, jiraConfig)
       return res.status(200).json({ ok: true })
     }
 

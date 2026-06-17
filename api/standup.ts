@@ -1,10 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText } from 'ai';
 
 import { AuthError, verifyRequest } from './_lib/auth.js';
-import { getSettings } from './_lib/kv.js';
+import { isAiEnabled, requireAiModel } from './_lib/ai.js';
 
 interface RequestLog {
   task: string;
@@ -75,16 +74,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
-    const settings = await getSettings(machineId);
-    if (!settings.geminiConfig.enabled || !settings.geminiConfig.apiKey) {
-      return res.status(400).json({ error: 'AI Assistant is not configured.' });
+    if (!isAiEnabled()) {
+      return res.status(400).json({ error: 'AI is not configured on this deployment.' });
     }
 
     const body = req.body as StandupRequest;
-    const google = createGoogleGenerativeAI({ apiKey: settings.geminiConfig.apiKey });
 
     const { text } = await generateText({
-      model: google(settings.geminiConfig.model),
+      model: requireAiModel(),
       prompt: buildPrompt(body.items, body.today),
     });
 

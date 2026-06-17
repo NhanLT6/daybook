@@ -459,6 +459,7 @@ const onAiUndoLogs = () => {
   .form-panel {
     flex: none;
     overflow: visible !important;
+    min-height: 80vh;
   }
 
   .content-column {
