@@ -131,7 +131,7 @@ const allProjectsSorted = computed((): ProjectBreakdownItem[] => {
 
   const grouped: Record<string, number> = {};
   for (const log of props.timeLogs) {
-    grouped[log.project] = (grouped[log.project] ?? 0) + log.duration;
+    grouped[log.project] = (grouped[log.project] ?? 0) + (log.duration ?? 0);
   }
 
   return Object.entries(grouped)

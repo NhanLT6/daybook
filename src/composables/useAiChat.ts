@@ -137,9 +137,16 @@ export function useAiChat() {
   const injectCatchUp = (items: CatchUpRenderItem[]) => {
     const id = `catchup-${Date.now()}`;
     // Plain-text bullet list for AI conversation context (follow-up questions)
-    const text = items
-      .map((i) => `• ${i.text}${i.effortLabel ? ` · ${i.effortLabel}` : ''}`)
-      .join('\n');
+    const hasGroups = items.some((i) => i.group);
+    const text = hasGroups
+      ? [
+          'Did:',
+          ...items.filter((i) => i.group === 'did').map((i) => `• ${i.text}${i.effortLabel ? ` · ${i.effortLabel}` : ''}`),
+          '',
+          'Todo:',
+          ...items.filter((i) => i.group === 'todo').map((i) => `• ${i.text}`),
+        ].join('\n')
+      : items.map((i) => `• ${i.text}${i.effortLabel ? ` · ${i.effortLabel}` : ''}`).join('\n');
 
     const syntheticMsg = {
       id,

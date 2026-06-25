@@ -75,7 +75,7 @@ const weekStartDate = computed(() => {
 });
 
 const todayMinutes = computed(() =>
-  timeLogs.value.filter((log) => log.date === todayStr.value).reduce((sum, log) => sum + log.duration, 0),
+  timeLogs.value.filter((log) => log.date === todayStr.value).reduce((sum, log) => sum + (log.duration ?? 0), 0),
 );
 
 const thisWeekMinutes = computed(() => {
@@ -85,7 +85,7 @@ const thisWeekMinutes = computed(() => {
       const d = dayjs(log.date, shortDateFormat);
       return d.isValid() && !d.isBefore(weekStart) && !d.isAfter(dayjs().endOf('day'));
     })
-    .reduce((sum, log) => sum + log.duration, 0);
+    .reduce((sum, log) => sum + (log.duration ?? 0), 0);
 });
 
 // Chart data computed property (automatically reactive to props and storage changes)
@@ -105,7 +105,7 @@ const chartData = computed(() => {
         data: daysInMonth.value.map((d) =>
           chain(logsByProject)
             .filter((item) => item.date === d.format(shortDateFormat))
-            .map((item) => round(item.duration / 60, 1))
+            .map((item) => round((item.duration ?? 0) / 60, 1))
             .sum()
             .value(),
         ),
@@ -130,7 +130,7 @@ const chartData = computed(() => {
         data: daysInMonth.value.map((d) =>
           chain(logsByProject)
             .filter((item) => item.date === d.format(shortDateFormat))
-            .map((item) => round(item.duration / 60, 1))
+            .map((item) => round((item.duration ?? 0) / 60, 1))
             .sum()
             .value(),
         ),
@@ -144,7 +144,7 @@ const chartData = computed(() => {
       const totalLogged = chain(timeLogs.value)
         .filter((log) => log.date === d.format(shortDateFormat))
         .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
-        .map((log) => round(log.duration / 60, 1))
+        .map((log) => round((log.duration ?? 0) / 60, 1))
         .sum()
         .value();
 

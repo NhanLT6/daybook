@@ -31,6 +31,9 @@ const tool = computed(() => props.message.metadata?.tool);
 const extractedLogs = computed(() => props.message.metadata?.extractedLogs);
 const saveState = computed(() => props.message.metadata?.saveState);
 const catchUpItems = computed<CatchUpRenderItem[] | undefined>(() => props.message.metadata?.catchUpItems);
+const catchUpHasGroups = computed(() => catchUpItems.value?.some((i) => i.group) ?? false);
+const catchUpDidItems = computed(() => catchUpItems.value?.filter((i) => i.group === 'did') ?? []);
+const catchUpTodoItems = computed(() => catchUpItems.value?.filter((i) => i.group === 'todo') ?? []);
 
 const handleSave = () => {
   if (extractedLogs.value?.length) {
@@ -130,17 +133,42 @@ const copyMessage = () => {
         </p>
 
         <!-- catchUp tool result -->
-        <ul v-if="tool === 'catchUp' && catchUpItems?.length" class="catchup-list">
-          <li
-            v-for="(entry, idx) in catchUpItems"
-            :key="idx"
-            class="catchup-item"
-            :class="{ 'is-ongoing': entry.ongoing }"
-          >
-            {{ entry.text
-            }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
-          </li>
-        </ul>
+        <template v-if="tool === 'catchUp' && catchUpItems?.length">
+          <!-- Grouped: Did / Todo sections -->
+          <template v-if="catchUpHasGroups">
+            <p class="catchup-group-header">Did</p>
+            <ul class="catchup-list">
+              <li
+                v-for="(entry, idx) in catchUpDidItems"
+                :key="idx"
+                class="catchup-item"
+                :class="{ 'is-ongoing': entry.ongoing }"
+              >
+                {{ entry.text
+                }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
+              </li>
+            </ul>
+            <p class="catchup-group-header mt-2">Todo</p>
+            <ul class="catchup-list">
+              <li v-for="(entry, idx) in catchUpTodoItems" :key="idx" class="catchup-item">
+                {{ entry.text }}
+              </li>
+            </ul>
+          </template>
+
+          <!-- No groups: existing flat list -->
+          <ul v-else class="catchup-list">
+            <li
+              v-for="(entry, idx) in catchUpItems"
+              :key="idx"
+              class="catchup-item"
+              :class="{ 'is-ongoing': entry.ongoing }"
+            >
+              {{ entry.text
+              }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
+            </li>
+          </ul>
+        </template>
 
         <!-- extractLogs tool result + action area -->
         <template v-if="tool === 'extractLogs' && extractedLogs?.length">
@@ -214,5 +242,14 @@ const copyMessage = () => {
 .catchup-effort {
   color: rgba(140, 140, 140, 0.85);
   font-variant-numeric: tabular-nums;
+}
+
+.catchup-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(140, 140, 140, 0.85);
+  margin: 4px 0 2px;
 }
 </style>
