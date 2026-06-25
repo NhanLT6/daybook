@@ -81,7 +81,7 @@ const validationSchema = object({
   selectedDates: array(date()).min(1, 'At least one date must be selected'),
   project: string().required('Required'),
   task: string().required('Required'),
-  duration: number().optional().test('min-if-set', 'Must be greater than 0', (v) => !v || v >= 1),
+  duration: number().nullable().optional().test('min-if-set', 'Must be greater than 0', (v) => !v || v >= 1),
   description: string(),
   categoryName: string().typeError('Please enter a category name').optional(),
 });
