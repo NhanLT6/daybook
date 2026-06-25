@@ -3,7 +3,8 @@
   date: Date;
   project: string;
   task: string;
-  duration: number;
+  duration: number | undefined;
   description?: string;
   isLogged?: boolean;
+  type?: 'log' | 'plan';
 }

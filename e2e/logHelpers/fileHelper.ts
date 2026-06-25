@@ -21,7 +21,7 @@ function getTaskEntries(filePath: string): TaskEntry[] {
     },
     transform: (value, field) => {
       if (field === 'date') return new Date(value);
-      if (field === 'duration') return parseInt(value, 10);
+      if (field === 'duration') return value ? parseInt(value, 10) : undefined;
       if (field === 'isLogged') return value.toLowerCase() === 'true';
       return value;
     },
@@ -30,7 +30,7 @@ function getTaskEntries(filePath: string): TaskEntry[] {
     },
   });
 
-  return (result.data as TaskEntry[]).filter((entry) => !entry.isLogged);
+  return (result.data as TaskEntry[]).filter((entry) => !entry.isLogged && entry.type !== 'plan');
 }
 
 /**
@@ -47,7 +47,7 @@ function getAllTaskEntries(filePath: string): TaskEntry[] {
     },
     transform: (value, field) => {
       if (field === 'date') return new Date(value);
-      if (field === 'duration') return parseInt(value, 10);
+      if (field === 'duration') return value ? parseInt(value, 10) : undefined;
       if (field === 'isLogged') return value.toLowerCase() === 'true';
       return value;
     },
@@ -81,7 +81,8 @@ function saveTaskEntriesWithLoggedStatus(filePath: string, processedEntries: Tas
       Date: dayjs(entry.date).format('MM-DD-YY'),
       Project: entry.project,
       Task: entry.task,
-      Duration: entry.duration,
+      Duration: entry.duration ?? '',
+      Type: entry.type ?? 'log',
       Description: entry.description || '',
       // Update isLogged status if this entry was processed, otherwise keep original
       IsLogged: processedEntry ? (processedEntry.isLogged ? 'true' : 'false') : (entry.isLogged ? 'true' : 'false'),

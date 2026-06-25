@@ -187,7 +187,8 @@ const exportToCsv = () => {
     Date: dayjs(log.date).format(templateDateFormat),
     Project: log.project,
     Task: log.task,
-    Duration: log.duration,
+    Duration: log.duration ?? '',
+    Type: log.type ?? 'log',
     Description: log.description,
     IsLogged: false,
   }));
@@ -209,9 +210,10 @@ const importCsv = async (file?: File) => {
     transformHeader(header: string): string {
       return camelCase(header);
     },
-    transform(value: string, header: string): string | number {
+    transform(value: string, header: string): string | number | undefined {
       if (header === 'date') return dayjs(value, templateDateFormat).format(shortDateFormat);
-      if (header === 'duration') return toNumber(value);
+      if (header === 'duration') return value ? toNumber(value) : undefined;
+      if (header === 'type') return value === 'plan' ? 'plan' : 'log';
 
       return value;
     },
@@ -229,14 +231,16 @@ const importCsv = async (file?: File) => {
   }
 
   const dataWithIds: TimeLog[] = result.data.map((item) => {
-    const log = item as Record<string, string | number>;
+    const log = item as Record<string, string | number | undefined>;
+    const duration = log.duration as number | undefined;
     return {
       id: (log.id as string) ?? nanoid(),
       date: log.date as string,
       project: log.project as string,
       task: log.task as string,
-      duration: log.duration as number,
-      description: log.description as string,
+      duration: duration || undefined,
+      type: (log.type as 'log' | 'plan' | undefined) ?? (duration ? 'log' : 'plan'),
+      description: log.description as string | undefined,
     };
   });
 
@@ -277,12 +281,14 @@ const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
     const logMonth = dayjs(log.date, 'YYYY-MM-DD').month() + 1; // 1-based month number
     const id = nanoid();
     const monthStorage = getTimeLogsForMonth(logMonth);
+    const duration = log.duration;
     monthStorage.value.push({
       id,
       date,
       project: log.project,
       task: log.task,
-      duration: log.duration,
+      duration,
+      type: duration ? 'log' : 'plan',
       description: log.description,
     });
     savedBatch.push({ id, month: logMonth });

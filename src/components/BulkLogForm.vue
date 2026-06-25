@@ -81,7 +81,7 @@ const validationSchema = object({
   selectedDates: array(date()).min(1, 'At least one date must be selected'),
   project: string().required('Required'),
   task: string().required('Required'),
-  duration: number().required('Required').min(1, 'Must be greater than 0'),
+  duration: number().optional().test('min-if-set', 'Must be greater than 0', (v) => !v || v >= 1),
   description: string(),
   categoryName: string().typeError('Please enter a category name').optional(),
 });
@@ -127,6 +127,9 @@ const scrollToFirstError = async () => {
 };
 
 const onSave = handleSubmit((values) => {
+  const duration = values.duration ? Math.round(values.duration) : undefined;
+  const type: 'log' | 'plan' = duration ? 'log' : 'plan';
+
   // Edit mode: Update single log (emit as array with 1 item)
   if (isEditMode.value && editingLog) {
     const updatedLog: TimeLog = {
@@ -134,7 +137,8 @@ const onSave = handleSubmit((values) => {
       date: dayjs(values.selectedDates[0]).format(shortDateFormat),
       project: values.project!,
       task: values.task!,
-      duration: Math.round(values.duration!),
+      duration,
+      type,
       description: values.description,
     };
 
@@ -146,7 +150,8 @@ const onSave = handleSubmit((values) => {
       date: dayjs(date).format(shortDateFormat),
       project: values.project!,
       task: values.task!,
-      duration: Math.round(values.duration!),
+      duration,
+      type,
       description: values.description,
     }));
 
@@ -216,6 +221,11 @@ const onCategoryUpdate = (v: unknown) => {
   const name = v == null ? '' : typeof v === 'object' ? (v as { name: string }).name : (v as string);
   categoryNameField.setValue(name);
 };
+
+const durationHint = computed(() => {
+  const val = durationField.value.value;
+  return val ? minutesToHourWithMinutes(val) : 'Leave empty to save as plan';
+});
 
 const onHourClick = (hour: number) => {
   // Add to the existing duration instead of replacing it
@@ -370,7 +380,7 @@ watch(
         :error-messages="errors.duration"
         :min="0"
         :step="30"
-        :hint="minutesToHourWithMinutes(durationField.value.value)"
+        :hint="durationHint"
         persistent-hint
       />
 

@@ -51,10 +51,11 @@ test.describe('Xero Work Logger', () => {
           await createTask(page, taskName);
 
           for (const entry of tasks) {
-            await addTimeSpentToTask(page, entry.task, entry.duration, entry.date, entry.description);
+            // Plan entries are filtered out by getTaskEntries before reaching here
+            await addTimeSpentToTask(page, entry.task, entry.duration!, entry.date, entry.description);
             entry.isLogged = true;
             const label = progress.increment();
-            const duration = convertMinutesToHourMinutes(entry.duration);
+            const duration = convertMinutesToHourMinutes(entry.duration!);
             const date = dayjs(entry.date).format('YYYY-MM-DD');
             const desc = entry.description ? ` · "${entry.description}"` : '';
             console.log(`    ${label} ⏱  ${date} · ${duration}${desc}`);

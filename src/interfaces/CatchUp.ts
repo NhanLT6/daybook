@@ -3,4 +3,5 @@ export interface CatchUpRenderItem {
   text: string;
   ongoing: boolean;
   effortLabel?: string;
+  group?: 'did' | 'todo';
 }

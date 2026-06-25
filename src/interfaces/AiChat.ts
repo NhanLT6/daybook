@@ -6,7 +6,7 @@ export interface ExtractedLog {
   project: string;
   task: string;
   date: string; // 'YYYY-MM-DD'
-  duration: number; // minutes
+  duration?: number; // minutes; undefined = plan entry
   description?: string;
 }
 

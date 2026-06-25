@@ -17,44 +17,90 @@ interface RequestItem {
   logs: RequestLog[];
 }
 
+interface RequestPlanTask {
+  task: string;
+  description?: string;
+}
+
+interface RequestPlan {
+  id: string;
+  project: string;
+  tasks: RequestPlanTask[];
+}
+
 interface StandupRequest {
   items: RequestItem[];
+  plans?: RequestPlan[];
   today: string;
 }
 
-function buildPrompt(items: RequestItem[], today: string): string {
-  const itemsText = items
-    .map(
-      (it) =>
-        `id: ${it.id}\nproject: ${it.project}\n${it.logs
-          .map((l) => `  - ${l.task}${l.description ? `: ${l.description}` : ''} (${l.duration})`)
-          .join('\n')}`,
-    )
-    .join('\n\n');
+function buildPrompt(items: RequestItem[], today: string, plans?: RequestPlan[]): string {
+  const hasDid = items.length > 0;
+  const hasTodo = plans && plans.length > 0;
 
-  return `You are helping a developer recap recent work for a standup. Today is ${today}.
-Each block below is one project the developer worked on. "id" is a reference key, "project" is the display label. The indented sub-lines are tasks/notes done under it.
+  const didSection = hasDid
+    ? items
+        .map(
+          (it) =>
+            `id: ${it.id}\nproject: ${it.project}\n${it.logs
+              .map((l) => `  - ${l.task}${l.description ? `: ${l.description}` : ''} (${l.duration})`)
+              .join('\n')}`,
+        )
+        .join('\n\n')
+    : '';
 
-${itemsText}
+  const todoSection = hasTodo
+    ? plans!
+        .map(
+          (p) =>
+            `id: ${p.id}\nproject: ${p.project}\n${p.tasks
+              .map((t) => `  - ${t.task}${t.description ? `: ${t.description}` : ''}`)
+              .join('\n')}`,
+        )
+        .join('\n\n')
+    : '';
 
-For each block, write ONE concise past-tense sentence describing what was done, merging the sub-lines.
+  const didInstruction = hasDid
+    ? `For each Did block, write ONE concise past-tense sentence describing what was done, merging the sub-lines.
 Start the sentence with the "project" value exactly as given — do not include the "id" value in the sentence text.
+Return these in "lines".`
+    : '';
+
+  const todoInstruction = hasTodo
+    ? `For each Todo block, write ONE concise present/future-tense sentence describing what will be done today.
+Start the sentence with the "project" value exactly as given — do not include the "id" value in the sentence text.
+Return these in "todoLines".`
+    : '';
+
+  const responseShape = hasTodo
+    ? '{"lines":[{"id":"<id>","text":"<sentence>"}],"todoLines":[{"id":"<id>","text":"<sentence>"}]}'
+    : '{"lines":[{"id":"<id>","text":"<sentence>"}]}';
+
+  return `You are helping a developer write a standup update. Today is ${today}.
+${hasDid ? `\nDid (recent work):\n${didSection}` : ''}
+${hasTodo ? `\nTodo (plans for today):\n${todoSection}` : ''}
+
+${didInstruction}
+${todoInstruction}
 Return STRICT JSON only — no markdown, no code fences, no extra prose:
-{"lines":[{"id":"<id>","text":"<sentence>"}]}
-with exactly one entry per block, echoing each block's "id" value unchanged.`;
+${responseShape}
+with exactly one entry per block in each array, echoing each block's "id" value unchanged.`;
 }
 
-function parseLines(raw: string): { id: string; text: string }[] {
+function parseResponse(raw: string): { lines: { id: string; text: string }[]; todoLines: { id: string; text: string }[] } {
   const cleaned = raw
     .trim()
     .replace(/^```(?:json)?/i, '')
     .replace(/```$/, '')
     .trim();
   try {
-    const parsed = JSON.parse(cleaned) as { lines?: { id: string; text: string }[] };
-    return Array.isArray(parsed.lines) ? parsed.lines : [];
+    const parsed = JSON.parse(cleaned) as { lines?: { id: string; text: string }[]; todoLines?: { id: string; text: string }[] };
+    return {
+      lines: Array.isArray(parsed.lines) ? parsed.lines : [],
+      todoLines: Array.isArray(parsed.todoLines) ? parsed.todoLines : [],
+    };
   } catch {
-    return [];
+    return { lines: [], todoLines: [] };
   }
 }
 
@@ -82,10 +128,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { text } = await generateText({
       model: requireAiModel(),
-      prompt: buildPrompt(body.items, body.today),
+      prompt: buildPrompt(body.items, body.today, body.plans),
     });
 
-    return res.json({ lines: parseLines(text) });
+    return res.json(parseResponse(text));
   } catch (err) {
     if (err instanceof AuthError) {
       return res.status(err.status).json({ error: err.message });

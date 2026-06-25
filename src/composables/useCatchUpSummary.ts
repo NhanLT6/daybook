@@ -62,6 +62,12 @@ export interface CatchUpItem {
   ongoing: boolean;
 }
 
+interface RequestPlan {
+  id: string;
+  project: string;
+  tasks: { task: string; description?: string }[];
+}
+
 export type { CatchUpRenderItem };
 
 // ── Notification → Chat bridge (module-level singleton, no reactive signal) ──
@@ -90,13 +96,13 @@ export function buildCatchUpItems(didLogs: TimeLog[], accumulated: Map<string, n
   }
 
   const ranked = Array.from(byProject.entries()).map(([project, logs]) => {
-    const windowMinutes = logs.reduce((sum, l) => sum + l.duration, 0);
+    const windowMinutes = logs.reduce((sum, l) => sum + (l.duration ?? 0), 0);
     const accumulatedMinutes = accumulated.get(project) ?? windowMinutes;
     const latest = logs.reduce((max, l) => (l.date > max ? l.date : max), '');
     const item: CatchUpItem = {
       id: deriveItemId(project),
       project,
-      logs: logs.map((l) => ({ task: l.task, description: l.description, duration: l.duration })),
+      logs: logs.map((l) => ({ task: l.task, description: l.description, duration: l.duration ?? 0 })),
       windowMinutes,
       accumulatedMinutes,
       ongoing: accumulatedMinutes >= LONG_RUNNING_THRESHOLD_MINUTES,
@@ -118,7 +124,7 @@ export function buildCatchUpItems(didLogs: TimeLog[], accumulated: Map<string, n
 export function accumulateMinutesByProject(logs: TimeLog[]): Map<string, number> {
   const totals = new Map<string, number>();
   for (const log of logs) {
-    totals.set(log.project, (totals.get(log.project) ?? 0) + log.duration);
+    totals.set(log.project, (totals.get(log.project) ?? 0) + (log.duration ?? 0));
   }
   return totals;
 }
@@ -207,6 +213,7 @@ function getLogsForSummary(): TimeLog[] {
     const logs = readLogs(monthKey);
 
     const anchor = logs
+      .filter((log) => log.type !== 'plan')
       .map((log) => parseLogDate(log.date)?.startOf('day'))
       .filter((d): d is dayjs.Dayjs => !!d?.isValid() && d.isBefore(today) && d.day() !== 0 && d.day() !== 6)
       .sort((a, b) => b.valueOf() - a.valueOf())[0];
@@ -247,13 +254,41 @@ function setCachedSummary(items: CatchUpRenderItem[]): void {
   localStorage.setItem(storageKeys.catchUp.summaries, JSON.stringify({ key, items } satisfies SummaryCache));
 }
 
-async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null> {
-  const didLogs = getLogsForSummary();
-  if (!didLogs.length) return null;
+function getTodayPlans(today: dayjs.Dayjs): TimeLog[] {
+  const monthKey = `timeLogs-${today.format(yearAndMonthFormat)}`;
+  return readLogs(monthKey).filter((log) => {
+    const logDate = parseLogDate(log.date)?.startOf('day');
+    return logDate?.isSame(today, 'day') && log.type === 'plan';
+  });
+}
 
-  const accumulated = accumulateMinutesByProject(collectAccumulationLogs(dayjs(today).startOf('day')));
+function buildPlanRequestItems(plans: TimeLog[]): RequestPlan[] {
+  const byProject = new Map<string, TimeLog[]>();
+  for (const plan of plans) {
+    if (!byProject.has(plan.project)) byProject.set(plan.project, []);
+    byProject.get(plan.project)!.push(plan);
+  }
+  return Array.from(byProject.entries()).map(([project, logs]) => ({
+    id: `plan-${deriveItemId(project)}`,
+    project,
+    tasks: logs.map((l) => ({ task: l.task, description: l.description })),
+  }));
+}
+
+async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null> {
+  const todayDayjs = dayjs(today).startOf('day');
+
+  // Separate did logs (actual work) from plan entries
+  const allLogs = getLogsForSummary();
+  const didLogs = allLogs.filter((l) => l.type !== 'plan');
+
+  const todayPlans = getTodayPlans(todayDayjs);
+  const hasTodayPlans = todayPlans.length > 0;
+
+  if (!didLogs.length && !hasTodayPlans) return null;
+
+  const accumulated = accumulateMinutesByProject(collectAccumulationLogs(todayDayjs).filter((l) => l.type !== 'plan'));
   const items = buildCatchUpItems(didLogs, accumulated);
-  if (!items.length) return null;
 
   const requestItems = items.map((item) => ({
     id: item.id,
@@ -265,16 +300,30 @@ async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null
     })),
   }));
 
+  const planItems = hasTodayPlans ? buildPlanRequestItems(todayPlans) : [];
+  const planIdToProject = new Map(planItems.map((p) => [p.id, p.project]));
+
   const headers = await buildAuthHeaders();
-  const response = await httpClient.post<{ lines: { id: string; text: string }[] }>(
+  const response = await httpClient.post<{ lines: { id: string; text: string }[]; todoLines?: { id: string; text: string }[] }>(
     '/api/standup',
-    { items: requestItems, today },
+    { items: requestItems, plans: planItems, today },
     { headers },
   );
 
-  const rendered = applyLines(items, response.data.lines ?? []);
+  const didRendered = applyLines(items, response.data.lines ?? []);
+  const todoRendered: CatchUpRenderItem[] = (response.data.todoLines ?? []).map((l) => ({
+    project: planIdToProject.get(l.id) ?? l.id,
+    text: l.text,
+    ongoing: false,
+    group: 'todo' as const,
+  }));
+
+  const rendered: CatchUpRenderItem[] = hasTodayPlans
+    ? [...didRendered.map((r) => ({ ...r, group: 'did' as const })), ...todoRendered]
+    : didRendered;
+
   setCachedSummary(rendered);
-  return rendered;
+  return rendered.length ? rendered : null;
 }
 
 export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {

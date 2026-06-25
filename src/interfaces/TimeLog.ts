@@ -3,6 +3,7 @@ export interface TimeLog {
   date: string; // 'YYYY-MM-DD'
   project: string;
   task: string;
-  duration: number;
+  duration?: number; // undefined = plan entry
+  type: 'log' | 'plan';
   description?: string;
 }

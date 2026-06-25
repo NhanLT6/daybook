@@ -109,7 +109,7 @@ const loggedTimeByDates = computed(() =>
     .groupBy((item) => item.date)
     .map((items, date) => ({
       date,
-      durationSum: sumBy(items, 'duration'),
+      durationSum: sumBy(items, (item) => item.duration ?? 0),
       tasks: items,
     }))
     .orderBy((item) => item.date)
@@ -248,7 +248,8 @@ const readCsv = (file?: File) => {
             <VCard class="elevation-0 rounded-lg">
               <VDataTable :items="group.tasks" :headers="headers" class="bg-container" hide-default-footer>
                 <template #item.duration="{ item }">
-                  {{ minutesToHourWithMinutes(item.duration) }}
+                  <VChip v-if="item.type === 'plan'" color="success" size="x-small" variant="tonal">Plan</VChip>
+                  <span v-else>{{ minutesToHourWithMinutes(item.duration ?? 0) }}</span>
                 </template>
 
                 <!--suppress VueUnrecognizedSlot -->
