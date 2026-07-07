@@ -2,6 +2,8 @@ import './assets/main.css';
 
 import { createApp } from 'vue';
 
+import { initDb } from '@/db';
+
 import 'vuetify/styles';
 
 import { createVuetify } from 'vuetify';
@@ -93,4 +95,6 @@ dayjs.extend(relativeTime);
 app.use(setupCalendar, {});
 app.component('Calendar', Calendar);
 
-app.mount('#app');
+initDb()
+  .catch((err) => console.error('[db] init failed', err))
+  .finally(() => app.mount('#app'));
