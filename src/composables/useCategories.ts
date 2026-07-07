@@ -1,49 +1,43 @@
 import { computed } from 'vue';
 
-import { useStorage } from '@vueuse/core';
-
 import { nanoid } from 'nanoid';
 
 import type { Category } from '@/interfaces/Category';
-import { storageKeys } from '@/common/storageKeys';
+
+import { useCollection } from '@/composables/useCollection';
 
 const defaultCategories: Category[] = [{ id: 'work', name: 'Work', displayOrder: 0 }];
 
 export function useCategories() {
-  const categories = useStorage<Category[]>(storageKeys.categories, defaultCategories);
+  const c = useCollection<Category>('categories');
 
-  // Sorted by displayOrder for consistent rendering
-  const sortedCategories = computed(() => [...categories.value].sort((a, b) => a.displayOrder - b.displayOrder));
+  // Seed default once, only if the store has never been populated.
+  void c.ready.then(() => {
+    if (c.items.value.length === 0) void c.addMany(defaultCategories);
+  });
+
+  const categories = computed(() => c.items.value);
+  const sortedCategories = computed(() => [...c.items.value].sort((a, b) => a.displayOrder - b.displayOrder));
 
   const getCategoryById = (id: string | undefined): Category | undefined =>
-    id ? categories.value.find((c) => c.id === id) : undefined;
-
+    id ? c.items.value.find((x) => x.id === id) : undefined;
   const getCategoryName = (id: string | undefined): string => getCategoryById(id)?.name ?? 'Uncategorized';
 
   const addCategory = (name: string): Category => {
-    const maxOrder = categories.value.reduce((max, c) => Math.max(max, c.displayOrder), -1);
-    const newCategory: Category = { id: nanoid(), name: name.trim(), displayOrder: maxOrder + 1 };
-    categories.value.push(newCategory);
-    return newCategory;
+    const maxOrder = c.items.value.reduce((max, x) => Math.max(max, x.displayOrder), -1);
+    const created: Category = { id: nanoid(), name: name.trim(), displayOrder: maxOrder + 1 };
+    void c.add(created);
+    return created;
   };
 
   const renameCategory = (id: string, newName: string) => {
-    const cat = categories.value.find((c) => c.id === id);
-    if (cat) cat.name = newName.trim();
+    const cat = c.items.value.find((x) => x.id === id);
+    if (cat) void c.upsert({ ...cat, name: newName.trim() });
   };
 
-  // Deleting a category leaves its projects as "Uncategorized" (no cascade)
   const deleteCategory = (id: string) => {
-    categories.value = categories.value.filter((c) => c.id !== id);
+    void c.remove(id);
   };
 
-  return {
-    categories,
-    sortedCategories,
-    getCategoryById,
-    getCategoryName,
-    addCategory,
-    renameCategory,
-    deleteCategory,
-  };
+  return { categories, sortedCategories, getCategoryById, getCategoryName, addCategory, renameCategory, deleteCategory };
 }
