@@ -25,6 +25,7 @@ const { items: logItems, selectedDates } = defineProps<LogListProps>();
 
 const emit = defineEmits<{
   editLog: [log: TimeLog];
+  cloneLog: [log: TimeLog];
   deleteLog: [log: TimeLog];
   import: [file?: File];
   export: [];
@@ -126,6 +127,10 @@ const onCollapse = () => {
 
 const onEditLog = (log: TimeLog) => {
   emit('editLog', log);
+};
+
+const onCloneLog = (log: TimeLog) => {
+  emit('cloneLog', log);
 };
 
 const onDeleteLog = (log: TimeLog) => {
@@ -255,8 +260,29 @@ const readCsv = (file?: File) => {
                 <!--suppress VueUnrecognizedSlot -->
                 <template #item.actions="{ item }">
                   <div class="d-flex ga-2">
-                    <VBtn icon="mdi-pencil-outline" variant="text" size="sm" @click="onEditLog(item)" />
-                    <VBtn icon="mdi-trash-can-outline" variant="text" size="sm" @click="onDeleteLog(item)" />
+                    <VBtn
+                      icon="mdi-pencil-outline"
+                      variant="text"
+                      size="small"
+                      @click="onEditLog(item)"
+                      v-tooltip="'Edit'"
+                    />
+
+                    <VBtn
+                      icon="mdi-content-duplicate"
+                      variant="text"
+                      size="small"
+                      @click="onCloneLog(item)"
+                      v-tooltip="'Clone'"
+                    />
+
+                    <VBtn
+                      icon="mdi-trash-can-outline"
+                      variant="text"
+                      size="small"
+                      @click="onDeleteLog(item)"
+                      v-tooltip="'Delete'"
+                    />
                   </div>
                 </template>
               </VDataTable>

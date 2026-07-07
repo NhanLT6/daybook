@@ -31,8 +31,23 @@ interface BulkLogFormData {
 
 const selectedDates = defineModel<Date[]>('selectedDates', { default: () => [] });
 
-const { editingLog } = defineProps<{
+const { editingLog, cloneSeed } = defineProps<{
   editingLog?: TimeLog;
+  /**
+   * Clone source. When set, the form seeds its create-mode fields from a log the
+   * user is cloning (project/task/duration/description), dated today. `nonce` is
+   * bumped by the parent on every clone click: Vue skips a watcher when the new
+   * value deep-equals the old one, so cloning the *same* log twice in a row would
+   * not re-seed the form. The changing `nonce` guarantees the watcher below fires
+   * on every clone.
+   */
+  cloneSeed?: {
+    project: string;
+    task: string;
+    duration?: number;
+    description?: string;
+    nonce: number;
+  };
 }>();
 
 const emit = defineEmits<{
@@ -258,6 +273,26 @@ watch(
     }
   },
   { immediate: true, deep: true },
+);
+
+// Clone: seed the create-mode form from a source log, dated today. Kept on its own
+// trigger (separate from editingLog) so clone and edit never compete over form state.
+// Keyed on `nonce` so re-cloning the same log re-fires (see cloneSeed prop docs).
+watch(
+  () => cloneSeed?.nonce,
+  (nonce) => {
+    if (nonce === undefined || !cloneSeed) return;
+    resetForm({
+      values: {
+        selectedDates: selectedDates.value,
+        project: cloneSeed.project,
+        task: cloneSeed.task,
+        duration: cloneSeed.duration,
+        description: cloneSeed.description,
+        categoryName: undefined,
+      },
+    });
+  },
 );
 
 // In create mode: auto-fill (disabled) category when an existing project is selected.

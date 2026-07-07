@@ -81,6 +81,19 @@ const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based t
 const selectedProject = ref<string | null>(null);
 const editingLog = ref<TimeLog | undefined>(undefined);
 
+// Clone: seed the form (create mode) with a source log's fields, dated today.
+// `nonce` is bumped on every clone so the form re-seeds even when the same log is
+// cloned twice in a row (see cloneSeed prop in BulkLogForm).
+interface CloneSeed {
+  project: string;
+  task: string;
+  duration?: number;
+  description?: string;
+  nonce: number;
+}
+const cloneSeed = ref<CloneSeed | undefined>(undefined);
+let cloneNonce = 0;
+
 // Keep the calendar navigated to the current month for long-running tabs
 watch(todayDateStr, () => {
   if (!editingLog.value) {
@@ -170,6 +183,20 @@ const onEditLog = (log: TimeLog) => {
   editingLog.value = log;
   // Set calendar to show the log's date as selected (user can change it)
   selectedDates.value = [dayjs(log.date, shortDateFormat).toDate()];
+};
+
+// Clone a log: copy its fields into the form as a new (create-mode) entry dated today.
+const onCloneLog = (log: TimeLog) => {
+  editingLog.value = undefined; // ensure create mode, not edit
+  selectedDates.value = [dayjs().toDate()]; // today
+  cloneSeed.value = {
+    project: log.project,
+    task: log.task,
+    duration: log.duration,
+    description: log.description,
+    nonce: ++cloneNonce,
+  };
+  tab.value = 'form'; // reveal the form if the Chat tab is active
 };
 
 const onDeleteLog = (log: TimeLog) => {
@@ -348,6 +375,7 @@ const onAiUndoLogs = () => {
           <BulkLogForm
             v-model:selected-dates="selectedDates"
             :editing-log="editingLog"
+            :clone-seed="cloneSeed"
             @submit="saveBulkLogs"
             @cancel="onBulkCancel"
             @month-changed="onMonthChanged"
@@ -381,6 +409,7 @@ const onAiUndoLogs = () => {
         :items="timeLogs"
         :selected-dates="selectedDates"
         @edit-log="onEditLog"
+        @clone-log="onCloneLog"
         @delete-log="onDeleteLog"
         @import="importCsv"
         @export="exportToCsv"
