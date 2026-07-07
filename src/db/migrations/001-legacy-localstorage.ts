@@ -1,8 +1,11 @@
 import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 import { isoDateFormat, shortDateFormat } from '@/common/DateFormat';
 
 import type { StorageAdapter } from '@/db/types';
+
+dayjs.extend(customParseFormat);
 
 // Collect every legacy per-month key of a given prefix, newest first is irrelevant here.
 function legacyKeys(prefix: string): string[] {
