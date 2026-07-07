@@ -40,3 +40,8 @@ yarn.lock
 .env
 .vercel
 .env*.local
+
+# Agent tooling / session state (not part of the app)
+.claude/
+.superpowers/
+nul
