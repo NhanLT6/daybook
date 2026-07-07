@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 
 import { useCategories } from '@/composables/useCategories';
+import { useCollection } from '@/composables/useCollection';
 import { useProjectColors } from '@/composables/useProjectColors';
 import { useWorkspace } from '@/composables/useWorkspace';
 
@@ -24,6 +25,12 @@ const projectColors = useProjectColors();
 const settingsStore = useSettingsStore();
 const { sortedCategories, addCategory, renameCategory, deleteCategory } = useCategories();
 const { allTasks, allProjects, getTasksByProject, initTeamWorkPreset } = useWorkspace();
+
+// `allTasks`/`allProjects` from useWorkspace are now read-only computeds backed by db
+// collections, so direct CRUD in this view (add/rename/delete project & task) writes
+// through these same collections instead of mutating the arrays in place.
+const tasksCol = useCollection<Task & { id: string }>('tasks');
+const projectsCol = useCollection<Project & { id: string }>('projects');
 
 onMounted(() => {
   initTeamWorkPreset();
@@ -170,10 +177,12 @@ const createNewTask = (forProjectTitle?: string) => {
   resetForm({ values: { projectTitle: forProjectTitle || undefined, taskTitle: undefined, categoryId: undefined } });
 };
 
+const taskId = (t: { title: string; project: string }) => `${t.project}::${t.title}`;
+
 const upsertTask = (title: string, project: string) => {
-  if (!allTasks.value.some((t) => t.title === title && t.project === project)) {
-    allTasks.value.push({ title, project });
-  }
+  if (allTasks.value.some((t) => t.title === title && t.project === project)) return;
+  const created = { title, project };
+  void tasksCol.add({ ...created, id: taskId(created) });
 };
 
 const onSave = handleSubmit((values) => {
@@ -185,24 +194,35 @@ const onSave = handleSubmit((values) => {
     const projectExists = allProjects.value.some((p) => p.title === values.projectTitle);
 
     if (editing) {
-      // Rename/update the project in place; migrate its tasks if the title changed.
-      // (Checked before the new-project push so renaming to a fresh title renames
-      // rather than creating a duplicate project.)
-      const index = allProjects.value.findIndex((p) => p.title === editing.title);
-      if (index >= 0) {
-        allProjects.value[index] = {
-          ...allProjects.value[index],
+      if (editing.title !== values.projectTitle) {
+        // Project/task ids are keyed by title, so a rename is remove-then-add under
+        // the new id — for the project and for every task pointing at it.
+        void projectsCol.remove(editing.title);
+        void projectsCol.add({
           title: values.projectTitle,
           categoryId: values.categoryId ?? undefined,
-        };
-        if (editing.title !== values.projectTitle) {
-          allTasks.value.forEach((task) => {
-            if (task.project === editing.title) task.project = values.projectTitle;
-          });
+          id: values.projectTitle,
+        });
+
+        for (const task of allTasks.value.filter((t) => t.project === editing.title)) {
+          void tasksCol.remove(taskId(task));
+          const renamed = { title: task.title, project: values.projectTitle };
+          void tasksCol.add({ ...renamed, id: taskId(renamed) });
         }
+      } else {
+        // Same title — only categoryId can have changed.
+        void projectsCol.upsert({
+          title: editing.title,
+          categoryId: values.categoryId ?? undefined,
+          id: editing.title,
+        });
       }
     } else if (!projectExists) {
-      allProjects.value.push({ title: values.projectTitle, categoryId: values.categoryId ?? undefined });
+      void projectsCol.add({
+        title: values.projectTitle,
+        categoryId: values.categoryId ?? undefined,
+        id: values.projectTitle,
+      });
     }
 
     // New project with an optional task name → create that task too.
@@ -213,8 +233,9 @@ const onSave = handleSubmit((values) => {
     // new-task or edit-task
     const editing = state.mode === 'edit-task' ? state.task : null;
     if (editing) {
-      const index = allTasks.value.findIndex((t) => t.title === editing.title && t.project === editing.project);
-      if (index >= 0) allTasks.value[index] = { title: values.taskTitle, project: values.projectTitle };
+      void tasksCol.remove(taskId(editing));
+      const renamed = { title: values.taskTitle, project: values.projectTitle };
+      void tasksCol.add({ ...renamed, id: taskId(renamed) });
     } else {
       upsertTask(values.taskTitle, values.projectTitle);
     }
@@ -234,7 +255,7 @@ const confirmDeleteProject = (projectTitle: string) => {
   const tasksInProject = getTasksByProject(projectTitle).length;
 
   if (tasksInProject === 0) {
-    allProjects.value = allProjects.value.filter((p) => p.title !== projectTitle);
+    void projectsCol.remove(projectTitle);
     return;
   }
 
@@ -244,8 +265,10 @@ const confirmDeleteProject = (projectTitle: string) => {
 
 const executeDeleteProject = () => {
   if (projectToDelete.value) {
-    allProjects.value = allProjects.value.filter((p) => p.title !== projectToDelete.value);
-    allTasks.value = allTasks.value.filter((t) => t.project !== projectToDelete.value);
+    void projectsCol.remove(projectToDelete.value);
+    for (const task of allTasks.value.filter((t) => t.project === projectToDelete.value)) {
+      void tasksCol.remove(taskId(task));
+    }
 
     projectToDelete.value = null;
     isDeleteProjectDialogOpen.value = false;
@@ -258,10 +281,7 @@ const cancelDeleteProject = () => {
 };
 
 const deleteTaskDirectly = (taskTitle: string, projectTitle: string) => {
-  const taskIndex = allTasks.value.findIndex((t) => t.title === taskTitle && t.project === projectTitle);
-  if (taskIndex >= 0) {
-    allTasks.value.splice(taskIndex, 1);
-  }
+  void tasksCol.remove(taskId({ title: taskTitle, project: projectTitle }));
 };
 
 const dialogTitles: Record<NonNullable<typeof dialogMode.value>, string> = {

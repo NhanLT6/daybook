@@ -1,21 +1,24 @@
 import { computed } from 'vue';
 
 import { useCategories } from '@/composables/useCategories';
+import { useCollection } from '@/composables/useCollection';
 import { useJira } from '@/composables/useJira';
 
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 
-import { useStorage } from '@vueuse/core';
-
-import { storageKeys } from '@/common/storageKeys';
 import { useSettingsStore } from '@/stores/settings';
 import { uniq, uniqBy } from 'lodash';
 
 export function useWorkspace() {
-  const allTasks = useStorage<Task[]>(storageKeys.tasks, []);
-  const allProjects = useStorage<Project[]>(storageKeys.projects, []);
-  const pinnedProjects = useStorage<string[]>(storageKeys.pinnedProjects, []);
+  const tasksCol = useCollection<Task & { id: string }>('tasks');
+  const projectsCol = useCollection<Project & { id: string }>('projects');
+  const pinsCol = useCollection<{ id: string }>('pinnedProjects');
+
+  // Public refs keep prior shapes: Task[]/Project[]/string[]
+  const allTasks = computed(() => tasksCol.items.value as Task[]);
+  const allProjects = computed(() => projectsCol.items.value as Project[]);
+  const pinnedProjects = computed(() => pinsCol.items.value.map((p) => p.id));
 
   const settingsStore = useSettingsStore();
   const { getCategoryName } = useCategories();
@@ -38,13 +41,18 @@ export function useWorkspace() {
 
   /**
    * Initialize workspace with team work preset data if enabled and user data is empty
-   * This is called manually from components when needed
+   * This is called manually from components when needed.
+   * Collections load asynchronously, so we must await both being ready before the
+   * empty-check — otherwise this races the initial load and seeds the preset over
+   * data that simply hasn't finished loading yet.
    */
-  const initTeamWorkPreset = () => {
+  const initTeamWorkPreset = async () => {
+    await Promise.all([projectsCol.ready, tasksCol.ready]);
+
     if (settingsStore.useDefaultTasks && allTasks.value.length === 0 && allProjects.value.length === 0) {
       // Initialize with team work preset tasks and projects
-      allProjects.value = [...teamWorkProjects];
-      allTasks.value = [...teamWorkTasks];
+      void projectsCol.addMany(teamWorkProjects.map((p) => ({ ...p, id: p.title })));
+      void tasksCol.addMany(teamWorkTasks.map((t) => ({ ...t, id: `${t.project}::${t.title}` })));
     }
   };
 
@@ -117,13 +125,11 @@ export function useWorkspace() {
   });
 
   const pinProject = (title: string) => {
-    if (!pinnedProjects.value.includes(title)) {
-      pinnedProjects.value.push(title);
-    }
+    if (!pinnedProjects.value.includes(title)) void pinsCol.add({ id: title });
   };
 
   const unpinProject = (title: string) => {
-    pinnedProjects.value = pinnedProjects.value.filter((t) => t !== title);
+    void pinsCol.remove(title);
   };
 
   const isPinned = (title: string): boolean => pinnedProjects.value.includes(title);
@@ -149,6 +155,13 @@ export function useWorkspace() {
     return uniq(teamJiraProjects.value.map((ticket) => `Review ticket ${ticket.title}`));
   });
 
+  /**
+   * Write-through helpers for bulk writers (import/AI flows) that add projects/tasks
+   * directly to the underlying collections.
+   */
+  const addProjects = (list: Project[]) => projectsCol.addMany(list.map((p) => ({ ...p, id: p.title })));
+  const addTasks = (list: Task[]) => tasksCol.addMany(list.map((t) => ({ ...t, id: `${t.project}::${t.title}` })));
+
   return {
     allTasks,
     allProjects,
@@ -165,5 +178,7 @@ export function useWorkspace() {
     codeReviewDescriptions,
 
     initTeamWorkPreset,
+    addProjects,
+    addTasks,
   };
 }

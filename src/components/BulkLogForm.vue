@@ -61,7 +61,6 @@ const settingsStore = useSettingsStore();
 const { sortedCategories, addCategory } = useCategories();
 
 const {
-  allProjects,
   allTasks,
   myProjects,
   sortedProjectItems,
@@ -71,6 +70,8 @@ const {
   codeReviewDescriptions,
   getTasksByProject,
   initTeamWorkPreset,
+  addProjects,
+  addTasks,
 } = useWorkspace();
 
 onMounted(() => {
@@ -186,11 +187,11 @@ const onSave = handleSubmit((values) => {
       );
       categoryId = existingCat ? existingCat.id : addCategory(values.categoryName.trim()).id;
     }
-    allProjects.value.push({ title: values.project!, categoryId });
+    void addProjects([{ title: values.project!, categoryId }]);
   }
 
   const isTaskExisting = allTasks.value.some((t) => t.title === values.task!);
-  if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
+  if (!isTaskExisting) void addTasks([{ title: values.task!, project: values.project! } satisfies Task]);
 
   // Use current parent selectedDates so vee-validate stays in sync when the
   // remember-last-date feature keeps the parent value unchanged after save.
