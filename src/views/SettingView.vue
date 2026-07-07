@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import { useBackup } from '@/composables/useBackup';
 import { useCategories } from '@/composables/useCategories';
 import { useJira } from '@/composables/useJira';
 import { useServerSettings } from '@/composables/useServerSettings';
@@ -22,6 +23,11 @@ const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJ
 const { saveSettings } = useServerSettings();
 const showApiToken = ref(false);
 const isSavingSettings = ref(false);
+
+const { exportBackup, importBackup } = useBackup();
+const isExportingBackup = ref(false);
+const isImportingBackup = ref(false);
+const backupFile = ref<File[]>([]);
 
 const jiraValidationSchema = yup.object({
   email: yup.string().email('Please enter a valid email address').required('Email is required'),
@@ -135,6 +141,40 @@ const handleSyncTickets = async (): Promise<void> => {
     notificationCenter.error('Failed to sync Jira tickets', {
       message: error instanceof Error ? error.message : 'Unknown error occurred',
     });
+  }
+};
+
+const handleExportBackup = async (): Promise<void> => {
+  isExportingBackup.value = true;
+  try {
+    await exportBackup();
+    notificationCenter.success('Backup exported');
+  } catch (error) {
+    notificationCenter.error('Failed to export backup', {
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+    });
+  } finally {
+    isExportingBackup.value = false;
+  }
+};
+
+const handleImportBackup = async (): Promise<void> => {
+  const file = backupFile.value[0];
+  if (!file) return;
+
+  isImportingBackup.value = true;
+  try {
+    await importBackup(file);
+    notificationCenter.success('Backup imported');
+    // Every composable/collection cache is reloaded from the freshly-restored store.
+    window.location.reload();
+  } catch (error) {
+    notificationCenter.error('Failed to import backup', {
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+    });
+  } finally {
+    isImportingBackup.value = false;
+    backupFile.value = [];
   }
 };
 </script>
@@ -257,6 +297,41 @@ const handleSyncTickets = async (): Promise<void> => {
               color="primary"
               persistent-hint
               hint="Controls both blur and opacity of all glass surfaces. Higher = more readable over busy backgrounds, lower = more transparent."
+            />
+          </VCardText>
+        </VCard>
+      </div>
+
+      <!-- Backup & Restore island -->
+      <div>
+        <VCard class="glass-acrylic">
+          <VCardTitle>Backup &amp; Restore</VCardTitle>
+          <VCardText class="d-flex flex-column ga-2">
+            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
+              Export a full JSON snapshot of your data, or import one to replace everything currently stored in this
+              browser. This is a local safety net — no data leaves your device.
+            </VAlert>
+
+            <VBtn
+              :loading="isExportingBackup"
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-download-outline"
+              @click="handleExportBackup"
+            >
+              Export backup (JSON)
+            </VBtn>
+
+            <VFileInput
+              v-model="backupFile"
+              label="Import backup (JSON)"
+              accept="application/json"
+              prepend-icon=""
+              prepend-inner-icon="mdi-upload-outline"
+              :loading="isImportingBackup"
+              persistent-hint
+              hint="Replaces all data currently stored in this browser."
+              @update:model-value="handleImportBackup"
             />
           </VCardText>
         </VCard>
