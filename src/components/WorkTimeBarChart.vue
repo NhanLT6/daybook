@@ -27,6 +27,16 @@ const chartColors = computed(() => ({
   gridColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
   tickColor: isDark.value ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
   legendColor: isDark.value ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)',
+  // Border between stacked segments — matches the card surface so it reads as a thin gap,
+  // separating similar pastel fills without changing the palette
+  segmentBorder: theme.global.current.value.colors.surface,
+}));
+
+// Shared per-dataset border config: a hairline gap between stacked segments
+const segmentBorder = computed(() => ({
+  borderColor: chartColors.value.segmentBorder,
+  borderWidth: 1,
+  borderSkipped: false as const,
 }));
 
 // Component props
@@ -102,6 +112,7 @@ const chartData = computed(() => {
       .map((logsByProject, projectName) => ({
         label: projectName,
         backgroundColor: projectColors.getProjectColor(projectName),
+        ...segmentBorder.value,
         data: daysInMonth.value.map((d) =>
           chain(logsByProject)
             .filter((item) => item.date === d.format(shortDateFormat))
@@ -127,6 +138,7 @@ const chartData = computed(() => {
       .map((logsByProject) => ({
         label: 'Invalid Data',
         backgroundColor: pattern.draw('diagonal', projectColors.invalidDataColor()),
+        ...segmentBorder.value,
         data: daysInMonth.value.map((d) =>
           chain(logsByProject)
             .filter((item) => item.date === d.format(shortDateFormat))
@@ -154,6 +166,7 @@ const chartData = computed(() => {
     const remainingDataSet = {
       label: 'Remaining',
       backgroundColor: projectColors.remainingDataColor(),
+      ...segmentBorder.value,
       data: remainingData,
     };
 
@@ -218,7 +231,7 @@ const chartOptions = computed(() => ({
             hidden: !chart.isDatasetVisible(index),
             datasetIndex: index,
             fontColor: chartColors.value.legendColor,
-            pointStyle: 'circle' as const,
+            pointStyle: 'rectRounded' as const,
           }));
         },
       },

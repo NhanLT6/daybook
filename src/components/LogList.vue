@@ -259,30 +259,23 @@ const readCsv = (file?: File) => {
 
                 <!--suppress VueUnrecognizedSlot -->
                 <template #item.actions="{ item }">
+                  <!-- Tooltip as activator="parent" child (not the v-tooltip directive):
+                       the directive's update hook throws when these keyed rows re-patch -->
                   <div class="d-flex">
-                    <VBtn
-                      icon="mdi-pencil-outline"
-                      variant="text"
-                      size="small"
-                      @click="onEditLog(item)"
-                      v-tooltip="'Edit'"
-                    />
+                    <VBtn icon variant="text" size="small" @click="onEditLog(item)">
+                      <VIcon icon="mdi-pencil-outline" />
+                      <VTooltip activator="parent" text="Edit" />
+                    </VBtn>
 
-                    <VBtn
-                      icon="mdi-content-duplicate"
-                      variant="text"
-                      size="small"
-                      @click="onCloneLog(item)"
-                      v-tooltip="'Clone'"
-                    />
+                    <VBtn icon variant="text" size="small" @click="onCloneLog(item)">
+                      <VIcon icon="mdi-content-duplicate" />
+                      <VTooltip activator="parent" text="Clone" />
+                    </VBtn>
 
-                    <VBtn
-                      icon="mdi-trash-can-outline"
-                      variant="text"
-                      size="small"
-                      @click="onDeleteLog(item)"
-                      v-tooltip="'Delete'"
-                    />
+                    <VBtn icon variant="text" size="small" @click="onDeleteLog(item)">
+                      <VIcon icon="mdi-trash-can-outline" />
+                      <VTooltip activator="parent" text="Delete" />
+                    </VBtn>
                   </div>
                 </template>
               </VDataTable>

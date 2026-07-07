@@ -107,8 +107,8 @@ export const useProjectColors = () => {
   };
 
   // Theme-aware utility colors
-  // Remaining: subtle placeholder color (very muted on dark theme)
-  const remainingDataColor = () => (isDark() ? '#2E3B2E' : '#E8F5E9');
+  // Remaining: neutral grey placeholder (Vuetify grey-darken-3 / grey-lighten-3)
+  const remainingDataColor = () => (isDark() ? '#424242' : '#EEEEEE');
   const invalidDataColor = () => (isDark() ? '#4A2C2C' : '#FFCDD2');
 
   return {
