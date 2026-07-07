@@ -1,5 +1,6 @@
 import { computed } from 'vue';
 import dayjs, { type Dayjs } from 'dayjs';
+import { isoDateFormat } from '@/common/DateFormat';
 import { useSettingsStore } from '@/stores/settings';
 
 /**
@@ -28,8 +29,8 @@ export function useDateDisplay() {
    * Format a date string from internal format to display format
    */
   const formatInternalDateForDisplay = (dateString: string): string => {
-    // Internal dates are stored in MM/DD/YYYY format
-    return formatDateForDisplay(dateString, 'MM/DD/YYYY');
+    // Internal dates are stored in ISO YYYY-MM-DD format
+    return formatDateForDisplay(dateString, isoDateFormat);
   };
 
   /**
