@@ -29,13 +29,15 @@ export function useCategories() {
   if (!seedAttempted) {
     seedAttempted = true;
     if (localStorage.getItem(SEEDED_FLAG_KEY) !== '1') {
-      void c.ready.then(async () => {
-        if (c.items.value.length === 0) await c.addMany(defaultCategories);
-        // Mark seeded regardless of whether we actually added anything: migrated
-        // users who already had categories at this point must also be flagged, so
-        // they never get a default resurrected after clearing their categories out.
-        localStorage.setItem(SEEDED_FLAG_KEY, '1');
-      });
+      void c.ready
+        .then(async () => {
+          if (c.items.value.length === 0) await c.addMany(defaultCategories);
+          // Mark seeded regardless of whether we actually added anything: migrated
+          // users who already had categories at this point must also be flagged, so
+          // they never get a default resurrected after clearing their categories out.
+          localStorage.setItem(SEEDED_FLAG_KEY, '1');
+        })
+        .catch((e) => console.warn('[categories] seed skipped', e));
     }
   }
 

@@ -15,7 +15,7 @@ function isIndexedDbAvailable(): boolean {
   }
 }
 
-function selectAdapter(): StorageAdapter {
+function makeSelectedAdapter(): StorageAdapter {
   if (STORAGE_BACKEND === 'indexeddb' && isIndexedDbAvailable()) return createIndexedDbAdapter();
   if (STORAGE_BACKEND === 'indexeddb') {
     console.warn('[db] IndexedDB unavailable, falling back to localStorage');
@@ -23,15 +23,45 @@ function selectAdapter(): StorageAdapter {
   return createLocalStorageAdapter();
 }
 
-const adapter = selectAdapter();
-export const db: Repository = createRepository(adapter);
+// `current` is the real backend and can be swapped (indexeddb -> localstorage) if
+// opening it fails at init time. `db` below binds to a stable delegating adapter so
+// callers holding a reference to `db` transparently see the swapped backend too.
+let current: StorageAdapter = makeSelectedAdapter();
+
+// Delegating adapter: repository binds to this stable object; we can swap `current`
+// on init failure without invalidating anything that already imported `db`.
+const delegating: StorageAdapter = {
+  init: () => current.init(),
+  getAll: (c) => current.getAll(c),
+  put: (c, r) => current.put(c, r),
+  putMany: (c, r) => current.putMany(c, r),
+  remove: (c, id) => current.remove(c, id),
+  clear: (c) => current.clear(c),
+  snapshot: () => current.snapshot(),
+  restore: (s) => current.restore(s),
+};
+
+export const db: Repository = createRepository(delegating);
 
 let initPromise: Promise<void> | null = null;
 export function initDb(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
-      await adapter.init();
-      await runMigrations(adapter);
+      try {
+        await current.init();
+      } catch (err) {
+        // Primary backend named IndexedDB but failed to OPEN (private mode / quota /
+        // corruption) — fall back to localStorage. If we were already on localStorage,
+        // there's nothing left to fall back to, so rethrow.
+        if (STORAGE_BACKEND === 'indexeddb') {
+          console.warn('[db] IndexedDB init failed, falling back to localStorage', err);
+          current = createLocalStorageAdapter();
+          await current.init();
+        } else {
+          throw err;
+        }
+      }
+      await runMigrations(current);
     })();
   }
   return initPromise;
