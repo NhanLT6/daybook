@@ -17,7 +17,7 @@ import { useNow } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { isoDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { onCatchUpView } from '@/composables/useCatchUpSummary';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
@@ -25,10 +25,10 @@ import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
+import { xeroExportCsv, xeroImportCsv } from '@/xero/xeroCsv';
 import { saveAs } from 'file-saver';
-import { camelCase, toNumber, uniqBy } from 'lodash';
+import { uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
-import { parse, unparse } from 'papaparse';
 
 const { logs, forMonth, save, remove: removeLog, addMany: addLogs } = useTimeLogs();
 const { addProjects, addTasks, allProjects: projects, allTasks: tasks } = useWorkspace();
@@ -177,18 +177,7 @@ const onDeleteLog = async (log: TimeLog) => {
 };
 
 const exportToCsv = () => {
-  const transformedData = timeLogs.value.map((log) => ({
-    Id: log.id,
-    Date: dayjs(log.date, isoDateFormat).format(templateDateFormat),
-    Project: log.project,
-    Task: log.task,
-    Duration: log.duration ?? '',
-    Type: log.type ?? 'log',
-    Description: log.description,
-    IsLogged: false,
-  }));
-
-  const csv = unparse(transformedData);
+  const csv = xeroExportCsv(logs.value);
 
   // Save Csv file
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -200,44 +189,14 @@ const importCsv = async (file?: File) => {
 
   const fileContent = await file.text();
 
-  const result = parse(fileContent, {
-    header: true,
-    transformHeader(header: string): string {
-      return camelCase(header);
-    },
-    transform(value: string, header: string): string | number | undefined {
-      if (header === 'date') return dayjs(value, templateDateFormat).format(isoDateFormat);
-      if (header === 'duration') return value ? toNumber(value) : undefined;
-      if (header === 'type') return value === 'plan' ? 'plan' : 'log';
-
-      return value;
-    },
-  });
-
-  if (result.errors.length) {
-    result.errors.map((e) => {
-      notificationCenter.error('Import failed', {
-        message: e.message,
-      });
-      console.error(e);
-    });
-
+  let dataWithIds: TimeLog[];
+  try {
+    dataWithIds = xeroImportCsv(fileContent);
+  } catch (e) {
+    notificationCenter.error('Import failed', { message: (e as Error).message });
+    console.error(e);
     return;
   }
-
-  const dataWithIds: TimeLog[] = result.data.map((item) => {
-    const log = item as Record<string, string | number | undefined>;
-    const duration = log.duration as number | undefined;
-    return {
-      id: (log.id as string) ?? nanoid(),
-      date: log.date as string,
-      project: log.project as string,
-      task: log.task as string,
-      duration: duration || undefined,
-      type: (log.type as 'log' | 'plan' | undefined) ?? (duration ? 'log' : 'plan'),
-      description: log.description as string | undefined,
-    };
-  });
 
   await addLogs(dataWithIds.map((l) => ({ ...l, id: l.id ?? nanoid() })));
   await addProjects(uniqBy(dataWithIds.map((l) => ({ title: l.project })), 'title'));
