@@ -2,12 +2,13 @@ import { computed, ref } from 'vue';
 
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { ExtractLogsInput } from '@/interfaces/aiTools';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
-import type { DynamicToolUIPart, FileUIPart, UIMessage } from 'ai';
+import type { FileUIPart } from 'ai';
 
 import { Chat } from '@ai-sdk/vue';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, getToolName, isToolUIPart } from 'ai';
 
 import { buildAuthHeaders } from './useCrypto';
 
@@ -24,6 +25,21 @@ export async function fileToBase64(file: File): Promise<{ base64: string; mimeTy
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// ── Tool-part reader ────────────────────────────────────────────────────────
+
+/**
+ * Derive extracted logs from a message's parts. Static AI SDK tools stream as
+ * `tool-extractLogs` parts (not `dynamic-tool`); this is the single place that
+ * reads them, so it is unit-tested against SDK part shapes.
+ */
+export function extractLogsFromMessage(message: Pick<DaybookUIMessage, 'parts'>): ExtractedLog[] {
+  const part = message.parts.find(
+    (p) => isToolUIPart(p) && getToolName(p) === 'extractLogs' && p.state === 'input-available',
+  );
+  const input = part && 'input' in part ? (part.input as ExtractLogsInput | undefined) : undefined;
+  return input?.logs ?? [];
 }
 
 // ── Composable ────────────────────────────────────────────────────────────
@@ -44,22 +60,9 @@ export function useAiChat() {
       const last = finished[finished.length - 1];
       if (!last || last.role !== 'assistant') return;
 
-      // Find extractLogs dynamic tool invocation from the AI SDK
-      const toolPart = last.parts.find(
-        (p) =>
-          p.type === 'dynamic-tool' &&
-          (p as DynamicToolUIPart).toolName === 'extractLogs' &&
-          (p as DynamicToolUIPart).state === 'input-available',
-      ) as (DynamicToolUIPart & { state: 'input-available' }) | undefined;
-
-      const logs = (toolPart?.input as { logs?: ExtractedLog[] })?.logs ?? [];
-
-      metadataMap.value = new Map(metadataMap.value).set(last.id, {
-        timestamp: Date.now(),
-        ...(logs.length > 0 ? { tool: 'extractLogs' as const, extractedLogs: logs } : {}),
-      });
-
-      if (logs.length > 0) {
+      // extractedLogs are derived from message parts in `messages` (below); here
+      // we only record which message currently owns the saveable log preview.
+      if (extractLogsFromMessage(last).length > 0) {
         latestLogsMessageId.value = last.id;
       }
     },
@@ -68,12 +71,22 @@ export function useAiChat() {
     },
   });
 
-  // Merge SDK messages with our app metadata
+  // Merge SDK messages with app state. extractLogs metadata is derived from the
+  // tool part (single source = SDK parts); the map only holds client-only state
+  // (saveState) and fully client-injected catch-up messages.
   const messages = computed<DaybookUIMessage[]>(() =>
-    (chat.messages as UIMessage[]).map((m) => ({
-      ...m,
-      metadata: metadataMap.value.get(m.id),
-    })),
+    (chat.messages as DaybookUIMessage[]).map((m) => {
+      const stored = metadataMap.value.get(m.id);
+      // Catch-up messages are injected client-side and carry their own metadata.
+      if (stored?.tool === 'catchUp') return { ...m, metadata: stored };
+
+      const logs = extractLogsFromMessage(m);
+      const metadata: DaybookMessageMetadata | undefined =
+        logs.length || stored
+          ? { ...stored, ...(logs.length ? { tool: 'extractLogs', extractedLogs: logs } : {}) }
+          : undefined;
+      return { ...m, metadata };
+    }),
   );
 
   // True while request is in-flight or tokens are arriving
@@ -156,7 +169,6 @@ export function useAiChat() {
     };
     chat.messages = [...chat.messages, syntheticMsg as unknown as DaybookUIMessage];
     metadataMap.value = new Map(metadataMap.value).set(id, {
-      timestamp: Date.now(),
       tool: 'catchUp' as const,
       catchUpItems: items,
     });

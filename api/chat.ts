@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { UIMessage } from 'ai';
 
 import { convertToModelMessages, streamText, tool } from 'ai';
-import { z } from 'zod';
 
+import { extractLogsInputSchema } from '../src/interfaces/aiTools.js';
 import { AuthError, verifyRequest } from './_lib/auth.js';
 import { isAiEnabled, requireAiModel } from './_lib/ai.js';
 
@@ -17,17 +17,7 @@ interface ChatApiRequest {
 const extractLogsTool = tool({
   description:
     "Extract one or more time log entries from the user's message. Call this whenever the user describes work they did (via text or screenshot).",
-  parameters: z.object({
-    logs: z.array(
-      z.object({
-        project: z.string().describe('Project name, matched to known projects where possible'),
-        task: z.string().describe('Task name; use project name if no task is mentioned'),
-        date: z.string().describe('ISO date YYYY-MM-DD, resolved from relative references using today'),
-        duration: z.number().int().positive().describe('Duration in minutes'),
-        description: z.string().optional().describe('Optional extra detail'),
-      }),
-    ),
-  }),
+  inputSchema: extractLogsInputSchema,
 });
 
 function buildSystemPrompt(
@@ -67,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { machineId } = await verifyRequest({
+    await verifyRequest({
       get: (name: string) => {
         const val = req.headers[name.toLowerCase()];
         return Array.isArray(val) ? val[0] : (val ?? null);
@@ -85,7 +75,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       system: buildSystemPrompt(body.projects, body.tasks, body.currentDate),
       messages: await convertToModelMessages(body.messages),
       tools: { extractLogs: extractLogsTool },
-      maxSteps: 1,
     });
 
     // Stream to Node.js ServerResponse using the AI SDK helper

@@ -113,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { machineId } = await verifyRequest({
+    await verifyRequest({
       get: (name: string) => {
         const val = req.headers[name.toLowerCase()];
         return Array.isArray(val) ? val[0] : (val ?? null);

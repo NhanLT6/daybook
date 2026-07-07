@@ -9,8 +9,6 @@ import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { TextUIPart } from 'ai';
 
-import { useRouter } from 'vue-router';
-
 import AiChatMessage from './AiChatMessage.vue';
 
 const props = defineProps<{
@@ -35,7 +33,6 @@ const {
   markDiscarded,
   injectCatchUp,
 } = useAiChat();
-const router = useRouter();
 
 const isConfigError = computed(() => error.value?.includes('not configured') ?? false);
 

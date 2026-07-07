@@ -28,8 +28,10 @@ defineProps<{
         </p>
       </div>
 
-      <!-- Duration chip -->
-      <VChip size="small" variant="tonal" color="primary" class="flex-shrink-0"> {{ log.duration }} min </VChip>
+      <!-- Duration chip — plan entries have no logged time yet -->
+      <VChip size="small" variant="tonal" color="primary" class="flex-shrink-0">
+        {{ log.duration != null ? `${log.duration} min` : 'Plan' }}
+      </VChip>
     </div>
   </VCard>
 </template>

@@ -1,14 +1,9 @@
-import type { UIMessage } from 'ai';
-
+import type { ExtractLogsInput, ExtractedLog } from './aiTools';
 import type { CatchUpRenderItem } from './CatchUp';
+import type { UIDataTypes, UIMessage } from 'ai';
 
-export interface ExtractedLog {
-  project: string;
-  task: string;
-  date: string; // 'YYYY-MM-DD'
-  duration?: number; // minutes; undefined = plan entry
-  description?: string;
-}
+// Re-export so existing `@/interfaces/AiChat` importers keep working
+export type { ExtractedLog } from './aiTools';
 
 export type ChatTool = 'extractLogs' | 'catchUp';
 
@@ -16,9 +11,15 @@ export interface DaybookMessageMetadata {
   tool?: ChatTool;
   extractedLogs?: ExtractedLog[];
   saveState?: 'saved' | 'discarded';
-  timestamp?: number;
   catchUpItems?: CatchUpRenderItem[];
 }
 
+// Tools the client knows about — types the `tool-extractLogs` message parts so
+// `part.input` is `ExtractLogsInput` instead of `unknown`. Must be a `type`
+// (not `interface`) to satisfy the SDK's `UITools = Record<string, UITool>`.
+export type DaybookUITools = {
+  extractLogs: { input: ExtractLogsInput; output: never };
+};
+
 // Typed UIMessage used throughout this app
-export type DaybookUIMessage = UIMessage<DaybookMessageMetadata>;
+export type DaybookUIMessage = UIMessage<DaybookMessageMetadata, UIDataTypes, DaybookUITools>;
