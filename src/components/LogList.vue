@@ -9,7 +9,7 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
 
-import { shortDateFormat } from '@/common/DateFormat';
+import { isoDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
@@ -52,7 +52,7 @@ const scrollToSelectedDate = async (date: Date) => {
   await nextTick();
 
   // Get the date and find its element
-  const dateId = dayjs(date).format(shortDateFormat);
+  const dateId = dayjs(date).format(isoDateFormat);
   const element = document.getElementById(dateId);
   if (!element) return;
 
@@ -129,9 +129,9 @@ const headers = ref([
 
 // Week start key for a date, derived from the configured firstDayOfWeek (matches WorkTimeBarChart)
 const weekStartOf = (date: string) => {
-  const d = dayjs(date, shortDateFormat);
+  const d = dayjs(date, isoDateFormat);
   const diff = (d.day() - settingsStore.firstDayOfWeek + 7) % 7;
-  return d.subtract(diff, 'day').format('YYYY-MM-DD');
+  return d.subtract(diff, 'day').format(isoDateFormat);
 };
 
 // ── Filter option lists (from the month's logs) ─────────────────────────────────
@@ -169,7 +169,7 @@ const filteredItems = computed(() => {
   const bounds = dateBounds.value;
   if (bounds) {
     result = result.filter((l) => {
-      const d = dayjs(l.date, shortDateFormat);
+      const d = dayjs(l.date, isoDateFormat);
       return d.isValid() && !d.isBefore(bounds.from) && !d.isAfter(bounds.to);
     });
   }
@@ -231,7 +231,7 @@ watch(
   (newDates) => {
     if (hasActiveFilter.value) return;
     if (newDates && newDates.length > 0) {
-      openedPanels.value = newDates.map((date) => dayjs(date).format(shortDateFormat));
+      openedPanels.value = newDates.map((date) => dayjs(date).format(isoDateFormat));
       scrollToSelectedDate(newDates[newDates.length - 1]);
     } else {
       openedPanels.value = [];
@@ -247,9 +247,7 @@ watch([hasActiveFilter, filteredItems], ([active], [prevActive]) => {
     openedPanels.value = uniq(filteredItems.value.map((l) => l.date));
   } else if (prevActive) {
     openedPanels.value =
-      selectedDates && selectedDates.length > 0
-        ? selectedDates.map((date) => dayjs(date).format(shortDateFormat))
-        : [];
+      selectedDates && selectedDates.length > 0 ? selectedDates.map((date) => dayjs(date).format(isoDateFormat)) : [];
   }
 });
 
@@ -476,7 +474,7 @@ const readCsv = (file?: File) => {
           <VExpansionPanelTitle>
             <div class="me-2 d-flex align-center ga-2">
               <span class="text-caption text-medium-emphasis" style="min-width: 36px">
-                {{ dayjs(group.date, shortDateFormat).format('ddd').toUpperCase() }}
+                {{ dayjs(group.date, isoDateFormat).format('ddd').toUpperCase() }}
               </span>
               <span class="font-weight-bold" style="min-width: 110px">
                 {{ formatInternalDateForDisplay(group.date) }}

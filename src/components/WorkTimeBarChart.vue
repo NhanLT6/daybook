@@ -7,13 +7,12 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 
 import { useTheme } from 'vuetify';
 
-import { useStorage } from '@vueuse/core';
-
 import dayjs from 'dayjs';
 
-import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes, sumMinutesToHours } from '@/common/DateHelpers';
 import { useTaskBreakdown } from '@/composables/useTaskBreakdown';
+import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
 import { chain } from 'lodash';
@@ -64,14 +63,12 @@ const daysInMonth = computed(() =>
   ),
 );
 
-// Get time logs from storage (reactive to month changes)
-const timeLogsStorage = computed(() => {
-  const storageKey = `timeLogs-${selectedMonth.value.format(yearAndMonthFormat)}`;
-  return useStorage<TimeLog[]>(storageKey, []);
-});
+// Get time logs from the repo (reactive to month changes)
+const { forMonth } = useTimeLogs();
+const monthLogs = computed(() => forMonth(selectedMonth.value.format(yearAndMonthFormat)));
 
-// Use external timeLogs prop if provided, otherwise use storage
-const timeLogs = computed(() => props.timeLogs ?? timeLogsStorage.value.value);
+// Use external timeLogs prop if provided, otherwise use the repo's month logs
+const timeLogs = computed(() => props.timeLogs ?? monthLogs.value);
 
 // Task-level breakdown of the selected project (drives task stacking below)
 const taskBreakdown = useTaskBreakdown(timeLogs, () => props.selectedProject ?? null);
@@ -79,7 +76,7 @@ const taskBreakdown = useTaskBreakdown(timeLogs, () => props.selectedProject ?? 
 // Header stats — only shown when viewing the current month
 const isCurrentMonth = computed(() => (currentMonth?.value ?? dayjs().month() + 1) === dayjs().month() + 1);
 
-const todayStr = computed(() => dayjs().format(shortDateFormat));
+const todayStr = computed(() => dayjs().format(isoDateFormat));
 
 const weekStartDate = computed(() => {
   const today = dayjs();
@@ -95,7 +92,7 @@ const thisWeekMinutes = computed(() => {
   const weekStart = weekStartDate.value;
   return timeLogs.value
     .filter((log) => {
-      const d = dayjs(log.date, shortDateFormat);
+      const d = dayjs(log.date, isoDateFormat);
       return d.isValid() && !d.isBefore(weekStart) && !d.isAfter(dayjs().endOf('day'));
     })
     .reduce((sum, log) => sum + (log.duration ?? 0), 0);
@@ -105,9 +102,9 @@ const thisWeekMinutes = computed(() => {
 const chartData = computed(() => {
   try {
     // Precompute once per recompute (avoids dayjs.format in inner loops)
-    const dayKeys = daysInMonth.value.map((d) => d.format(shortDateFormat));
+    const dayKeys = daysInMonth.value.map((d) => d.format(isoDateFormat));
     const weekendDay = daysInMonth.value.map((d) => settingsStore.weekendDays.includes(d.day()));
-    const isWeekendLog = (log: TimeLog) => settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day());
+    const isWeekendLog = (log: TimeLog) => settingsStore.weekendDays.includes(dayjs(log.date, isoDateFormat).day());
 
     // Per-day logged hours (summed then rounded once) for a set of logs, indexed by day-of-month
     const dailyHours = (logs: TimeLog[]) =>
@@ -168,6 +165,7 @@ const chartData = computed(() => {
 
     // Remaining fills each weekday up to 8h; weekend days show only logged work
     const loggedPerDay = dailyHours(timeLogs.value.filter((log) => !isWeekendLog(log)));
+
     const remainingDataSet = {
       label: 'Remaining',
       backgroundColor: projectColors.remainingDataColor(),

@@ -7,9 +7,10 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
 
-import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { computeTaskBreakdown, type TaskBreakdownItem } from '@/composables/useTaskBreakdown';
+import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useSettingsStore } from '@/stores/settings';
 import { sumBy, uniqBy } from 'lodash';
 
@@ -22,6 +23,7 @@ const selectedProject = defineModel<string | null>('selectedProject', { default:
 
 const settingsStore = useSettingsStore();
 const { getProjectColor, getTaskColors } = useProjectColors();
+const { inRange } = useTimeLogs();
 
 // Alpha-hex suffixes appended to a project colour for the selected-row tints
 const SELECTED_TINT = '40'; // ~25% — selected project title
@@ -66,10 +68,6 @@ const currentMonthKey = computed(() => {
     .format(yearAndMonthFormat);
 });
 
-const lastMonthKey = computed(() => {
-  return dayjs(currentMonthKey.value, yearAndMonthFormat).subtract(1, 'month').format(yearAndMonthFormat);
-});
-
 // Week-over-week delta
 const weekStartDate = computed(() => {
   const today = dayjs();
@@ -82,7 +80,7 @@ const thisWeekMinutes = computed(() => {
   const today = dayjs().endOf('day');
   return sumBy(
     props.timeLogs.filter((log) => {
-      const d = dayjs(log.date, shortDateFormat);
+      const d = dayjs(log.date, isoDateFormat);
       return d.isValid() && !d.isBefore(weekStart) && !d.isAfter(today);
     }),
     'duration',
@@ -92,25 +90,8 @@ const thisWeekMinutes = computed(() => {
 const lastWeekMinutes = computed(() => {
   const lastWeekStart = weekStartDate.value.subtract(7, 'day');
   const lastWeekEnd = weekStartDate.value.subtract(1, 'day').endOf('day');
-  // Read from both current and previous month in case the week spans a month boundary
-  let total = 0;
-  for (const key of [currentMonthKey.value, lastMonthKey.value]) {
-    const raw = localStorage.getItem(`timeLogs-${key}`);
-    if (!raw) continue;
-    try {
-      const logs: TimeLog[] = JSON.parse(raw);
-      total += sumBy(
-        logs.filter((log) => {
-          const d = dayjs(log.date, shortDateFormat);
-          return d.isValid() && !d.isBefore(lastWeekStart) && !d.isAfter(lastWeekEnd);
-        }),
-        'duration',
-      );
-    } catch {
-      // ignore malformed storage
-    }
-  }
-  return total;
+  // Range query spans the month boundary automatically since logs are sourced from the repo, not a per-month cache
+  return sumBy(inRange(lastWeekStart.format(isoDateFormat), lastWeekEnd.format(isoDateFormat)), 'duration');
 });
 
 const delta = computed(() => thisWeekMinutes.value - lastWeekMinutes.value);
