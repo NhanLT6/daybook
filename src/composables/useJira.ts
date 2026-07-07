@@ -8,11 +8,15 @@ import { useStorage } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { fetchJiraTickets, testJiraConnection as testJiraConnectionApi } from '@/apis/jiraApi';
-import { shortDateFormat } from '@/common/DateFormat';
+import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { differenceBy } from 'lodash';
+
+// Jira project cache is month-scoped and regenerable, deliberately kept out of the shared
+// storageKeys registry (separate from the unified data-layer store).
+const JIRA_PROJECTS_KEY = `jiraProjects-${dayjs().format(yearAndMonthFormat)}`;
 
 export function useJira() {
   // Separate loading states for different operations (TanStack Query style)
@@ -23,7 +27,7 @@ export function useJira() {
   // Storage for last sync date - tracks when we last auto-synced
   const lastSyncDate = useStorage<string | null>(storageKeys.jira.lastSyncDate, null);
 
-  const jiraProjects = useStorage<JiraProject[]>(storageKeys.jiraProjects, []);
+  const jiraProjects = useStorage<JiraProject[]>(JIRA_PROJECTS_KEY, []);
 
   const { jiraConfig } = useSettingsStore();
   const notificationCenter = useNotificationCenterStore();
