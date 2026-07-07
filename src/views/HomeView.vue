@@ -363,7 +363,10 @@ const onAiUndoLogs = () => {
   <!-- Three-column layout: form | chart+logs | insights (lg+) -->
   <div class="home-layout">
     <!-- Left panel: Form + AI Assistant tabs -->
-    <VCard class="glass-acrylic form-panel d-flex flex-column overflow-hidden">
+    <VCard
+      class="glass-acrylic form-panel d-flex flex-column overflow-hidden"
+      :class="{ 'form-panel--chat': tab === 'ai' }"
+    >
       <VTabs v-model="tab" density="compact" class="ma-2" align-tabs="center" :slider-color="tabSliderColor">
         <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
         <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
@@ -384,7 +387,13 @@ const onAiUndoLogs = () => {
 
         <!-- AI Assistant tab — eager keeps AiChatPanel mounted so onCatchUpView fires immediately -->
         <VTabsWindowItem value="ai" eager>
-          <AiChatPanel :projects="projects" :tasks="tasks" @save-logs="onAiSaveLogs" @undo-logs="onAiUndoLogs" />
+          <AiChatPanel
+            class="mobile-chat"
+            :projects="projects"
+            :tasks="tasks"
+            @save-logs="onAiSaveLogs"
+            @undo-logs="onAiUndoLogs"
+          />
         </VTabsWindowItem>
       </VTabsWindow>
     </VCard>
@@ -516,6 +525,24 @@ const onAiUndoLogs = () => {
     overflow: visible !important;
     height: auto !important;
     flex: none !important;
+  }
+
+  /* Chat tab: the fixed-height chat app needs a bounded panel to fill (with its
+     own internal message scroll). The page-scroll model above suits the tall
+     Form but collapses the chat to content height. Restore the flex chain and
+     give the panel a definite height only while the Chat tab is active. */
+  .form-panel.form-panel--chat {
+    min-height: 0;
+    height: 80vh;
+  }
+  .form-panel.form-panel--chat :deep(.v-tabs-window),
+  .form-panel.form-panel--chat :deep(.v-tabs-window .v-window__container),
+  .form-panel.form-panel--chat :deep(.v-tabs-window .v-window-item),
+  .form-panel.form-panel--chat :deep(.v-card.mobile-chat) {
+    flex: 1 !important;
+    height: auto !important;
+    min-height: 0;
+    overflow: hidden !important;
   }
 }
 </style>
