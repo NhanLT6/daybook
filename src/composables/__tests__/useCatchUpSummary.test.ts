@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createPinia, setActivePinia } from 'pinia';
 
-import { accumulateMinutesByProject, applyLines, buildCatchUpItems, deriveItemId, formatEffort, isAiAvailable, shouldSkipCatchUp, useCatchUpSummary } from '@/composables/useCatchUpSummary';
+import { accumulateMinutesByProject, applyLines, buildCatchUpItems, deriveItemId, formatEffort, isAiAvailable, logsStamp, shouldSkipCatchUp, useCatchUpSummary } from '@/composables/useCatchUpSummary';
 import type { CatchUpItem, CatchUpRenderItem } from '@/composables/useCatchUpSummary';
+import type { TimeLog } from '@/interfaces/TimeLog';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 
 describe('useCatchUpSummary helpers', () => {
@@ -115,6 +116,44 @@ describe('buildCatchUpItems', () => {
     // accumulated map only contains in-window totals; an out-of-window project is absent
     const items = buildCatchUpItems(didLogs, new Map([['DS-4272 Sync', 120]]));
     expect(items.every((i: CatchUpItem) => i.ongoing)).toBe(false);
+  });
+});
+
+describe('logsStamp', () => {
+  const base: TimeLog[] = [
+    { id: '1', date: '2026-06-12', project: 'DS-4272 Sync', task: 'Sync Teams', duration: 90, type: 'log', description: 'orig' },
+    { id: '2', date: '2026-06-11', project: 'DS-4319 Teams fail', task: 'CTA label', duration: 30, type: 'log' },
+  ];
+
+  it('changes when a log field is edited in place (same length, same max date)', () => {
+    const edited: TimeLog[] = [
+      { ...base[0], description: 'edited' },
+      base[1],
+    ];
+    // Regression guard: this is the exact case the old `count:maxDate` formula collided on.
+    expect(logsStamp(edited)).not.toBe(logsStamp(base));
+  });
+
+  it('changes when duration is edited in place', () => {
+    const edited: TimeLog[] = [
+      { ...base[0], duration: 91 },
+      base[1],
+    ];
+    expect(logsStamp(edited)).not.toBe(logsStamp(base));
+  });
+
+  it('changes when a log is added', () => {
+    const added: TimeLog[] = [...base, { id: '3', date: '2026-06-10', project: 'P3', task: 't', duration: 10, type: 'log' }];
+    expect(logsStamp(added)).not.toBe(logsStamp(base));
+  });
+
+  it('changes when a log is deleted', () => {
+    const deleted: TimeLog[] = [base[0]];
+    expect(logsStamp(deleted)).not.toBe(logsStamp(base));
+  });
+
+  it('is stable for the same content', () => {
+    expect(logsStamp([...base])).toBe(logsStamp(base));
   });
 });
 

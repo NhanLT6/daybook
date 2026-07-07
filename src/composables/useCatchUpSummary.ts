@@ -199,10 +199,13 @@ interface SummaryCache {
   items: CatchUpRenderItem[];
 }
 
-function logsStamp(all: TimeLog[]): string {
-  let maxDate = '';
-  for (const l of all) if (l.date > maxDate) maxDate = l.date;
-  return `${all.length}:${maxDate}`;
+export function logsStamp(all: TimeLog[]): string {
+  let h = 0;
+  for (const l of all) {
+    const s = `${l.id}|${l.date}|${l.project}|${l.task}|${l.duration ?? ''}|${l.type}|${l.description ?? ''}`;
+    for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  }
+  return `${all.length}:${h}`;
 }
 
 function getCachedSummary(all: TimeLog[]): CatchUpRenderItem[] | null {

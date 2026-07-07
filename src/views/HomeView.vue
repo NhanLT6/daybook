@@ -177,7 +177,7 @@ const onDeleteLog = async (log: TimeLog) => {
 };
 
 const exportToCsv = () => {
-  const csv = xeroExportCsv(logs.value);
+  const csv = xeroExportCsv(timeLogs.value);
 
   // Save Csv file
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
