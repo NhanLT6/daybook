@@ -20,7 +20,7 @@ import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { RouterView, useRoute } from 'vue-router';
 
-const { events, replaceAll } = useEvents();
+const { events, replaceAll, ready } = useEvents();
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
 const { startCatchUpNotifications } = useCatchUpSummary();
 const { startGreetingNotifications } = useGreetingNotifications();
@@ -44,6 +44,7 @@ const glassStyle = computed(() => {
 });
 
 const autoFetchEvents = async () => {
+  await ready;
   const currentYear = new Date().getFullYear();
   const hasHolidaysThisYear = events.value.some((e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)));
   if (!hasHolidaysThisYear) {
