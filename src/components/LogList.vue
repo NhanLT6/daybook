@@ -259,7 +259,7 @@ const readCsv = (file?: File) => {
 
                 <!--suppress VueUnrecognizedSlot -->
                 <template #item.actions="{ item }">
-                  <div class="d-flex ga-2">
+                  <div class="d-flex">
                     <VBtn
                       icon="mdi-pencil-outline"
                       variant="text"
