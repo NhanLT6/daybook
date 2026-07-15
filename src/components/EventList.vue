@@ -22,6 +22,19 @@ const notificationCenter = useNotificationCenterStore();
 // All events sorted chronologically
 const filteredEvents = computed<AppEvent[]>(() => [...events.value].sort((a, b) => dayjs(a.date).diff(dayjs(b.date))));
 
+// Table columns — actions right-aligned via the slot (no header `align` to keep typing simple)
+const headers = [
+  { title: '', key: 'type', sortable: false, width: 56 },
+  { title: 'Event', key: 'title', sortable: false },
+  { title: 'When', key: 'when', sortable: false },
+  { title: '', key: 'actions', sortable: false, width: 96 },
+];
+
+// Dim past events at the row level
+const rowProps = ({ item }: { item: AppEvent }) => ({
+  class: isPastEvent(item.date) ? 'text-disabled' : '',
+});
+
 const isPastEvent = (date: string): boolean => dayjs(date).isBefore(dayjs(), 'day');
 
 // ─── Modal state ─────────────────────────────────────────────
@@ -84,78 +97,78 @@ const deleteEvent = (event: AppEvent) => {
 </script>
 
 <template>
-  <VCard class="glass-acrylic d-flex flex-column">
-    <!-- Header — sticky so it stays visible while list scrolls -->
-    <VCardTitle style="position: sticky; top: 0; z-index: 1000">
-      <VToolbar class="bg-transparent" density="compact">
-        <VToolbarTitle class="ms-0">Events</VToolbarTitle>
+  <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
+    <!-- Header -->
+    <VCardTitle class="flex-shrink-0 pa-0">
+      <VContainer class="page-inner py-0">
+        <VToolbar class="bg-transparent" density="compact">
+          <VToolbarTitle class="ms-0">Events</VToolbarTitle>
 
-        <VSpacer />
+          <VSpacer />
 
-        <div class="d-flex ga-2">
           <VTooltip>
             <template #activator="{ props }">
-              <VBtn
-                prepend-icon="mdi-plus"
-                icon-size="small"
-                color="primary"
-                variant="tonal"
-                @click="openAddModal"
-                v-bind="props"
-              >
+              <VBtn prepend-icon="mdi-plus" color="primary" variant="tonal" @click="openAddModal" v-bind="props">
                 New Event
               </VBtn>
             </template>
             Add event
           </VTooltip>
-        </div>
-      </VToolbar>
+        </VToolbar>
+      </VContainer>
     </VCardTitle>
 
-    <!-- Scrollable content area -->
+    <!-- Scrollable body -->
     <div class="scroll-content">
-      <!-- Empty state — mirrors LogList pattern, different icon -->
-      <VCardText v-if="filteredEvents.length === 0">
-        <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
-          <VIcon icon="mdi-calendar-blank-outline" class="text-disabled" />
-          <div class="text-subtitle-1 text-disabled">No events</div>
+      <VContainer class="page-inner">
+        <!-- Empty state -->
+        <div
+          v-if="filteredEvents.length === 0"
+          class="d-flex flex-column ga-2 py-8 align-center bg-container rounded-lg text-disabled"
+        >
+          <VIcon icon="mdi-calendar-blank-outline" />
+          <div class="text-subtitle-1">No events</div>
         </div>
-      </VCardText>
 
-      <!-- Event list -->
-      <VList v-else lines="three" density="compact">
-        <VHover v-for="event in filteredEvents" :key="event.id">
-          <template #default="{ isHovering, props: hoverProps }">
-            <VListItem
-              v-bind="hoverProps"
-              :class="{ 'text-disabled': isPastEvent(event.date) }"
-              :title="event.title"
-              :subtitle="formatEventDate(event)"
-            >
-              <!-- Avatar: holiday image vs custom icon -->
-              <template #prepend>
-                <VAvatar size="small" variant="tonal">
-                  <VImg v-if="event.type === 'holiday'" :src="holidayImg" alt="Holiday" />
-                  <VIcon v-else icon="mdi-account-outline" class="text-disabled" />
-                </VAvatar>
-              </template>
+        <!-- Events table -->
+        <VCard v-else class="elevation-0 rounded-lg overflow-hidden">
+          <VDataTable
+            :items="filteredEvents"
+            :headers="headers"
+            :items-per-page="-1"
+            :row-props="rowProps"
+            class="bg-container"
+            hide-default-footer
+          >
+            <!-- Type avatar: holiday image vs custom icon -->
+            <template #item.type="{ item }">
+              <VAvatar size="small" variant="tonal">
+                <VImg v-if="item.type === 'holiday'" :src="holidayImg" alt="Holiday" />
+                <VIcon v-else icon="mdi-account-outline" />
+              </VAvatar>
+            </template>
 
-              <!-- Description as third line -->
-              <span v-if="event.description" class="text-caption text-medium-emphasis">{{ event.description }}</span>
+            <!-- Title + optional muted description line -->
+            <template #item.title="{ item }">
+              <div class="py-1">
+                <div>{{ item.title }}</div>
+                <div v-if="item.description" class="text-caption text-medium-emphasis">{{ item.description }}</div>
+              </div>
+            </template>
 
-              <!-- Edit / delete — custom events only -->
-              <template v-if="event.type === 'custom'" #append>
-                <div class="d-flex ga-1">
-                  <template v-if="isHovering">
-                    <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(event)" />
-                    <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(event)" />
-                  </template>
-                </div>
-              </template>
-            </VListItem>
-          </template>
-        </VHover>
-      </VList>
+            <!-- Formatted date/time -->
+            <template #item.when="{ item }">{{ formatEventDate(item) }}</template>
+
+            <!-- Edit / delete — custom events only -->
+            <template #item.actions="{ item }">
+              <div v-if="item.type === 'custom'" class="d-flex ga-1 justify-end">
+                <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(item)" />
+                <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(item)" />
+              </div>
+            </template>
+          </VDataTable>
+        </VCard>
+      </VContainer>
     </div>
 
     <!-- Add / Edit Modal -->

@@ -3,7 +3,7 @@ import EventList from '@/components/EventList.vue';
 </script>
 
 <template>
-  <VContainer>
+  <div class="page-fill">
     <EventList />
-  </VContainer>
+  </div>
 </template>
