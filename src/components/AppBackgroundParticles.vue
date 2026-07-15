@@ -125,7 +125,7 @@ watch(isDark, (dark) => generateParticles(dark));
 }
 
 .app-background.light {
-  background: linear-gradient(145deg, #dde4ec 0%, #d4dde6 45%, #d7e2d8 100%);
+  background: linear-gradient(145deg, #b4bec9 0%, #abb6c2 45%, #b2beb4 100%);
 }
 
 .app-background.dark {
