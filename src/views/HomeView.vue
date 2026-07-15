@@ -437,8 +437,16 @@ const onAiUndoLogs = () => {
       v-model:selected-project="selectedProject"
     />
 
-    <!-- Small screens: same panel in an opt-in right drawer (toggled from the header) -->
-    <VNavigationDrawer v-if="!lgAndUp" v-model="insightsDrawerOpen" location="right" temporary width="320">
+    <!-- Small screens: same panel in an opt-in right drawer (toggled from the header).
+         Transparent shell + side gaps so the panel floats like the app's other glass cards. -->
+    <VNavigationDrawer
+      v-if="!lgAndUp"
+      v-model="insightsDrawerOpen"
+      location="right"
+      temporary
+      width="332"
+      class="insights-drawer"
+    >
       <InsightsPanel
         :time-logs="timeLogs"
         :current-month="currentMonth"
@@ -476,6 +484,30 @@ const onAiUndoLogs = () => {
 /* Right panel: fixed-width insights column (only rendered on lg+) */
 .insights-panel {
   flex: 0 0 320px;
+}
+
+/* Insights drawer (small screens): float the panel like the app's other glass
+   cards — start below the app bar, gaps on the sides — instead of an
+   edge-to-edge slab. The transparent shell lets the panel's own glass show. */
+.insights-drawer {
+  top: 65px !important; /* clear the 53px app bar + a 12px gap */
+  bottom: 12px !important;
+  height: auto !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Content flexes so the panel fills the shell; padding-right lifts it off the
+   screen edge (top/bottom gaps come from the shell offsets above). */
+.insights-drawer :deep(.v-navigation-drawer__content) {
+  display: flex;
+  padding-right: 12px;
+}
+
+.insights-drawer :deep(.v-navigation-drawer__content) > * {
+  flex: 1;
+  min-height: 0;
 }
 
 /* VTabsWindow flex chain.
