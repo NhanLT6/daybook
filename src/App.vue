@@ -218,6 +218,19 @@ const navItems = [
   background: transparent !important;
 }
 
+/* Small screens: the Home layout switches to page-scroll (height:auto), so the
+   document grows and scrolls. Stop VMain's own overflow from adding a SECOND,
+   inset scrollbar — that inset pushed the content cards ~1 scrollbar-width left
+   of the full-width app bar, leaving a gap on the right. Let the document own the
+   single scrollbar so the fixed app bar and the content align on the right edge. */
+@media (max-width: 959px) {
+  /* Both axes: with overflow-x left as `hidden`, `overflow-y: visible` computes
+     back to `auto` (CSS spec), so VMain would keep its scrollbar. */
+  .v-main {
+    overflow: visible !important;
+  }
+}
+
 /* App bar — transparent shell; the glass dock inside handles visuals */
 .v-app-bar {
   border-bottom: none !important;
