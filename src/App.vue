@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import { useCatchUpSummary } from '@/composables/useCatchUpSummary';
 import { useGreetingNotifications } from '@/composables/useGreetingNotifications';
+import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { useJira } from '@/composables/useJira';
 import { useServerSettings } from '@/composables/useServerSettings';
 
@@ -109,7 +110,9 @@ onUnmounted(() => {
 
 const route = useRoute();
 
-const { smAndDown } = useDisplay();
+const { isOpen: insightsDrawerOpen } = useInsightsDrawer();
+
+const { smAndDown, lgAndUp } = useDisplay();
 
 // Theme toggle
 const theme = useTheme();
@@ -154,6 +157,15 @@ const navItems = [
           <span class="dock-spacer" />
 
 <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
+
+          <!-- Insights drawer toggle — Home only, small screens (inline panel hidden) -->
+          <VIconBtn
+            v-if="route.path === '/' && !lgAndUp"
+            icon="mdi-chart-box-outline"
+            size="small"
+            variant="text"
+            @click="insightsDrawerOpen = !insightsDrawerOpen"
+          />
 
           <!-- Desktop nav links -->
           <VBtn
