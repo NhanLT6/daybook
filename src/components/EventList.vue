@@ -182,8 +182,10 @@ const deleteEvent = (event: AppEvent) => {
               </div>
             </template>
 
-            <!-- Formatted date/time -->
-            <template #item.when="{ item }">{{ formatEventDate(item) }}</template>
+            <!-- Formatted date/time — keep on one line -->
+            <template #item.when="{ item }">
+              <span class="text-no-wrap">{{ formatEventDate(item) }}</span>
+            </template>
 
             <!-- Edit / delete — custom events only -->
             <template #item.actions="{ item }">
