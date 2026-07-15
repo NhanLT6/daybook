@@ -112,21 +112,21 @@ const deleteEvent = (event: AppEvent) => {
   <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
     <!-- Header -->
     <VCardTitle class="flex-shrink-0 pa-0">
-      <VContainer class="page-inner py-0">
+      <VContainer class="page-inner pt-3 pb-0">
         <VToolbar class="bg-transparent" density="compact">
           <VToolbarTitle class="ms-0">Events</VToolbarTitle>
 
           <VSpacer />
 
           <!-- Type filter -->
-          <VBtnToggle v-model="typeFilter" density="compact" variant="text" mandatory class="me-2">
+          <VBtnToggle v-model="typeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
             <VBtn value="all" size="small">All</VBtn>
             <VBtn value="custom" size="small">Mine</VBtn>
             <VBtn value="holiday" size="small">Holidays</VBtn>
           </VBtnToggle>
 
           <!-- Time filter -->
-          <VBtnToggle v-model="timeFilter" density="compact" variant="text" mandatory class="me-2">
+          <VBtnToggle v-model="timeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
             <VBtn value="upcoming" size="small">Upcoming</VBtn>
             <VBtn value="all" size="small">All</VBtn>
           </VBtnToggle>
