@@ -184,10 +184,10 @@ const onSave = handleSubmit((values) => {
     const editing = state.mode === 'edit-project' ? state.project : null;
     const projectExists = allProjects.value.some((p) => p.title === values.projectTitle);
 
-    if (!projectExists) {
-      allProjects.value.push({ title: values.projectTitle, categoryId: values.categoryId ?? undefined });
-    } else if (editing) {
-      // Update the existing project in place; migrate its tasks if the title changed.
+    if (editing) {
+      // Rename/update the project in place; migrate its tasks if the title changed.
+      // (Checked before the new-project push so renaming to a fresh title renames
+      // rather than creating a duplicate project.)
       const index = allProjects.value.findIndex((p) => p.title === editing.title);
       if (index >= 0) {
         allProjects.value[index] = {
@@ -201,6 +201,8 @@ const onSave = handleSubmit((values) => {
           });
         }
       }
+    } else if (!projectExists) {
+      allProjects.value.push({ title: values.projectTitle, categoryId: values.categoryId ?? undefined });
     }
 
     // New project with an optional task name → create that task too.
