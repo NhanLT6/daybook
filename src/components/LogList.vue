@@ -319,7 +319,7 @@ const readCsv = (file?: File) => {
    Scoped to the accordion context to out-specify Vuetify's
    `.v-expansion-panels--variant-accordion > .v-expansion-panel { margin-top: 0; border-radius: 0 }`. */
 :deep(.v-expansion-panels--variant-accordion > .v-expansion-panel.week-gap) {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 /* !important mirrors Vuetify's own accordion rule that resets middle-panel radius:
