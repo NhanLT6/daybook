@@ -29,11 +29,23 @@ onMounted(() => {
   initTeamWorkPreset();
 });
 
-const editingTask = ref<Task | null>(null);
-const editingProject = ref<Project | null>(null);
-const isNewTask = ref(false);
-const isNewProject = ref(false);
-const isDialogOpen = ref(false);
+// Create/edit dialog — one discriminated-union state replaces the four mode flags.
+type DialogState =
+  | { mode: 'new-project'; categoryId: string | null }
+  | { mode: 'new-task'; project?: string }
+  | { mode: 'edit-project'; project: Project }
+  | { mode: 'edit-task'; task: Task };
+
+const dialog = ref<DialogState | null>(null);
+const dialogMode = computed(() => dialog.value?.mode ?? null);
+const isDialogOpen = computed({
+  get: () => dialog.value !== null,
+  set: (open) => {
+    // VDialog closes itself (outside click / Esc) by setting this false.
+    if (!open) closeDialog();
+  },
+});
+
 const isDeleteProjectDialogOpen = ref(false);
 const projectToDelete = ref<string | null>(null);
 
@@ -117,7 +129,9 @@ const validationSchema = computed(() =>
   object({
     projectTitle: string().required('Project name is required'),
     taskTitle:
-      isNewProject.value || editingProject.value ? string().optional() : string().required('Task name is required'),
+      dialogMode.value === 'new-project' || dialogMode.value === 'edit-project'
+        ? string().optional()
+        : string().required('Task name is required'),
     categoryId: string().optional().nullable(),
   }),
 );
@@ -137,134 +151,70 @@ const taskField = useField<string>('taskTitle');
 const categoryField = useField<string | null | undefined>('categoryId');
 
 const editTask = (task: Task) => {
-  editingTask.value = task;
-  editingProject.value = null;
-  isNewTask.value = false;
-  isNewProject.value = false;
-  isDialogOpen.value = true;
-
-  resetForm({
-    values: {
-      projectTitle: task.project,
-      taskTitle: task.title,
-      categoryId: undefined,
-    },
-  });
+  dialog.value = { mode: 'edit-task', task };
+  resetForm({ values: { projectTitle: task.project, taskTitle: task.title, categoryId: undefined } });
 };
 
 const editProject = (project: Project) => {
-  editingProject.value = project;
-  editingTask.value = null;
-  isNewProject.value = false;
-  isNewTask.value = false;
-  isDialogOpen.value = true;
-  resetForm({
-    values: {
-      projectTitle: project.title,
-      taskTitle: '',
-      categoryId: project.categoryId ?? null,
-    },
-  });
+  dialog.value = { mode: 'edit-project', project };
+  resetForm({ values: { projectTitle: project.title, taskTitle: '', categoryId: project.categoryId ?? null } });
 };
 
 const createNewProject = (forCategoryId?: string | null) => {
-  editingProject.value = null;
-  editingTask.value = null;
-  isNewProject.value = true;
-  isNewTask.value = false;
-  isDialogOpen.value = true;
-  resetForm({
-    values: {
-      projectTitle: undefined,
-      taskTitle: undefined,
-      categoryId: forCategoryId ?? null,
-    },
-  });
+  dialog.value = { mode: 'new-project', categoryId: forCategoryId ?? null };
+  resetForm({ values: { projectTitle: undefined, taskTitle: undefined, categoryId: forCategoryId ?? null } });
 };
 
 const createNewTask = (forProjectTitle?: string) => {
-  editingTask.value = null;
-  editingProject.value = null;
-  isNewTask.value = true;
-  isNewProject.value = false;
-  isDialogOpen.value = true;
-  resetForm({
-    values: {
-      projectTitle: forProjectTitle || undefined,
-      taskTitle: undefined,
-      categoryId: undefined,
-    },
-  });
+  dialog.value = { mode: 'new-task', project: forProjectTitle };
+  resetForm({ values: { projectTitle: forProjectTitle || undefined, taskTitle: undefined, categoryId: undefined } });
+};
+
+const upsertTask = (title: string, project: string) => {
+  if (!allTasks.value.some((t) => t.title === title && t.project === project)) {
+    allTasks.value.push({ title, project });
+  }
 };
 
 const onSave = handleSubmit((values) => {
-  if (isNewProject.value || editingProject.value) {
-    const isProjectExisting = allProjects.value.map((p) => p.title).includes(values.projectTitle);
-    if (!isProjectExisting) {
-      allProjects.value.push({
-        title: values.projectTitle,
-        categoryId: values.categoryId ?? undefined,
-      });
-    } else if (editingProject.value && editingProject.value.title !== values.projectTitle) {
-      const projectIndex = allProjects.value.findIndex((p) => p.title === editingProject.value!.title);
-      if (projectIndex >= 0) {
-        allProjects.value[projectIndex] = {
-          ...allProjects.value[projectIndex],
+  const state = dialog.value;
+  if (!state) return;
+
+  if (state.mode === 'new-project' || state.mode === 'edit-project') {
+    const editing = state.mode === 'edit-project' ? state.project : null;
+    const projectExists = allProjects.value.some((p) => p.title === values.projectTitle);
+
+    if (!projectExists) {
+      allProjects.value.push({ title: values.projectTitle, categoryId: values.categoryId ?? undefined });
+    } else if (editing) {
+      // Update the existing project in place; migrate its tasks if the title changed.
+      const index = allProjects.value.findIndex((p) => p.title === editing.title);
+      if (index >= 0) {
+        allProjects.value[index] = {
+          ...allProjects.value[index],
           title: values.projectTitle,
           categoryId: values.categoryId ?? undefined,
         };
-        allTasks.value.forEach((task) => {
-          if (task.project === editingProject.value!.title) {
-            task.project = values.projectTitle;
-          }
-        });
-      }
-    } else if (editingProject.value) {
-      // Same title, just update categoryId
-      const projectIndex = allProjects.value.findIndex((p) => p.title === editingProject.value!.title);
-      if (projectIndex >= 0) {
-        allProjects.value[projectIndex] = {
-          ...allProjects.value[projectIndex],
-          categoryId: values.categoryId ?? undefined,
-        };
+        if (editing.title !== values.projectTitle) {
+          allTasks.value.forEach((task) => {
+            if (task.project === editing.title) task.project = values.projectTitle;
+          });
+        }
       }
     }
 
-    // If creating a new project and task name is provided, create the task too
-    if (isNewProject.value && values.taskTitle && values.taskTitle.trim()) {
-      const isTaskExisting = allTasks.value.some(
-        (t) => t.title === values.taskTitle && t.project === values.projectTitle,
-      );
-      if (!isTaskExisting) {
-        allTasks.value.push({
-          title: values.taskTitle,
-          project: values.projectTitle,
-        });
-      }
+    // New project with an optional task name → create that task too.
+    if (state.mode === 'new-project' && values.taskTitle?.trim()) {
+      upsertTask(values.taskTitle, values.projectTitle);
     }
-  }
-
-  if (isNewTask.value || editingTask.value) {
-    if (!isNewTask.value && editingTask.value) {
-      const taskIndex = allTasks.value.findIndex(
-        (t) => t.title === editingTask.value!.title && t.project === editingTask.value!.project,
-      );
-      if (taskIndex >= 0) {
-        allTasks.value[taskIndex] = {
-          title: values.taskTitle,
-          project: values.projectTitle,
-        };
-      }
+  } else {
+    // new-task or edit-task
+    const editing = state.mode === 'edit-task' ? state.task : null;
+    if (editing) {
+      const index = allTasks.value.findIndex((t) => t.title === editing.title && t.project === editing.project);
+      if (index >= 0) allTasks.value[index] = { title: values.taskTitle, project: values.projectTitle };
     } else {
-      const isTaskExisting = allTasks.value.some(
-        (t) => t.title === values.taskTitle && t.project === values.projectTitle,
-      );
-      if (!isTaskExisting) {
-        allTasks.value.push({
-          title: values.taskTitle,
-          project: values.projectTitle,
-        });
-      }
+      upsertTask(values.taskTitle, values.projectTitle);
     }
   }
 
@@ -273,11 +223,7 @@ const onSave = handleSubmit((values) => {
 
 const closeDialog = () => {
   resetForm();
-  editingTask.value = null;
-  editingProject.value = null;
-  isNewTask.value = false;
-  isNewProject.value = false;
-  isDialogOpen.value = false;
+  dialog.value = null;
 };
 
 const onCancel = closeDialog;
@@ -316,15 +262,17 @@ const deleteTaskDirectly = (taskTitle: string, projectTitle: string) => {
   }
 };
 
-const currentMode = computed(() => {
-  if (isNewProject.value) return 'New Project';
-  if (isNewTask.value) return 'New Task';
-  if (editingProject.value) return 'Edit Project';
-  if (editingTask.value) return 'Edit Task';
-  return 'Task Management';
-});
+const dialogTitles: Record<NonNullable<typeof dialogMode.value>, string> = {
+  'new-project': 'New Project',
+  'new-task': 'New Task',
+  'edit-project': 'Edit Project',
+  'edit-task': 'Edit Task',
+};
+const currentMode = computed(() => (dialogMode.value ? dialogTitles[dialogMode.value] : 'Task Management'));
 
-const showTaskField = computed(() => isNewTask.value || editingTask.value || isNewProject.value);
+const showTaskField = computed(
+  () => dialogMode.value === 'new-task' || dialogMode.value === 'edit-task' || dialogMode.value === 'new-project',
+);
 </script>
 
 <template>
@@ -344,12 +292,12 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
               v-model="projectField.value.value"
               label="Project Name"
               :error-messages="errors.projectTitle"
-              :disabled="editingTask !== null"
+              :disabled="dialogMode === 'edit-task'"
             />
 
             <!-- Category dropdown — only when categories feature is enabled -->
             <VSelect
-              v-if="settingsStore.useCategories && (isNewProject || editingProject)"
+              v-if="settingsStore.useCategories && (dialogMode === 'new-project' || dialogMode === 'edit-project')"
               v-model="categoryField.value.value"
               :items="sortedCategories"
               item-title="name"
@@ -365,8 +313,8 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
               v-model="taskField.value.value"
               label="Task Name"
               :error-messages="errors.taskTitle"
-              :hint="isNewProject ? 'This field is optional when creating a project' : ''"
-              :persistent-hint="isNewProject"
+              :hint="dialogMode === 'new-project' ? 'This field is optional when creating a project' : ''"
+              :persistent-hint="dialogMode === 'new-project'"
             />
           </form>
         </VCardText>
@@ -395,11 +343,11 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
               </VBtn>
             </template>
             {{
-              isNewProject
+              dialogMode === 'new-project'
                 ? 'Create new project'
-                : isNewTask
+                : dialogMode === 'new-task'
                   ? 'Create new task'
-                  : editingProject
+                  : dialogMode === 'edit-project'
                     ? 'Save project changes'
                     : 'Save task changes'
             }}
