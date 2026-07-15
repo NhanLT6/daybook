@@ -169,7 +169,7 @@ const deleteEvent = (event: AppEvent) => {
             <template #item.type="{ item }">
               <VAvatar size="small" variant="tonal">
                 <VImg v-if="item.type === 'holiday'" :src="holidayImg" alt="Holiday" />
-                <VIcon v-else icon="mdi-account-outline" />
+                <VIcon v-else icon="mdi-account-outline" class="text-disabled" />
               </VAvatar>
             </template>
 
