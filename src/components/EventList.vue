@@ -119,14 +119,14 @@ const deleteEvent = (event: AppEvent) => {
           <VSpacer />
 
           <!-- Type filter -->
-          <VBtnToggle v-model="typeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
+          <VBtnToggle v-model="typeFilter" density="compact" variant="text" mandatory class="me-2">
             <VBtn value="all" size="small">All</VBtn>
             <VBtn value="custom" size="small">Mine</VBtn>
             <VBtn value="holiday" size="small">Holidays</VBtn>
           </VBtnToggle>
 
           <!-- Time filter -->
-          <VBtnToggle v-model="timeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
+          <VBtnToggle v-model="timeFilter" density="compact" variant="text" mandatory class="me-2">
             <VBtn value="upcoming" size="small">Upcoming</VBtn>
             <VBtn value="all" size="small">All</VBtn>
           </VBtnToggle>
@@ -143,9 +143,9 @@ const deleteEvent = (event: AppEvent) => {
       </VContainer>
     </VCardTitle>
 
-    <!-- Scrollable body -->
-    <div class="scroll-content">
-      <VContainer class="page-inner">
+    <!-- Body — the table owns the scroll so its header stays fixed -->
+    <div class="event-body">
+      <VContainer class="page-inner event-inner">
         <!-- Empty state -->
         <div
           v-if="filteredEvents.length === 0"
@@ -156,13 +156,14 @@ const deleteEvent = (event: AppEvent) => {
         </div>
 
         <!-- Events table -->
-        <VCard v-else class="elevation-0 rounded-lg overflow-hidden">
+        <VCard v-else class="elevation-0 rounded-lg overflow-hidden event-table-card">
           <VDataTable
             :items="filteredEvents"
             :headers="headers"
             :items-per-page="-1"
             :row-props="rowProps"
-            class="bg-container"
+            class="bg-container events-table"
+            fixed-header
             hide-default-footer
           >
             <!-- Type avatar: holiday image vs custom icon -->
@@ -204,8 +205,48 @@ const deleteEvent = (event: AppEvent) => {
 </template>
 
 <style scoped>
-.scroll-content {
+/* Body fills the card; the table (not the page) owns the scroll so its header
+   stays fixed via VDataTable's fixed-header. */
+.event-body {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.event-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.event-table-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Flex chain down through VDataTable's internals so .v-table__wrapper is the
+   bounded scroll container (letting fixed-header stick) instead of growing to
+   full content height. */
+.event-table-card :deep(.v-data-table),
+.event-table-card :deep(.v-table) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.event-table-card :deep(.v-table__wrapper) {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+}
+
+/* Sticky header needs an opaque fill so scrolled rows don't bleed through the
+   frosted glass card behind the semi-transparent .bg-container. */
+.events-table :deep(thead th) {
+  background: rgb(var(--v-theme-surface)) !important;
 }
 </style>
