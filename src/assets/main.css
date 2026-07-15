@@ -16,6 +16,23 @@
   background-color: rgba(var(--v-theme-on-surface), 0.05);
 }
 
+/* ── Full-height page shell (shared by Task/Event views) ─────────────────────
+   .page-fill fills VMain and pads it; its panel VCard fills the height so the
+   card reads as the content area. .page-inner caps the readable width of the
+   scrollable content inside that card. */
+.page-fill {
+  height: 100%;
+  padding: 12px;
+}
+
+.page-fill > .v-card {
+  height: 100%;
+}
+
+.page-inner {
+  max-width: 900px;
+}
+
 /* Sticky card titles with proper background */
 .v-card-title.bg-surface {
   background-color: rgb(var(--v-theme-surface)) !important;

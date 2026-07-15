@@ -278,7 +278,7 @@ const showTaskField = computed(
 </script>
 
 <template>
-  <div class="tasks-layout">
+  <div class="page-fill">
     <!-- Modal Dialog for Creating/Editing Projects and Tasks -->
     <VDialog v-model="isDialogOpen" max-width="500px">
       <VCard>
@@ -359,10 +359,10 @@ const showTaskField = computed(
     </VDialog>
 
     <!-- Main content: big card fills the space, inner container keeps content narrow -->
-    <VCard class="glass-acrylic tasks-card d-flex flex-column overflow-hidden">
+    <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
       <!-- Header — same constrained container as the body so the actions align with the content edges -->
       <VCardTitle class="flex-shrink-0 pa-0">
-        <VContainer class="tasks-inner py-0">
+        <VContainer class="page-inner py-0">
           <VToolbar class="bg-transparent">
             <VToolbarTitle>Projects & Tasks</VToolbarTitle>
 
@@ -407,7 +407,7 @@ const showTaskField = computed(
 
       <!-- Scrollable body; inner container keeps projects/tasks at a comfortable width -->
       <div class="tasks-body flex-grow-1 overflow-y-auto">
-        <VContainer class="tasks-inner">
+        <VContainer class="page-inner">
           <!-- Projects grouped by category -->
           <template v-if="allProjects.length > 0">
             <div v-for="group in projectGroups" :key="group.categoryId ?? 'uncategorized'" class="mb-6">
@@ -640,21 +640,6 @@ const showTaskField = computed(
 </template>
 
 <style scoped>
-/* Full-height layout: big card fills VMain, mirrors HomeView's .home-layout */
-.tasks-layout {
-  height: 100%;
-  padding: 12px;
-}
-
-.tasks-card {
-  height: 100%;
-}
-
-/* Inner container caps content width so projects/tasks don't stretch across the wide card */
-.tasks-inner {
-  max-width: 900px;
-}
-
 .cursor-pointer {
   cursor: pointer;
 }
