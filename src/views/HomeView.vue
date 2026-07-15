@@ -23,6 +23,7 @@ import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/commo
 import { storageKeys } from '@/common/storageKeys';
 import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
 import { onCatchUpView } from '@/composables/useCatchUpSummary';
+import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { saveAs } from 'file-saver';
@@ -63,6 +64,7 @@ onUnmounted(() => {
 });
 
 onMounted(() => {
+  insightsDrawerOpen.value = false; // never auto-reopen when returning to Home
   const off = onCatchUpView(() => {
     tab.value = 'ai';
   });
@@ -104,6 +106,7 @@ watch(todayDateStr, () => {
 const tab = ref<'form' | 'ai'>('form');
 const theme = useTheme();
 const { smAndDown, lgAndUp } = useDisplay();
+const { isOpen: insightsDrawerOpen } = useInsightsDrawer();
 const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-darken-4' : 'green-lighten-2'));
 
 // Function to get or create storage for a specific month
@@ -425,7 +428,7 @@ const onAiUndoLogs = () => {
       />
     </div>
 
-    <!-- Right panel: Insights — visible on large screens only -->
+    <!-- Right panel: Insights — inline on large screens -->
     <InsightsPanel
       v-if="lgAndUp"
       class="insights-panel"
@@ -433,6 +436,15 @@ const onAiUndoLogs = () => {
       :current-month="currentMonth"
       v-model:selected-project="selectedProject"
     />
+
+    <!-- Small screens: same panel in an opt-in right drawer (toggled from the header) -->
+    <VNavigationDrawer v-if="!lgAndUp" v-model="insightsDrawerOpen" location="right" temporary width="320">
+      <InsightsPanel
+        :time-logs="timeLogs"
+        :current-month="currentMonth"
+        v-model:selected-project="selectedProject"
+      />
+    </VNavigationDrawer>
   </div>
 </template>
 
