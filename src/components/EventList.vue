@@ -19,8 +19,20 @@ import { nanoid } from 'nanoid';
 const events = useStorage<AppEvent[]>(storageKeys.events, []);
 const notificationCenter = useNotificationCenterStore();
 
-// All events sorted chronologically
-const filteredEvents = computed<AppEvent[]>(() => [...events.value].sort((a, b) => dayjs(a.date).diff(dayjs(b.date))));
+// ─── Filters ─────────────────────────────────────────────────
+const typeFilter = ref<'all' | 'custom' | 'holiday'>('all');
+const timeFilter = ref<'upcoming' | 'all'>('upcoming');
+
+// Events filtered by type + time, sorted chronologically
+const filteredEvents = computed<AppEvent[]>(() =>
+  events.value
+    .filter((e) => typeFilter.value === 'all' || e.type === typeFilter.value)
+    .filter((e) => timeFilter.value === 'all' || !isPastEvent(e.date))
+    .sort((a, b) => dayjs(a.date).diff(dayjs(b.date))),
+);
+
+// Empty-state copy reflects the active time filter
+const emptyMessage = computed(() => (timeFilter.value === 'upcoming' ? 'No upcoming events' : 'No events'));
 
 // Table columns — actions right-aligned via the slot (no header `align` to keep typing simple)
 const headers = [
@@ -106,6 +118,19 @@ const deleteEvent = (event: AppEvent) => {
 
           <VSpacer />
 
+          <!-- Type filter -->
+          <VBtnToggle v-model="typeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
+            <VBtn value="all" size="small">All</VBtn>
+            <VBtn value="custom" size="small">Mine</VBtn>
+            <VBtn value="holiday" size="small">Holidays</VBtn>
+          </VBtnToggle>
+
+          <!-- Time filter -->
+          <VBtnToggle v-model="timeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
+            <VBtn value="upcoming" size="small">Upcoming</VBtn>
+            <VBtn value="all" size="small">All</VBtn>
+          </VBtnToggle>
+
           <VTooltip>
             <template #activator="{ props }">
               <VBtn prepend-icon="mdi-plus" color="primary" variant="tonal" @click="openAddModal" v-bind="props">
@@ -127,7 +152,7 @@ const deleteEvent = (event: AppEvent) => {
           class="d-flex flex-column ga-2 py-8 align-center bg-container rounded-lg text-disabled"
         >
           <VIcon icon="mdi-calendar-blank-outline" />
-          <div class="text-subtitle-1">No events</div>
+          <div class="text-subtitle-1">{{ emptyMessage }}</div>
         </div>
 
         <!-- Events table -->
