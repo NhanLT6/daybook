@@ -12,6 +12,7 @@ import dayjs from 'dayjs';
 import { shortDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
+import { useSettingsStore } from '@/stores/settings';
 import { chain, sumBy } from 'lodash';
 
 export interface LogListProps {
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 
 const { formatInternalDateForDisplay } = useDateDisplay();
 const notificationCenter = useNotificationCenterStore();
+const settingsStore = useSettingsStore();
 
 const scrollContentRef = ref<HTMLElement | null>(null);
 
@@ -105,8 +107,15 @@ const headers = ref([
   { title: 'Actions', key: 'actions', sortable: false },
 ]);
 
-const loggedTimeByDates = computed(() =>
-  chain(logItems)
+// Week start key for a date, derived from the configured firstDayOfWeek (matches WorkTimeBarChart)
+const weekStartOf = (date: string) => {
+  const d = dayjs(date, shortDateFormat);
+  const diff = (d.day() - settingsStore.firstDayOfWeek + 7) % 7;
+  return d.subtract(diff, 'day').format('YYYY-MM-DD');
+};
+
+const loggedTimeByDates = computed(() => {
+  const groups = chain(logItems)
     .groupBy((item) => item.date)
     .map((items, date) => ({
       date,
@@ -114,8 +123,16 @@ const loggedTimeByDates = computed(() =>
       tasks: items,
     }))
     .orderBy((item) => item.date)
-    .value(),
-);
+    .value();
+
+  // Flag the first/last panel of each week so the template can space and round week groups
+  return groups.map((group, i) => {
+    const week = weekStartOf(group.date);
+    const isWeekStart = i === 0 || weekStartOf(groups[i - 1].date) !== week;
+    const isWeekEnd = i === groups.length - 1 || weekStartOf(groups[i + 1].date) !== week;
+    return { ...group, isWeekStart, isWeekEnd, gapBefore: isWeekStart && i > 0 };
+  });
+});
 
 const onExpand = () => {
   openedPanels.value = loggedTimeByDates.value.map((item) => item.date);
@@ -232,7 +249,12 @@ const readCsv = (file?: File) => {
           :id="group.date"
           :key="group.date"
           :value="group.date"
-          class="border-b-sm"
+          :class="{
+            'border-b-sm': !group.isWeekEnd,
+            'week-gap': group.gapBefore,
+            'week-start': group.isWeekStart,
+            'week-end': group.isWeekEnd,
+          }"
         >
           <VExpansionPanelTitle>
             <div class="me-2 d-flex align-center ga-2">
@@ -291,5 +313,26 @@ const readCsv = (file?: File) => {
 .scroll-content {
   flex: 1;
   overflow-y: auto;
+}
+
+/* Week grouping: gap between weeks + rounded corners so each week reads as its own card.
+   Scoped to the accordion context to out-specify Vuetify's
+   `.v-expansion-panels--variant-accordion > .v-expansion-panel { margin-top: 0; border-radius: 0 }`. */
+:deep(.v-expansion-panels--variant-accordion > .v-expansion-panel.week-gap) {
+  margin-top: 16px;
+}
+
+/* !important mirrors Vuetify's own accordion rule that resets middle-panel radius:
+   `... > :not(:first-child):not(:last-child) { border-radius: 0 !important }` */
+:deep(.v-expansion-panels--variant-accordion > .v-expansion-panel.week-start) {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+  overflow: hidden;
+}
+
+:deep(.v-expansion-panels--variant-accordion > .v-expansion-panel.week-end) {
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  overflow: hidden;
 }
 </style>
