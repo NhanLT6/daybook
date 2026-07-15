@@ -74,24 +74,38 @@ const saveCategoryForm = () => {
 
 // ─── Project groups ───────────────────────────────────────────
 
-const projectGroups = computed(() => {
+interface ProjectWithTasks extends Project {
+  tasks: Task[];
+}
+
+interface ProjectGroup {
+  categoryId: string | null;
+  categoryName: string | null;
+  projects: ProjectWithTasks[];
+}
+
+// Attach each project's tasks once here so the template reads `project.tasks`
+// instead of calling getTasksByProject() several times per row.
+const withTasks = (projects: Project[]): ProjectWithTasks[] =>
+  projects.map((p) => ({ ...p, tasks: getTasksByProject(p.title) }));
+
+const projectGroups = computed<ProjectGroup[]>(() => {
   if (!settingsStore.useCategories) {
-    return [{ categoryId: null as string | null, categoryName: null as string | null, projects: allProjects.value }];
+    return [{ categoryId: null, categoryName: null, projects: withTasks(allProjects.value) }];
   }
 
-  const groups: { categoryId: string | null; categoryName: string; projects: Project[] }[] = [];
-
-  for (const cat of sortedCategories.value) {
-    const projects = allProjects.value.filter((p) => p.categoryId === cat.id);
-    groups.push({ categoryId: cat.id, categoryName: cat.name, projects });
-  }
+  const groups: ProjectGroup[] = sortedCategories.value.map((cat) => ({
+    categoryId: cat.id,
+    categoryName: cat.name,
+    projects: withTasks(allProjects.value.filter((p) => p.categoryId === cat.id)),
+  }));
 
   // Uncategorized group (only shown if there are projects without a valid category)
   const uncategorized = allProjects.value.filter(
     (p) => !p.categoryId || !sortedCategories.value.find((c) => c.id === p.categoryId),
   );
   if (uncategorized.length > 0) {
-    groups.push({ categoryId: null, categoryName: 'Uncategorized', projects: uncategorized });
+    groups.push({ categoryId: null, categoryName: 'Uncategorized', projects: withTasks(uncategorized) });
   }
 
   return groups;
@@ -254,15 +268,10 @@ const onSave = handleSubmit((values) => {
     }
   }
 
-  resetForm();
-  editingTask.value = null;
-  editingProject.value = null;
-  isNewTask.value = false;
-  isNewProject.value = false;
-  isDialogOpen.value = false;
+  closeDialog();
 });
 
-const onCancel = () => {
+const closeDialog = () => {
   resetForm();
   editingTask.value = null;
   editingProject.value = null;
@@ -270,6 +279,8 @@ const onCancel = () => {
   isNewProject.value = false;
   isDialogOpen.value = false;
 };
+
+const onCancel = closeDialog;
 
 const confirmDeleteProject = (projectTitle: string) => {
   const tasksInProject = getTasksByProject(projectTitle).length;
@@ -317,7 +328,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
 </script>
 
 <template>
-  <VContainer>
+  <div class="tasks-layout">
     <!-- Modal Dialog for Creating/Editing Projects and Tasks -->
     <VDialog v-model="isDialogOpen" max-width="500px">
       <VCard>
@@ -397,13 +408,13 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
       </VCard>
     </VDialog>
 
-    <!-- Main Content Area -->
-    <VRow>
-      <VCol cols="12">
-        <VCard class="glass-acrylic">
-          <VCardTitle>
-            <VToolbar class="bg-transparent">
-              <VToolbarTitle class="ms-0">Projects & Tasks</VToolbarTitle>
+    <!-- Main content: big card fills the space, inner container keeps content narrow -->
+    <VCard class="glass-acrylic tasks-card d-flex flex-column overflow-hidden">
+      <!-- Header — same constrained container as the body so the actions align with the content edges -->
+      <VCardTitle class="flex-shrink-0 pa-0">
+        <VContainer class="tasks-inner py-0">
+          <VToolbar class="bg-transparent">
+            <VToolbarTitle>Projects & Tasks</VToolbarTitle>
 
               <VSpacer />
 
@@ -441,8 +452,12 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
                 </VTooltip>
               </div>
             </VToolbar>
-          </VCardTitle>
+          </VContainer>
+      </VCardTitle>
 
+      <!-- Scrollable body; inner container keeps projects/tasks at a comfortable width -->
+      <div class="tasks-body flex-grow-1 overflow-y-auto">
+        <VContainer class="tasks-inner">
           <!-- Projects grouped by category -->
           <template v-if="allProjects.length > 0">
             <div v-for="group in projectGroups" :key="group.categoryId ?? 'uncategorized'" class="mb-6">
@@ -478,7 +493,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
               </div>
 
               <!-- Projects in this group -->
-              <div v-for="project in group.projects" :key="project.title" class="project-section">
+              <div v-for="project in group.projects" :key="project.title" class="project-section mb-4">
                 <!-- Project row -->
                 <div class="d-flex align-center px-4 py-2">
                   <VAvatar
@@ -489,9 +504,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
 
                   <span class="font-weight-medium flex-grow-1 project-title">
                     {{ project.title }}
-                    <VChip size="x-small" variant="tonal" class="ms-2">
-                      {{ getTasksByProject(project.title).length }} Task(s)
-                    </VChip>
+                    <VChip size="x-small" variant="tonal" class="ms-2"> {{ project.tasks.length }} Task(s) </VChip>
                   </span>
 
                   <div class="d-flex flex-shrink-0 ga-1">
@@ -518,7 +531,7 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
                           @click="confirmDeleteProject(project.title)"
                         />
                       </template>
-                      Delete project{{ getTasksByProject(project.title).length > 0 ? ' and all its tasks' : '' }}
+                      Delete project{{ project.tasks.length > 0 ? ' and all its tasks' : '' }}
                     </VTooltip>
 
                     <VTooltip>
@@ -536,57 +549,56 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
                   </div>
                 </div>
 
-                <!-- Tasks under this project -->
-                <VDataTable
-                  v-if="getTasksByProject(project.title).length"
-                  :items="
-                    getTasksByProject(project.title).map((task) => ({ title: task.title, project: project.title }))
-                  "
-                  :headers="[]"
-                  class="bg-container ms-10"
-                  hide-default-footer
-                  hide-default-header
-                >
-                  <template #item="{ item }">
-                    <tr @click="editTask({ title: item.title, project: item.project })" class="cursor-pointer">
-                      <td class="d-flex align-center pa-3">
-                        <span class="text-truncate flex-grow-1 me-2">{{ item.title }}</span>
+                <!-- Tasks under this project — wrapped in a rounded card that clips the corners -->
+                <VCard v-if="project.tasks.length" class="elevation-0 rounded-lg overflow-hidden mt-2">
+                  <VDataTable
+                    :items="project.tasks.map((task) => ({ title: task.title, project: project.title }))"
+                    :headers="[]"
+                    class="bg-container"
+                    hide-default-footer
+                    hide-default-header
+                  >
+                    <template #item="{ item }">
+                      <tr @click="editTask({ title: item.title, project: item.project })" class="cursor-pointer">
+                        <td class="d-flex align-center pa-3">
+                          <span class="text-truncate flex-grow-1 me-2">{{ item.title }}</span>
 
-                        <div class="d-flex flex-shrink-0">
-                          <VTooltip>
-                            <template #activator="{ props }">
-                              <VBtn
-                                icon="mdi-pencil-outline"
-                                variant="text"
-                                size="x-small"
-                                @click.stop="editTask({ title: item.title, project: item.project })"
-                                v-bind="props"
-                              />
-                            </template>
-                            Edit task name
-                          </VTooltip>
+                          <div class="d-flex flex-shrink-0">
+                            <VTooltip>
+                              <template #activator="{ props }">
+                                <VBtn
+                                  icon="mdi-pencil-outline"
+                                  variant="text"
+                                  size="x-small"
+                                  @click.stop="editTask({ title: item.title, project: item.project })"
+                                  v-bind="props"
+                                />
+                              </template>
+                              Edit task name
+                            </VTooltip>
 
-                          <VTooltip>
-                            <template #activator="{ props }">
-                              <VBtn
-                                icon="mdi-trash-can-outline"
-                                variant="text"
-                                size="x-small"
-                                @click.stop="deleteTaskDirectly(item.title, item.project)"
-                                class="me-1"
-                                v-bind="props"
-                              />
-                            </template>
-                            Delete this task
-                          </VTooltip>
-                        </div>
-                      </td>
-                    </tr>
-                  </template>
-                </VDataTable>
+                            <VTooltip>
+                              <template #activator="{ props }">
+                                <VBtn
+                                  icon="mdi-trash-can-outline"
+                                  variant="text"
+                                  size="x-small"
+                                  @click.stop="deleteTaskDirectly(item.title, item.project)"
+                                  class="me-1"
+                                  v-bind="props"
+                                />
+                              </template>
+                              Delete this task
+                            </VTooltip>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </VDataTable>
+                </VCard>
 
                 <!-- Empty task state -->
-                <div v-else class="text-center py-2 text-medium-emphasis bg-container ms-10 text-caption">
+                <div v-else class="text-center py-2 text-medium-emphasis bg-container rounded-lg text-caption mt-2">
                   No tasks in this project.
                   <a
                     href="#"
@@ -613,10 +625,10 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
             <div class="text-h6 mb-2">No projects yet</div>
             <div>Create your first project to get started</div>
           </div>
-        </VCard>
-      </VCol>
-    </VRow>
-  </VContainer>
+        </VContainer>
+      </div>
+    </VCard>
+  </div>
 
   <!-- Confirmation Dialog - Project Deletion -->
   <VDialog v-model="isDeleteProjectDialogOpen" max-width="400px">
@@ -678,6 +690,21 @@ const showTaskField = computed(() => isNewTask.value || editingTask.value || isN
 </template>
 
 <style scoped>
+/* Full-height layout: big card fills VMain, mirrors HomeView's .home-layout */
+.tasks-layout {
+  height: 100%;
+  padding: 12px;
+}
+
+.tasks-card {
+  height: 100%;
+}
+
+/* Inner container caps content width so projects/tasks don't stretch across the wide card */
+.tasks-inner {
+  max-width: 900px;
+}
+
 .cursor-pointer {
   cursor: pointer;
 }
