@@ -29,8 +29,11 @@
   height: 100%;
 }
 
+/* !important out-specifies Vuetify's `.v-container` responsive max-width, which
+   otherwise ties on specificity and wins on source order (letting content grow
+   to ~1200px instead of the intended cap). */
 .page-inner {
-  max-width: 900px;
+  max-width: 900px !important;
 }
 
 /* Sticky card titles with proper background */

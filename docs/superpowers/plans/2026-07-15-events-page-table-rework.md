@@ -47,8 +47,10 @@ Append after the existing `.bg-container` rule (near the top, after line 17):
   height: 100%;
 }
 
+/* !important out-specifies Vuetify's `.v-container` responsive max-width, which
+   otherwise ties on specificity and wins on source order. */
 .page-inner {
-  max-width: 900px;
+  max-width: 900px !important;
 }
 ```
 
