@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
+import { useTaskBreakdown } from '@/composables/useTaskBreakdown';
 import { useSettingsStore } from '@/stores/settings';
 import { sumBy, uniqBy } from 'lodash';
 
@@ -20,7 +21,19 @@ const props = defineProps<{
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
 
 const settingsStore = useSettingsStore();
-const { getProjectColor } = useProjectColors();
+const { getProjectColor, getTaskColors } = useProjectColors();
+
+// Task breakdown of the currently selected project (inline expand below its row)
+const taskBreakdown = useTaskBreakdown(
+  () => props.timeLogs,
+  selectedProject,
+);
+
+const taskColors = computed(() =>
+  selectedProject.value && taskBreakdown.value.hasBreakdown
+    ? getTaskColors(selectedProject.value, taskBreakdown.value.tasks.map((t) => t.task))
+    : ({} as Record<string, string>),
+);
 
 // ── Totals ────────────────────────────────────────────────────────────────────
 
@@ -225,36 +238,70 @@ const getProjectRowStyle = (project: string) => {
         <VCard>
           <div class="pa-4">
             <div class="d-flex flex-column ga-3">
-              <div
-                v-for="item in projectBreakdown"
-                :key="item.project"
-                :style="getProjectRowStyle(item.project)"
-                @click="onProjectClick(item.project)"
-              >
-                <!-- Row 1: dot + name + hours (pct) -->
-                <div class="d-flex align-center ga-2 mb-1">
-                  <span
-                    class="flex-shrink-0"
-                    :style="{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: getProjectColor(item.project),
-                    }"
+              <div v-for="item in projectBreakdown" :key="item.project">
+                <!-- Clickable project row -->
+                <div :style="getProjectRowStyle(item.project)" @click="onProjectClick(item.project)">
+                  <!-- Row 1: dot + name + hours (pct) -->
+                  <div class="d-flex align-center ga-2 mb-1">
+                    <span
+                      class="flex-shrink-0"
+                      :style="{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: getProjectColor(item.project),
+                      }"
+                    />
+                    <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
+                    <span class="text-caption text-medium-emphasis flex-shrink-0">
+                      {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
+                    </span>
+                  </div>
+                  <!-- Row 2: progress bar -->
+                  <VProgressLinear
+                    :model-value="item.pct"
+                    :color="getProjectColor(item.project)"
+                    bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+                    rounded
+                    height="5"
                   />
-                  <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
-                  <span class="text-caption text-medium-emphasis flex-shrink-0">
-                    {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
-                  </span>
                 </div>
-                <!-- Row 2: progress bar -->
-                <VProgressLinear
-                  :model-value="item.pct"
-                  :color="getProjectColor(item.project)"
-                  bg-color="rgba(var(--v-theme-on-surface), 0.08)"
-                  rounded
-                  height="5"
-                />
+
+                <!-- Inline task breakdown for the selected project (only when it has ≥2 tasks) -->
+                <VExpandTransition>
+                  <div
+                    v-if="selectedProject === item.project && taskBreakdown.hasBreakdown"
+                    class="mt-2 ms-4 d-flex flex-column ga-2"
+                    @click.stop
+                  >
+                    <div v-for="t in taskBreakdown.tasks" :key="t.task">
+                      <!-- Task row: shade dot + name + hours (pct) -->
+                      <div class="d-flex align-center ga-2 mb-1">
+                        <span
+                          class="flex-shrink-0"
+                          :style="{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: taskColors[t.task],
+                          }"
+                        />
+                        <span class="text-caption text-truncate flex-grow-1">{{ truncate(t.task) }}</span>
+                        <span class="text-caption text-medium-emphasis flex-shrink-0">
+                          {{ minutesToHourWithMinutes(t.minutes) }} ({{ t.pct }}%)
+                        </span>
+                      </div>
+                      <!-- Task progress bar -->
+                      <VProgressLinear
+                        :model-value="t.pct"
+                        :color="taskColors[t.task]"
+                        bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+                        rounded
+                        height="4"
+                      />
+                    </div>
+                  </div>
+                </VExpandTransition>
               </div>
             </div>
 
