@@ -1,5 +1,13 @@
 import dayjs from 'dayjs';
+import { round, sum } from 'lodash';
 import type { AppEvent } from '@/interfaces/Event';
+
+/**
+ * Sum per-log durations (minutes) into hours, rounded to 1 decimal.
+ * Rounds ONCE after summing: rounding each log's hours individually first
+ * accumulates per-log drift and inflates the displayed total (e.g. 7h55m → 8.1h).
+ */
+export const sumMinutesToHours = (minutes: number[]): number => round(sum(minutes) / 60, 1);
 
 export const minutesToHourWithMinutes = (minutes: number): string => {
   if (minutes === 0) return '0m';

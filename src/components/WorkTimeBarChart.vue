@@ -12,10 +12,10 @@ import { useStorage } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
-import { minutesToHourWithMinutes } from '@/common/DateHelpers';
+import { minutesToHourWithMinutes, sumMinutesToHours } from '@/common/DateHelpers';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
-import { chain, round } from 'lodash';
+import { chain } from 'lodash';
 import * as pattern from 'patternomaly';
 
 // Theme integration
@@ -114,11 +114,12 @@ const chartData = computed(() => {
         backgroundColor: projectColors.getProjectColor(projectName),
         ...segmentBorder.value,
         data: daysInMonth.value.map((d) =>
-          chain(logsByProject)
-            .filter((item) => item.date === d.format(shortDateFormat))
-            .map((item) => round((item.duration ?? 0) / 60, 1))
-            .sum()
-            .value(),
+          sumMinutesToHours(
+            chain(logsByProject)
+              .filter((item) => item.date === d.format(shortDateFormat))
+              .map((item) => item.duration ?? 0)
+              .value(),
+          ),
         ),
       }))
       .value();
@@ -140,11 +141,12 @@ const chartData = computed(() => {
         backgroundColor: pattern.draw('diagonal', projectColors.invalidDataColor()),
         ...segmentBorder.value,
         data: daysInMonth.value.map((d) =>
-          chain(logsByProject)
-            .filter((item) => item.date === d.format(shortDateFormat))
-            .map((item) => round((item.duration ?? 0) / 60, 1))
-            .sum()
-            .value(),
+          sumMinutesToHours(
+            chain(logsByProject)
+              .filter((item) => item.date === d.format(shortDateFormat))
+              .map((item) => item.duration ?? 0)
+              .value(),
+          ),
         ),
       }))
       .value();
@@ -153,12 +155,13 @@ const chartData = computed(() => {
       const isWeekend = settingsStore.weekendDays.includes(d.day());
       if (isWeekend) return 0;
 
-      const totalLogged = chain(timeLogs.value)
-        .filter((log) => log.date === d.format(shortDateFormat))
-        .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
-        .map((log) => round((log.duration ?? 0) / 60, 1))
-        .sum()
-        .value();
+      const totalLogged = sumMinutesToHours(
+        chain(timeLogs.value)
+          .filter((log) => log.date === d.format(shortDateFormat))
+          .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
+          .map((log) => log.duration ?? 0)
+          .value(),
+      );
 
       return Math.max(8 - totalLogged, 0);
     });
