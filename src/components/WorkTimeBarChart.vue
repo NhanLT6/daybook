@@ -40,6 +40,9 @@ const segmentBorder = computed(() => ({
   borderSkipped: false as const,
 }));
 
+// Red diagonal-hatch flag colour (theme danger) drawn over weekend cells
+const weekendHatchColor = computed(() => theme.global.current.value.colors.error);
+
 // Component props
 const props = defineProps<{
   currentMonth?: number; // 1-based month, default to current month
@@ -105,108 +108,90 @@ const thisWeekMinutes = computed(() => {
 // Chart data computed property (automatically reactive to props and storage changes)
 const chartData = computed(() => {
   try {
-    // Selected project WITH real sub-tasks → stack each day's bar by task
-    if (props.selectedProject && taskBreakdown.value.hasBreakdown) {
+    // Precompute once per recompute (avoids dayjs.format in inner loops)
+    const dayKeys = daysInMonth.value.map((d) => d.format(shortDateFormat));
+    const weekendDay = daysInMonth.value.map((d) => settingsStore.weekendDays.includes(d.day()));
+    const isWeekendLog = (log: TimeLog) => settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day());
+
+    // Per-day logged hours (summed then rounded once) for a set of logs, indexed by day-of-month
+    const dailyHours = (logs: TimeLog[]) =>
+      dayKeys.map((key) => sumMinutesToHours(logs.filter((l) => l.date === key).map((l) => l.duration ?? 0)));
+
+    const labels = daysInMonth.value.map((d) => d.format('DD'));
+
+    // Selected project → stack by task (or a single series for simple projects).
+    // Weekday cells use the solid shade; weekend cells get a red diagonal-hatch flag.
+    if (props.selectedProject) {
       const projectLogs = timeLogs.value.filter((log) => log.project === props.selectedProject);
-      const taskNames = taskBreakdown.value.tasks.map((t) => t.task);
-      const taskColors = projectColors.getTaskColors(props.selectedProject, taskNames);
 
-      const taskDataSets = taskBreakdown.value.tasks.map((t) => ({
-        label: t.task,
-        backgroundColor: taskColors[t.task],
-        ...segmentBorder.value,
-        data: daysInMonth.value.map((d) =>
-          sumMinutesToHours(
-            chain(projectLogs)
-              .filter((item) => item.task === t.task && item.date === d.format(shortDateFormat))
-              .map((item) => item.duration ?? 0)
-              .value(),
-          ),
-        ),
-      }));
+      const series = taskBreakdown.value.hasBreakdown
+        ? (() => {
+            const colors = projectColors.getTaskColors(
+              props.selectedProject,
+              taskBreakdown.value.tasks.map((t) => t.task),
+            );
+            return taskBreakdown.value.tasks.map((t) => ({
+              label: t.task,
+              color: colors[t.task],
+              logs: projectLogs.filter((l) => l.task === t.task),
+            }));
+          })()
+        : [
+            {
+              label: props.selectedProject,
+              color: projectColors.getProjectColor(props.selectedProject),
+              logs: projectLogs,
+            },
+          ];
 
-      return {
-        labels: daysInMonth.value.map((d) => d.format('DD')),
-        datasets: taskDataSets,
-      };
+      const datasets = series.map((s) => {
+        const hatched = pattern.draw('diagonal', s.color, weekendHatchColor.value);
+        return {
+          label: s.label,
+          backgroundColor: weekendDay.map((w) => (w ? hatched : s.color)),
+          ...segmentBorder.value,
+          data: dailyHours(s.logs),
+        };
+      });
+
+      return { labels, datasets };
     }
 
-    // Build per-project datasets (weekend logs excluded); pre-filter when a project is selected
-    const logsForDataset = props.selectedProject
-      ? timeLogs.value.filter((log) => log.project === props.selectedProject)
-      : timeLogs.value;
+    // All-projects view: per-project weekday bars + a lumped Weekend flag + Remaining
+    const weekdayLogs = timeLogs.value.filter((log) => !isWeekendLog(log));
+    const weekendLogs = timeLogs.value.filter(isWeekendLog);
 
-    const loggedDataSet = chain(logsForDataset)
-      .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
+    const loggedDataSet = chain(weekdayLogs)
       .groupBy((l) => l.project)
       .map((logsByProject, projectName) => ({
         label: projectName,
         backgroundColor: projectColors.getProjectColor(projectName),
         ...segmentBorder.value,
-        data: daysInMonth.value.map((d) =>
-          sumMinutesToHours(
-            chain(logsByProject)
-              .filter((item) => item.date === d.format(shortDateFormat))
-              .map((item) => item.duration ?? 0)
-              .value(),
-          ),
-        ),
+        data: dailyHours(logsByProject),
       }))
       .value();
 
-    // Filtered view: show only the selected project
-    if (props.selectedProject) {
-      return {
-        labels: daysInMonth.value.map((d) => d.format('DD')),
-        datasets: loggedDataSet,
-      };
-    }
+    // Weekend work is flagged (not invalid) — one diagonal-hatch segment per day
+    const weekendDataSet = weekendLogs.length
+      ? [
+          {
+            label: 'Weekend',
+            backgroundColor: pattern.draw('diagonal', projectColors.weekendDataColor()),
+            ...segmentBorder.value,
+            data: dailyHours(weekendLogs),
+          },
+        ]
+      : [];
 
-    // Default view: all projects + invalid data + remaining
-    const invalidDataSet = chain(timeLogs.value)
-      .filter((log) => settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
-      .groupBy(() => 'Invalid Data')
-      .map((logsByProject) => ({
-        label: 'Invalid Data',
-        backgroundColor: pattern.draw('diagonal', projectColors.invalidDataColor()),
-        ...segmentBorder.value,
-        data: daysInMonth.value.map((d) =>
-          sumMinutesToHours(
-            chain(logsByProject)
-              .filter((item) => item.date === d.format(shortDateFormat))
-              .map((item) => item.duration ?? 0)
-              .value(),
-          ),
-        ),
-      }))
-      .value();
-
-    const remainingData = daysInMonth.value.map((d) => {
-      const isWeekend = settingsStore.weekendDays.includes(d.day());
-      if (isWeekend) return 0;
-
-      const totalLogged = sumMinutesToHours(
-        chain(timeLogs.value)
-          .filter((log) => log.date === d.format(shortDateFormat))
-          .filter((log) => !settingsStore.weekendDays.includes(dayjs(log.date, shortDateFormat).day()))
-          .map((log) => log.duration ?? 0)
-          .value(),
-      );
-
-      return Math.max(8 - totalLogged, 0);
-    });
-
+    const loggedPerDay = dailyHours(weekdayLogs);
     const remainingDataSet = {
       label: 'Remaining',
       backgroundColor: projectColors.remainingDataColor(),
       ...segmentBorder.value,
-      data: remainingData,
+      data: loggedPerDay.map((h, i) => (weekendDay[i] ? 0 : Math.max(8 - h, 0))),
     };
 
-    return {
-      labels: daysInMonth.value.map((d) => d.format('DD')),
-      datasets: [...loggedDataSet, ...invalidDataSet, remainingDataSet],
-    };
+    return { labels, datasets: [...loggedDataSet, ...weekendDataSet, remainingDataSet] };
   } catch (error) {
     console.error('Chart data generation error:', error);
     return {

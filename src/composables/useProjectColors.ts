@@ -80,12 +80,14 @@ const hslToHex = (h: number, s: number, l: number): string => {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
 
+// Dark-theme saturation model: moderate saturation (40–60%)
+const darkSaturation = (s: number): number => Math.min(Math.max(s * 0.9, 0.4), 0.6);
+
 // Adjust color for dark theme - moderate saturation with comfortable lightness
 const adjustColorForDarkTheme = (hexColor: string): string => {
   const [h, s] = hexToHsl(hexColor);
-  const newS = Math.min(Math.max(s * 0.9, 0.4), 0.6);
   const newL = 0.6; // Fixed comfortable lightness for dark backgrounds
-  return hslToHex(h, newS, newL);
+  return hslToHex(h, darkSaturation(s), newL);
 };
 
 /**
@@ -99,7 +101,7 @@ export const deriveTaskShades = (baseHex: string, count: number, isDark: boolean
   const [h, s] = hexToHsl(baseHex);
   const lStart = isDark ? 0.68 : 0.86;
   const lEnd = isDark ? 0.44 : 0.6;
-  const sat = isDark ? Math.min(Math.max(s * 0.9, 0.4), 0.6) : s;
+  const sat = isDark ? darkSaturation(s) : s;
 
   return Array.from({ length: count }, (_, i) => {
     const t = count === 1 ? 0 : i / (count - 1);
@@ -143,12 +145,13 @@ export const useProjectColors = () => {
   // Theme-aware utility colors
   // Remaining: neutral grey placeholder (Vuetify grey-darken-3 / grey-lighten-3)
   const remainingDataColor = () => (isDark() ? '#424242' : '#EEEEEE');
-  const invalidDataColor = () => (isDark() ? '#4A2C2C' : '#FFCDD2');
+  // Weekend: muted red base for the weekend-work flag (not an error — just flagged)
+  const weekendDataColor = () => (isDark() ? '#4A2C2C' : '#FFCDD2');
 
   return {
     chartPalette,
     remainingDataColor,
-    invalidDataColor,
+    weekendDataColor,
     getProjectColor,
     getTaskColors,
     setProjectColor,
