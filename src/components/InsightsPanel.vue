@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
-import { useTaskBreakdown } from '@/composables/useTaskBreakdown';
+import { computeTaskBreakdown, type TaskBreakdownItem } from '@/composables/useTaskBreakdown';
 import { useSettingsStore } from '@/stores/settings';
 import { sumBy, uniqBy } from 'lodash';
 
@@ -23,17 +23,33 @@ const selectedProject = defineModel<string | null>('selectedProject', { default:
 const settingsStore = useSettingsStore();
 const { getProjectColor, getTaskColors } = useProjectColors();
 
-// Task breakdown of the currently selected project (inline expand below its row)
-const taskBreakdown = useTaskBreakdown(
-  () => props.timeLogs,
-  selectedProject,
-);
+// Per-project task breakdown for every project with >=2 distinct tasks.
+// Keyed by project name; absent = "simple" project (no expandable detail).
+const breakdownByProject = computed(() => {
+  const map: Record<string, TaskBreakdownItem[]> = {};
+  for (const project of new Set(props.timeLogs.map((l) => l.project))) {
+    const breakdown = computeTaskBreakdown(props.timeLogs, project);
+    if (breakdown.hasBreakdown) map[project] = breakdown.tasks;
+  }
+  return map;
+});
 
-const taskColors = computed(() =>
-  selectedProject.value && taskBreakdown.value.hasBreakdown
-    ? getTaskColors(selectedProject.value, taskBreakdown.value.tasks.map((t) => t.task))
-    : ({} as Record<string, string>),
-);
+// Task color shades per breakdown project (matches the chart's coloring).
+const taskColorsByProject = computed(() => {
+  const map: Record<string, Record<string, string>> = {};
+  for (const [project, tasks] of Object.entries(breakdownByProject.value)) {
+    map[project] = getTaskColors(
+      project,
+      tasks.map((t) => t.task),
+    );
+  }
+  return map;
+});
+
+// Sync the single-open accordion with the shared selectedProject state.
+const onPanelChange = (value: string | undefined) => {
+  selectedProject.value = value ?? null;
+};
 
 // ── Totals ────────────────────────────────────────────────────────────────────
 
@@ -175,25 +191,6 @@ const monthLabel = computed(() => dayjs(currentMonthKey.value, yearAndMonthForma
 
 // Truncate project names at 16 chars
 const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len) + '…' : str);
-
-const onProjectClick = (project: string) => {
-  selectedProject.value = selectedProject.value === project ? null : project;
-};
-
-const getProjectRowStyle = (project: string) => {
-  const isSelected = selectedProject.value === project;
-  const color = getProjectColor(project);
-  return {
-    cursor: 'pointer',
-    borderRadius: '8px',
-    paddingInline: '4px',
-    paddingBlock: isSelected ? '6px' : undefined,
-    margin: '0 -4px',
-    border: `1.5px solid ${isSelected ? color : 'transparent'}`,
-    backgroundColor: isSelected ? `${color}1A` : undefined,
-    transition: 'background-color 0.15s, padding 0.15s',
-  };
-};
 </script>
 
 <template>
@@ -236,45 +233,60 @@ const getProjectRowStyle = (project: string) => {
       <div v-if="projectBreakdown.length > 0">
         <div class="text-overline text-medium-emphasis ms-2">Time by project</div>
         <VCard>
-          <div class="pa-4">
-            <div class="d-flex flex-column ga-3">
-              <div v-for="item in projectBreakdown" :key="item.project">
-                <!-- Clickable project row -->
-                <div :style="getProjectRowStyle(item.project)" @click="onProjectClick(item.project)">
-                  <!-- Row 1: dot + name + hours (pct) -->
-                  <div class="d-flex align-center ga-2 mb-1">
-                    <span
-                      class="flex-shrink-0"
-                      :style="{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: getProjectColor(item.project),
-                      }"
+          <div class="pa-2">
+            <!-- Accordion: each project expands to its task breakdown (simple projects have no chevron/detail) -->
+            <VExpansionPanels
+              variant="accordion"
+              flat
+              :model-value="selectedProject ?? undefined"
+              @update:model-value="onPanelChange"
+            >
+              <VExpansionPanel
+                v-for="item in projectBreakdown"
+                :key="item.project"
+                :value="item.project"
+                :hide-actions="!breakdownByProject[item.project]"
+              >
+                <!-- Project row (selected → subtle project-colored tint) -->
+                <VExpansionPanelTitle
+                  :style="
+                    selectedProject === item.project
+                      ? { backgroundColor: `${getProjectColor(item.project)}1A` }
+                      : undefined
+                  "
+                >
+                  <div class="flex-grow-1">
+                    <!-- Row 1: dot + name + hours (pct) -->
+                    <div class="d-flex align-center ga-2 mb-1">
+                      <span
+                        class="flex-shrink-0"
+                        :style="{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: getProjectColor(item.project),
+                        }"
+                      />
+                      <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
+                      <span class="text-caption text-medium-emphasis flex-shrink-0">
+                        {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
+                      </span>
+                    </div>
+                    <!-- Row 2: progress bar -->
+                    <VProgressLinear
+                      :model-value="item.pct"
+                      :color="getProjectColor(item.project)"
+                      bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+                      rounded
+                      height="5"
                     />
-                    <span class="text-body-2 text-truncate flex-grow-1">{{ truncate(item.project) }}</span>
-                    <span class="text-caption text-medium-emphasis flex-shrink-0">
-                      {{ minutesToHourWithMinutes(item.minutes) }} ({{ item.pct }}%)
-                    </span>
                   </div>
-                  <!-- Row 2: progress bar -->
-                  <VProgressLinear
-                    :model-value="item.pct"
-                    :color="getProjectColor(item.project)"
-                    bg-color="rgba(var(--v-theme-on-surface), 0.08)"
-                    rounded
-                    height="5"
-                  />
-                </div>
+                </VExpansionPanelTitle>
 
-                <!-- Inline task breakdown for the selected project (only when it has ≥2 tasks) -->
-                <VExpandTransition>
-                  <div
-                    v-if="selectedProject === item.project && taskBreakdown.hasBreakdown"
-                    class="mt-2 ms-4 d-flex flex-column ga-2"
-                    @click.stop
-                  >
-                    <div v-for="t in taskBreakdown.tasks" :key="t.task">
+                <!-- Task breakdown list (only for projects with >=2 tasks) -->
+                <VExpansionPanelText v-if="breakdownByProject[item.project]">
+                  <VList class="bg-transparent py-0" density="compact">
+                    <VListItem v-for="t in breakdownByProject[item.project]" :key="t.task" class="px-0">
                       <!-- Task row: shade dot + name + hours (pct) -->
                       <div class="d-flex align-center ga-2 mb-1">
                         <span
@@ -283,7 +295,7 @@ const getProjectRowStyle = (project: string) => {
                             width: '6px',
                             height: '6px',
                             borderRadius: '50%',
-                            backgroundColor: taskColors[t.task],
+                            backgroundColor: taskColorsByProject[item.project]?.[t.task],
                           }"
                         />
                         <span class="text-caption text-truncate flex-grow-1">{{ truncate(t.task) }}</span>
@@ -294,26 +306,26 @@ const getProjectRowStyle = (project: string) => {
                       <!-- Task progress bar -->
                       <VProgressLinear
                         :model-value="t.pct"
-                        :color="taskColors[t.task]"
+                        :color="taskColorsByProject[item.project]?.[t.task]"
                         bg-color="rgba(var(--v-theme-on-surface), 0.08)"
                         rounded
                         height="4"
                       />
-                    </div>
-                  </div>
-                </VExpandTransition>
-              </div>
-            </div>
+                    </VListItem>
+                  </VList>
+                </VExpansionPanelText>
+              </VExpansionPanel>
+            </VExpansionPanels>
 
             <!-- +N more -->
-            <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2">
+            <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2 ms-3">
               +{{ extraProjectCount }} more
             </div>
 
             <!-- Focus line -->
             <template v-if="uniqueProjectCount >= 2">
               <VDivider class="mt-4 mb-3" />
-              <div class="text-caption text-medium-emphasis">
+              <div class="text-caption text-medium-emphasis ms-3">
                 {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
               </div>
             </template>
