@@ -17,7 +17,6 @@ import { useTaskBreakdown } from '@/composables/useTaskBreakdown';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
 import { chain } from 'lodash';
-import * as pattern from 'patternomaly';
 
 // Theme integration
 const theme = useTheme();
@@ -39,9 +38,6 @@ const segmentBorder = computed(() => ({
   borderWidth: 1,
   borderSkipped: false as const,
 }));
-
-// Red diagonal-hatch flag colour (theme danger) drawn over weekend cells
-const weekendHatchColor = computed(() => theme.global.current.value.colors.error);
 
 // Component props
 const props = defineProps<{
@@ -118,9 +114,11 @@ const chartData = computed(() => {
       dayKeys.map((key) => sumMinutesToHours(logs.filter((l) => l.date === key).map((l) => l.duration ?? 0)));
 
     const labels = daysInMonth.value.map((d) => d.format('DD'));
+    // Weekend cells wear the danger colour in every view; weekday cells keep their own colour
+    const weekendColor = projectColors.weekendDataColor();
 
     // Selected project → stack by task (or a single series for simple projects).
-    // Weekday cells use the solid shade; weekend cells get a red diagonal-hatch flag.
+    // Weekday cells use the task shade; weekend cells share the danger colour flag.
     if (props.selectedProject) {
       const projectLogs = timeLogs.value.filter((log) => log.project === props.selectedProject);
 
@@ -144,46 +142,32 @@ const chartData = computed(() => {
             },
           ];
 
-      const datasets = series.map((s) => {
-        const hatched = pattern.draw('diagonal', s.color, weekendHatchColor.value);
-        return {
-          label: s.label,
-          backgroundColor: weekendDay.map((w) => (w ? hatched : s.color)),
-          ...segmentBorder.value,
-          data: dailyHours(s.logs),
-        };
-      });
+      const datasets = series.map((s) => ({
+        label: s.label,
+        backgroundColor: weekendDay.map((w) => (w ? weekendColor : s.color)),
+        ...segmentBorder.value,
+        data: dailyHours(s.logs),
+      }));
 
       return { labels, datasets };
     }
 
-    // All-projects view: per-project weekday bars + a lumped Weekend flag + Remaining
-    const weekdayLogs = timeLogs.value.filter((log) => !isWeekendLog(log));
-    const weekendLogs = timeLogs.value.filter(isWeekendLog);
-
-    const loggedDataSet = chain(weekdayLogs)
+    // All-projects view: per-project bars keep their own label; weekend cells wear the danger flag.
+    const loggedDataSet = chain(timeLogs.value)
       .groupBy((l) => l.project)
-      .map((logsByProject, projectName) => ({
-        label: projectName,
-        backgroundColor: projectColors.getProjectColor(projectName),
-        ...segmentBorder.value,
-        data: dailyHours(logsByProject),
-      }))
+      .map((logsByProject, projectName) => {
+        const projectColor = projectColors.getProjectColor(projectName);
+        return {
+          label: projectName,
+          backgroundColor: weekendDay.map((w) => (w ? weekendColor : projectColor)),
+          ...segmentBorder.value,
+          data: dailyHours(logsByProject),
+        };
+      })
       .value();
 
-    // Weekend work is flagged (not invalid) — one diagonal-hatch segment per day
-    const weekendDataSet = weekendLogs.length
-      ? [
-          {
-            label: 'Weekend',
-            backgroundColor: pattern.draw('diagonal', projectColors.weekendDataColor()),
-            ...segmentBorder.value,
-            data: dailyHours(weekendLogs),
-          },
-        ]
-      : [];
-
-    const loggedPerDay = dailyHours(weekdayLogs);
+    // Remaining fills each weekday up to 8h; weekend days show only logged work
+    const loggedPerDay = dailyHours(timeLogs.value.filter((log) => !isWeekendLog(log)));
     const remainingDataSet = {
       label: 'Remaining',
       backgroundColor: projectColors.remainingDataColor(),
@@ -191,7 +175,7 @@ const chartData = computed(() => {
       data: loggedPerDay.map((h, i) => (weekendDay[i] ? 0 : Math.max(8 - h, 0))),
     };
 
-    return { labels, datasets: [...loggedDataSet, ...weekendDataSet, remainingDataSet] };
+    return { labels, datasets: [...loggedDataSet, remainingDataSet] };
   } catch (error) {
     console.error('Chart data generation error:', error);
     return {
@@ -240,10 +224,21 @@ const chartOptions = computed(() => ({
         usePointStyle: true,
         generateLabels: (chart: Chart) => {
           const datasets = chart.data.datasets || [];
+          // Per-point colour arrays mix weekday + weekend cells; show the dominant
+          // (weekday) colour in the swatch, not whatever day 0 happens to land on.
+          const swatchColor = (bg: unknown): string | undefined => {
+            if (!Array.isArray(bg)) return bg as string | undefined;
+            const counts = new Map<string, number>();
+            for (const c of bg) if (typeof c === 'string') counts.set(c, (counts.get(c) ?? 0) + 1);
+            let best = bg[0] as string;
+            let max = -1;
+            for (const [c, n] of counts) if (n > max) [max, best] = [n, c];
+            return best;
+          };
           return datasets.map((dataset, index) => ({
             text:
               dataset.label && dataset.label.length > 20 ? `${dataset.label.substring(0, 20)}...` : dataset.label || '',
-            fillStyle: Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor[0] : dataset.backgroundColor,
+            fillStyle: swatchColor(dataset.backgroundColor),
             strokeStyle: Array.isArray(dataset.borderColor) ? dataset.borderColor[0] : dataset.borderColor,
             lineWidth: typeof dataset.borderWidth === 'number' ? dataset.borderWidth : 0,
             hidden: !chart.isDatasetVisible(index),
