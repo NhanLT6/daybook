@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 
 import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes, sumMinutesToHours } from '@/common/DateHelpers';
+import { useTaskBreakdown } from '@/composables/useTaskBreakdown';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
 import { chain } from 'lodash';
@@ -73,6 +74,9 @@ const timeLogsStorage = computed(() => {
 // Use external timeLogs prop if provided, otherwise use storage
 const timeLogs = computed(() => props.timeLogs ?? timeLogsStorage.value.value);
 
+// Task-level breakdown of the selected project (drives task stacking below)
+const taskBreakdown = useTaskBreakdown(timeLogs, () => props.selectedProject ?? null);
+
 // Header stats — only shown when viewing the current month
 const isCurrentMonth = computed(() => (currentMonth?.value ?? dayjs().month() + 1) === dayjs().month() + 1);
 
@@ -101,6 +105,32 @@ const thisWeekMinutes = computed(() => {
 // Chart data computed property (automatically reactive to props and storage changes)
 const chartData = computed(() => {
   try {
+    // Selected project WITH real sub-tasks → stack each day's bar by task
+    if (props.selectedProject && taskBreakdown.value.hasBreakdown) {
+      const projectLogs = timeLogs.value.filter((log) => log.project === props.selectedProject);
+      const taskNames = taskBreakdown.value.tasks.map((t) => t.task);
+      const taskColors = projectColors.getTaskColors(props.selectedProject, taskNames);
+
+      const taskDataSets = taskBreakdown.value.tasks.map((t) => ({
+        label: t.task,
+        backgroundColor: taskColors[t.task],
+        ...segmentBorder.value,
+        data: daysInMonth.value.map((d) =>
+          sumMinutesToHours(
+            chain(projectLogs)
+              .filter((item) => item.task === t.task && item.date === d.format(shortDateFormat))
+              .map((item) => item.duration ?? 0)
+              .value(),
+          ),
+        ),
+      }));
+
+      return {
+        labels: daysInMonth.value.map((d) => d.format('DD')),
+        datasets: taskDataSets,
+      };
+    }
+
     // Build per-project datasets (weekend logs excluded); pre-filter when a project is selected
     const logsForDataset = props.selectedProject
       ? timeLogs.value.filter((log) => log.project === props.selectedProject)
@@ -246,6 +276,7 @@ const chartOptions = computed(() => ({
           const dataset = tooltipItems[0]?.dataset;
           return dataset?.label || '';
         },
+        label: (tooltipItem: any) => `${tooltipItem.parsed.y}h`,
       },
     },
   },
