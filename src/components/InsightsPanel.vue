@@ -247,15 +247,15 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                 :value="item.project"
                 :hide-actions="!breakdownByProject[item.project]"
               >
-                <!-- Project row (selected → subtle project-colored tint) -->
+                <!-- Project row (selected → project-colored tint) -->
                 <VExpansionPanelTitle
                   :style="
                     selectedProject === item.project
-                      ? { backgroundColor: `${getProjectColor(item.project)}1A` }
+                      ? { backgroundColor: `${getProjectColor(item.project)}40` }
                       : undefined
                   "
                 >
-                  <div class="flex-grow-1">
+                  <div class="flex-grow-1 me-3">
                     <!-- Row 1: dot + name + hours (pct) -->
                     <div class="d-flex align-center ga-2 mb-1">
                       <span
