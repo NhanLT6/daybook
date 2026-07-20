@@ -23,11 +23,15 @@ const selectedProject = defineModel<string | null>('selectedProject', { default:
 const settingsStore = useSettingsStore();
 const { getProjectColor, getTaskColors } = useProjectColors();
 
-// Per-project task breakdown for every project with >=2 distinct tasks.
+// Alpha-hex suffixes appended to a project colour for the selected-row tints
+const SELECTED_TINT = '40'; // ~25% — selected project title
+const DETAIL_TINT = '1A'; // ~10% — expanded breakdown body
+
+// Per-project task breakdown, limited to the projects actually rendered below.
 // Keyed by project name; absent = "simple" project (no expandable detail).
 const breakdownByProject = computed(() => {
   const map: Record<string, TaskBreakdownItem[]> = {};
-  for (const project of new Set(props.timeLogs.map((l) => l.project))) {
+  for (const { project } of projectBreakdown.value) {
     const breakdown = computeTaskBreakdown(props.timeLogs, project);
     if (breakdown.hasBreakdown) map[project] = breakdown.tasks;
   }
@@ -251,7 +255,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                 <VExpansionPanelTitle
                   :style="
                     selectedProject === item.project
-                      ? { backgroundColor: `${getProjectColor(item.project)}40` }
+                      ? { backgroundColor: `${getProjectColor(item.project)}${SELECTED_TINT}` }
                       : undefined
                   "
                 >
@@ -288,7 +292,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                 <VExpansionPanelText
                   v-if="breakdownByProject[item.project]"
                   :style="{
-                    backgroundColor: `${getProjectColor(item.project)}1A`,
+                    backgroundColor: `${getProjectColor(item.project)}${DETAIL_TINT}`,
                     borderTop: '1px solid rgba(var(--v-theme-on-surface), 0.12)',
                   }"
                 >
