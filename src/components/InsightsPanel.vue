@@ -288,7 +288,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                 <VExpansionPanelText
                   v-if="breakdownByProject[item.project]"
                   :style="{
-                    backgroundColor: `${getProjectColor(item.project)}40`,
+                    backgroundColor: `${getProjectColor(item.project)}1A`,
                     borderTop: '1px solid rgba(var(--v-theme-on-surface), 0.12)',
                   }"
                 >
