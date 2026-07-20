@@ -19,8 +19,8 @@ const chartPalette = [
   '#E6D4E8', // soft thistle (hsl 290, 35%, 87%)
 ];
 
-// Adjust color for dark theme - moderate saturation with comfortable lightness
-const adjustColorForDarkTheme = (hexColor: string): string => {
+// Pure hex↔HSL helpers (h, s, l in 0..1)
+const hexToHsl = (hexColor: string): [number, number, number] => {
   const hex = hexColor.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16) / 255;
   const g = parseInt(hex.substring(2, 4), 16) / 255;
@@ -49,37 +49,63 @@ const adjustColorForDarkTheme = (hexColor: string): string => {
     }
   }
 
-  // For dark theme: moderate saturation (50-60%), comfortable lightness (55-65%)
-  const newS = Math.min(Math.max(s * 0.9, 0.4), 0.6);
-  const newL = 0.6; // Fixed comfortable lightness for dark backgrounds
+  return [h, s, l];
+};
 
-  const hslToRgb = (h: number, s: number, l: number) => {
-    let r, g, b;
-
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1 / 6) return p + (q - p) * 6 * t;
-        if (t < 1 / 2) return q;
-        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-        return p;
-      };
-
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1 / 3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1 / 3);
-    }
-
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+const hslToHex = (h: number, s: number, l: number): string => {
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
   };
 
-  const [newR, newG, newB] = hslToRgb(h, newS, newL);
-  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+  let r: number;
+  let g: number;
+  let b: number;
+
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+
+  const toHex = (v: number) => Math.round(v * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
+// Adjust color for dark theme - moderate saturation with comfortable lightness
+const adjustColorForDarkTheme = (hexColor: string): string => {
+  const [h, s] = hexToHsl(hexColor);
+  const newS = Math.min(Math.max(s * 0.9, 0.4), 0.6);
+  const newL = 0.6; // Fixed comfortable lightness for dark backgrounds
+  return hslToHex(h, newS, newL);
+};
+
+/**
+ * Derive `count` shades of a base color by stepping lightness across the base
+ * hue/saturation. Used to color a project's task segments so they read as tones
+ * of the one project color. Theme-aware: darker, less-saturated ramp on dark.
+ */
+export const deriveTaskShades = (baseHex: string, count: number, isDark: boolean): string[] => {
+  if (count <= 0) return [];
+
+  const [h, s] = hexToHsl(baseHex);
+  const lStart = isDark ? 0.68 : 0.86;
+  const lEnd = isDark ? 0.44 : 0.6;
+  const sat = isDark ? Math.min(Math.max(s * 0.9, 0.4), 0.6) : s;
+
+  return Array.from({ length: count }, (_, i) => {
+    const t = count === 1 ? 0 : i / (count - 1);
+    const l = lStart + (lEnd - lStart) * t;
+    return hslToHex(h, sat, l);
+  });
 };
 
 export const useProjectColors = () => {
@@ -106,6 +132,14 @@ export const useProjectColors = () => {
     return isDark() ? adjustColorForDarkTheme(baseColor) : baseColor;
   };
 
+  // Map each task of a project to a distinct shade of the project's base color
+  const getTaskColors = (project: string, tasks: string[]): Record<string, string> => {
+    if (!projectColorMaps.value.has(project)) setProjectColor(project);
+    const base = projectColorMaps.value.get(project) as string;
+    const shades = deriveTaskShades(base, tasks.length, isDark());
+    return Object.fromEntries(tasks.map((task, i) => [task, shades[i]]));
+  };
+
   // Theme-aware utility colors
   // Remaining: neutral grey placeholder (Vuetify grey-darken-3 / grey-lighten-3)
   const remainingDataColor = () => (isDark() ? '#424242' : '#EEEEEE');
@@ -116,6 +150,7 @@ export const useProjectColors = () => {
     remainingDataColor,
     invalidDataColor,
     getProjectColor,
+    getTaskColors,
     setProjectColor,
   };
 };
