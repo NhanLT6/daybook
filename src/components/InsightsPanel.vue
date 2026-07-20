@@ -283,10 +283,12 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                   </div>
                 </VExpansionPanelTitle>
 
-                <!-- Task breakdown list (only for projects with >=2 tasks) -->
+                <!-- Task breakdown list (only for projects with >=2 tasks) —
+                     wrapped in a rounded tinted card so it reads as distinct from its parent row -->
                 <VExpansionPanelText v-if="breakdownByProject[item.project]">
-                  <VList class="bg-transparent py-0" density="compact">
-                    <VListItem v-for="t in breakdownByProject[item.project]" :key="t.task" class="px-0">
+                  <VCard class="elevation-0 rounded-lg">
+                    <VList class="bg-container px-2 py-1" density="compact">
+                      <VListItem v-for="t in breakdownByProject[item.project]" :key="t.task" class="px-1">
                       <!-- Task row: shade dot + name + hours (pct) -->
                       <div class="d-flex align-center ga-2 mb-1">
                         <span
@@ -311,8 +313,9 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                         rounded
                         height="4"
                       />
-                    </VListItem>
-                  </VList>
+                      </VListItem>
+                    </VList>
+                  </VCard>
                 </VExpansionPanelText>
               </VExpansionPanel>
             </VExpansionPanels>
