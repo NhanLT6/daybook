@@ -17,7 +17,7 @@
 ## Key Dependencies
 - **Vue Ecosystem**: vue, vue-router, pinia
 - **UI/UX**: vuetify, @vueuse/core, v-calendar, vue-sonner
-- **Charts**: chart.js, chartjs-plugin-datalabels, patternomaly
+- **Charts**: chart.js, chartjs-plugin-datalabels
 - **Data Processing**: papaparse, file-saver, dayjs, lodash
 - **Forms**: vee-validate, yup
 - **HTTP**: axios

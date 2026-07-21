@@ -54,7 +54,7 @@ export default defineConfig({
           // UI library
           vuetify: ['vuetify'],
           // Chart libraries
-          chart: ['chart.js', 'chartjs-plugin-datalabels', 'patternomaly'],
+          chart: ['chart.js', 'chartjs-plugin-datalabels'],
           // Utility libraries
           utils: ['lodash', 'dayjs', 'nanoid', 'axios'],
           // Form libraries
