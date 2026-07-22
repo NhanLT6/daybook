@@ -105,8 +105,8 @@ watch(todayDateStr, () => {
 
 const tab = ref<'form' | 'ai'>('form');
 const theme = useTheme();
-const { smAndDown, lgAndUp } = useDisplay();
-const { isOpen: insightsDrawerOpen } = useInsightsDrawer();
+const { smAndDown } = useDisplay();
+const { isOpen: insightsDrawerOpen, isInline: insightsInline } = useInsightsDrawer();
 const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-darken-4' : 'green-lighten-2'));
 
 // Function to get or create storage for a specific month
@@ -430,9 +430,9 @@ const onAiUndoLogs = () => {
       />
     </div>
 
-    <!-- Right panel: Insights — inline on large screens -->
+    <!-- Right panel: Insights — inline only on wide viewports (>= INSIGHTS_INLINE_MIN) -->
     <InsightsPanel
-      v-if="lgAndUp"
+      v-if="insightsInline"
       class="insights-panel"
       :time-logs="timeLogs"
       :current-month="currentMonth"
@@ -442,7 +442,7 @@ const onAiUndoLogs = () => {
     <!-- Small screens: same panel in an opt-in right drawer (toggled from the header).
          Transparent shell + side gaps so the panel floats like the app's other glass cards. -->
     <VNavigationDrawer
-      v-if="!lgAndUp"
+      v-if="!insightsInline"
       v-model="insightsDrawerOpen"
       location="right"
       temporary

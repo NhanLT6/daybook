@@ -110,9 +110,9 @@ onUnmounted(() => {
 
 const route = useRoute();
 
-const { isOpen: insightsDrawerOpen } = useInsightsDrawer();
+const { isOpen: insightsDrawerOpen, isInline: insightsInline } = useInsightsDrawer();
 
-const { smAndDown, lgAndUp } = useDisplay();
+const { smAndDown } = useDisplay();
 
 // Theme toggle
 const theme = useTheme();
@@ -158,9 +158,9 @@ const navItems = [
 
 <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
-          <!-- Insights drawer toggle — Home only, small screens (inline panel hidden) -->
+          <!-- Insights drawer toggle — Home only, when the inline panel is hidden -->
           <VIconBtn
-            v-if="route.path === '/' && !lgAndUp"
+            v-if="route.path === '/' && !insightsInline"
             icon="mdi-chart-box-outline"
             size="small"
             variant="text"
