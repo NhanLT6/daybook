@@ -53,6 +53,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 ## Feature Documentation
 Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.
 - `docs/features/categories.md` — Category grouping for projects, VCombobox grouping pattern, BulkLogForm category rules
+- `docs/features/log-list-filters.md` — LogList filter bar (project/task/date/search), Insights↔chart project sync, panel-expansion coordination
 
 ## Important Notes
 - **Type Safety**: Full TypeScript coverage required

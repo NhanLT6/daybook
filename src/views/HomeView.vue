@@ -419,7 +419,9 @@ const onAiUndoLogs = () => {
       <LogList
         class="flex-grow-1 overflow-hidden"
         :items="timeLogs"
+        :current-month="currentMonth"
         :selected-dates="selectedDates"
+        v-model:selected-project="selectedProject"
         @edit-log="onEditLog"
         @clone-log="onCloneLog"
         @delete-log="onDeleteLog"
