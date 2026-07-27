@@ -5,18 +5,16 @@ import EventForm from '@/components/EventForm.vue';
 
 import type { AppEvent } from '@/interfaces/Event';
 
-import { useStorage } from '@vueuse/core';
-
 import dayjs from 'dayjs';
 
 import holidayImg from '@/assets/summer-holidays.png';
 import { formatEventDate } from '@/common/DateHelpers';
-import { storageKeys } from '@/common/storageKeys';
+import { useEvents } from '@/composables/useEvents';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { nanoid } from 'nanoid';
 
-// ─── Events from unified storage ─────────────────────────────
-const events = useStorage<AppEvent[]>(storageKeys.events, []);
+// ─── Events from shared db collection ─────────────────────────
+const { events, addEvent, removeEvent } = useEvents();
 const notificationCenter = useNotificationCenterStore();
 
 // ─── Filters ─────────────────────────────────────────────────
@@ -76,11 +74,7 @@ const onSaveEvent = (event: AppEvent) => {
     id: event.id || nanoid(),
   };
 
-  if (editingEvent.value) {
-    events.value = events.value.map((e) => (e.id === savedEvent.id ? savedEvent : e));
-  } else {
-    events.value = [...events.value, savedEvent];
-  }
+  addEvent(savedEvent);
 
   isModalOpen.value = false;
 };
@@ -100,7 +94,7 @@ const deleteEvent = (event: AppEvent) => {
         tone: 'danger',
         closeOnComplete: true,
         onClick: () => {
-          events.value = events.value.filter((e) => e.id !== event.id);
+          removeEvent(event.id);
         },
       },
     ],

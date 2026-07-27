@@ -15,7 +15,7 @@ import { array, date, number, object, string } from 'yup';
 
 import dayjs from 'dayjs';
 
-import { shortDateFormat } from '@/common/DateFormat';
+import { isoDateFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useSettingsStore } from '@/stores/settings';
 import { nanoid } from 'nanoid';
@@ -61,7 +61,6 @@ const settingsStore = useSettingsStore();
 const { sortedCategories, addCategory } = useCategories();
 
 const {
-  allProjects,
   allTasks,
   myProjects,
   sortedProjectItems,
@@ -71,6 +70,8 @@ const {
   codeReviewDescriptions,
   getTasksByProject,
   initTeamWorkPreset,
+  addProjects,
+  addTasks,
 } = useWorkspace();
 
 onMounted(() => {
@@ -149,7 +150,7 @@ const onSave = handleSubmit((values) => {
   if (isEditMode.value && editingLog) {
     const updatedLog: TimeLog = {
       id: editingLog.id, // Keep existing ID
-      date: dayjs(values.selectedDates[0]).format(shortDateFormat),
+      date: dayjs(values.selectedDates[0]).format(isoDateFormat),
       project: values.project!,
       task: values.task!,
       duration,
@@ -162,7 +163,7 @@ const onSave = handleSubmit((values) => {
     // Create mode: Create multiple logs for selected dates
     const logs = values.selectedDates.map((date) => ({
       id: nanoid(),
-      date: dayjs(date).format(shortDateFormat),
+      date: dayjs(date).format(isoDateFormat),
       project: values.project!,
       task: values.task!,
       duration,
@@ -186,11 +187,11 @@ const onSave = handleSubmit((values) => {
       );
       categoryId = existingCat ? existingCat.id : addCategory(values.categoryName.trim()).id;
     }
-    allProjects.value.push({ title: values.project!, categoryId });
+    void addProjects([{ title: values.project!, categoryId }]);
   }
 
   const isTaskExisting = allTasks.value.some((t) => t.title === values.task!);
-  if (!isTaskExisting) allTasks.value.push({ title: values.task!, project: values.project! } satisfies Task);
+  if (!isTaskExisting) void addTasks([{ title: values.task!, project: values.project! } satisfies Task]);
 
   // Use current parent selectedDates so vee-validate stays in sync when the
   // remember-last-date feature keeps the parent value unchanged after save.
@@ -259,7 +260,7 @@ watch(
       const catName = sortedCategories.value.find((c) => c.id === existingProject?.categoryId)?.name;
       resetForm({
         values: {
-          selectedDates: dates.length > 0 ? dates : [dayjs(editing.date, shortDateFormat).toDate()],
+          selectedDates: dates.length > 0 ? dates : [dayjs(editing.date, [isoDateFormat, 'MM/DD/YYYY']).toDate()],
           project: editing.project,
           task: editing.task,
           duration: editing.duration,

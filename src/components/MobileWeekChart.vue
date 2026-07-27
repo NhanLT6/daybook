@@ -7,7 +7,7 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
 
-import { shortDateFormat } from '@/common/DateFormat';
+import { isoDateFormat } from '@/common/DateFormat';
 import { useSettingsStore } from '@/stores/settings';
 import { chain, sumBy } from 'lodash';
 
@@ -52,11 +52,11 @@ const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // index = dayjs .day()
 const dayLabels = computed(() => weekDays.value.map((d) => DAY_LETTERS[d.day()]));
 
 // Per-day stacked segment data.
-const todayStr = dayjs().format(shortDateFormat);
+const todayStr = dayjs().format(isoDateFormat);
 
 const dayData = computed(() =>
   weekDays.value.map((day) => {
-    const dateStr = day.format(shortDateFormat);
+    const dateStr = day.format(isoDateFormat);
     const logsForDay = props.timeLogs.filter((l) => l.date === dateStr);
 
     const segments = chain(logsForDay)

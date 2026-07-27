@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import { useCatchUpSummary } from '@/composables/useCatchUpSummary';
+import { useEvents } from '@/composables/useEvents';
 import { useGreetingNotifications } from '@/composables/useGreetingNotifications';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { useJira } from '@/composables/useJira';
@@ -10,19 +11,16 @@ import { useServerSettings } from '@/composables/useServerSettings';
 import AppBackground from '@/components/AppBackground.vue';
 import NotificationIsland from '@/components/NotificationIsland.vue';
 
-import type { AppEvent } from '@/interfaces/Event';
-
 import { useDisplay, useTheme } from 'vuetify';
 
 import { useStorage } from '@vueuse/core';
 
 import { fetchHolidays } from '@/apis/holidayApi';
-import { storageKeys } from '@/common/storageKeys';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { RouterView, useRoute } from 'vue-router';
 
-const events = useStorage<AppEvent[]>(storageKeys.events, []);
+const { events, replaceAll, ready } = useEvents();
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
 const { startCatchUpNotifications } = useCatchUpSummary();
 const { startGreetingNotifications } = useGreetingNotifications();
@@ -46,11 +44,14 @@ const glassStyle = computed(() => {
 });
 
 const autoFetchEvents = async () => {
+  await ready;
   const currentYear = new Date().getFullYear();
   const hasHolidaysThisYear = events.value.some((e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)));
   if (!hasHolidaysThisYear) {
     const holidays = await fetchHolidays(currentYear);
-    events.value = [...events.value, ...holidays];
+    // fetchHolidays swallows API failures and returns [] — rewriting the collection
+    // with nothing new to add would be a pure risk to the user's own events.
+    if (holidays.length) await replaceAll([...events.value, ...holidays]);
   }
 };
 

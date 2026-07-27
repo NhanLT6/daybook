@@ -9,5 +9,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['src/**/*.test.ts'],
+    setupFiles: ['src/db/__tests__/setup.indexeddb.ts'],
   },
 })

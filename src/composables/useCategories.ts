@@ -1,49 +1,68 @@
 import { computed } from 'vue';
 
-import { useStorage } from '@vueuse/core';
-
 import { nanoid } from 'nanoid';
 
 import type { Category } from '@/interfaces/Category';
-import { storageKeys } from '@/common/storageKeys';
+
+import { useCollection } from '@/composables/useCollection';
 
 const defaultCategories: Category[] = [{ id: 'work', name: 'Work', displayOrder: 0 }];
 
-export function useCategories() {
-  const categories = useStorage<Category[]>(storageKeys.categories, defaultCategories);
+// Persisted marker: seeding must happen at most once, EVER — this matches the old
+// useStorage-backed behavior, where a default was written only the first time the
+// storage key never existed. Without a persisted flag, an empty collection (e.g.
+// the user deleted their last category) looks identical to a fresh install, and
+// every later mount of useCategories() would silently resurrect 'Work'.
+const SEEDED_FLAG_KEY = 'daybook:categoriesSeeded';
 
-  // Sorted by displayOrder for consistent rendering
-  const sortedCategories = computed(() => [...categories.value].sort((a, b) => a.displayOrder - b.displayOrder));
+// In-memory guard so concurrent mounts within one session don't each attach their
+// own seed check. This is just an optimization on top of the persisted flag above,
+// which is what actually guarantees correctness across reloads.
+let seedAttempted = false;
+
+export function useCategories() {
+  const c = useCollection<Category>('categories');
+
+  // Seed default once, ever. Skip entirely once the persisted flag is set, so an
+  // empty collection after the user deletes their last category is never mistaken
+  // for a fresh install.
+  if (!seedAttempted) {
+    seedAttempted = true;
+    if (localStorage.getItem(SEEDED_FLAG_KEY) !== '1') {
+      void c.ready
+        .then(async () => {
+          if (c.items.value.length === 0) await c.addMany(defaultCategories);
+          // Mark seeded regardless of whether we actually added anything: migrated
+          // users who already had categories at this point must also be flagged, so
+          // they never get a default resurrected after clearing their categories out.
+          localStorage.setItem(SEEDED_FLAG_KEY, '1');
+        })
+        .catch((e) => console.warn('[categories] seed skipped', e));
+    }
+  }
+
+  const categories = computed(() => c.items.value);
+  const sortedCategories = computed(() => [...c.items.value].sort((a, b) => a.displayOrder - b.displayOrder));
 
   const getCategoryById = (id: string | undefined): Category | undefined =>
-    id ? categories.value.find((c) => c.id === id) : undefined;
-
+    id ? c.items.value.find((x) => x.id === id) : undefined;
   const getCategoryName = (id: string | undefined): string => getCategoryById(id)?.name ?? 'Uncategorized';
 
   const addCategory = (name: string): Category => {
-    const maxOrder = categories.value.reduce((max, c) => Math.max(max, c.displayOrder), -1);
-    const newCategory: Category = { id: nanoid(), name: name.trim(), displayOrder: maxOrder + 1 };
-    categories.value.push(newCategory);
-    return newCategory;
+    const maxOrder = c.items.value.reduce((max, x) => Math.max(max, x.displayOrder), -1);
+    const created: Category = { id: nanoid(), name: name.trim(), displayOrder: maxOrder + 1 };
+    void c.add(created);
+    return created;
   };
 
   const renameCategory = (id: string, newName: string) => {
-    const cat = categories.value.find((c) => c.id === id);
-    if (cat) cat.name = newName.trim();
+    const cat = c.items.value.find((x) => x.id === id);
+    if (cat) void c.upsert({ ...cat, name: newName.trim() });
   };
 
-  // Deleting a category leaves its projects as "Uncategorized" (no cascade)
   const deleteCategory = (id: string) => {
-    categories.value = categories.value.filter((c) => c.id !== id);
+    void c.remove(id);
   };
 
-  return {
-    categories,
-    sortedCategories,
-    getCategoryById,
-    getCategoryName,
-    addCategory,
-    renameCategory,
-    deleteCategory,
-  };
+  return { categories, sortedCategories, getCategoryById, getCategoryName, addCategory, renameCategory, deleteCategory };
 }

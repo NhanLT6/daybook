@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
@@ -9,35 +9,29 @@ import MobileWeekChart from '@/components/MobileWeekChart.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
-import type { Project } from '@/interfaces/Project';
-import type { Task } from '@/interfaces/Task';
 import type { TimeLog } from '@/interfaces/TimeLog';
 
 import { useDisplay, useTheme } from 'vuetify';
 
-import { useNow, useStorage } from '@vueuse/core';
+import { useNow } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { shortDateFormat, templateDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
-import { storageKeys } from '@/common/storageKeys';
-import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
+import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { onCatchUpView } from '@/composables/useCatchUpSummary';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
+import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
+import { useTimeLogs } from '@/composables/useTimeLogs';
+import { useWorkspace } from '@/composables/useWorkspace';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
+import { xeroExportCsv, xeroImportCsv } from '@/xero/xeroCsv';
 import { saveAs } from 'file-saver';
-import { camelCase, chain, toNumber, unionBy } from 'lodash';
+import { uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
-import { parse, unparse } from 'papaparse';
 
-// Use dynamic storage that updates with month changes
-const timeLogs = ref<TimeLog[]>([]);
-const tasks = useStorage<Task[]>(storageKeys.tasks, []);
-const projects = useStorage<Project[]>(storageKeys.projects, []);
-
-// Storage map to keep track of different month storages
-const monthStorages = new Map<string, ReturnType<typeof useStorage<TimeLog[]>>>();
+const { logs, forMonth, save, remove: removeLog, addMany: addLogs } = useTimeLogs();
+const { addProjects, addTasks, allProjects: projects, allTasks: tasks } = useWorkspace();
 
 const now = useNow({ interval: 60_000 });
 const todayDateStr = computed(() => dayjs(now.value).format('YYYY-MM-DD'));
@@ -109,22 +103,9 @@ const { smAndDown } = useDisplay();
 const { isOpen: insightsDrawerOpen, isInline: insightsInline } = useInsightsDrawer();
 const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-darken-4' : 'green-lighten-2'));
 
-// Function to get or create storage for a specific month
-const getTimeLogsForMonth = (month: number) => {
-  const monthForKey = dayjs().month(month - 1); // Convert from 1-based to 0-based for dayjs
-  const storageKey = `timeLogs-${monthForKey.format(yearAndMonthFormat)}`;
-
-  if (!monthStorages.has(storageKey)) {
-    monthStorages.set(storageKey, useStorage<TimeLog[]>(storageKey, []));
-  }
-  return monthStorages.get(storageKey)!;
-};
-
-// Initialize with current month and watch for changes
-watchEffect(() => {
-  const monthStorage = getTimeLogsForMonth(currentMonth.value);
-  timeLogs.value = monthStorage.value;
-});
+// Logs for the calendar's current month (ISO 'YYYY-MM'). Assumes current year —
+// matches prior behavior; cross-year navigation would need a year threaded alongside.
+const timeLogs = computed(() => forMonth(dayjs().month(currentMonth.value - 1).format('YYYY-MM')));
 
 const onMonthChanged = (month: number) => {
   currentMonth.value = month; // v-calendar uses 1-based months (1-12)
@@ -132,29 +113,17 @@ const onMonthChanged = (month: number) => {
 
 // Logs
 
-const saveBulkLogs = (logs: TimeLog[]) => {
-  const monthStorage = getTimeLogsForMonth(currentMonth.value);
+const saveBulkLogs = async (incoming: TimeLog[]) => {
   let addedCount = 0;
   let updatedCount = 0;
+  const existingIds = new Set(logs.value.map((l) => l.id));
 
   // Handle both create and update based on log ID
-  logs.forEach((log) => {
-    const existingIndex = monthStorage.value.findIndex((item) => item.id === log.id);
-
-    if (existingIndex !== -1) {
-      // Update existing log
-      monthStorage.value[existingIndex] = log;
-      updatedCount += 1;
-    } else {
-      // Add new log
-      monthStorage.value.push(log);
-      addedCount += 1;
-    }
-  });
-
-  // Update the reactive timeLogs ref as well
-  timeLogs.value = monthStorage.value;
-  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
+  for (const log of incoming) {
+    if (existingIds.has(log.id)) updatedCount += 1;
+    else addedCount += 1;
+    await save({ ...log, date: dayjs(log.date, [isoDateFormat, 'MM/DD/YYYY']).format(isoDateFormat) });
+  }
 
   if (updatedCount) {
     notificationCenter.success(updatedCount === 1 ? 'Log updated' : `${updatedCount} logs updated`);
@@ -164,7 +133,7 @@ const saveBulkLogs = (logs: TimeLog[]) => {
     notificationCenter.success(addedCount === 1 ? 'Log added' : `${addedCount} logs added`);
   }
 
-  const isSingleCreate = !editingLog.value && logs.length === 1;
+  const isSingleCreate = !editingLog.value && incoming.length === 1;
   if (settingsStore.rememberLastSelectedDate && isSingleCreate && selectedDates.value[0]) {
     settingsStore.lastSelectedDate = { date: selectedDates.value[0].toISOString(), savedAt: Date.now() };
     startAutoDeselectTimer(REMEMBER_DATE_EXPIRY_MS);
@@ -185,7 +154,7 @@ const onBulkCancel = () => {
 const onEditLog = (log: TimeLog) => {
   editingLog.value = log;
   // Set calendar to show the log's date as selected (user can change it)
-  selectedDates.value = [dayjs(log.date, shortDateFormat).toDate()];
+  selectedDates.value = [dayjs(log.date, [isoDateFormat, 'MM/DD/YYYY']).toDate()];
 };
 
 // Clone a log: copy its fields into the form as a new (create-mode) entry dated today.
@@ -202,28 +171,13 @@ const onCloneLog = (log: TimeLog) => {
   tab.value = 'form'; // reveal the form if the Chat tab is active
 };
 
-const onDeleteLog = (log: TimeLog) => {
-  const monthStorage = getTimeLogsForMonth(currentMonth.value);
-  monthStorage.value = monthStorage.value.filter((item: TimeLog) => item !== log);
-  // Update the reactive timeLogs ref as well
-  timeLogs.value = monthStorage.value;
-  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
+const onDeleteLog = async (log: TimeLog) => {
+  await removeLog(log.id);
   notificationCenter.success('Log deleted');
 };
 
 const exportToCsv = () => {
-  const transformedData = timeLogs.value.map((log) => ({
-    Id: log.id,
-    Date: dayjs(log.date).format(templateDateFormat),
-    Project: log.project,
-    Task: log.task,
-    Duration: log.duration ?? '',
-    Type: log.type ?? 'log',
-    Description: log.description,
-    IsLogged: false,
-  }));
-
-  const csv = unparse(transformedData);
+  const csv = xeroExportCsv(timeLogs.value);
 
   // Save Csv file
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -235,128 +189,60 @@ const importCsv = async (file?: File) => {
 
   const fileContent = await file.text();
 
-  const result = parse(fileContent, {
-    header: true,
-    transformHeader(header: string): string {
-      return camelCase(header);
-    },
-    transform(value: string, header: string): string | number | undefined {
-      if (header === 'date') return dayjs(value, templateDateFormat).format(shortDateFormat);
-      if (header === 'duration') return value ? toNumber(value) : undefined;
-      if (header === 'type') return value === 'plan' ? 'plan' : 'log';
-
-      return value;
-    },
-  });
-
-  if (result.errors.length) {
-    result.errors.map((e) => {
-      notificationCenter.error('Import failed', {
-        message: e.message,
-      });
-      console.error(e);
-    });
-
+  let dataWithIds: TimeLog[];
+  try {
+    dataWithIds = xeroImportCsv(fileContent);
+  } catch (e) {
+    notificationCenter.error('Import failed', { message: (e as Error).message });
+    console.error(e);
     return;
   }
 
-  const dataWithIds: TimeLog[] = result.data.map((item) => {
-    const log = item as Record<string, string | number | undefined>;
-    const duration = log.duration as number | undefined;
-    return {
-      id: (log.id as string) ?? nanoid(),
-      date: log.date as string,
-      project: log.project as string,
-      task: log.task as string,
-      duration: duration || undefined,
-      type: (log.type as 'log' | 'plan' | undefined) ?? (duration ? 'log' : 'plan'),
-      description: log.description as string | undefined,
-    };
-  });
-
-  // Merge imported data with existing data, prioritize imported data if there are records with the same id
-  const monthStorage = getTimeLogsForMonth(currentMonth.value);
-  monthStorage.value = unionBy(dataWithIds, monthStorage.value, 'id');
-  // Update the reactive timeLogs ref as well
-  timeLogs.value = monthStorage.value;
-  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
-
-  // Extract Projects and Tasks
-  projects.value = chain(dataWithIds)
-    .map((log) => ({ title: log.project }))
-    .concat(projects.value)
-    .uniqBy('title')
-    .value();
-
-  tasks.value = chain(dataWithIds)
-    .map((log) => ({ project: log.project, title: log.task }) satisfies Task)
-    .concat(tasks.value)
-    .uniqBy((value) => `${value.project}-${value.title}`)
-    .value();
+  await addLogs(dataWithIds.map((l) => ({ ...l, id: l.id ?? nanoid() })));
+  await addProjects(uniqBy(dataWithIds.map((l) => ({ title: l.project })), 'title'));
+  await addTasks(uniqBy(dataWithIds.map((l) => ({ project: l.project, title: l.task })), (t) => `${t.project}-${t.title}`));
 
   notificationCenter.success('Logs imported');
 };
 
-// Track IDs of the last AI-saved batch for undo support
-const lastAiSavedLogs = ref<Array<{ id: string; month: number }>>([]);
+// Track IDs of the last AI-saved batch for undo support (unified store, no month bucket)
+const lastAiSavedLogs = ref<string[]>([]);
 
-// Handle logs saved from the AI chat panel.
-// Each log has an explicit date, so save to the correct month bucket.
-const onAiSaveLogs = (extractedLogs: ExtractedLog[]) => {
-  const savedBatch: Array<{ id: string; month: number }> = [];
-
-  extractedLogs.forEach((log) => {
-    // AI returns YYYY-MM-DD; convert to the app's internal MM/DD/YYYY format
-    const date = dayjs(log.date, 'YYYY-MM-DD').format(shortDateFormat);
-    const logMonth = dayjs(log.date, 'YYYY-MM-DD').month() + 1; // 1-based month number
+// Handle logs saved from the AI chat panel. AI already returns ISO YYYY-MM-DD, so store directly.
+const onAiSaveLogs = async (extractedLogs: ExtractedLog[]) => {
+  const savedIds: string[] = [];
+  const toSave = extractedLogs.map((log) => {
     const id = nanoid();
-    const monthStorage = getTimeLogsForMonth(logMonth);
-    const duration = log.duration;
-    monthStorage.value.push({
+    savedIds.push(id);
+    return {
       id,
-      date,
+      date: log.date, // already ISO YYYY-MM-DD
       project: log.project,
       task: log.task,
-      duration,
-      type: duration ? 'log' : 'plan',
+      duration: log.duration,
+      type: log.duration ? 'log' : 'plan',
       description: log.description,
-    });
-    savedBatch.push({ id, month: logMonth });
+    } as TimeLog & { id: string };
   });
 
-  lastAiSavedLogs.value = savedBatch;
+  await addLogs(toSave);
+  lastAiSavedLogs.value = savedIds;
 
   // Merge any new projects and tasks into the stored lists (same as importCsv)
-  projects.value = chain(extractedLogs)
-    .map((log) => ({ title: log.project }))
-    .concat(projects.value)
-    .uniqBy('title')
-    .value();
-
-  tasks.value = chain(extractedLogs)
-    .map((log) => ({ project: log.project, title: log.task }) satisfies Task)
-    .concat(tasks.value)
-    .uniqBy((value) => `${value.project}-${value.title}`)
-    .value();
-
-  // Refresh displayed timeLogs if any log belongs to the current month
-  const currentMonthStorage = getTimeLogsForMonth(currentMonth.value);
-  timeLogs.value = currentMonthStorage.value;
-  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
+  await addProjects(uniqBy(extractedLogs.map((log) => ({ title: log.project })), 'title'));
+  await addTasks(
+    uniqBy(
+      extractedLogs.map((log) => ({ project: log.project, title: log.task })),
+      (t) => `${t.project}-${t.title}`,
+    ),
+  );
 
   notificationCenter.success(`${extractedLogs.length} log${extractedLogs.length > 1 ? 's' : ''} saved`);
 };
 
-const onAiUndoLogs = () => {
-  lastAiSavedLogs.value.forEach(({ id, month }) => {
-    const monthStorage = getTimeLogsForMonth(month);
-    monthStorage.value = monthStorage.value.filter((log) => log.id !== id);
-  });
+const onAiUndoLogs = async () => {
+  for (const id of lastAiSavedLogs.value) await removeLog(id);
   lastAiSavedLogs.value = [];
-
-  // Refresh displayed logs
-  timeLogs.value = getTimeLogsForMonth(currentMonth.value).value;
-  localStorage.setItem(storageKeys.logsLastModified, Date.now().toString());
 
   notificationCenter.info('Logs removed');
 };

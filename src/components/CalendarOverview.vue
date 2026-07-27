@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import type { AppEvent } from '@/interfaces/Event';
 import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
 
 import { useTheme } from 'vuetify';
@@ -11,6 +10,7 @@ import { useNow, useStorage } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { storageKeys } from '@/common/storageKeys';
+import { useEvents } from '@/composables/useEvents';
 import { useSettingsStore } from '@/stores/settings';
 
 // Theme integration
@@ -47,7 +47,7 @@ const now = useNow({ interval: 60_000 });
 const lastEmittedMonth = ref(new Date().getMonth() + 1);
 const isTodayVisible = ref(true);
 
-const events = useStorage<AppEvent[]>(storageKeys.events, []);
+const { events } = useEvents();
 
 // Calendar attributes - static, not reactive to displayed month to avoid recursion
 const todayAttribute = computed(() => ({

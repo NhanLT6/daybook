@@ -6,8 +6,9 @@ import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 import { httpClient } from '@/apis/httpClient';
-import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { shortDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
+import { db } from '@/db';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 
@@ -150,36 +151,15 @@ function parseLogDate(value: string): dayjs.Dayjs | null {
   return fallback.isValid() ? fallback : null;
 }
 
-function readLogs(monthKey: string): TimeLog[] {
-  const stored = localStorage.getItem(monthKey);
-  if (!stored) return [];
-
-  try {
-    return JSON.parse(stored) as TimeLog[];
-  } catch {
-    return [];
-  }
+async function allLogs(): Promise<TimeLog[]> {
+  return db.timeLogs.all();
 }
 
-function collectLogsFromDate(rangeStart: dayjs.Dayjs, today: dayjs.Dayjs): TimeLog[] {
-  const allLogs: TimeLog[] = [];
-  let cursor = rangeStart.startOf('month');
-  const endMonth = today.startOf('month');
-
-  while (cursor.isBefore(endMonth) || cursor.isSame(endMonth, 'month')) {
-    const monthKey = `timeLogs-${cursor.format(yearAndMonthFormat)}`;
-    const logs = readLogs(monthKey);
-    allLogs.push(
-      ...logs.filter((log) => {
-        const logDate = parseLogDate(log.date)?.startOf('day');
-        if (!logDate) return false;
-        return logDate.valueOf() >= rangeStart.valueOf() && logDate.valueOf() <= today.valueOf();
-      }),
-    );
-    cursor = cursor.add(1, 'month');
-  }
-
-  return allLogs;
+function collectLogsFromArray(all: TimeLog[], rangeStart: dayjs.Dayjs, today: dayjs.Dayjs): TimeLog[] {
+  return all.filter((log) => {
+    const d = parseLogDate(log.date)?.startOf('day');
+    return !!d && d.valueOf() >= rangeStart.valueOf() && d.valueOf() <= today.valueOf();
+  });
 }
 
 function workingDaysAgo(from: dayjs.Dayjs, workingDays: number): dayjs.Dayjs {
@@ -193,70 +173,59 @@ function workingDaysAgo(from: dayjs.Dayjs, workingDays: number): dayjs.Dayjs {
   return cursor;
 }
 
-function collectAccumulationLogs(today: dayjs.Dayjs): TimeLog[] {
+function collectAccumulationLogs(all: TimeLog[], today: dayjs.Dayjs): TimeLog[] {
   const rangeStart = workingDaysAgo(today, LOOKBACK_WORKING_DAYS);
-  return collectLogsFromDate(rangeStart, today);
+  return collectLogsFromArray(all, rangeStart, today);
 }
 
-function getLogsForSummary(): TimeLog[] {
-  const today = dayjs().startOf('day');
+function getLogsForSummary(all: TimeLog[], today: dayjs.Dayjs): TimeLog[] {
+  // Find the latest weekday before today that has a did-log (non-plan) entry —
+  // that becomes the standup anchor. collectLogsFromArray then sweeps from that
+  // anchor to today, naturally picking up any weekend work in between.
+  const anchor = all
+    .filter((log) => log.type !== 'plan')
+    .map((log) => parseLogDate(log.date)?.startOf('day'))
+    .filter((d): d is dayjs.Dayjs => !!d?.isValid() && d.isBefore(today) && d.day() !== 0 && d.day() !== 6)
+    .sort((a, b) => b.valueOf() - a.valueOf())[0];
 
-  // Scan all stored log months newest-first. Find the latest weekday before today
-  // that has entries — that becomes the standup anchor. collectLogsFromDate then
-  // sweeps from that anchor to today, naturally picking up any weekend work in between.
-  const logMonthKeys = Object.keys(localStorage)
-    .filter((key) => /^timeLogs-\d{4}-\d{2}$/.test(key))
-    .sort()
-    .reverse();
-
-  for (const monthKey of logMonthKeys) {
-    const logs = readLogs(monthKey);
-
-    const anchor = logs
-      .filter((log) => log.type !== 'plan')
-      .map((log) => parseLogDate(log.date)?.startOf('day'))
-      .filter((d): d is dayjs.Dayjs => !!d?.isValid() && d.isBefore(today) && d.day() !== 0 && d.day() !== 6)
-      .sort((a, b) => b.valueOf() - a.valueOf())[0];
-
-    if (anchor) return collectLogsFromDate(anchor, today);
-  }
-
-  return [];
+  if (!anchor) return [];
+  return collectLogsFromArray(all, anchor, today);
 }
 
-// ── Summary cache (single key, keyed by logsLastModified timestamp) ──────────
+// ── Summary cache (single key, keyed by a stamp derived from the logs: count + latest date) ──
 
 interface SummaryCache {
   key: string;
   items: CatchUpRenderItem[];
 }
 
-function getCachedSummary(): CatchUpRenderItem[] | null {
-  const key = localStorage.getItem(storageKeys.logsLastModified);
-  if (!key) return null;
+export function logsStamp(all: TimeLog[]): string {
+  let h = 0;
+  for (const l of all) {
+    const s = `${l.id}|${l.date}|${l.project}|${l.task}|${l.duration ?? ''}|${l.type}|${l.description ?? ''}`;
+    for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  }
+  return `${all.length}:${h}`;
+}
+
+function getCachedSummary(all: TimeLog[]): CatchUpRenderItem[] | null {
   const raw = localStorage.getItem(storageKeys.catchUp.summaries);
   if (!raw) return null;
   try {
     const cache = JSON.parse(raw) as SummaryCache;
-    return cache.key === key ? cache.items : null;
+    return cache.key === logsStamp(all) ? cache.items : null;
   } catch {
     return null;
   }
 }
 
-function setCachedSummary(items: CatchUpRenderItem[]): void {
-  let key = localStorage.getItem(storageKeys.logsLastModified);
-  if (!key) {
-    // Seed the key so cache is usable until the user next saves a log
-    key = Date.now().toString();
-    localStorage.setItem(storageKeys.logsLastModified, key);
-  }
+function setCachedSummary(all: TimeLog[], items: CatchUpRenderItem[]): void {
+  const key = logsStamp(all);
   localStorage.setItem(storageKeys.catchUp.summaries, JSON.stringify({ key, items } satisfies SummaryCache));
 }
 
-function getTodayPlans(today: dayjs.Dayjs): TimeLog[] {
-  const monthKey = `timeLogs-${today.format(yearAndMonthFormat)}`;
-  return readLogs(monthKey).filter((log) => {
+function getTodayPlans(all: TimeLog[], today: dayjs.Dayjs): TimeLog[] {
+  return all.filter((log) => {
     const logDate = parseLogDate(log.date)?.startOf('day');
     return logDate?.isSame(today, 'day') && log.type === 'plan';
   });
@@ -275,19 +244,21 @@ function buildPlanRequestItems(plans: TimeLog[]): RequestPlan[] {
   }));
 }
 
-async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null> {
+async function callStandupApi(all: TimeLog[], today: string): Promise<CatchUpRenderItem[] | null> {
   const todayDayjs = dayjs(today).startOf('day');
 
   // Separate did logs (actual work) from plan entries
-  const allLogs = getLogsForSummary();
-  const didLogs = allLogs.filter((l) => l.type !== 'plan');
+  const summaryLogs = getLogsForSummary(all, todayDayjs);
+  const didLogs = summaryLogs.filter((l) => l.type !== 'plan');
 
-  const todayPlans = getTodayPlans(todayDayjs);
+  const todayPlans = getTodayPlans(all, todayDayjs);
   const hasTodayPlans = todayPlans.length > 0;
 
   if (!didLogs.length && !hasTodayPlans) return null;
 
-  const accumulated = accumulateMinutesByProject(collectAccumulationLogs(todayDayjs).filter((l) => l.type !== 'plan'));
+  const accumulated = accumulateMinutesByProject(
+    collectAccumulationLogs(all, todayDayjs).filter((l) => l.type !== 'plan'),
+  );
   const items = buildCatchUpItems(didLogs, accumulated);
 
   const requestItems = items.map((item) => ({
@@ -322,14 +293,15 @@ async function callStandupApi(today: string): Promise<CatchUpRenderItem[] | null
     ? [...didRendered.map((r) => ({ ...r, group: 'did' as const })), ...todoRendered]
     : didRendered;
 
-  setCachedSummary(rendered);
+  setCachedSummary(all, rendered);
   return rendered.length ? rendered : null;
 }
 
 export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {
-  const cached = getCachedSummary();
+  const all = await allLogs();
+  const cached = getCachedSummary(all);
   if (cached) return cached;
-  return callStandupApi(dayjs().format('YYYY-MM-DD'));
+  return callStandupApi(all, dayjs().format('YYYY-MM-DD'));
 }
 
 export function isAiAvailable(config: AiConfig): boolean {
@@ -384,13 +356,14 @@ export function useCatchUpSummary() {
         return;
       }
 
-      const cached = getCachedSummary();
+      const all = await allLogs();
+      const cached = getCachedSummary(all);
       if (cached) {
         enqueueCatchUp(cached, date);
         return;
       }
 
-      const items = await callStandupApi(date);
+      const items = await callStandupApi(all, date);
       if (items?.length) enqueueCatchUp(items, date);
     } catch {
       // Foundation phase: catch-up failures do not create user-facing notifications.
