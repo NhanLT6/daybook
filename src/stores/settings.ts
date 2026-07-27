@@ -136,6 +136,15 @@ export const useSettingsStore = defineStore('settings', () => {
     resolveSettingsReady?.();
   }
 
+  /**
+   * Drop the signed-in user's credentials from memory on sign-out, so the next
+   * account never sees the previous one's keys in the Settings form.
+   */
+  function resetServerConfigs() {
+    jiraConfig.value = { ...DEFAULT_JIRA_CONFIG };
+    aiConfig.value = { ...DEFAULT_AI_CONFIG };
+  }
+
   // ── Computed ──────────────────────────────────────────────────────────
   // Convert our 0-6 value to v-calendar's 1-7 format
   const vCalendarFirstDay = computed(() => (firstDayOfWeek.value === 0 ? 1 : firstDayOfWeek.value + 1));
@@ -159,6 +168,7 @@ export const useSettingsStore = defineStore('settings', () => {
     aiConfig,
     waitForSettings,
     populateFromServer,
+    resetServerConfigs,
     vCalendarFirstDay,
     vCalendarWeekendDays,
     dateFormatOptions,

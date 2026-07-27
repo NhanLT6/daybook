@@ -10,7 +10,7 @@ import type { FileUIPart } from 'ai';
 import { Chat } from '@ai-sdk/vue';
 import { DefaultChatTransport, getToolName, isToolUIPart } from 'ai';
 
-import { buildAuthHeaders } from './useCrypto';
+import { authHeaders } from './useAuth';
 
 // ── Image helper ──────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ export function useAiChat() {
 
   const chat = new Chat<DaybookUIMessage>({
     transport: new DefaultChatTransport<DaybookUIMessage>({
-      headers: () => buildAuthHeaders(),
+      headers: async () => (await authHeaders()) ?? {},
     }),
     onFinish: ({ messages: finished }) => {
       const last = finished[finished.length - 1];

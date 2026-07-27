@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { buildAuthHeaders } from './useCrypto'
+import { authHeaders } from './useAuth'
 import type { ServerSettings } from '@/interfaces/ServerSettings'
 import type { JiraConfig } from '@/interfaces/JiraConfig'
 
@@ -10,13 +10,21 @@ const isLoading = ref(false)
 const isLoaded = ref(false)
 const error = ref<string | null>(null)
 
+/** Thrown when the caller is signed out, so callers can skip a certain 401. */
+export class NotSignedInError extends Error {
+  constructor() {
+    super('Sign in to use server-stored settings')
+  }
+}
+
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const authHeaders = await buildAuthHeaders()
+  const auth = await authHeaders()
+  if (!auth) throw new NotSignedInError()
   return fetch(path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...authHeaders,
+      ...auth,
       ...(options.headers as Record<string, string> | undefined),
     },
   })
@@ -31,6 +39,8 @@ export function useServerSettings() {
       if (!res.ok) throw new Error(`Settings load failed: ${res.status}`)
       return (await res.json()) as ServerSettings
     } catch (e) {
+      // Signed out is an ordinary state, not a failure worth showing.
+      if (e instanceof NotSignedInError) return null
       error.value = e instanceof Error ? e.message : 'Failed to load settings'
       return null
     } finally {

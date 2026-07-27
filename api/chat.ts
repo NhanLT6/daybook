@@ -4,9 +4,9 @@ import type { UIMessage } from 'ai';
 import { convertToModelMessages, streamText, tool } from 'ai';
 
 import { extractLogsInputSchema } from '../src/interfaces/aiTools.js';
-import { AuthError, verifyRequest } from './_lib/auth.js';
+import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js';
 import { isAiEnabled, requireAiModel } from './_lib/ai.js';
-import { getSettings } from './_lib/kv.js';
+import { getSettings } from './_lib/settingsRepo.js';
 
 interface ChatApiRequest {
   messages: UIMessage[];
@@ -52,20 +52,15 @@ If you cannot find any time log data in the message, reply conversationally and 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Machine-Id, X-Public-Key, X-Signature, X-Timestamp');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { machineId } = await verifyRequest({
-      get: (name: string) => {
-        const val = req.headers[name.toLowerCase()];
-        return Array.isArray(val) ? val[0] : (val ?? null);
-      },
-    });
+    const { userId } = await requireUser(headerReader(req));
 
-    const { aiConfig } = await getSettings(machineId);
+    const { aiConfig } = await getSettings(userId);
     if (!isAiEnabled(aiConfig)) {
       return res.status(400).json({
         error: 'AI Assistant is not configured. Add your Gemini API key in Settings.',

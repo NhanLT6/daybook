@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 
+import { useAuth } from '@/composables/useAuth';
 import { useCatchUpSummary } from '@/composables/useCatchUpSummary';
 import { useEvents } from '@/composables/useEvents';
 import { useGreetingNotifications } from '@/composables/useGreetingNotifications';
@@ -9,6 +10,7 @@ import { useJira } from '@/composables/useJira';
 import { useServerSettings } from '@/composables/useServerSettings';
 
 import AppBackground from '@/components/AppBackground.vue';
+import AuthMenu from '@/components/AuthMenu.vue';
 import NotificationIsland from '@/components/NotificationIsland.vue';
 
 import { useDisplay, useTheme } from 'vuetify';
@@ -21,6 +23,7 @@ import { useSettingsStore } from '@/stores/settings';
 import { RouterView, useRoute } from 'vue-router';
 
 const { events, replaceAll, ready } = useEvents();
+const { isAuthenticated, ready: authReady } = useAuth();
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
 const { startCatchUpNotifications } = useCatchUpSummary();
 const { startGreetingNotifications } = useGreetingNotifications();
@@ -84,12 +87,13 @@ const showReleaseNotification = () => {
 };
 
 /**
- * Load server-side settings (Gemini + Jira) on app mount.
+ * Load server-side settings (AI + Jira) for the signed-in user.
  * Also handles one-time migration of Jira config from localStorage.
+ * Signed out this resolves to null and the app runs on local data alone.
  */
 const initServerSettings = async () => {
   const serverSettings = await loadSettings();
-  if (!serverSettings) return; // silently fail — server may be unreachable locally
+  if (!serverSettings) return; // signed out, or the server is unreachable locally
 
   const jiraConfig = await migrateJiraFromLocalStorage(settingsStore.jiraConfig, serverSettings);
   settingsStore.populateFromServer(jiraConfig, serverSettings.aiConfig);
@@ -97,11 +101,23 @@ const initServerSettings = async () => {
 
 onMounted(async () => {
   stopGreetingNotifications = startGreetingNotifications();
+  await authReady; // settle the session first so the settings call carries a token
   await initServerSettings();
   stopCatchUpNotifications = startCatchUpNotifications();
   await autoFetchEvents();
   await autoSyncJiraTickets();
   showReleaseNotification();
+});
+
+// Credentials live per account, so re-read them whenever the signed-in user changes.
+watch(isAuthenticated, async (signedIn, wasSignedIn) => {
+  if (signedIn === wasSignedIn) return;
+  if (signedIn) {
+    await initServerSettings();
+    await autoSyncJiraTickets();
+  } else {
+    settingsStore.resetServerConfigs();
+  }
 });
 
 onUnmounted(() => {
@@ -157,7 +173,9 @@ const navItems = [
 
           <span class="dock-spacer" />
 
-<VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
+          <AuthMenu />
+
+          <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
           <!-- Insights drawer toggle — Home only, when the inline panel is hidden -->
           <VIconBtn

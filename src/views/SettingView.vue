@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import { useAuth } from '@/composables/useAuth';
 import { useBackup } from '@/composables/useBackup';
 import { useCategories } from '@/composables/useCategories';
 import { useJira } from '@/composables/useJira';
@@ -17,6 +18,9 @@ import { useNotificationCenterStore } from '@/stores/notificationCenter';
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
 const { sortedCategories } = useCategories();
+// Jira and AI credentials live on the server against an account, so both cards
+// are inert until the user signs in. Everything else here is local and stays open.
+const { isAuthenticated } = useAuth();
 
 const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJira();
 
@@ -366,8 +370,11 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
           <VCardText class="d-flex flex-column ga-2">
             <!-- Connection group -->
             <VAlert type="info" variant="tonal" density="compact" class="text-caption">
-              Your API token is stored securely on the server, tied to this browser. It cannot be read by others even if
-              they know your machine ID.
+              Your API token is stored on the server against your account, and is only ever readable by you.
+            </VAlert>
+
+            <VAlert v-if="!isAuthenticated" type="warning" variant="tonal" density="compact" class="text-caption">
+              Sign in to save Jira credentials — they are stored against your account.
             </VAlert>
 
             <VTextField
@@ -487,6 +494,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
                 color="primary"
                 variant="tonal"
                 :loading="isSavingSettings"
+                :disabled="!isAuthenticated"
                 prepend-icon="mdi-content-save-outline"
                 @click="handleSaveCredentials"
               >
@@ -507,8 +515,12 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
 
           <VCardText class="d-flex flex-column ga-2">
             <VAlert type="info" variant="tonal" density="compact" class="text-caption">
-              Bring your own key — AI runs on your Gemini account, billed to you. It is stored on the server, tied to
-              this browser, and cannot be read by others even if they know your machine ID.
+              Bring your own key — AI runs on your Gemini account, billed to you. It is stored on the server against
+              your account and is only ever readable by you.
+            </VAlert>
+
+            <VAlert v-if="!isAuthenticated" type="warning" variant="tonal" density="compact" class="text-caption">
+              Sign in to save your Gemini key — it is stored against your account.
             </VAlert>
 
             <VTextField
@@ -550,6 +562,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
                 color="primary"
                 variant="tonal"
                 :loading="isSavingSettings"
+                :disabled="!isAuthenticated"
                 prepend-icon="mdi-content-save-outline"
                 @click="handleSaveCredentials"
               >

@@ -12,7 +12,7 @@ import { db } from '@/db';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 
-import { buildAuthHeaders } from './useCrypto';
+import { authHeaders } from './useAuth';
 
 dayjs.extend(customParseFormat);
 
@@ -274,7 +274,8 @@ async function callStandupApi(all: TimeLog[], today: string): Promise<CatchUpRen
   const planItems = hasTodayPlans ? buildPlanRequestItems(todayPlans) : [];
   const planIdToProject = new Map(planItems.map((p) => [p.id, p.project]));
 
-  const headers = await buildAuthHeaders();
+  const headers = await authHeaders();
+  if (!headers) return null; // signed out — the catch-up is a server-backed feature
   const response = await httpClient.post<{ lines: { id: string; text: string }[]; todoLines?: { id: string; text: string }[] }>(
     '/api/standup',
     { items: requestItems, plans: planItems, today },

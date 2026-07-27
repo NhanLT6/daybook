@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
 
+import { AuthError, headerReader, requireUser } from '../_lib/neonAuth.js';
+
 // Interface for request body
 interface TestConnectionRequest {
   domain: string;
@@ -30,6 +32,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Gated so this cannot be used as an anonymous proxy for probing Atlassian
+    // credentials from our domain. The Jira credentials themselves still come
+    // from the caller's own request body.
+    await requireUser(headerReader(req));
+
     const { domain, email, apiToken } = req.body as TestConnectionRequest;
 
     // Validate required fields
@@ -65,6 +72,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ success: false, message: error.message });
+    }
     if (axios.isAxiosError(error)) {
       const status = error.response?.status || 500;
       const message = error.response?.data?.errorMessages?.[0] || error.response?.data?.message || error.message;

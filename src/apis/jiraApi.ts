@@ -1,7 +1,16 @@
 import type { JiraConfig } from '@/interfaces/JiraConfig';
 import type { JiraTicket } from '@/interfaces/JiraTicket';
 
+import { authHeaders } from '@/composables/useAuth';
+
 import { httpClient } from './httpClient';
+
+/** The Jira proxy endpoints require a signed-in caller. */
+async function requireAuthHeaders(): Promise<Record<string, string>> {
+  const headers = await authHeaders();
+  if (!headers) throw new Error('Sign in to use the Jira integration');
+  return headers;
+}
 
 // API route base URL (relative path works for both dev and production)
 const API_BASE_URL = '/api';
@@ -29,11 +38,15 @@ export const testJiraConnection = async (
   config: JiraConfig,
 ): Promise<{ success: boolean; message: string; user?: any }> => {
   try {
-    const response = await httpClient.post<TestConnectionResponse>(`${API_BASE_URL}/jira/test-connection`, {
-      domain: config.domain,
-      email: config.email,
-      apiToken: config.apiToken,
-    });
+    const response = await httpClient.post<TestConnectionResponse>(
+      `${API_BASE_URL}/jira/test-connection`,
+      {
+        domain: config.domain,
+        email: config.email,
+        apiToken: config.apiToken,
+      },
+      { headers: await requireAuthHeaders() },
+    );
 
     return response.data;
   } catch (error: any) {
@@ -55,13 +68,17 @@ export const fetchJiraTickets = async (config: JiraConfig): Promise<JiraTicket[]
     throw new Error('No valid statuses configured. Please add at least one status in settings.');
   }
 
-  const response = await httpClient.post<FetchTicketsResponse>(`${API_BASE_URL}/jira/fetch-tickets`, {
-    domain: config.domain,
-    email: config.email,
-    apiToken: config.apiToken,
-    projectKey: config.projectKey,
-    statuses,
-  });
+  const response = await httpClient.post<FetchTicketsResponse>(
+    `${API_BASE_URL}/jira/fetch-tickets`,
+    {
+      domain: config.domain,
+      email: config.email,
+      apiToken: config.apiToken,
+      projectKey: config.projectKey,
+      statuses,
+    },
+    { headers: await requireAuthHeaders() },
+  );
 
   if (!response.data.success || !response.data.tickets) {
     throw new Error(response.data.message || 'Failed to fetch tickets');
