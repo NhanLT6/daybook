@@ -3,8 +3,8 @@ import { buildAuthHeaders } from './useCrypto'
 import type { ServerSettings } from '@/interfaces/ServerSettings'
 import type { JiraConfig } from '@/interfaces/JiraConfig'
 
-// Shape of the PUT body — only jira is user-configurable; aiConfig comes from server env vars.
-type SavePayload = { jiraConfig: JiraConfig }
+// PUT body — either section may be omitted; the server keeps the stored value for anything absent.
+type SavePayload = Partial<ServerSettings>
 
 const isLoading = ref(false)
 const isLoaded = ref(false)

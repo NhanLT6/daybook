@@ -1,60 +1,65 @@
-# Vercel AI Setup Checklist
+# AI Setup Checklist (bring your own key)
 
-Run this after deploying a build that uses env-var-based AI config (i.e. after the
-"remove AI settings UI" change is deployed).
+Daybook's AI features run on **each user's own Gemini key**, entered in the app.
+There is no deployment-wide key.
+
+## Why not an env var?
+
+This repo is public and the Vercel deployment is reachable by anyone. `verifyRequest`
+(`api/_lib/auth.ts`) only proves the caller holds the private key matching the
+`machineId` it presents — every visitor can mint a valid keypair in their browser. It
+isolates users from each other; it does not gate who may call the API.
+
+So a `GEMINI_API_KEY` env var would be a shared credential: anyone hitting
+`/api/chat` or `/api/standup` on the deployment would spend the owner's Gemini
+quota. Keys are per-user instead, stored in Upstash KV under the caller's own
+`machineId`, readable only by whoever holds that machine's private key.
 
 ---
 
-## 1. Add environment variables in Vercel
-
-Go to: **Vercel dashboard → your project → Settings → Environment Variables**
+## 1. Deployment env vars
 
 | Variable | Value | Required |
 |---|---|---|
-| `GEMINI_API_KEY` | Your Google AI Studio API key | ✅ Yes |
-| `GEMINI_MODEL` | e.g. `gemini-2.5-flash` | No (defaults to `gemini-2.5-flash`) |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | From the Upstash integration | ✅ Yes |
+| `GEMINI_API_KEY` | — | ❌ **Do not set.** Remove it if present. |
+| `GEMINI_MODEL` | — | ❌ Not used. Model is per-user, chosen in Settings. |
 
-Get your key at: https://aistudio.google.com/app/apikey
-
-Set scope to **Production** (and **Preview** if you want AI in preview deployments).
-
----
-
-## 2. Redeploy
-
-Vercel does not pick up new env vars until the next deployment.
-
-Trigger a redeploy: **Vercel dashboard → Deployments → Redeploy** (or push a commit).
+If `GEMINI_API_KEY` was ever set on this project, delete it in
+**Vercel dashboard → Settings → Environment Variables**, then redeploy — Vercel keeps
+serving the old value until the next deployment. Rotate that key at
+https://aistudio.google.com/app/apikey, since anyone who used the deployment while it
+was set was spending it.
 
 ---
 
-## 3. Verify AI is working
+## 2. Per-user setup (each person, including the project owner)
 
-Open the deployed app and check:
+1. Get a key at https://aistudio.google.com/app/apikey
+2. Open the app → **Settings → AI Assistant**
+3. Toggle it on, paste the key, pick a model
+4. **Save credentials**
 
-- [ ] Catch-up notification appears within a minute of opening (or on next tab return after a day)
-- [ ] AI Chat tab loads and accepts a message
-- [ ] Standup summary generates correctly in the Catch-up panel
+The key goes to `/api/settings` (PUT) and is stored in KV under that browser's
+`machineId`. It never appears in the repo or in any build output.
 
 ---
 
-## 4. Verify error handling (optional)
+## 3. Verify
 
-Temporarily remove `GEMINI_API_KEY` from Vercel env vars and redeploy. The app should:
-
-- [ ] Not crash — the notification simply doesn't appear
-- [ ] Show a clear error message if you trigger the chat or standup endpoints directly
-
-Re-add the key and redeploy when done.
+- [ ] Settings → AI Assistant saves without error, and the key is still there after reload
+- [ ] AI Chat tab accepts a message and streams a reply
+- [ ] Catch-up notification appears within a minute of opening
+- [ ] With the toggle **off**, chat shows "AI Assistant is not configured. Add your Gemini API key in Settings." and the catch-up notification stays silent
+- [ ] A fresh browser profile (new `machineId`) sees an empty AI config — not yours
 
 ---
 
 ## Switching providers in the future
 
 See `docs/superpowers/specs/2026-06-17-ai-provider-research.md` for the provider
-comparison and swap instructions. The short version:
+comparison. The short version:
 
-1. Replace `GEMINI_API_KEY` with the new provider's key variable (e.g. `CEREBRAS_API_KEY`)
-2. Update `api/_lib/aiConfig.ts` to read the new env var name
-3. Swap the SDK import in `api/standup.ts` and `api/chat.ts`
-4. Redeploy
+1. Swap the SDK import and `createGoogleGenerativeAI` call in `api/_lib/ai.ts`
+2. Update the model list (`GEMINI_MODELS`) and field labels in `src/views/SettingView.vue`
+3. Keep the key per-user — do not reintroduce a deployment-wide key

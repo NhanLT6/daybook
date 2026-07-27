@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { useAiChat } from '@/composables/useAiChat';
 import { fetchCatchUpItems, onCatchUpView } from '@/composables/useCatchUpSummary';
@@ -33,6 +34,8 @@ const {
   markDiscarded,
   injectCatchUp,
 } = useAiChat();
+
+const router = useRouter();
 
 const isConfigError = computed(() => error.value?.includes('not configured') ?? false);
 
@@ -211,9 +214,12 @@ onMounted(() => {
           </VAvatar>
           <VCard color="error" variant="tonal" elevation="0" rounded="lg rounded-ts-sm" style="max-width: 88%">
             <VCardText class="pa-3 d-flex align-center ga-2">
-              <!-- Config error: no dismiss button — the error won't go away until the server is configured -->
+              <!-- Config error: render "Settings" as a clickable link, no dismiss button -->
               <template v-if="isConfigError">
-                <span class="text-body-2 mb-0">AI is not available on this deployment.</span>
+                <span class="text-body-2 mb-0">
+                  AI Assistant is not configured. Add your Gemini API key in
+                  <a class="error-link" @click.prevent="router.push('/setting')">Settings</a>.
+                </span>
               </template>
               <template v-else>
                 <span class="text-body-2 mb-0">{{ error }}</span>

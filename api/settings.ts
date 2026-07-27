@@ -1,7 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { AuthError, verifyRequest } from './_lib/auth.js'
-import { isAiEnabled } from './_lib/ai.js'
-import { getJiraConfig, saveJiraConfig } from './_lib/kv.js'
+import { getSettings, saveSettings } from './_lib/kv.js'
+import type { AiConfig } from '../src/interfaces/ServerSettings.js'
+import type { JiraConfig } from '../src/interfaces/JiraConfig.js'
+
+interface SettingsPutBody {
+  jiraConfig?: JiraConfig
+  aiConfig?: AiConfig
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS for local development
@@ -19,18 +25,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     })
 
+    // Settings are keyed by machineId, which is the SHA-256 of the caller's own
+    // public key. verifyRequest proves possession of the matching private key,
+    // so a caller can only ever read or write its own credentials.
     if (req.method === 'GET') {
-      const jiraConfig = await getJiraConfig(machineId)
-      const aiConfig = {
-        enabled: isAiEnabled(),
-        model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
-      }
-      return res.status(200).json({ jiraConfig, aiConfig })
+      return res.status(200).json(await getSettings(machineId))
     }
 
     if (req.method === 'PUT') {
-      const { jiraConfig } = req.body as { jiraConfig: Parameters<typeof saveJiraConfig>[1] }
-      await saveJiraConfig(machineId, jiraConfig)
+      const body = req.body as SettingsPutBody
+      const current = await getSettings(machineId)
+      // Merge so a partial save never clears the other section's credentials.
+      await saveSettings(machineId, {
+        jiraConfig: body.jiraConfig ?? current.jiraConfig,
+        aiConfig: body.aiConfig ?? current.aiConfig,
+      })
       return res.status(200).json({ ok: true })
     }
 

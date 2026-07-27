@@ -6,6 +6,7 @@ import { convertToModelMessages, streamText, tool } from 'ai';
 import { extractLogsInputSchema } from '../src/interfaces/aiTools.js';
 import { AuthError, verifyRequest } from './_lib/auth.js';
 import { isAiEnabled, requireAiModel } from './_lib/ai.js';
+import { getSettings } from './_lib/kv.js';
 
 interface ChatApiRequest {
   messages: UIMessage[];
@@ -57,21 +58,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    await verifyRequest({
+    const { machineId } = await verifyRequest({
       get: (name: string) => {
         const val = req.headers[name.toLowerCase()];
         return Array.isArray(val) ? val[0] : (val ?? null);
       },
     });
 
-    if (!isAiEnabled()) {
-      return res.status(400).json({ error: 'AI is not configured on this deployment.' });
+    const { aiConfig } = await getSettings(machineId);
+    if (!isAiEnabled(aiConfig)) {
+      return res.status(400).json({
+        error: 'AI Assistant is not configured. Add your Gemini API key in Settings.',
+      });
     }
 
     const body = req.body as ChatApiRequest;
 
     const result = streamText({
-      model: requireAiModel(),
+      model: requireAiModel(aiConfig),
       system: buildSystemPrompt(body.projects, body.tasks, body.currentDate),
       messages: await convertToModelMessages(body.messages),
       tools: { extractLogs: extractLogsTool },
@@ -84,6 +88,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(err.status).json({ error: err.message });
     }
     console.error('Chat error:', err);
-    return res.status(500).json({ error: 'AI request failed. Check the server configuration.' });
+    return res.status(500).json({ error: 'AI request failed. Check your API key in Settings.' });
   }
 }

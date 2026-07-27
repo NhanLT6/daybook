@@ -40,8 +40,8 @@ A statically-registered tool (`tools: { extractLogs }`) streams as a `tool-extra
 - Module-level emitter in `useCatchUpSummary.ts`: `onCatchUpView` / `triggerCatchUpView` / `markCatchUpViewed`. `NotificationIsland` catchup item click → `triggerCatchUpView` → panel injects + HomeView switches to the AI tab.
 
 ## AI backend (`api/chat.ts`)
-- `streamText({ model: requireAiModel(), tools: { extractLogs }, ... })`; `extractLogs` uses `inputSchema: extractLogsInputSchema`.
-- AI config is env-based: `isAiEnabled()` / `requireAiModel()` from `api/_lib/ai.ts` (no per-user Gemini key UI anymore).
+- `streamText({ model: requireAiModel(aiConfig), tools: { extractLogs }, ... })`; `extractLogs` uses `inputSchema: extractLogsInputSchema`.
+- AI config is **per-user (BYOK)**: `getSettings(machineId)` from `api/_lib/kv.ts` → `isAiEnabled(aiConfig)` / `requireAiModel(aiConfig)` from `api/_lib/ai.ts`. Each user enters their own Gemini key in Settings → AI Assistant. There is deliberately **no `GEMINI_API_KEY` env var** — this repo is public and its deployment is reachable by anyone, so a deployment-wide key would let strangers spend the owner's quota.
 - Auth via Web Crypto ECDSA (`verifyRequest`).
 - **Backend changes require a Vercel redeploy** to take effect.
 

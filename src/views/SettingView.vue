@@ -21,7 +21,16 @@ const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJ
 
 const { saveSettings } = useServerSettings();
 const showApiToken = ref(false);
+const showGeminiKey = ref(false);
 const isSavingSettings = ref(false);
+
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
+];
 
 const jiraValidationSchema = yup.object({
   email: yup.string().email('Please enter a valid email address').required('Email is required'),
@@ -114,10 +123,17 @@ const selectedWeekendPattern = computed({
   },
 });
 
+/**
+ * Save both Jira and AI credentials to the server.
+ * Called via an explicit Save button — settings are not auto-saved.
+ */
 const handleSaveCredentials = async () => {
   isSavingSettings.value = true;
   try {
-    const ok = await saveSettings({ jiraConfig: settingsStore.jiraConfig });
+    const ok = await saveSettings({
+      jiraConfig: settingsStore.jiraConfig,
+      aiConfig: settingsStore.aiConfig,
+    });
     if (ok) notificationCenter.success('Settings saved');
     else notificationCenter.error('Failed to save settings');
   } finally {
@@ -387,6 +403,69 @@ const handleSyncTickets = async (): Promise<void> => {
               :disabled="!settingsStore.jiraConfig.enabled || !settingsStore.useCategories"
               persistent-hint
               hint="Jira tickets synced will be auto-assigned this category"
+            />
+
+            <div class="d-flex justify-end mt-2">
+              <VBtn
+                color="primary"
+                variant="tonal"
+                :loading="isSavingSettings"
+                prepend-icon="mdi-content-save-outline"
+                @click="handleSaveCredentials"
+              >
+                Save credentials
+              </VBtn>
+            </div>
+          </VCardText>
+        </VCard>
+      </div>
+
+      <!-- AI Assistant section -->
+      <div>
+        <VCard class="glass-acrylic">
+          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
+            AI Assistant
+            <VSwitch v-model="settingsStore.aiConfig.enabled" color="primary" hide-details density="compact" />
+          </VCardTitle>
+
+          <VCardText class="d-flex flex-column ga-2">
+            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
+              Bring your own key — AI runs on your Gemini account, billed to you. It is stored on the server, tied to
+              this browser, and cannot be read by others even if they know your machine ID.
+            </VAlert>
+
+            <VTextField
+              v-model="settingsStore.aiConfig.apiKey"
+              label="Gemini API Key"
+              :type="showGeminiKey ? 'text' : 'password'"
+              :disabled="!settingsStore.aiConfig.enabled"
+              :append-inner-icon="showGeminiKey ? 'mdi-eye-off' : 'mdi-eye'"
+              @click:append-inner="showGeminiKey = !showGeminiKey"
+              clearable
+              persistent-hint
+            >
+              <template #details>
+                <div class="text-caption text-medium-emphasis">
+                  Get your key at
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary text-decoration-none"
+                  >
+                    Google AI Studio
+                  </a>
+                </div>
+              </template>
+            </VTextField>
+
+            <VCombobox
+              v-model="settingsStore.aiConfig.model"
+              :items="GEMINI_MODELS"
+              label="Model"
+              :disabled="!settingsStore.aiConfig.enabled"
+              persistent-hint
+              hint="Select a model or type a custom model ID"
             />
 
             <div class="d-flex justify-end mt-2">

@@ -4,6 +4,7 @@ import { generateText } from 'ai';
 
 import { AuthError, verifyRequest } from './_lib/auth.js';
 import { isAiEnabled, requireAiModel } from './_lib/ai.js';
+import { getSettings } from './_lib/kv.js';
 
 interface RequestLog {
   task: string;
@@ -113,21 +114,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    await verifyRequest({
+    const { machineId } = await verifyRequest({
       get: (name: string) => {
         const val = req.headers[name.toLowerCase()];
         return Array.isArray(val) ? val[0] : (val ?? null);
       },
     });
 
-    if (!isAiEnabled()) {
-      return res.status(400).json({ error: 'AI is not configured on this deployment.' });
+    const { aiConfig } = await getSettings(machineId);
+    if (!isAiEnabled(aiConfig)) {
+      return res.status(400).json({ error: 'AI Assistant is not configured.' });
     }
 
     const body = req.body as StandupRequest;
 
     const { text } = await generateText({
-      model: requireAiModel(),
+      model: requireAiModel(aiConfig),
       prompt: buildPrompt(body.items, body.today, body.plans),
     });
 

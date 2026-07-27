@@ -13,17 +13,21 @@ describe('useCatchUpSummary helpers', () => {
   });
 
   it('skips catch-up when AI is unavailable', () => {
-    expect(shouldSkipCatchUp('2026-05-29', null, { enabled: false, model: 'gemini-2.5-flash' })).toBe(true);
+    expect(shouldSkipCatchUp('2026-05-29', null, { enabled: false, apiKey: '', model: 'gemini-2.5-flash' })).toBe(true);
+  });
+
+  it('skips catch-up when AI is enabled but has no API key', () => {
+    expect(shouldSkipCatchUp('2026-05-29', null, { enabled: true, apiKey: '', model: 'gemini-2.5-flash' })).toBe(true);
   });
 
   it('skips catch-up when dismissed today', () => {
     expect(
-      shouldSkipCatchUp('2026-05-29', '2026-05-29', { enabled: true, model: 'gemini-2.5-flash' }),
+      shouldSkipCatchUp('2026-05-29', '2026-05-29', { enabled: true, apiKey: 'key', model: 'gemini-2.5-flash' }),
     ).toBe(true);
   });
 
   it('allows catch-up when AI is available and not dismissed', () => {
-    const config = { enabled: true, model: 'gemini-2.5-flash' };
+    const config = { enabled: true, apiKey: 'key', model: 'gemini-2.5-flash' };
 
     expect(isAiAvailable(config)).toBe(true);
     expect(shouldSkipCatchUp('2026-05-29', null, config)).toBe(false);

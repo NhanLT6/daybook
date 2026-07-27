@@ -333,7 +333,7 @@ export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {
 }
 
 export function isAiAvailable(config: AiConfig): boolean {
-  return config.enabled;
+  return config.enabled && !!config.apiKey;
 }
 
 export function shouldSkipCatchUp(today: string, dismissedDate: string | null, aiConfig: AiConfig): boolean {
