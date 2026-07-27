@@ -2630,13 +2630,6 @@
     "@typescript-eslint/types" "8.42.0"
     eslint-visitor-keys "^4.2.1"
 
-"@upstash/redis@^1.34.0", "@upstash/redis@^1.37.0":
-  version "1.37.0"
-  resolved "https://registry.yarnpkg.com/@upstash/redis/-/redis-1.37.0.tgz#76a1efa33ab89eaf078697d5f7e5a91713e050fb"
-  integrity sha512-LqOJ3+XWPLSZ2rGSed5DYG3ixybxb8EhZu3yQqF7MdZX1wLBG/FRcI6xcUZXHy/SS7mmXWyadrud0HJHkOc+uw==
-  dependencies:
-    uncrypto "^0.1.3"
-
 "@vercel/backends@0.0.23":
   version "0.0.23"
   resolved "https://registry.yarnpkg.com/@vercel/backends/-/backends-0.0.23.tgz#e21b6657748ea4c9abf28bc3ab39b4e7f3b17858"
@@ -2810,13 +2803,6 @@
   dependencies:
     "@vercel/node" "5.5.28"
     "@vercel/static-config" "3.1.2"
-
-"@vercel/kv@^3.0.0":
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/@vercel/kv/-/kv-3.0.0.tgz#4579153536c9fc0ca8c52d3d7cfe944ccffd08c0"
-  integrity sha512-pKT8fRnfyYk2MgvyB6fn6ipJPCdfZwiKDdw7vB+HL50rjboEBHDVBEcnwfkEpVSp2AjNtoaOUH7zG+bVC/rvSg==
-  dependencies:
-    "@upstash/redis" "^1.34.0"
 
 "@vercel/nestjs@0.2.31":
   version "0.2.31"
@@ -7058,11 +7044,6 @@ uid-promise@1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/uid-promise/-/uid-promise-1.0.0.tgz#68ef7c70a19dea4d637c7e3df2e0e548106f1a37"
   integrity sha512-R8375j0qwXyIu/7R0tjdF06/sElHqbmdmWC9M2qQHpEVbvE4I5+38KJI7LUUmQMp7NVq4tKHiBMkT0NFM453Ig==
-
-uncrypto@^0.1.3:
-  version "0.1.3"
-  resolved "https://registry.yarnpkg.com/uncrypto/-/uncrypto-0.1.3.tgz#e1288d609226f2d02d8d69ee861fa20d8348ef2b"
-  integrity sha512-Ql87qFHB3s/De2ClA9e0gsnS6zXG27SkTiSJwjCc9MebbfapQfuPzumMIUMi38ezPZVNFcHI9sUIepeQfw8J8Q==
 
 undici-types@~5.26.4:
   version "5.26.5"
