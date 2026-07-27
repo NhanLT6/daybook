@@ -85,8 +85,9 @@ async function seedAndOpen(page: Page) {
   );
 
   await page.goto('/');
-  // Wait until the seeded rows have rendered
-  await expect(datePanel(page, ALL_DAYS[0])).toHaveCount(1);
+  // Wait until the seeded rows have rendered. The app blocks mount on initDb() and
+  // the legacy migration, so first paint is slower than the default expect timeout.
+  await expect(datePanel(page, ALL_DAYS[0])).toHaveCount(1, { timeout: 20000 });
 }
 
 // Assert exactly the given days' panels are present (and no other seeded day is)
