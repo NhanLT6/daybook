@@ -12,6 +12,8 @@
     "test:e2e": "playwright test",
     "build-only": "vite build",
     "type-check": "vue-tsc --build --force",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:status": "node scripts/db-migrate.mjs --status",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "lint": "eslint . --fix",
@@ -20,6 +22,7 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.63",
     "@ai-sdk/vue": "^3.0.168",
+    "@neondatabase/serverless": "^1.1.0",
     "@popperjs/core": "^2.11.8",
     "@upstash/redis": "^1.37.0",
     "@vercel/kv": "^3.0.0",
