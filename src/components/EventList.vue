@@ -107,33 +107,43 @@ const deleteEvent = (event: AppEvent) => {
     <!-- Header -->
     <VCardTitle class="flex-shrink-0 pa-0">
       <VContainer class="page-inner pt-3 pb-0">
-        <VToolbar class="bg-transparent" density="compact">
-          <VToolbarTitle class="ms-0">Events</VToolbarTitle>
+        <!-- Wrapping header: title and controls share one row when there's room and
+             stack when there isn't. VToolbar can't wrap, so on narrow screens it
+             crushed the title to zero width and clipped the filter labels. -->
+        <div class="event-toolbar">
+          <div class="text-h6 event-toolbar__title">Events</div>
 
-          <VSpacer />
+          <div class="event-toolbar__controls">
+            <!-- Type filter -->
+            <VBtnToggle v-model="typeFilter" density="compact" variant="outlined" divided mandatory>
+              <VBtn value="all" size="small">All</VBtn>
+              <VBtn value="custom" size="small">Mine</VBtn>
+              <VBtn value="holiday" size="small">Holidays</VBtn>
+            </VBtnToggle>
 
-          <!-- Type filter -->
-          <VBtnToggle v-model="typeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
-            <VBtn value="all" size="small">All</VBtn>
-            <VBtn value="custom" size="small">Mine</VBtn>
-            <VBtn value="holiday" size="small">Holidays</VBtn>
-          </VBtnToggle>
+            <!-- Time filter -->
+            <VBtnToggle v-model="timeFilter" density="compact" variant="outlined" divided mandatory>
+              <VBtn value="upcoming" size="small">Upcoming</VBtn>
+              <VBtn value="all" size="small">All</VBtn>
+            </VBtnToggle>
 
-          <!-- Time filter -->
-          <VBtnToggle v-model="timeFilter" density="compact" variant="outlined" divided mandatory class="me-2">
-            <VBtn value="upcoming" size="small">Upcoming</VBtn>
-            <VBtn value="all" size="small">All</VBtn>
-          </VBtnToggle>
-
-          <VTooltip>
-            <template #activator="{ props }">
-              <VBtn prepend-icon="mdi-plus" color="primary" variant="tonal" @click="openAddModal" v-bind="props">
-                New Event
-              </VBtn>
-            </template>
-            Add event
-          </VTooltip>
-        </VToolbar>
+            <VTooltip>
+              <template #activator="{ props }">
+                <VBtn
+                  prepend-icon="mdi-plus"
+                  color="primary"
+                  variant="tonal"
+                  class="event-toolbar__add"
+                  @click="openAddModal"
+                  v-bind="props"
+                >
+                  New Event
+                </VBtn>
+              </template>
+              Add event
+            </VTooltip>
+          </div>
+        </div>
       </VContainer>
     </VCardTitle>
 
@@ -201,6 +211,44 @@ const deleteEvent = (event: AppEvent) => {
 </template>
 
 <style scoped>
+/* Header: one row while it fits, stacked once it doesn't. */
+.event-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-block: 4px;
+}
+
+/* Grows to push the controls right, but may shrink to 0 rather than clip them. */
+.event-toolbar__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.event-toolbar__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Below sm the title takes its own line and the controls span the full width, so
+   the toggle groups render their labels instead of overflowing into scrollbars. */
+@media (max-width: 599px) {
+  .event-toolbar__title {
+    flex-basis: 100%;
+  }
+
+  .event-toolbar__controls {
+    width: 100%;
+  }
+
+  .event-toolbar__add {
+    flex: 1 1 100%;
+  }
+}
+
 /* Body fills the card; the table (not the page) owns the scroll so its header
    stays fixed via VDataTable's fixed-header. */
 .event-body {
