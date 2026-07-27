@@ -4,10 +4,14 @@ import { expect, type Page, test } from '@playwright/test';
  * E2E coverage for the LogList filter bar (project / task / date-range / search)
  * and its two-way project sync with the Insights panel.
  *
- * Data is seeded straight into localStorage (the app's store) before load, so the
- * tests are deterministic regardless of what's already saved. All seeded logs live
- * in the *current* month, because LogList only shows the current month's bucket and
- * the date-range filter is clamped to it.
+ * Data is seeded into the legacy `timeLogs-YYYY-MM` localStorage key before load.
+ * On a fresh browser context the schema version is 0, so the db's migration 001
+ * imports that key into the unified `timeLogs` collection — which is how the app
+ * gets seeded without having to write IndexedDB by hand. Seeded dates are already
+ * ISO, the canonical stored format, so the migration passes them through unchanged.
+ *
+ * All seeded logs live in the *current* month, because LogList only shows the
+ * current month's bucket and the date-range filter is clamped to it.
  */
 
 // Force the large (lg+) layout so the Insights panel renders inline, not in the drawer.
@@ -21,10 +25,11 @@ function storageKey(): string {
   return `timeLogs-${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
 }
 
-// A day in the current month, formatted as the app's shortDateFormat (MM/DD/YYYY)
+// A day in the current month in the canonical stored format (ISO YYYY-MM-DD).
+// Doubles as the date-panel DOM id, which LogList keys off the stored date.
 function dateId(day: number): string {
   const now = new Date();
-  return `${pad(now.getMonth() + 1)}/${pad(day)}/${now.getFullYear()}`;
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(day)}`;
 }
 
 interface Seed {

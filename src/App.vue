@@ -49,7 +49,9 @@ const autoFetchEvents = async () => {
   const hasHolidaysThisYear = events.value.some((e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)));
   if (!hasHolidaysThisYear) {
     const holidays = await fetchHolidays(currentYear);
-    await replaceAll([...events.value, ...holidays]);
+    // fetchHolidays swallows API failures and returns [] — rewriting the collection
+    // with nothing new to add would be a pure risk to the user's own events.
+    if (holidays.length) await replaceAll([...events.value, ...holidays]);
   }
 };
 

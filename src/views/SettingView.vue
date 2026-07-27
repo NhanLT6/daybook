@@ -27,7 +27,7 @@ const isSavingSettings = ref(false);
 const { exportBackup, importBackup } = useBackup();
 const isExportingBackup = ref(false);
 const isImportingBackup = ref(false);
-const backupFile = ref<File[]>([]);
+const backupFile = ref<File | File[] | null>(null);
 
 const jiraValidationSchema = yup.object({
   email: yup.string().email('Please enter a valid email address').required('Email is required'),
@@ -158,8 +158,10 @@ const handleExportBackup = async (): Promise<void> => {
   }
 };
 
-const handleImportBackup = async (): Promise<void> => {
-  const file = backupFile.value[0];
+// VFileInput emits a single File when `multiple` is unset (and an array when set),
+// so normalise both shapes rather than assuming one.
+const handleImportBackup = async (selected: File | File[] | null): Promise<void> => {
+  const file = Array.isArray(selected) ? selected[0] : selected;
   if (!file) return;
 
   isImportingBackup.value = true;
@@ -174,7 +176,7 @@ const handleImportBackup = async (): Promise<void> => {
     });
   } finally {
     isImportingBackup.value = false;
-    backupFile.value = [];
+    backupFile.value = null;
   }
 };
 </script>

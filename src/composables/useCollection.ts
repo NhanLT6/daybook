@@ -1,4 +1,4 @@
-import { type Ref, ref } from 'vue';
+import { type Ref, ref, toRaw } from 'vue';
 
 import { db, notifyDbChange, onDbChange } from '@/db';
 import type { CollectionName, IdRecord } from '@/db/types';
@@ -40,6 +40,10 @@ function getState<T extends IdRecord>(name: CollectionName): CollectionState<T> 
 export function useCollection<T extends IdRecord>(name: CollectionName) {
   const state = getState<T>(name);
 
+  // Records read back out of `items` are reactive proxies, and IndexedDB's structured
+  // clone throws DataCloneError on a Proxy. Anything crossing back into storage must be
+  // unwrapped here — this is the one seam between Vue reactivity and the db.
+
   const mutate = async (fn: () => Promise<void>) => {
     await fn();
     await state.reload();
@@ -51,9 +55,9 @@ export function useCollection<T extends IdRecord>(name: CollectionName) {
     loading: state.loading,
     ready: state.ready,
     reload: state.reload,
-    add: (r: T) => mutate(() => db[name].add(r as never)),
-    addMany: (r: T[]) => mutate(() => db[name].addMany(r as never)),
-    upsert: (r: T) => mutate(() => db[name].upsert(r as never)),
+    add: (r: T) => mutate(() => db[name].add(toRaw(r) as never)),
+    addMany: (r: T[]) => mutate(() => db[name].addMany(r.map(toRaw) as never)),
+    upsert: (r: T) => mutate(() => db[name].upsert(toRaw(r) as never)),
     remove: (id: string) => mutate(() => db[name].remove(id)),
     clear: () => mutate(() => db[name].clear()),
   };

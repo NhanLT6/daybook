@@ -11,9 +11,17 @@ export function useEvents() {
     ready: c.ready,
     addEvent: (e: AppEvent) => c.upsert(e),
     removeEvent: (id: string) => c.remove(id),
+    // Clear-then-add: the caller passes the full desired list. Snapshot it first so a
+    // failure mid-way can restore what was there rather than leaving the user empty.
     replaceAll: async (list: AppEvent[]) => {
+      const previous = c.items.value.map((e) => ({ ...e }));
       await c.clear();
-      await c.addMany(list);
+      try {
+        await c.addMany(list);
+      } catch (err) {
+        await c.addMany(previous);
+        throw err;
+      }
     },
   };
 }
