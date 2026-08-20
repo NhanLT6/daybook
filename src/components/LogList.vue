@@ -2,6 +2,8 @@
 import { computed, nextTick, ref, watch } from 'vue';
 
 import { useDateDisplay } from '@/composables/useDateDisplay';
+import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
+import { NO_TASK } from '@/composables/useTaskBreakdown';
 
 import SingleFilePicker from '@/components/app/SingleFilePicker.vue';
 
@@ -76,10 +78,11 @@ const scrollToSelectedDate = async (date: Date) => {
 const openedPanels = ref<string[]>([]);
 
 // ── Filter state ──────────────────────────────────────────────────────────────
-// `selectedProject` is shared (defineModel above); the rest are LogList-local.
-const selectedTask = ref<string | null>(null);
-const searchText = ref('');
-const dateRangeModel = ref<unknown[]>([]); // raw VDatePicker range output (Date[])
+// All shared (defineModel) so HomeView can compute the same filtered set for Insights'
+// filtered-stats section — see docs/features/log-list-filters.md.
+const selectedTask = defineModel<string | null>('selectedTask', { default: null });
+const searchText = defineModel<string>('searchText', { default: '' });
+const dateRangeModel = defineModel<unknown[]>('dateRange', { default: () => [] }); // raw VDatePicker range output (Date[])
 const isFilterMenuOpen = ref(false);
 
 // Toolbar search: collapsed to a magnify button, expands to a field on demand
@@ -139,7 +142,8 @@ const projectOptions = computed(() => uniq(logItems.map((l) => l.project)).sort(
 
 const taskOptions = computed(() => {
   const scoped = selectedProject.value ? logItems.filter((l) => l.project === selectedProject.value) : logItems;
-  return uniq(scoped.map((l) => l.task)).sort();
+  const realTasks = uniq(scoped.map((l) => l.task).filter((t): t is string => !!t)).sort();
+  return scoped.some((l) => !l.task) ? [...realTasks, NO_TASK] : realTasks;
 });
 
 // ── Date-range bounds (clamped to the current month) ────────────────────────────
@@ -147,14 +151,7 @@ const monthDate = computed(() => dayjs().month(currentMonth - 1));
 const monthMin = computed(() => monthDate.value.startOf('month').toDate());
 const monthMax = computed(() => monthDate.value.endOf('month').toDate());
 
-const dateBounds = computed(() => {
-  const arr = dateRangeModel.value;
-  if (!arr.length) return null;
-  return {
-    from: dayjs(arr[0] as Date).startOf('day'),
-    to: dayjs(arr[arr.length - 1] as Date).endOf('day'),
-  };
-});
+const dateBounds = computed(() => computeDateBounds(dateRangeModel.value));
 
 const dateRangeLabel = computed(() => {
   const b = dateBounds.value;
@@ -162,23 +159,14 @@ const dateRangeLabel = computed(() => {
 });
 
 // ── Filtered logs: project → task → date range → text search ────────────────────
-const filteredItems = computed(() => {
-  let result = logItems;
-  if (selectedProject.value) result = result.filter((l) => l.project === selectedProject.value);
-  if (selectedTask.value) result = result.filter((l) => l.task === selectedTask.value);
-  const bounds = dateBounds.value;
-  if (bounds) {
-    result = result.filter((l) => {
-      const d = dayjs(l.date, isoDateFormat);
-      return d.isValid() && !d.isBefore(bounds.from) && !d.isAfter(bounds.to);
-    });
-  }
-  const q = searchText.value.trim().toLowerCase();
-  if (q) {
-    result = result.filter((l) => [l.project, l.task, l.description].some((f) => f?.toLowerCase().includes(q)));
-  }
-  return result;
-});
+const filteredItems = computed(() =>
+  filterTimeLogs(logItems, {
+    project: selectedProject.value,
+    task: selectedTask.value,
+    dateBounds: dateBounds.value,
+    search: searchText.value,
+  }),
+);
 
 // Badge counts only the in-panel filters — search has its own always-visible field
 const panelFilterCount = computed(
@@ -269,7 +257,7 @@ const onCloneLog = (log: TimeLog) => {
 
 const onDeleteLog = (log: TimeLog) => {
   notificationCenter.confirm('Delete log?', {
-    message: `${log.project} · ${log.task}`,
+    message: log.task ? `${log.project} · ${log.task}` : log.project,
     actions: [
       {
         id: 'cancel',
@@ -489,6 +477,10 @@ const readCsv = (file?: File) => {
           <VExpansionPanelText>
             <VCard class="elevation-0 rounded-lg">
               <VDataTable :items="group.tasks" :headers="headers" class="bg-container" hide-default-footer>
+                <template #item.task="{ item }">
+                  <span :class="{ 'text-disabled': !item.task }">{{ item.task || '-' }}</span>
+                </template>
+
                 <template #item.duration="{ item }">
                   <VChip v-if="item.type === 'plan'" color="success" size="x-small" variant="tonal">Plan</VChip>
                   <span v-else>{{ minutesToHourWithMinutes(item.duration ?? 0) }}</span>

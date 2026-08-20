@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 export const extractedLogSchema = z.object({
   project: z.string().describe('Project name, matched to known projects where possible'),
-  task: z.string().describe('Task name; use project name if no task is mentioned'),
+  task: z.string().optional().describe('Task name, only if explicitly mentioned; leave unset otherwise'),
   date: z.string().describe('ISO date YYYY-MM-DD, resolved from relative references using today'),
   duration: z
     .number()

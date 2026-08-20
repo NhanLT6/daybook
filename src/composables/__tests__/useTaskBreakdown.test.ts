@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { ref } from 'vue';
 
-import { useTaskBreakdown } from '@/composables/useTaskBreakdown';
+import { NO_TASK, useTaskBreakdown } from '@/composables/useTaskBreakdown';
 import type { TimeLog } from '@/interfaces/TimeLog';
 
-const log = (project: string, task: string, duration: number | undefined): TimeLog => ({
+const log = (project: string, task: string | undefined, duration: number | undefined): TimeLog => ({
   id: `${project}-${task}-${duration}`,
   date: '07/02/2026',
   project,
@@ -61,6 +61,20 @@ describe('useTaskBreakdown', () => {
 
     const planning = result.value.tasks.find((t) => t.task === 'Planning');
     expect(planning).toEqual({ task: 'Planning', minutes: 0, pct: 0 });
+  });
+
+  it('groups logs with no task under the NO_TASK bucket', () => {
+    const logs = ref<TimeLog[]>([
+      log('Team work', 'Code review', 60),
+      log('Team work', undefined, 30),
+      log('Team work', undefined, 30),
+    ]);
+    const result = useTaskBreakdown(logs, ref('Team work'));
+
+    const noTask = result.value.tasks.find((t) => t.task === NO_TASK);
+    expect(noTask).toEqual({ task: NO_TASK, minutes: 60, pct: 50 });
+    expect(result.value.distinctTaskCount).toBe(2);
+    expect(result.value.hasBreakdown).toBe(true);
   });
 
   it('reacts to project changes', () => {

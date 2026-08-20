@@ -63,7 +63,7 @@ const dayData = computed(() =>
       .groupBy('project')
       .map((logs, project) => ({
         project,
-        duration: sumBy(logs, 'duration'),
+        duration: sumBy(logs, (l) => l.duration ?? 0),
         color: getProjectColor(project),
       }))
       .value();
@@ -71,7 +71,7 @@ const dayData = computed(() =>
     return {
       dateStr,
       isToday: dateStr === todayStr,
-      totalDuration: sumBy(segments, 'duration'),
+      totalDuration: sumBy(segments, (s) => s.duration ?? 0),
       segments,
     };
   }),

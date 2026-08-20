@@ -26,6 +26,8 @@ test.describe('Xero Work Logger', () => {
     const templateFilePath = path.join(config.templatePath, fileName);
 
     const taskEntries = getTaskEntries(templateFilePath);
+    // Xero has no task-less time entry — default a blank task to the entry's project name.
+    for (const entry of taskEntries) entry.task = entry.task || entry.project;
     console.log(`\n📊 Total records to log: ${taskEntries.length}\n`);
 
     // eslint-disable-next-line playwright/no-skipped-test

@@ -13,4 +13,9 @@ describe('xero csv', () => {
     const csv = 'Id,Date,Project,Task,Duration,Type,Description,IsLogged\n1,07-01-26,P,T,2,log,,false';
     expect(xeroImportCsv(csv)[0].date).toBe('2026-07-01');
   });
+
+  it('imports a blank task cell as undefined, not an empty string', () => {
+    const csv = 'Id,Date,Project,Task,Duration,Type,Description,IsLogged\n1,07-01-26,P,,2,log,,false';
+    expect(xeroImportCsv(csv)[0].task).toBeUndefined();
+  });
 });

@@ -43,7 +43,7 @@ const { editingLog, cloneSeed } = defineProps<{
    */
   cloneSeed?: {
     project: string;
-    task: string;
+    task?: string;
     duration?: number;
     description?: string;
     nonce: number;
@@ -96,7 +96,7 @@ const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 const validationSchema = object({
   selectedDates: array(date()).min(1, 'At least one date must be selected'),
   project: string().required('Required'),
-  task: string().required('Required'),
+  task: string().optional(),
   duration: number().nullable().optional().test('min-if-set', 'Must be greater than 0', (v) => !v || v >= 1),
   description: string(),
   categoryName: string().typeError('Please enter a category name').optional(),
@@ -145,6 +145,7 @@ const scrollToFirstError = async () => {
 const onSave = handleSubmit((values) => {
   const duration = values.duration ? Math.round(values.duration) : undefined;
   const type: 'log' | 'plan' = duration ? 'log' : 'plan';
+  const task = values.task?.trim() || undefined;
 
   // Edit mode: Update single log (emit as array with 1 item)
   if (isEditMode.value && editingLog) {
@@ -152,7 +153,7 @@ const onSave = handleSubmit((values) => {
       id: editingLog.id, // Keep existing ID
       date: dayjs(values.selectedDates[0]).format(isoDateFormat),
       project: values.project!,
-      task: values.task!,
+      task,
       duration,
       type,
       description: values.description,
@@ -165,7 +166,7 @@ const onSave = handleSubmit((values) => {
       id: nanoid(),
       date: dayjs(date).format(isoDateFormat),
       project: values.project!,
-      task: values.task!,
+      task,
       duration,
       type,
       description: values.description,
@@ -190,8 +191,10 @@ const onSave = handleSubmit((values) => {
     void addProjects([{ title: values.project!, categoryId }]);
   }
 
-  const isTaskExisting = allTasks.value.some((t) => t.title === values.task!);
-  if (!isTaskExisting) void addTasks([{ title: values.task!, project: values.project! } satisfies Task]);
+  if (task) {
+    const isTaskExisting = allTasks.value.some((t) => t.title === task);
+    if (!isTaskExisting) void addTasks([{ title: task, project: values.project! } satisfies Task]);
+  }
 
   // Use current parent selectedDates so vee-validate stays in sync when the
   // remember-last-date feature keeps the parent value unchanged after save.
@@ -248,6 +251,17 @@ const onHourClick = (hour: number) => {
   const currentDuration = durationField.value.value || 0;
   setFieldValue('duration', currentDuration + hour * 60);
 };
+
+// Label reflects what Save will actually do: no dates selected → plain "Save";
+// otherwise "Save"/"Plan" (duration set vs empty) + the count. One duration field
+// for the whole batch, so every date shares the same log/plan type — no mixed case.
+const saveButtonLabel = computed(() => {
+  if (isEditMode.value) return 'Update Log';
+  const count = selectedDatesField.value.value?.length || 0;
+  if (count === 0) return 'Save';
+  const verb = durationField.value.value ? 'Save' : 'Plan';
+  return `${verb} ${count} Logs`;
+});
 
 // Single combined watch with clear priority
 watch(
@@ -452,7 +466,7 @@ watch(
         <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel" @click="onCancel"> Cancel </VBtn>
 
         <VBtn class="flex-fill" variant="tonal" color="primary" prepend-icon="mdi-content-save-outline" @click="onSave">
-          {{ isEditMode ? 'Update Log' : `Save ${selectedDatesField.value.value?.length || 0} Logs` }}
+          {{ saveButtonLabel }}
         </VBtn>
       </VCard>
     </form>

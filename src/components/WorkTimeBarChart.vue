@@ -11,7 +11,7 @@ import dayjs from 'dayjs';
 
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes, sumMinutesToHours } from '@/common/DateHelpers';
-import { useTaskBreakdown } from '@/composables/useTaskBreakdown';
+import { NO_TASK, useTaskBreakdown } from '@/composables/useTaskBreakdown';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
@@ -128,7 +128,7 @@ const chartData = computed(() => {
             return taskBreakdown.value.tasks.map((t) => ({
               label: t.task,
               color: colors[t.task],
-              logs: projectLogs.filter((l) => l.task === t.task),
+              logs: projectLogs.filter((l) => (t.task === NO_TASK ? !l.task : l.task === t.task)),
             }));
           })()
         : [

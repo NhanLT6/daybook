@@ -17,6 +17,10 @@ import { sumBy, uniqBy } from 'lodash';
 const props = defineProps<{
   timeLogs: TimeLog[];
   currentMonth: number;
+  // The logs LogList is currently showing (project/task/date range/search applied) —
+  // see src/composables/useLogFilters.ts. Powers the "Filtered" stats section below.
+  filteredTimeLogs: TimeLog[];
+  hasActiveFilter: boolean;
 }>();
 
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
@@ -59,7 +63,7 @@ const onPanelChange = (value: string | undefined) => {
 
 // ── Totals ────────────────────────────────────────────────────────────────────
 
-const totalMinutes = computed(() => sumBy(props.timeLogs, 'duration'));
+const totalMinutes = computed(() => sumBy(props.timeLogs, (l) => l.duration ?? 0));
 
 const currentMonthKey = computed(() => {
   // currentMonth is 1-based; convert to 0-based for dayjs
@@ -169,6 +173,29 @@ const top2Pct = computed(() => {
 });
 
 const extraProjectCount = computed(() => Math.max(0, uniqueProjectCount.value - 6));
+
+// ── Filtered stats (last section — reflects LogList's current filter) ───────────
+
+const filteredMinutes = computed(() => sumBy(props.filteredTimeLogs, (l) => l.duration ?? 0));
+const filteredEntryCount = computed(() => props.filteredTimeLogs.length);
+const filteredDaysLogged = computed(() => uniqBy(props.filteredTimeLogs, 'date').length);
+
+const filteredAvgPerDay = computed(() =>
+  filteredDaysLogged.value > 0 ? Math.round(filteredMinutes.value / filteredDaysLogged.value) : 0,
+);
+
+const filteredPctOfMonth = computed(() =>
+  totalMinutes.value > 0 ? Math.round((filteredMinutes.value / totalMinutes.value) * 100) : 0,
+);
+
+const filteredDateRangeLabel = computed(() => {
+  if (props.filteredTimeLogs.length === 0) return null;
+  const dates = props.filteredTimeLogs.map((l) => l.date).sort();
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  if (first === last) return dayjs(first, isoDateFormat).format('MMM D');
+  return `${dayjs(first, isoDateFormat).format('MMM D')} – ${dayjs(last, isoDateFormat).format('MMM D')}`;
+});
 
 // ── Month label ───────────────────────────────────────────────────────────────
 
@@ -321,6 +348,29 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                 {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
               </div>
             </template>
+          </div>
+        </VCard>
+      </div>
+
+      <!-- Filtered stats — reflects LogList's current project/task/date/search filter -->
+      <div v-if="hasActiveFilter">
+        <div class="text-overline text-medium-emphasis ms-2">Filtered</div>
+        <VCard>
+          <div class="pa-4">
+            <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(filteredMinutes) }}</div>
+            <div class="text-caption text-medium-emphasis mt-1">
+              {{ filteredEntryCount }} {{ filteredEntryCount === 1 ? 'entry' : 'entries' }} · {{ filteredPctOfMonth }}%
+              of month
+            </div>
+            <VDivider class="my-3" />
+            <div class="d-flex justify-space-between text-caption">
+              <span class="text-medium-emphasis">Avg per day</span>
+              <span>{{ minutesToHourWithMinutes(filteredAvgPerDay) }}</span>
+            </div>
+            <div v-if="filteredDateRangeLabel" class="d-flex justify-space-between text-caption mt-1">
+              <span class="text-medium-emphasis">Date range</span>
+              <span>{{ filteredDateRangeLabel }}</span>
+            </div>
           </div>
         </VCard>
       </div>

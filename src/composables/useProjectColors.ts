@@ -3,6 +3,7 @@ import { useTheme } from 'vuetify';
 import { useLocalStorage } from '@vueuse/core';
 
 import { storageKeys } from '@/common/storageKeys';
+import { NO_TASK } from '@/composables/useTaskBreakdown';
 
 // Uniform pastel palette - all colors have similar lightness (~80%) and saturation (~50%)
 // Avoiding red, orange, yellow to not conflict with error/warning colors
@@ -134,12 +135,17 @@ export const useProjectColors = () => {
     return isDark() ? adjustColorForDarkTheme(baseColor) : baseColor;
   };
 
-  // Map each task of a project to a distinct shade of the project's base color
+  // Map each task of a project to a distinct shade of the project's base color.
+  // NO_TASK gets a fixed neutral grey instead of a cycled shade, so "no task" reads
+  // as its own state rather than an arbitrary task color.
   const getTaskColors = (project: string, tasks: string[]): Record<string, string> => {
     if (!projectColorMaps.value.has(project)) setProjectColor(project);
     const base = projectColorMaps.value.get(project) as string;
-    const shades = deriveTaskShades(base, tasks.length, isDark());
-    return Object.fromEntries(tasks.map((task, i) => [task, shades[i]]));
+    const realTasks = tasks.filter((t) => t !== NO_TASK);
+    const shades = deriveTaskShades(base, realTasks.length, isDark());
+    const colors = Object.fromEntries(realTasks.map((task, i) => [task, shades[i]]));
+    if (tasks.includes(NO_TASK)) colors[NO_TASK] = remainingDataColor();
+    return colors;
   };
 
   // Theme-aware utility colors

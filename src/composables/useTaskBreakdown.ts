@@ -4,6 +4,9 @@ import { sumBy } from 'lodash';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
 
+/** Sentinel bucket for logs with no task set. Doubles as the display label. */
+export const NO_TASK = 'No task';
+
 export interface TaskBreakdownItem {
   task: string;
   minutes: number;
@@ -29,7 +32,8 @@ export function computeTaskBreakdown(timeLogs: TimeLog[], project: string | null
 
   const grouped: Record<string, number> = {};
   for (const log of logs) {
-    grouped[log.task] = (grouped[log.task] ?? 0) + (log.duration ?? 0);
+    const key = log.task ?? NO_TASK;
+    grouped[key] = (grouped[key] ?? 0) + (log.duration ?? 0);
   }
 
   const tasks: TaskBreakdownItem[] = Object.entries(grouped)

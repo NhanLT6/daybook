@@ -16,8 +16,10 @@ defineProps<{
       <div class="flex-grow-1 min-width-0">
         <div class="d-flex align-center ga-1 flex-wrap">
           <span class="text-body-2 font-weight-medium text-truncate">{{ log.project }}</span>
-          <span class="text-caption text-medium-emphasis">·</span>
-          <span class="text-caption text-medium-emphasis text-truncate">{{ log.task }}</span>
+          <template v-if="log.task">
+            <span class="text-caption text-medium-emphasis">·</span>
+            <span class="text-caption text-medium-emphasis text-truncate">{{ log.task }}</span>
+          </template>
         </div>
         <div class="d-flex align-center ga-1 mt-1">
           <VIcon icon="mdi-calendar-outline" size="12" class="text-medium-emphasis" />

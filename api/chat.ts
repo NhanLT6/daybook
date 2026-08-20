@@ -40,7 +40,7 @@ ${taskList}
 When the user describes work they did (via text or screenshot), call the extractLogs tool with the extracted entries.
 - Match project names to the known list where possible. If not found, use what the user said.
 - Match task names to the known list for that project where possible. If not found, use what the user said.
-- If no task is mentioned or cannot be determined, set task equal to the project name. This is the app's convention. Mention this briefly in your text reply (e.g. "I used the project name as the task since none was specified.").
+- Task is optional. Only set it when the user's message actually mentions a task; leave it unset otherwise. Do not default it to the project name.
 - Resolve relative dates ("yesterday", "this morning", "last Friday") using today's date.
 - Duration must be in minutes (integer).
 - The user's standard workday is 8 hours (480 minutes) unless they state otherwise in the message.

@@ -57,7 +57,7 @@ export function formatEffort(minutes: number): string {
 export interface CatchUpItem {
   id: string;
   project: string;
-  logs: { task: string; description?: string; duration: number }[];
+  logs: { task?: string; description?: string; duration: number }[];
   windowMinutes: number;
   accumulatedMinutes: number;
   ongoing: boolean;
@@ -66,7 +66,7 @@ export interface CatchUpItem {
 interface RequestPlan {
   id: string;
   project: string;
-  tasks: { task: string; description?: string }[];
+  tasks: { task?: string; description?: string }[];
 }
 
 export type { CatchUpRenderItem };
@@ -202,7 +202,7 @@ interface SummaryCache {
 export function logsStamp(all: TimeLog[]): string {
   let h = 0;
   for (const l of all) {
-    const s = `${l.id}|${l.date}|${l.project}|${l.task}|${l.duration ?? ''}|${l.type}|${l.description ?? ''}`;
+    const s = `${l.id}|${l.date}|${l.project}|${l.task ?? ''}|${l.duration ?? ''}|${l.type}|${l.description ?? ''}`;
     for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   }
   return `${all.length}:${h}`;

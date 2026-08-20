@@ -7,7 +7,7 @@ import { isAiEnabled, requireAiModel } from './_lib/ai.js';
 import { getSettings } from './_lib/settingsRepo.js';
 
 interface RequestLog {
-  task: string;
+  task?: string;
   description?: string;
   duration: string;
 }
@@ -19,7 +19,7 @@ interface RequestItem {
 }
 
 interface RequestPlanTask {
-  task: string;
+  task?: string;
   description?: string;
 }
 
@@ -44,7 +44,10 @@ function buildPrompt(items: RequestItem[], today: string, plans?: RequestPlan[])
         .map(
           (it) =>
             `id: ${it.id}\nproject: ${it.project}\n${it.logs
-              .map((l) => `  - ${l.task}${l.description ? `: ${l.description}` : ''} (${l.duration})`)
+              .map((l) => {
+                const label = l.task ? `${l.task}${l.description ? `: ${l.description}` : ''}` : (l.description ?? 'work');
+                return `  - ${label} (${l.duration})`;
+              })
               .join('\n')}`,
         )
         .join('\n\n')
@@ -55,7 +58,10 @@ function buildPrompt(items: RequestItem[], today: string, plans?: RequestPlan[])
         .map(
           (p) =>
             `id: ${p.id}\nproject: ${p.project}\n${p.tasks
-              .map((t) => `  - ${t.task}${t.description ? `: ${t.description}` : ''}`)
+              .map((t) => {
+                const label = t.task ? `${t.task}${t.description ? `: ${t.description}` : ''}` : (t.description ?? 'work');
+                return `  - ${label}`;
+              })
               .join('\n')}`,
         )
         .join('\n\n')

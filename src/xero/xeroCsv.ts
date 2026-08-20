@@ -42,7 +42,7 @@ export function xeroImportCsv(csv: string): TimeLog[] {
       id: (row.id as string) ?? nanoid(),
       date: row.date as string,
       project: row.project as string,
-      task: row.task as string,
+      task: (row.task as string) || undefined,
       duration: duration || undefined,
       type: (row.type as 'log' | 'plan' | undefined) ?? (duration ? 'log' : 'plan'),
       description: row.description as string | undefined,

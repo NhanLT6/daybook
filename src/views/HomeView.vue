@@ -20,6 +20,7 @@ import dayjs from 'dayjs';
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { onCatchUpView } from '@/composables/useCatchUpSummary';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
+import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
 import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
@@ -75,6 +76,11 @@ if (initialDate && settingsStore.lastSelectedDate) {
 }
 const currentMonth = ref<number>(dayjs().month() + 1); // Convert from 0-based to 1-based
 const selectedProject = ref<string | null>(null);
+// Rest of LogList's filter state, lifted here (same pattern as selectedProject) so
+// Insights can compute stats for the logs LogList is actually showing.
+const selectedTask = ref<string | null>(null);
+const searchText = ref('');
+const dateRangeModel = ref<unknown[]>([]);
 const editingLog = ref<TimeLog | undefined>(undefined);
 
 // Clone: seed the form (create mode) with a source log's fields, dated today.
@@ -82,7 +88,7 @@ const editingLog = ref<TimeLog | undefined>(undefined);
 // cloned twice in a row (see cloneSeed prop in BulkLogForm).
 interface CloneSeed {
   project: string;
-  task: string;
+  task?: string;
   duration?: number;
   description?: string;
   nonce: number;
@@ -106,6 +112,19 @@ const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-
 // Logs for the calendar's current month (ISO 'YYYY-MM'). Assumes current year —
 // matches prior behavior; cross-year navigation would need a year threaded alongside.
 const timeLogs = computed(() => forMonth(dayjs().month(currentMonth.value - 1).format('YYYY-MM')));
+
+const dateBounds = computed(() => computeDateBounds(dateRangeModel.value));
+const hasActiveFilter = computed(
+  () => !!(selectedProject.value || selectedTask.value || dateBounds.value || searchText.value.trim()),
+);
+const filteredTimeLogs = computed(() =>
+  filterTimeLogs(timeLogs.value, {
+    project: selectedProject.value,
+    task: selectedTask.value,
+    dateBounds: dateBounds.value,
+    search: searchText.value,
+  }),
+);
 
 const onMonthChanged = (month: number) => {
   currentMonth.value = month; // v-calendar uses 1-based months (1-12)
@@ -200,7 +219,12 @@ const importCsv = async (file?: File) => {
 
   await addLogs(dataWithIds.map((l) => ({ ...l, id: l.id ?? nanoid() })));
   await addProjects(uniqBy(dataWithIds.map((l) => ({ title: l.project })), 'title'));
-  await addTasks(uniqBy(dataWithIds.map((l) => ({ project: l.project, title: l.task })), (t) => `${t.project}-${t.title}`));
+  await addTasks(
+    uniqBy(
+      dataWithIds.filter((l) => l.task).map((l) => ({ project: l.project, title: l.task! })),
+      (t) => `${t.project}-${t.title}`,
+    ),
+  );
 
   notificationCenter.success('Logs imported');
 };
@@ -232,7 +256,7 @@ const onAiSaveLogs = async (extractedLogs: ExtractedLog[]) => {
   await addProjects(uniqBy(extractedLogs.map((log) => ({ title: log.project })), 'title'));
   await addTasks(
     uniqBy(
-      extractedLogs.map((log) => ({ project: log.project, title: log.task })),
+      extractedLogs.filter((log) => log.task).map((log) => ({ project: log.project, title: log.task! })),
       (t) => `${t.project}-${t.title}`,
     ),
   );
@@ -308,6 +332,9 @@ const onAiUndoLogs = async () => {
         :current-month="currentMonth"
         :selected-dates="selectedDates"
         v-model:selected-project="selectedProject"
+        v-model:selected-task="selectedTask"
+        v-model:date-range="dateRangeModel"
+        v-model:search-text="searchText"
         @edit-log="onEditLog"
         @clone-log="onCloneLog"
         @delete-log="onDeleteLog"
@@ -322,6 +349,8 @@ const onAiUndoLogs = async () => {
       class="insights-panel"
       :time-logs="timeLogs"
       :current-month="currentMonth"
+      :filtered-time-logs="filteredTimeLogs"
+      :has-active-filter="hasActiveFilter"
       v-model:selected-project="selectedProject"
     />
 
@@ -338,6 +367,8 @@ const onAiUndoLogs = async () => {
       <InsightsPanel
         :time-logs="timeLogs"
         :current-month="currentMonth"
+        :filtered-time-logs="filteredTimeLogs"
+        :has-active-filter="hasActiveFilter"
         v-model:selected-project="selectedProject"
       />
     </VNavigationDrawer>
