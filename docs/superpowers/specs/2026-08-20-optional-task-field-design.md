@@ -38,32 +38,47 @@ No storage/migration change needed — `src/db/*` is untyped generic collection 
 - VCombobox loses its required indicator; no other UX change (confirmed: no placeholder hint, no auto-fill-from-project convenience — plain optional field).
 
 ### `src/composables/useTaskBreakdown.ts`
-Group blank/undefined task under a fixed sentinel key (e.g. `NO_TASK` constant), displayed as label `"No task"`. Existing `hasBreakdown` (≥2 distinct buckets) logic is unchanged — a "No task" bucket counts as a distinct bucket like any real task.
+Export a sentinel constant `export const NO_TASK = 'No task';` and group blank/undefined task under `grouped[NO_TASK]`. Making the sentinel *be* the display string (not a separate code needing a label lookup) means every consumer that renders the grouped key — `InsightsPanel.vue`, `WorkTimeBarChart.vue` — needs no extra label-mapping step; it already reads "No task". (Edge case: a real task literally titled "No task" would collide with the bucket — acceptable, documented here.) `grouped[log.task]` at line 32 becomes `grouped[log.task ?? NO_TASK]`, which also resolves the TS index-type error the widened `task?: string` would otherwise cause. Existing `hasBreakdown` (≥2 distinct buckets) logic is unchanged.
 
 ### `src/composables/useProjectColors.ts`
-`getTaskColors`/`deriveTaskShades` reserve a fixed muted/grey color for the `NO_TASK` sentinel instead of cycling it into the normal per-task palette, so it reads visually as "no task" rather than an arbitrary task color.
+Reservation happens **only** in `getTaskColors` (`:138-143`), not `deriveTaskShades` (`:98`) — `deriveTaskShades` takes a count, not task names, and has no way to know which slot is the sentinel; changing its signature would break its 5 existing tests (`useProjectColors.test.ts:7-32`) for no reason. In `getTaskColors`, derive shades only for `tasks.filter(t => t !== NO_TASK).length`, then map `NO_TASK` to a fixed grey — reuse the existing `remainingDataColor()` precedent at `:147`.
 
 ### `src/components/LogList.vue`
-- `taskOptions` computed: filter out falsy tasks from the real list, then prepend a `NO_TASK` sentinel option (rendered as "No task") when any scoped log has a blank task.
-- Filter logic: when `selectedTask === NO_TASK`, filter `!log.task`; otherwise match `log.task === selectedTask` as today.
-- Delete-confirmation message (~line 272): `log.task ? `${log.project} · ${log.task}` : log.project` — no dangling separator.
-- VDataTable task column: render `—` instead of a blank cell when task is absent, so it reads as intentional rather than a missing-data glitch.
+- `taskOptions` computed (`:142`): filter out falsy tasks from the real list, then append the `NO_TASK` option when any scoped log has a blank task. (Today this computed infers `(string | undefined)[]` once the type widens — the filter fixes that as a side effect, not a separate concern.)
+- Filter logic (`:168`): when `selectedTask === NO_TASK`, filter `!log.task`; otherwise match `log.task === selectedTask` as today.
+- Delete-confirmation message (`:272`): `log.task ? `${log.project} · ${log.task}` : log.project` — no dangling separator.
+- VDataTable task column: there is currently no `#item.task` slot (`headers` at `:122-128` just declares `{ title: 'Task', key: 'task' }` with default rendering) — add one (alongside the existing `#item.duration` at `:492` and `#item.actions` at `:498`) that renders `—` when task is absent, so it reads as intentional rather than a missing-data glitch.
+
+### `src/components/WorkTimeBarChart.vue`
+`:126-132` builds per-task chart segments and currently filters logs into each segment with `l.task === t.task` — once a "No task" bucket exists via the `NO_TASK` sentinel, this predicate matches zero real logs (`l.task` is `undefined`/falsy, never equal to the string `NO_TASK`), so that bucket's hours would silently render as an empty/zero bar while still counting in Insights. Fix: `logs: projectLogs.filter((l) => (t.task === NO_TASK ? !l.task : l.task === t.task))`. The `label: t.task` and `colors[t.task]` lookups at `:129-130` need no change — they already read "No task" correctly since the sentinel is the display string itself.
+
+### `src/components/InsightsPanel.vue`
+`:281` (`:key="t.task"`), `:290`/`:301` (color lookup via `taskColorsByProject[item.project]?.[t.task]`), and `:293` (`{{ truncate(t.task) }}`) all consume the grouped key directly — no code change needed here since the sentinel already *is* "No task" as plain text. Listed explicitly so it isn't mistaken for an oversight.
 
 ### `src/components/AiLogCard.vue`
-Wrap the `·` separator + task span in `v-if="log.task"` so a blank task doesn't leave a dangling `Project ·`.
+Wrap the `·` separator + task span (`:19-20`) in `v-if="log.task"` so a blank task doesn't leave a dangling `Project ·`.
 
 ### `src/interfaces/aiTools.ts`
 Change the zod field from `task: z.string().describe('Task name; use project name if no task is mentioned')` to `task: z.string().optional().describe('Task name, only if explicitly mentioned; leave unset otherwise')`. AI-extracted logs now behave identically to manual entry — blank when not mentioned, no auto-fill to project name.
 
+### `api/chat.ts`
+`:42-43` — the server system prompt independently instructs the model: *"If no task is mentioned or cannot be determined, set task equal to the project name... Mention this briefly in your text reply."* This is a **stronger, separate instruction** from the zod schema `.describe()` text and would keep producing `task = project` (plus a misleading reply sentence) even after the `aiTools.ts` change above. Remove this rule from the prompt so the server and schema agree: blank task stays blank.
+
 ### `src/views/HomeView.vue`
-- Local import-flow interface (~line 85): `task: string` → `task?: string`.
-- **Same catalog-pollution guard as BulkLogForm**, in two places: CSV-import catalog upsert (~line 203) and AI-import catalog upsert (~line 233). Both currently build `{ project, title: l.task }` unconditionally via `uniqBy`/`map` — must filter out entries with a falsy task *before* building the upsert list, so `addTasks` never receives a `title: undefined` entry.
+- `CloneSeed` interface (`:83-89`, used by the clone-log flow): `task: string` → `task?: string`.
+- **Same catalog-pollution guard as BulkLogForm**, in two places: CSV-import catalog upsert (`:203`) and AI-import catalog upsert (`:233-238`). Both currently build `{ project, title: l.task }` unconditionally via `uniqBy`/`map` — must filter out entries with a falsy task *before* building the upsert list, so `addTasks` never receives a `title: undefined` entry.
+
+### `src/components/BulkLogForm.vue` (cloneSeed prop)
+`:44-50` — the `cloneSeed` prop type has its own `task: string` (paired with the `CloneSeed` interface above via `HomeView.vue:166`'s `onCloneLog`). Must become `task?: string` or `yarn type-check` fails.
 
 ### `src/composables/useCatchUpSummary.ts`
-Line ~205 signature/hash builder: `${l.task}` → `${l.task ?? ''}`, so a blank task contributes an empty segment instead of the literal string `"undefined"`. Lines ~106, ~243, ~268 (AI prompt payload construction) need no change — `task: l.task` naturally omits/nullifies correctly and the AI seeing no task field for an entry is the correct new behavior.
+Two local interfaces pin `task` as required and must widen: `CatchUpItem['logs'][number].task` (`:60`) and `RequestPlan['tasks'][number].task` (`:69`) both become `task?: string` — otherwise `task: l.task` at `:106` and `:243` (assigning `string | undefined` into a `string` slot) fails `yarn type-check`. `:268` reads from the now-widened `CatchUpItem` and needs no further change. Separately, line `:205`'s signature/hash builder: `${l.task}` → `${l.task ?? ''}`, so a blank task contributes an empty segment instead of the literal string `"undefined"`.
+
+### `api/standup.ts`
+`:9-13` (`RequestLog`) and `:21-24` (`RequestPlanTask`) both pin `task: string` — widen both to `task?: string`, otherwise `JSON.stringify` silently drops the key when `undefined` reaches the server and `l.task`/`t.task` reads back as `undefined` inside the template literals at `:47` and `:58` (`` `  - ${l.task}${l.description ? ...} (${l.duration})` ``), rendering the literal text `- undefined: ...` into the AI prompt. Fix: guard both template literals, e.g. `` l.task ? `${l.task}` : '' `` with the description separator adjusted so the line reads cleanly with or without a task.
 
 ### `src/xero/xeroCsv.ts`
-No code change. Export already writes whatever `log.task` is (blank now valid); import already produces `undefined` for an empty cell, which now matches the widened type instead of being a latent type-lie.
+`:45` — import currently reads `task: row.task as string`. Papaparse yields `''` (not `undefined`) for a blank CSV cell, and the `transform` callback (`:31-36`) only special-cases `date`/`duration`/`type` — `task` falls through unchanged. This violates the spec's own normalization rule. Fix: `task: (row.task as string) || undefined`.
 
 ### `e2e/xeroWorkLogger.spec.ts` + `e2e/logHelpers/fileHelper.ts`
 - `TaskEntry.task` interface **stays required** — this is Xero's own contract, not daybook's.
@@ -80,7 +95,9 @@ No new failure modes introduced. The one system that cannot tolerate a blank tas
 - `BulkLogForm` test/e2e: save an entry with blank task, verify (a) it persists as `undefined` not `''`, (b) no catalog entry is created for it.
 - `LogList` test: verify "No task" filter option appears only when scoped logs have a blank task, and filters correctly.
 - `xeroWorkLogger.spec.ts` (or a focused unit test around the normalization step): blank-task CSV row → Xero task defaults to the row's project name.
-- AI extraction: verify a message with no task mentioned produces `task: undefined`, not the project name.
+- AI extraction: verify a message with no task mentioned produces `task: undefined`, not the project name (covers both `aiTools.ts` schema and the `api/chat.ts` prompt rule).
+- `WorkTimeBarChart`: a project with a mix of blank and real-task logs renders a non-zero "No task" stacked segment.
+- `yarn type-check`: run after all interface widenings (`useCatchUpSummary.ts`, `api/standup.ts`, `BulkLogForm.vue` cloneSeed prop, `HomeView.vue` `CloneSeed`) to confirm no `string | undefined`-into-`string` errors remain.
 
 ## Out of scope
 
