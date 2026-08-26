@@ -96,10 +96,10 @@ const hours = Array.from({ length: 7 }, (_, i) => i + 1);
 const validationSchema = object({
   selectedDates: array(date()).min(1, 'At least one date must be selected'),
   project: string().required('Required'),
-  task: string().optional(),
+  task: string().nullable().optional(),
   duration: number().nullable().optional().test('min-if-set', 'Must be greater than 0', (v) => !v || v >= 1),
-  description: string(),
-  categoryName: string().typeError('Please enter a category name').optional(),
+  description: string().nullable(),
+  categoryName: string().typeError('Please enter a category name').nullable().optional(),
 });
 
 const emptyLog: BulkLogFormData = {
