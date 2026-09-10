@@ -3,7 +3,10 @@ import dayjs from 'dayjs';
 import { saveAs } from 'file-saver';
 
 import { db } from '@/db';
-import { COLLECTION_NAMES, type DbSnapshot } from '@/db/types';
+import { COLLECTION_NAMES, type CollectionName, type DbSnapshot } from '@/db/types';
+
+// Collections added after the initial release: old backups genuinely lack them.
+const ADDED_LATER = new Set<CollectionName>(['notes']);
 
 // Narrow an unknown parsed JSON value into a DbSnapshot before trusting it as a restore source.
 function isSnapshot(x: unknown): x is DbSnapshot {
@@ -11,7 +14,7 @@ function isSnapshot(x: unknown): x is DbSnapshot {
   const s = x as Record<string, unknown>;
   if (typeof s.schemaVersion !== 'number' || !s.collections || typeof s.collections !== 'object') return false;
   const cols = s.collections as Record<string, unknown>;
-  return COLLECTION_NAMES.every((c) => Array.isArray(cols[c]));
+  return COLLECTION_NAMES.every((c) => Array.isArray(cols[c]) || (ADDED_LATER.has(c) && cols[c] === undefined));
 }
 
 export function useBackup() {

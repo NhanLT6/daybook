@@ -2,7 +2,8 @@ import { type IDBPDatabase, openDB } from 'idb';
 
 import { COLLECTION_NAMES, type CollectionName, type DbSnapshot, type IdRecord, type StorageAdapter } from '@/db/types';
 
-const DB_VERSION = 1;
+// Bumped for the 'notes' store — upgrade() only runs on a version bump.
+const DB_VERSION = 2;
 
 export function createIndexedDbAdapter(dbName = 'daybook'): StorageAdapter & { close(): void } {
   let dbPromise: Promise<IDBPDatabase> | null = null;

@@ -1,5 +1,6 @@
 import type { Category } from '@/interfaces/Category';
 import type { AppEvent } from '@/interfaces/Event';
+import type { Note } from '@/interfaces/Note';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { TimeLog } from '@/interfaces/TimeLog';
@@ -26,6 +27,7 @@ export interface Repository {
   pinnedProjects: Collection<PinnedProject>;
   categories: Collection<Category>;
   events: Collection<AppEvent>;
+  notes: Collection<Note>;
   export(): Promise<DbSnapshot>;
   import(s: DbSnapshot): Promise<void>;
 }
@@ -38,6 +40,7 @@ export function createRepository(adapter: StorageAdapter): Repository {
     pinnedProjects: makeCollection(adapter, 'pinnedProjects'),
     categories: makeCollection(adapter, 'categories'),
     events: makeCollection(adapter, 'events'),
+    notes: makeCollection(adapter, 'notes'),
     export: () => adapter.snapshot(),
     import: (s) => adapter.restore(s),
   };

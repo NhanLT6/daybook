@@ -6,6 +6,7 @@ import BulkLogForm from '@/components/BulkLogForm.vue';
 import InsightsPanel from '@/components/InsightsPanel.vue';
 import LogList from '@/components/LogList.vue';
 import MobileWeekChart from '@/components/MobileWeekChart.vue';
+import NotesPanel from '@/components/NotesPanel.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
@@ -103,7 +104,7 @@ watch(todayDateStr, () => {
   }
 });
 
-const tab = ref<'form' | 'ai'>('form');
+const tab = ref<'form' | 'ai' | 'notes'>('form');
 const theme = useTheme();
 const { smAndDown } = useDisplay();
 const { isOpen: insightsDrawerOpen, isInline: insightsInline } = useInsightsDrawer();
@@ -278,11 +279,12 @@ const onAiUndoLogs = async () => {
     <!-- Left panel: Form + AI Assistant tabs -->
     <VCard
       class="glass-acrylic form-panel d-flex flex-column overflow-hidden"
-      :class="{ 'form-panel--chat': tab === 'ai' }"
+      :class="{ 'form-panel--chat': tab !== 'form' }"
     >
       <VTabs v-model="tab" density="compact" class="ma-2" align-tabs="center" :slider-color="tabSliderColor">
         <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
         <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
+        <VTab value="notes" prepend-icon="mdi-note-text-outline">Notes</VTab>
       </VTabs>
 
       <VTabsWindow v-model="tab">
@@ -307,6 +309,11 @@ const onAiUndoLogs = async () => {
             @save-logs="onAiSaveLogs"
             @undo-logs="onAiUndoLogs"
           />
+        </VTabsWindowItem>
+
+        <!-- Notes tab -->
+        <VTabsWindowItem value="notes">
+          <NotesPanel />
         </VTabsWindowItem>
       </VTabsWindow>
     </VCard>
@@ -501,7 +508,8 @@ const onAiUndoLogs = async () => {
   .form-panel.form-panel--chat :deep(.v-tabs-window),
   .form-panel.form-panel--chat :deep(.v-tabs-window .v-window__container),
   .form-panel.form-panel--chat :deep(.v-tabs-window .v-window-item),
-  .form-panel.form-panel--chat :deep(.v-card.mobile-chat) {
+  .form-panel.form-panel--chat :deep(.v-card.mobile-chat),
+  .form-panel.form-panel--chat :deep(.notes-panel) {
     flex: 1 !important;
     height: auto !important;
     min-height: 0;

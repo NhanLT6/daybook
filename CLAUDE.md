@@ -49,11 +49,13 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Charts**: Visual time tracking with Chart.js
 - **Dark Theme**: Toggle in app toolbar, persisted to localStorage
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
+- **Sticky Notes**: Card-based rich-text notes tab with drag reorder / drag-to-trash (see `docs/features/notes.md`)
 
 ## Feature Documentation
 Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.
 - `docs/features/categories.md` — Category grouping for projects, VCombobox grouping pattern, BulkLogForm category rules
 - `docs/features/log-list-filters.md` — LogList filter bar (project/task/date/search), Insights↔chart project sync, panel-expansion coordination
+- `docs/features/notes.md` — Note data model + IndexedDB versioning, HTML sanitization rules, native drag & drop (reorder/trash) design, undo mechanism
 
 ## Important Notes
 - **Type Safety**: Full TypeScript coverage required

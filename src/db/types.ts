@@ -5,6 +5,7 @@ export const COLLECTION_NAMES = [
   'pinnedProjects',
   'categories',
   'events',
+  'notes',
 ] as const;
 
 export type CollectionName = (typeof COLLECTION_NAMES)[number];
@@ -15,7 +16,8 @@ export interface IdRecord {
 
 export type DbSnapshot = {
   schemaVersion: number;
-  collections: Record<CollectionName, IdRecord[]>;
+  // Partial: old backups predate collections added later (e.g. notes) and genuinely lack them.
+  collections: Partial<Record<CollectionName, IdRecord[]>>;
 };
 
 export interface StorageAdapter {
