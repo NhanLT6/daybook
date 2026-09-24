@@ -173,18 +173,20 @@ const navItems = [
 
           <span class="dock-spacer" />
 
-          <AuthMenu />
+          <!-- Icon actions grouped with their own breathing room: text buttons get visual space from
+               their padding, bare icons don't, so a shared 2px gap made these look cramped -->
+          <div class="dock-icons">
+            <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
-          <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
-
-          <!-- Insights drawer toggle — Home only, when the inline panel is hidden -->
-          <VIconBtn
-            v-if="route.path === '/' && !insightsInline"
-            icon="mdi-chart-box-outline"
-            size="small"
-            variant="text"
-            @click="insightsDrawerOpen = !insightsDrawerOpen"
-          />
+            <!-- Insights drawer toggle — Home only, when the inline panel is hidden -->
+            <VIconBtn
+              v-if="route.path === '/' && !insightsInline"
+              icon="mdi-chart-box-outline"
+              size="small"
+              variant="text"
+              @click="insightsDrawerOpen = !insightsDrawerOpen"
+            />
+          </div>
 
           <!-- Desktop nav links -->
           <VBtn
@@ -214,6 +216,11 @@ const navItems = [
               </VListItem>
             </VList>
           </VMenu>
+
+          <!-- Account avatar sits last, after nav, like most apps -->
+          <div class="dock-account">
+            <AuthMenu />
+          </div>
         </nav>
       </div>
     </VAppBar>
@@ -303,9 +310,23 @@ const navItems = [
   opacity: 0.7;
 }
 
+/* Icon buttons: wider gap inside the group, and a margin that separates it from the nav links */
+.dock-icons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-inline: 4px 12px;
+}
+
+/* Keep the avatar a little apart from the last nav link */
+.dock-account {
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
 /* Pushes brand left, actions right */
 .dock-spacer {
   flex: 1;
 }
-
 </style>

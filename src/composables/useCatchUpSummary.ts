@@ -1,9 +1,8 @@
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
-import type { TimeLog } from '@/interfaces/TimeLog';
 import type { AiConfig } from '@/interfaces/ServerSettings';
+import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 import { httpClient } from '@/apis/httpClient';
 import { shortDateFormat } from '@/common/DateFormat';
@@ -11,12 +10,14 @@ import { storageKeys } from '@/common/storageKeys';
 import { db } from '@/db';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 import { authHeaders } from './useAuth';
 
 dayjs.extend(customParseFormat);
 
 const SETTINGS_WAIT_FALLBACK_MS = 5000;
+const CATCH_UP_VISIBLE_MS = 5000; // same as warning / release-note notifications
 const HOURS_PER_DAY = 8; // for the "Xd Yh" effort metric
 const LONG_RUNNING_THRESHOLD_MINUTES = 15 * 60; // 15h accumulated effort
 const LOOKBACK_WORKING_DAYS = 15; // rolling window for accumulation (~3 weeks)
@@ -276,11 +277,10 @@ async function callStandupApi(all: TimeLog[], today: string): Promise<CatchUpRen
 
   const headers = await authHeaders();
   if (!headers) return null; // signed out — the catch-up is a server-backed feature
-  const response = await httpClient.post<{ lines: { id: string; text: string }[]; todoLines?: { id: string; text: string }[] }>(
-    '/api/standup',
-    { items: requestItems, plans: planItems, today },
-    { headers },
-  );
+  const response = await httpClient.post<{
+    lines: { id: string; text: string }[];
+    todoLines?: { id: string; text: string }[];
+  }>('/api/standup', { items: requestItems, plans: planItems, today }, { headers });
 
   const didRendered = applyLines(items, response.data.lines ?? []);
   const todoRendered: CatchUpRenderItem[] = (response.data.todoLines ?? []).map((l) => ({
@@ -327,7 +327,7 @@ export function useCatchUpSummary() {
   }
 
   function enqueueCatchUp(items: CatchUpRenderItem[], date = today()) {
-    notificationCenter.catchup('Catch-up', {
+    const id = notificationCenter.catchup('Catch-up', {
       id: `catchup-${date}`,
       persistent: true,
       message: 'Ready · click to view in Chat',
@@ -343,6 +343,9 @@ export function useCatchUpSummary() {
         },
       ],
     });
+    // The store keeps actionable items persistent; hide it on the same timing as other passive notifications.
+    // Not marking it dismissed, so it comes back on the next load until the user presses Dismiss.
+    setTimeout(() => notificationCenter.dismiss(id), CATCH_UP_VISIBLE_MS);
   }
 
   async function prepareCatchUp(): Promise<void> {
