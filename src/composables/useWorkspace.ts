@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useCategories } from '@/composables/useCategories';
 import { useCollection } from '@/composables/useCollection';
 import { useJira } from '@/composables/useJira';
+import { useTimeLogs } from '@/composables/useTimeLogs';
 
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
@@ -23,6 +24,7 @@ export function useWorkspace() {
   const settingsStore = useSettingsStore();
   const { getCategoryName } = useCategories();
   const { myJiraProjects, teamJiraProjects } = useJira();
+  const { logs } = useTimeLogs();
 
   const teamWorkTasks = [
     { title: 'Daily meeting', project: 'Team work' },
@@ -84,34 +86,63 @@ export function useWorkspace() {
     return [...pinned, ...unpinned];
   });
 
-  // For grouped VCombobox — flat array with injected subheader objects when categories are enabled.
-  // When categories are enabled, pinned projects are hoisted into a global "Pinned" section at the
-  // top (with their category shown as subtitle for context), then category groups follow with only
-  // unpinned projects. Empty groups are skipped automatically.
-  const sortedProjectItems = computed((): Array<{ title: string; header?: true; categoryName?: string }> => {
-    if (!settingsStore.useCategories) {
-      return sortedProjectTitles.value.map((title) => ({ title }));
+  // Most recently logged projects (by latest work date of a real log, not plans), excluding pinned ones —
+  // pinned projects already sit at the top. ISO dates compare lexicographically.
+  const RECENT_LIMIT = 5;
+  const recentProjectTitles = computed(() => {
+    const titles = new Set(myProjects.value.map((p) => p.title));
+    const lastUsed = new Map<string, string>();
+    for (const log of logs.value) {
+      if (log.type !== 'log' || !titles.has(log.project) || pinnedProjects.value.includes(log.project)) continue;
+      const prev = lastUsed.get(log.project);
+      if (!prev || log.date > prev) lastUsed.set(log.project, log.date);
     }
+    return [...lastUsed.entries()]
+      .sort((a, b) => b[1].localeCompare(a[1]))
+      .slice(0, RECENT_LIMIT)
+      .map(([title]) => title);
+  });
+
+  // For grouped VCombobox — flat array with injected subheader objects.
+  // Order: "Pinned", then "Recent" (each item carries its category as subtitle for context when categories
+  // are on), then the rest — category groups when categories are enabled, otherwise one "All projects" group.
+  // A project appears only once. With nothing pinned or recent and categories off, it's a plain flat list.
+  const sortedProjectItems = computed((): Array<{ title: string; header?: true; categoryName?: string }> => {
+    const categoryOf = (title: string) =>
+      settingsStore.useCategories
+        ? getCategoryName(myProjects.value.find((p) => p.title === title)?.categoryId)
+        : undefined;
 
     const pinnedTitles = sortedProjectTitles.value.filter((t) => pinnedProjects.value.includes(t));
-    const unpinnedTitles = sortedProjectTitles.value.filter((t) => !pinnedProjects.value.includes(t));
+    const recentTitles = recentProjectTitles.value;
+    const restTitles = sortedProjectTitles.value.filter(
+      (t) => !pinnedProjects.value.includes(t) && !recentTitles.includes(t),
+    );
 
-    const result: Array<{ title: string; header?: true; categoryName?: string }> = [];
-
-    // Pinned section at top
-    if (pinnedTitles.length > 0) {
-      result.push({ title: 'Pinned', header: true });
-      for (const title of pinnedTitles) {
-        const project = myProjects.value.find((p) => p.title === title);
-        result.push({ title, categoryName: getCategoryName(project?.categoryId) });
-      }
+    if (!settingsStore.useCategories && !pinnedTitles.length && !recentTitles.length) {
+      return restTitles.map((title) => ({ title }));
     }
 
-    // Category groups (unpinned only; empty groups are naturally skipped)
+    const result: Array<{ title: string; header?: true; categoryName?: string }> = [];
+    const pushSection = (header: string, titles: string[]) => {
+      if (!titles.length) return;
+      result.push({ title: header, header: true });
+      for (const title of titles) result.push({ title, categoryName: categoryOf(title) });
+    };
+
+    pushSection('Pinned', pinnedTitles);
+    pushSection('Recent', recentTitles);
+
+    if (!settingsStore.useCategories) {
+      if (restTitles.length) result.push({ title: 'All projects', header: true });
+      for (const title of restTitles) result.push({ title });
+      return result;
+    }
+
+    // Category groups (rest only; empty groups are naturally skipped)
     const groups = new Map<string, string[]>();
-    for (const title of unpinnedTitles) {
-      const project = myProjects.value.find((p) => p.title === title);
-      const categoryName = getCategoryName(project?.categoryId);
+    for (const title of restTitles) {
+      const categoryName = categoryOf(title)!;
       if (!groups.has(categoryName)) groups.set(categoryName, []);
       groups.get(categoryName)!.push(title);
     }

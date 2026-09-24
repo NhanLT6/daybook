@@ -41,9 +41,19 @@ On save (new project only): if the typed category name does not exist, `addCateg
 
 ## Project VCombobox Grouping (BulkLogForm & potentially others)
 
-`sortedProjectItems` returns `Array<{ title: string; header?: true; categoryName?: string }>`:
-- When categories disabled: flat list of `{ title }` objects, pinned projects first
-- When categories enabled: pinned projects are hoisted into a global "Pinned" section at the top (each carrying `categoryName` for context), followed by category groups containing only unpinned projects; empty groups are skipped
+`sortedProjectItems` returns `Array<{ title: string; header?: true; categoryName?: string }>`, in this order:
+1. **Pinned** — pinned projects (pin order).
+2. **Recent** — up to 5 unpinned projects with the latest logged work date (`type: 'log'` only, so future
+   plans don't count), newest first (`recentProjectTitles` in `useWorkspace.ts`).
+3. The rest, each project appearing only once: category groups when categories are enabled (empty groups
+   skipped), otherwise one "All projects" group, alphabetical.
+
+Pinned and Recent items carry `categoryName` (categories enabled) so their category is visible outside a
+category group. With categories off and nothing pinned or recent, it's a plain flat list with no headers.
+
+The menu is capped at the field's width (`useElementSize` → `menu-props.maxWidth`), so long project names
+truncate with an ellipsis (Vuetify's default for list item titles) instead of stretching the menu; names of
+40+ characters show the full title in a delayed tooltip.
 
 The `#item` slot checks `item.raw.header` to render `VListSubheader` vs a regular `VListItem`.
 A `custom-filter` ensures header items always pass through search filtering.

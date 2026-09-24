@@ -10,6 +10,7 @@ import CalendarOverview from '@/components/CalendarOverview.vue';
 import type { Task } from '@/interfaces/Task';
 import type { TimeLog } from '@/interfaces/TimeLog';
 
+import { useElementSize } from '@vueuse/core';
 import { useField, useForm } from 'vee-validate';
 import { array, date, number, object, string } from 'yup';
 
@@ -210,6 +211,13 @@ const onCalendarMonthChanged = (month: number) => {
   emit('monthChanged', month);
 };
 
+// Cap the project menu at the field's width: a long project name would otherwise stretch the menu past the
+// form; list item titles then truncate with an ellipsis (Vuetify's default for VListItem titles).
+const projectComboboxEl = ref();
+const { width: projectFieldWidth } = useElementSize(projectComboboxEl);
+// Full name on hover only when it's long enough to be cut off
+const LONG_PROJECT_NAME = 40;
+
 // Filter for project dropdown: header items always show, regular items filtered by title
 const projectFilter = (_value: string, query: string, item?: { raw: unknown }) => {
   const raw = item?.raw as { title?: string; header?: boolean } | undefined;
@@ -341,6 +349,7 @@ watch(
       </VInput>
 
       <VCombobox
+        ref="projectComboboxEl"
         :model-value="projectField.value.value"
         @update:model-value="onProjectUpdate"
         @update:search="onProjectSearch"
@@ -349,6 +358,7 @@ watch(
         item-title="title"
         item-value="title"
         :custom-filter="projectFilter"
+        :menu-props="{ maxWidth: projectFieldWidth || undefined }"
         :error-messages="errors.project"
         autocomplete="new-password"
         aria-autocomplete="list"
@@ -360,7 +370,15 @@ watch(
           <!-- Regular project item -->
           <VHover v-else>
             <template #default="{ isHovering, props: hoverProps }">
-              <VListItem v-bind="{ ...itemProps, ...hoverProps }" :subtitle="item.raw.categoryName">
+              <VListItem
+                v-bind="{ ...itemProps, ...hoverProps }"
+                v-tooltip="{
+                  text: item.raw.title,
+                  openDelay: 600,
+                  disabled: item.raw.title.length < LONG_PROJECT_NAME,
+                }"
+                :subtitle="item.raw.categoryName"
+              >
                 <template #prepend>
                   <VAvatar :color="projectColors.getProjectColor(item.raw.title)" size="small" />
                 </template>
