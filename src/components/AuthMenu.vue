@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { useAuthDialog } from '@/composables/useAuthDialog';
 
 /**
  * Sign-in surface for the server-backed features. Signing in is optional — time
@@ -12,7 +13,10 @@ import { useAuth } from '@/composables/useAuth';
 const { user, isAuthenticated, isLoading, error, isAuthConfigured, signInEmail, signUpEmail, signInGoogle, signOut } =
   useAuth();
 
-const isDialogOpen = ref(false);
+// Small screens show the account inside the hamburger menu instead, so only the dialog renders here
+defineProps<{ hideTrigger?: boolean }>();
+
+const { isAuthDialogOpen: isDialogOpen, openAuthDialog: openDialog } = useAuthDialog();
 const mode = ref<'signin' | 'signup'>('signin');
 const email = ref('');
 const password = ref('');
@@ -21,7 +25,8 @@ const showPassword = ref(false);
 
 const isSignUp = computed(() => mode.value === 'signup');
 const canSubmit = computed(
-  () => email.value.trim().length > 3 && password.value.length >= 8 && (!isSignUp.value || name.value.trim().length > 0),
+  () =>
+    email.value.trim().length > 3 && password.value.length >= 8 && (!isSignUp.value || name.value.trim().length > 0),
 );
 
 const initials = computed(() => {
@@ -29,11 +34,12 @@ const initials = computed(() => {
   return source.slice(0, 1).toUpperCase() || '?';
 });
 
-const openDialog = () => {
+// Every open starts on a clean sign-in form, whichever entry point opened it
+watch(isDialogOpen, (open) => {
+  if (!open) return;
   mode.value = 'signin';
   password.value = '';
-  isDialogOpen.value = true;
-};
+});
 
 const submit = async () => {
   if (!canSubmit.value) return;
@@ -51,7 +57,7 @@ const submit = async () => {
   <!-- Nothing to show when the deployment has no auth configured at all -->
   <template v-if="isAuthConfigured">
     <!-- Signed in: avatar menu -->
-    <VMenu v-if="isAuthenticated" location="bottom end" :offset="8">
+    <VMenu v-if="isAuthenticated && !hideTrigger" location="bottom end" :offset="8">
       <template #activator="{ props }">
         <VBtn icon variant="text" size="small" v-bind="props" aria-label="Account">
           <VAvatar size="26" color="primary" variant="tonal">
@@ -69,8 +75,15 @@ const submit = async () => {
     </VMenu>
 
     <!-- Signed out: sign-in entry point -->
-    <VBtn v-else class="text-none d-none d-sm-flex" size="small" variant="text" @click="openDialog"> Sign in </VBtn>
-    <VIconBtn v-if="!isAuthenticated" icon="mdi-login" size="small" variant="text" class="d-sm-none" @click="openDialog" />
+    <VBtn
+      v-else-if="!isAuthenticated && !hideTrigger"
+      class="text-none"
+      size="small"
+      variant="text"
+      @click="openDialog"
+    >
+      Sign in
+    </VBtn>
 
     <VDialog v-model="isDialogOpen" max-width="420">
       <VCard class="glass-acrylic">
@@ -110,12 +123,7 @@ const submit = async () => {
         </VCardText>
 
         <VCardActions class="px-4 pb-4 d-flex">
-          <VBtn
-            variant="text"
-            size="small"
-            class="text-none"
-            @click="mode = isSignUp ? 'signin' : 'signup'"
-          >
+          <VBtn variant="text" size="small" class="text-none" @click="mode = isSignUp ? 'signin' : 'signup'">
             {{ isSignUp ? 'I already have an account' : 'Create an account' }}
           </VBtn>
           <VSpacer />

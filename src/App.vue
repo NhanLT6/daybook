@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { useAuthDialog } from '@/composables/useAuthDialog';
 import { useCatchUpSummary } from '@/composables/useCatchUpSummary';
 import { useEvents } from '@/composables/useEvents';
 import { useGreetingNotifications } from '@/composables/useGreetingNotifications';
@@ -23,7 +24,10 @@ import { useSettingsStore } from '@/stores/settings';
 import { RouterView, useRoute } from 'vue-router';
 
 const { events, replaceAll, ready } = useEvents();
-const { isAuthenticated, ready: authReady } = useAuth();
+const { isAuthenticated, isAuthConfigured, user, signOut, ready: authReady } = useAuth();
+const { openAuthDialog } = useAuthDialog();
+
+const userInitial = computed(() => (user.value?.name || user.value?.email || '?').slice(0, 1).toUpperCase());
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
 const { startCatchUpNotifications } = useCatchUpSummary();
 const { startGreetingNotifications } = useGreetingNotifications();
@@ -176,7 +180,7 @@ const navItems = [
           <!-- Icon actions grouped with their own breathing room: text buttons get visual space from
                their padding, bare icons don't, so a shared 2px gap made these look cramped -->
           <div class="dock-icons">
-            <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
+            <VIconBtn v-if="!smAndDown" :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
             <!-- Insights drawer toggle — Home only, when the inline panel is hidden -->
             <VIconBtn
@@ -214,12 +218,37 @@ const navItems = [
               >
                 <VListItemTitle>{{ item.text }}</VListItemTitle>
               </VListItem>
+
+              <!-- Theme and account live here on small screens so the dock has room for the notification pill -->
+              <VDivider class="my-1" />
+              <VListItem
+                rounded="lg"
+                :prepend-icon="themeIcon"
+                :title="isDarkMode ? 'Light mode' : 'Dark mode'"
+                @click="toggleTheme"
+              />
+
+              <template v-if="isAuthConfigured">
+                <VDivider class="my-1" />
+                <template v-if="isAuthenticated">
+                  <VListItem :title="user?.name || 'Signed in'" :subtitle="user?.email">
+                    <template #prepend>
+                      <VAvatar size="26" color="primary" variant="tonal" class="me-3">
+                        <VImg v-if="user?.image" :src="user.image" alt="" />
+                        <span v-else class="text-caption">{{ userInitial }}</span>
+                      </VAvatar>
+                    </template>
+                  </VListItem>
+                  <VListItem rounded="lg" prepend-icon="mdi-logout" title="Sign out" @click="signOut" />
+                </template>
+                <VListItem v-else rounded="lg" prepend-icon="mdi-login" title="Sign in" @click="openAuthDialog" />
+              </template>
             </VList>
           </VMenu>
 
           <!-- Account avatar sits last, after nav, like most apps -->
-          <div class="dock-account">
-            <AuthMenu />
+          <div :class="{ 'dock-account': !smAndDown }">
+            <AuthMenu :hide-trigger="smAndDown" />
           </div>
         </nav>
       </div>
