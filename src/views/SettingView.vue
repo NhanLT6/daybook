@@ -12,8 +12,8 @@ import * as yup from 'yup';
 
 import dayjs from 'dayjs';
 
-import { useSettingsStore } from '@/stores/settings';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
+import { useSettingsStore } from '@/stores/settings';
 
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
@@ -204,7 +204,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
 <template>
   <div class="h-100 overflow-y-auto overflow-x-hidden">
     <div class="settings-grid">
-      <!-- App Configuration: two independent islands stacked in the column -->
+      <!-- First column: Date & Calendar, Features, Background -->
       <div class="d-flex flex-column settings-col">
         <!-- Date & Calendar island -->
         <VCard class="glass-acrylic">
@@ -324,8 +324,75 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
         </VCard>
       </div>
 
-      <!-- Backup & Restore island -->
-      <div>
+      <!-- Second column: AI Assistant, then Backup & Restore -->
+      <div class="d-flex flex-column settings-col">
+        <!-- AI Assistant island -->
+        <VCard class="glass-acrylic">
+          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
+            AI Assistant
+            <VSwitch v-model="settingsStore.aiConfig.enabled" color="primary" hide-details density="compact" />
+          </VCardTitle>
+
+          <VCardText class="d-flex flex-column ga-2">
+            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
+              Bring your own key — AI runs on your Gemini account, billed to you. It is stored on the server against
+              your account and is only ever readable by you.
+            </VAlert>
+
+            <VAlert v-if="!isAuthenticated" type="warning" variant="tonal" density="compact" class="text-caption">
+              Sign in to save your Gemini key — it is stored against your account.
+            </VAlert>
+
+            <VTextField
+              v-model="settingsStore.aiConfig.apiKey"
+              label="Gemini API Key"
+              :type="showGeminiKey ? 'text' : 'password'"
+              :disabled="!settingsStore.aiConfig.enabled"
+              :append-inner-icon="showGeminiKey ? 'mdi-eye-off' : 'mdi-eye'"
+              @click:append-inner="showGeminiKey = !showGeminiKey"
+              clearable
+              persistent-hint
+            >
+              <template #details>
+                <div class="text-caption text-medium-emphasis">
+                  Get your key at
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary text-decoration-none"
+                  >
+                    Google AI Studio
+                  </a>
+                </div>
+              </template>
+            </VTextField>
+
+            <VCombobox
+              v-model="settingsStore.aiConfig.model"
+              :items="GEMINI_MODELS"
+              label="Model"
+              :disabled="!settingsStore.aiConfig.enabled"
+              persistent-hint
+              hint="Select a model or type a custom model ID"
+            />
+
+            <div class="d-flex justify-end mt-2">
+              <VBtn
+                color="primary"
+                variant="tonal"
+                :loading="isSavingSettings"
+                :disabled="!isAuthenticated"
+                prepend-icon="mdi-content-save-outline"
+                @click="handleSaveCredentials"
+              >
+                Save credentials
+              </VBtn>
+            </div>
+          </VCardText>
+        </VCard>
+
+        <!-- Backup & Restore island -->
         <VCard class="glass-acrylic">
           <VCardTitle>Backup &amp; Restore</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
@@ -504,74 +571,6 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
           </VCardText>
         </VCard>
       </div>
-
-      <!-- AI Assistant section -->
-      <div>
-        <VCard class="glass-acrylic">
-          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
-            AI Assistant
-            <VSwitch v-model="settingsStore.aiConfig.enabled" color="primary" hide-details density="compact" />
-          </VCardTitle>
-
-          <VCardText class="d-flex flex-column ga-2">
-            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
-              Bring your own key — AI runs on your Gemini account, billed to you. It is stored on the server against
-              your account and is only ever readable by you.
-            </VAlert>
-
-            <VAlert v-if="!isAuthenticated" type="warning" variant="tonal" density="compact" class="text-caption">
-              Sign in to save your Gemini key — it is stored against your account.
-            </VAlert>
-
-            <VTextField
-              v-model="settingsStore.aiConfig.apiKey"
-              label="Gemini API Key"
-              :type="showGeminiKey ? 'text' : 'password'"
-              :disabled="!settingsStore.aiConfig.enabled"
-              :append-inner-icon="showGeminiKey ? 'mdi-eye-off' : 'mdi-eye'"
-              @click:append-inner="showGeminiKey = !showGeminiKey"
-              clearable
-              persistent-hint
-            >
-              <template #details>
-                <div class="text-caption text-medium-emphasis">
-                  Get your key at
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-primary text-decoration-none"
-                  >
-                    Google AI Studio
-                  </a>
-                </div>
-              </template>
-            </VTextField>
-
-            <VCombobox
-              v-model="settingsStore.aiConfig.model"
-              :items="GEMINI_MODELS"
-              label="Model"
-              :disabled="!settingsStore.aiConfig.enabled"
-              persistent-hint
-              hint="Select a model or type a custom model ID"
-            />
-
-            <div class="d-flex justify-end mt-2">
-              <VBtn
-                color="primary"
-                variant="tonal"
-                :loading="isSavingSettings"
-                :disabled="!isAuthenticated"
-                prepend-icon="mdi-content-save-outline"
-                @click="handleSaveCredentials"
-              >
-                Save credentials
-              </VBtn>
-            </div>
-          </VCardText>
-        </VCard>
-      </div>
     </div>
   </div>
 </template>
@@ -584,7 +583,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
   padding: 12px;
 }
 
-/* Stack the two App Config islands vertically with consistent gap */
+/* Stack the islands inside a column with the same gap as the grid */
 .settings-col {
   gap: 12px;
 }
