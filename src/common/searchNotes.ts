@@ -60,3 +60,24 @@ export function searchNotes(notes: Note[], { query }: SearchNotesInput): SearchN
 
   return { totalNotes: ranked.length, notes: result };
 }
+
+const MAX_OPEN_ITEMS = 20;
+
+/**
+ * The open part of the notes, for Catch-up: unticked checklist items and question lines
+ * ("...?") that are not ticked. Pinned notes first, then most recently edited. Small enough
+ * to send with every Catch-up, unlike the full notes.
+ */
+export function openNoteItems(notes: Note[]): string[] {
+  const items: string[] = [];
+  const sorted = [...notes].sort(
+    (a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt,
+  );
+  for (const note of sorted) {
+    for (const line of noteToPlainText(note.content).split('\n')) {
+      if (line.startsWith('[ ] ')) items.push(line.slice(4).trim());
+      else if (!line.startsWith('[x] ') && line.trim().endsWith('?')) items.push(line.replace(/^- /, '').trim());
+    }
+  }
+  return items.filter(Boolean).slice(0, MAX_OPEN_ITEMS);
+}

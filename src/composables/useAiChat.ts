@@ -181,14 +181,14 @@ export function useAiChat() {
     const id = `catchup-${Date.now()}`;
     // Plain-text bullet list for AI conversation context (follow-up questions)
     const hasGroups = items.some((i) => i.group);
+    const section = (title: string, group: CatchUpRenderItem['group']) => {
+      const lines = items
+        .filter((i) => i.group === group)
+        .map((i) => `• ${i.text}${i.effortLabel ? ` · ${i.effortLabel}` : ''}`);
+      return lines.length ? [title, ...lines, ''] : [];
+    };
     const text = hasGroups
-      ? [
-          'Did:',
-          ...items.filter((i) => i.group === 'did').map((i) => `• ${i.text}${i.effortLabel ? ` · ${i.effortLabel}` : ''}`),
-          '',
-          'Todo:',
-          ...items.filter((i) => i.group === 'todo').map((i) => `• ${i.text}`),
-        ].join('\n')
+      ? [...section('Did:', 'did'), ...section('Todo:', 'todo'), ...section('From notes:', 'notes')].join('\n').trim()
       : items.map((i) => `• ${i.text}${i.effortLabel ? ` · ${i.effortLabel}` : ''}`).join('\n');
 
     const syntheticMsg = {

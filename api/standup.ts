@@ -32,12 +32,20 @@ interface RequestPlan {
 interface StandupRequest {
   items: RequestItem[];
   plans?: RequestPlan[];
+  notes?: string[]; // open checklist items and questions from the user's sticky notes
   today: string;
 }
 
-function buildPrompt(items: RequestItem[], today: string, plans?: RequestPlan[]): string {
+interface StandupResponse {
+  lines: { id: string; text: string }[];
+  todoLines: { id: string; text: string }[];
+  noteLines: string[];
+}
+
+function buildPrompt(items: RequestItem[], today: string, plans?: RequestPlan[], notes?: string[]): string {
   const hasDid = items.length > 0;
   const hasTodo = plans && plans.length > 0;
+  const hasNotes = notes && notes.length > 0;
 
   const didSection = hasDid
     ? items
@@ -79,35 +87,45 @@ Start the sentence with the "project" value exactly as given — do not include 
 Return these in "todoLines".`
     : '';
 
-  const responseShape = hasTodo
-    ? '{"lines":[{"id":"<id>","text":"<sentence>"}],"todoLines":[{"id":"<id>","text":"<sentence>"}]}'
-    : '{"lines":[{"id":"<id>","text":"<sentence>"}]}';
+  const notesSection = hasNotes ? notes!.map((n) => `  - ${n}`).join('\n') : '';
+
+  const notesInstruction = hasNotes
+    ? `The "Open items from notes" are the user's own quick notes: messy shorthand, typos, abbreviations.
+Turn them into short lines worth raising or following up today (questions, blockers, reminders).
+Merge duplicates, keep the user's meaning, expand shorthand only when it is obvious, and never invent details.
+Return these as plain strings in "noteLines".`
+    : '';
+
+  const responseShape = `{"lines":[{"id":"<id>","text":"<sentence>"}]${hasTodo ? ',"todoLines":[{"id":"<id>","text":"<sentence>"}]' : ''}${hasNotes ? ',"noteLines":["<line>"]' : ''}}`;
 
   return `You are helping a developer write a standup update. Today is ${today}.
 ${hasDid ? `\nDid (recent work):\n${didSection}` : ''}
 ${hasTodo ? `\nTodo (plans for today):\n${todoSection}` : ''}
+${hasNotes ? `\nOpen items from notes:\n${notesSection}` : ''}
 
 ${didInstruction}
 ${todoInstruction}
+${notesInstruction}
 Return STRICT JSON only — no markdown, no code fences, no extra prose:
 ${responseShape}
-with exactly one entry per block in each array, echoing each block's "id" value unchanged.`;
+with exactly one entry per Did/Todo block in "lines"/"todoLines", echoing each block's "id" value unchanged.`;
 }
 
-function parseResponse(raw: string): { lines: { id: string; text: string }[]; todoLines: { id: string; text: string }[] } {
+function parseResponse(raw: string): StandupResponse {
   const cleaned = raw
     .trim()
     .replace(/^```(?:json)?/i, '')
     .replace(/```$/, '')
     .trim();
   try {
-    const parsed = JSON.parse(cleaned) as { lines?: { id: string; text: string }[]; todoLines?: { id: string; text: string }[] };
+    const parsed = JSON.parse(cleaned) as Partial<StandupResponse>;
     return {
       lines: Array.isArray(parsed.lines) ? parsed.lines : [],
       todoLines: Array.isArray(parsed.todoLines) ? parsed.todoLines : [],
+      noteLines: Array.isArray(parsed.noteLines) ? parsed.noteLines.filter((l) => typeof l === 'string' && l.trim()) : [],
     };
   } catch {
-    return { lines: [], todoLines: [] };
+    return { lines: [], todoLines: [], noteLines: [] };
   }
 }
 
@@ -131,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { text } = await generateText({
       model: requireAiModel(aiConfig),
-      prompt: buildPrompt(body.items, body.today, body.plans),
+      prompt: buildPrompt(body.items, body.today, body.plans, body.notes),
     });
 
     return res.json(parseResponse(text));

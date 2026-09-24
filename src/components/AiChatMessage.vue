@@ -47,6 +47,7 @@ const catchUpItems = computed<CatchUpRenderItem[] | undefined>(() => props.messa
 const catchUpHasGroups = computed(() => catchUpItems.value?.some((i) => i.group) ?? false);
 const catchUpDidItems = computed(() => catchUpItems.value?.filter((i) => i.group === 'did') ?? []);
 const catchUpTodoItems = computed(() => catchUpItems.value?.filter((i) => i.group === 'todo') ?? []);
+const catchUpNoteItems = computed(() => catchUpItems.value?.filter((i) => i.group === 'notes') ?? []);
 
 const handleSave = () => {
   if (extractedLogs.value?.length) {
@@ -153,26 +154,38 @@ const copyMessage = () => {
 
         <!-- catchUp tool result -->
         <template v-if="tool === 'catchUp' && catchUpItems?.length">
-          <!-- Grouped: Did / Todo sections -->
+          <!-- Grouped: Did / Todo / From your notes sections, each only when it has items -->
           <template v-if="catchUpHasGroups">
-            <p class="catchup-group-header">Did</p>
-            <ul class="catchup-list">
-              <li
-                v-for="(entry, idx) in catchUpDidItems"
-                :key="idx"
-                class="catchup-item"
-                :class="{ 'is-ongoing': entry.ongoing }"
-              >
-                {{ entry.text
-                }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
-              </li>
-            </ul>
-            <p class="catchup-group-header mt-2">Todo</p>
-            <ul class="catchup-list">
-              <li v-for="(entry, idx) in catchUpTodoItems" :key="idx" class="catchup-item">
-                {{ entry.text }}
-              </li>
-            </ul>
+            <template v-if="catchUpDidItems.length">
+              <p class="catchup-group-header">Did</p>
+              <ul class="catchup-list">
+                <li
+                  v-for="(entry, idx) in catchUpDidItems"
+                  :key="idx"
+                  class="catchup-item"
+                  :class="{ 'is-ongoing': entry.ongoing }"
+                >
+                  {{ entry.text
+                  }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
+                </li>
+              </ul>
+            </template>
+            <template v-if="catchUpTodoItems.length">
+              <p class="catchup-group-header mt-2">Todo</p>
+              <ul class="catchup-list">
+                <li v-for="(entry, idx) in catchUpTodoItems" :key="idx" class="catchup-item">
+                  {{ entry.text }}
+                </li>
+              </ul>
+            </template>
+            <template v-if="catchUpNoteItems.length">
+              <p class="catchup-group-header mt-2">From your notes</p>
+              <ul class="catchup-list">
+                <li v-for="(entry, idx) in catchUpNoteItems" :key="idx" class="catchup-item">
+                  {{ entry.text }}
+                </li>
+              </ul>
+            </template>
           </template>
 
           <!-- No groups: existing flat list -->

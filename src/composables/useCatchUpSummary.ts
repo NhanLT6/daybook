@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 
 import { httpClient } from '@/apis/httpClient';
 import { shortDateFormat } from '@/common/DateFormat';
+import { openNoteItems } from '@/common/searchNotes';
 import { storageKeys } from '@/common/storageKeys';
 import { db } from '@/db';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
@@ -193,7 +194,7 @@ function getLogsForSummary(all: TimeLog[], today: dayjs.Dayjs): TimeLog[] {
   return collectLogsFromArray(all, anchor, today);
 }
 
-// ── Summary cache (single key, keyed by a stamp derived from the logs: count + latest date) ──
+// ── Summary cache (single key, keyed by a stamp of the logs and the open note items) ──
 
 interface SummaryCache {
   key: string;
@@ -209,20 +210,28 @@ export function logsStamp(all: TimeLog[]): string {
   return `${all.length}:${h}`;
 }
 
-function getCachedSummary(all: TimeLog[]): CatchUpRenderItem[] | null {
+// Ticking or adding a note item changes the key, so Catch-up regenerates instead of showing stale items
+export function summaryKey(all: TimeLog[], noteItems: string[]): string {
+  return noteItems.length ? `${logsStamp(all)}|${hashString(noteItems.join('\n'))}` : logsStamp(all);
+}
+
+function getCachedSummary(key: string): CatchUpRenderItem[] | null {
   const raw = localStorage.getItem(storageKeys.catchUp.summaries);
   if (!raw) return null;
   try {
     const cache = JSON.parse(raw) as SummaryCache;
-    return cache.key === logsStamp(all) ? cache.items : null;
+    return cache.key === key ? cache.items : null;
   } catch {
     return null;
   }
 }
 
-function setCachedSummary(all: TimeLog[], items: CatchUpRenderItem[]): void {
-  const key = logsStamp(all);
+function setCachedSummary(key: string, items: CatchUpRenderItem[]): void {
   localStorage.setItem(storageKeys.catchUp.summaries, JSON.stringify({ key, items } satisfies SummaryCache));
+}
+
+async function openNoteItemsFromDb(): Promise<string[]> {
+  return openNoteItems(await db.notes.all());
 }
 
 function getTodayPlans(all: TimeLog[], today: dayjs.Dayjs): TimeLog[] {
@@ -245,7 +254,7 @@ function buildPlanRequestItems(plans: TimeLog[]): RequestPlan[] {
   }));
 }
 
-async function callStandupApi(all: TimeLog[], today: string): Promise<CatchUpRenderItem[] | null> {
+async function callStandupApi(all: TimeLog[], noteItems: string[], today: string): Promise<CatchUpRenderItem[] | null> {
   const todayDayjs = dayjs(today).startOf('day');
 
   // Separate did logs (actual work) from plan entries
@@ -255,7 +264,7 @@ async function callStandupApi(all: TimeLog[], today: string): Promise<CatchUpRen
   const todayPlans = getTodayPlans(all, todayDayjs);
   const hasTodayPlans = todayPlans.length > 0;
 
-  if (!didLogs.length && !hasTodayPlans) return null;
+  if (!didLogs.length && !hasTodayPlans && !noteItems.length) return null;
 
   const accumulated = accumulateMinutesByProject(
     collectAccumulationLogs(all, todayDayjs).filter((l) => l.type !== 'plan'),
@@ -280,7 +289,8 @@ async function callStandupApi(all: TimeLog[], today: string): Promise<CatchUpRen
   const response = await httpClient.post<{
     lines: { id: string; text: string }[];
     todoLines?: { id: string; text: string }[];
-  }>('/api/standup', { items: requestItems, plans: planItems, today }, { headers });
+    noteLines?: string[];
+  }>('/api/standup', { items: requestItems, plans: planItems, notes: noteItems, today }, { headers });
 
   const didRendered = applyLines(items, response.data.lines ?? []);
   const todoRendered: CatchUpRenderItem[] = (response.data.todoLines ?? []).map((l) => ({
@@ -290,19 +300,28 @@ async function callStandupApi(all: TimeLog[], today: string): Promise<CatchUpRen
     group: 'todo' as const,
   }));
 
-  const rendered: CatchUpRenderItem[] = hasTodayPlans
-    ? [...didRendered.map((r) => ({ ...r, group: 'did' as const })), ...todoRendered]
-    : didRendered;
+  const notesRendered: CatchUpRenderItem[] = (response.data.noteLines ?? []).map((text) => ({
+    project: '',
+    text,
+    ongoing: false,
+    group: 'notes' as const,
+  }));
 
-  setCachedSummary(all, rendered);
+  const rendered: CatchUpRenderItem[] =
+    todoRendered.length || notesRendered.length
+      ? [...didRendered.map((r) => ({ ...r, group: 'did' as const })), ...todoRendered, ...notesRendered]
+      : didRendered;
+
+  setCachedSummary(summaryKey(all, noteItems), rendered);
   return rendered.length ? rendered : null;
 }
 
 export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {
   const all = await allLogs();
-  const cached = getCachedSummary(all);
+  const noteItems = await openNoteItemsFromDb();
+  const cached = getCachedSummary(summaryKey(all, noteItems));
   if (cached) return cached;
-  return callStandupApi(all, dayjs().format('YYYY-MM-DD'));
+  return callStandupApi(all, noteItems, dayjs().format('YYYY-MM-DD'));
 }
 
 export function isAiAvailable(config: AiConfig): boolean {
@@ -361,13 +380,14 @@ export function useCatchUpSummary() {
       }
 
       const all = await allLogs();
-      const cached = getCachedSummary(all);
+      const noteItems = await openNoteItemsFromDb();
+      const cached = getCachedSummary(summaryKey(all, noteItems));
       if (cached) {
         enqueueCatchUp(cached, date);
         return;
       }
 
-      const items = await callStandupApi(all, date);
+      const items = await callStandupApi(all, noteItems, date);
       if (items?.length) enqueueCatchUp(items, date);
     } catch {
       // Foundation phase: catch-up failures do not create user-facing notifications.

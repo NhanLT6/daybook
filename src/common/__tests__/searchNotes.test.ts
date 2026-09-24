@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Note } from '@/interfaces/Note';
 
-import { noteToPlainText, searchNotes } from '@/common/searchNotes';
+import { noteToPlainText, openNoteItems, searchNotes } from '@/common/searchNotes';
 
 const note = (id: string, content: string, extra: Partial<Note> = {}): Note => ({
   id,
@@ -69,5 +69,22 @@ describe('searchNotes', () => {
     );
     expect(notes[0].text).toHaveLength(3001);
     expect(notes.length).toBe(3);
+  });
+});
+
+describe('openNoteItems', () => {
+  it('returns unticked checklist items and unticked questions, pinned then recent first', () => {
+    const notes = [
+      note('old', `<p>lunch?</p><ul data-type="taskList">${taskItem('done thing?', true)}</ul>`, { updatedAt: 1 }),
+      note('pin', `<p>standup notes</p><ul data-type="taskList">${taskItem('ping PM', false)}</ul>`, {
+        pinned: true,
+      }),
+      note('new', '<p>ask BA abt login redirect?</p><p>just a reminder</p>', { updatedAt: 5 }),
+    ];
+    expect(openNoteItems(notes)).toEqual(['ping PM', 'ask BA abt login redirect?', 'lunch?']);
+  });
+
+  it('returns nothing when every item is ticked', () => {
+    expect(openNoteItems([note('a', `<ul data-type="taskList">${taskItem('x', true)}</ul>`)])).toEqual([]);
   });
 });

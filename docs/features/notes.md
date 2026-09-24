@@ -214,8 +214,15 @@ Chat answers questions from notes through a tool, not by sending every note with
 - `extractLogs` never gets an output, so a turn that extracts logs never auto-resubmits.
 - Covered by `src/common/__tests__/searchNotes.test.ts` and `e2e/chatSearchNotes.spec.ts` (mocked stream).
 
+## Catch-up includes open note items
+
+Every Catch-up sends `openNoteItems()` (`src/common/searchNotes.ts`) to `/api/standup`: unticked checklist
+items and unticked lines ending in "?", pinned notes first, capped at 20. The model tidies them into
+`noteLines`, shown as a "From your notes" group after Did / Todo. Only the open part is sent, so it is small
+enough to include every time. The summary cache key includes these items (`summaryKey`), so ticking an item
+regenerates the Catch-up. Covered by `src/composables/__tests__/catchUpNotes.test.ts`.
+
 ## Backlog (not built)
 
-- Catch-up/standup reusing `searchNotes` for open (`[ ]`) checklist items.
 - Dropped after review (2026-09-24): select-text / right-click AI actions, AI tidy/summarize. Not worth the
   clicks for short reminder notes. Any AI output written into a note must go through the same sanitizer.
