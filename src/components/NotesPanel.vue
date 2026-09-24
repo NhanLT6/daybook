@@ -541,37 +541,37 @@ onBeforeUnmount(() => {
 
       <!-- Scrollable card grid (pinned notes first) -->
       <div class="notes-scroll" :class="{ 'notes-scroll--empty': !notes.length }">
-        <VFadeTransition leave-absolute>
-          <!-- No notes: fills the tab like the Chat panel, with the add action right there -->
-          <VCard v-if="!notes.length" class="notes-empty">
-            <div class="d-flex flex-column align-center justify-center text-center pa-6 h-100">
-              <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
-              <p class="text-body-2 text-medium-emphasis mb-1">Jot down what you need to remember today</p>
-              <p class="text-caption text-disabled mb-5">e.g. "Ask Bob about the T-123 deploy in standup"</p>
-              <VBtn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addNote">New note</VBtn>
-              <VBtn
-                v-if="isDev"
-                size="small"
-                variant="text"
-                prepend-icon="mdi-flask-outline"
-                class="mt-2"
-                aria-label="Add 20 sample notes"
-                @click="addSampleNotes"
-              >
-                Sample notes
-              </VBtn>
-            </div>
-          </VCard>
-
-          <!-- Search with no hits -->
-          <div
-            v-else-if="!filteredNotes.length"
-            class="notes-no-match d-flex flex-column align-center text-center pt-10"
-          >
-            <VIcon icon="mdi-magnify-close" size="36" class="mb-3 text-disabled" />
-            <p class="text-body-2 text-medium-emphasis">No matching notes</p>
+        <!-- No notes: fills the tab like the Chat panel, with the add action right there -->
+        <VCard v-if="!notes.length" class="notes-empty">
+          <div class="d-flex flex-column align-center justify-center text-center pa-6 h-100">
+            <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
+            <p class="text-body-2 text-medium-emphasis mb-1">Jot down what you need to remember today</p>
+            <p class="text-caption text-disabled mb-5">e.g. "Ask Bob about the T-123 deploy in standup"</p>
+            <VBtn color="primary" variant="tonal" prepend-icon="mdi-plus" aria-label="New note" @click="addNote">
+              New note
+            </VBtn>
+            <VBtn
+              v-if="isDev"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-flask-outline"
+              class="mt-2"
+              aria-label="Add 20 sample notes"
+              @click="addSampleNotes"
+            >
+              Sample notes
+            </VBtn>
           </div>
-        </VFadeTransition>
+        </VCard>
+
+        <!-- Search with no hits -->
+        <div
+          v-else-if="!filteredNotes.length"
+          class="notes-no-match d-flex flex-column align-center text-center pt-10"
+        >
+          <VIcon icon="mdi-magnify-close" size="36" class="mb-3 text-disabled" />
+          <p class="text-body-2 text-medium-emphasis">No matching notes</p>
+        </div>
 
         <div ref="gridEl" class="notes-grid" @pointerdown.capture="onGridPointerDown">
           <VScaleTransition group leave-absolute>
@@ -721,6 +721,19 @@ onBeforeUnmount(() => {
 .notes-empty {
   flex: 1;
   min-height: 0;
+}
+
+/* Fade in on mount only (no <Transition>): a fading-out copy would linger over the first cards and catch
+   their clicks, and a leave transition waits on frames that can stall in background tabs. */
+.notes-empty,
+.notes-no-match {
+  animation: notes-empty-in 0.2s ease;
+}
+
+@keyframes notes-empty-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .notes-grid {

@@ -224,7 +224,7 @@ test('search filters notes by visible text and clearing restores all', async ({ 
 
   await search.fill('nothing matches');
   await expect(page.locator('.note-card')).toHaveCount(0);
-  await expect(page.locator('.notes-empty')).toContainText('No matching notes');
+  await expect(page.locator('.notes-no-match')).toContainText('No matching notes');
 
   await search.fill('');
   await expect(page.locator('.note-card')).toHaveCount(2);
