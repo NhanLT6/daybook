@@ -1,5 +1,7 @@
 # Category Feature Implementation Plan
 
+> **Status (2026-09-24):** Shipped. Storage later moved from localStorage to the IndexedDB `categories` collection (ec48026); see `docs/features/categories.md`. Step checkboxes below were not kept up to date.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add user-defined categories so projects can be grouped (e.g. Work vs Side Projects). Categories are stored in localStorage, optional via a settings toggle, and Jira tickets can be auto-assigned a default category.

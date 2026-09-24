@@ -34,14 +34,11 @@ async function seed(page: Page) {
  * Retries because a reload can destroy the execution context mid-evaluate.
  */
 async function readStore(page: Page, store: string): Promise<Record<string, unknown>[]> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await evaluateStore(page, store);
-    } catch (err) {
-      if (attempt >= 5) throw err;
-      await page.waitForTimeout(300);
-    }
-  }
+  let rows: Record<string, unknown>[] = [];
+  await expect(async () => {
+    rows = await evaluateStore(page, store);
+  }).toPass({ intervals: [300], timeout: 2000 });
+  return rows;
 }
 
 async function evaluateStore(page: Page, store: string): Promise<Record<string, unknown>[]> {

@@ -1,3 +1,5 @@
+import { isAxiosError } from 'axios';
+
 import type { JiraConfig } from '@/interfaces/JiraConfig';
 import type { JiraTicket } from '@/interfaces/JiraTicket';
 
@@ -36,7 +38,7 @@ interface FetchTicketsResponse {
 // Test connection to Jira via Vercel API
 export const testJiraConnection = async (
   config: JiraConfig,
-): Promise<{ success: boolean; message: string; user?: any }> => {
+): Promise<TestConnectionResponse> => {
   try {
     const response = await httpClient.post<TestConnectionResponse>(
       `${API_BASE_URL}/jira/test-connection`,
@@ -49,9 +51,10 @@ export const testJiraConnection = async (
     );
 
     return response.data;
-  } catch (error: any) {
+  } catch (error) {
     // Extract error message from response
-    const message = error.response?.data?.message || 'Failed to connect to Jira';
+    const message =
+      (isAxiosError<{ message?: string }>(error) && error.response?.data?.message) || 'Failed to connect to Jira';
     return { success: false, message };
   }
 };

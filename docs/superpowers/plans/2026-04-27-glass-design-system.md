@@ -1,5 +1,7 @@
 # Glass Design System Implementation Plan
 
+> **Status (2026-09-24):** Not applied: the chart cards still use `glass-acrylic` and `glass-mica` does not exist in `src/`. Step checkboxes below were not kept up to date.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Demote the two chart components from `glass-acrylic` to `glass-mica` so passive display surfaces visually recede behind primary interactive panels.

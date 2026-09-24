@@ -1,5 +1,8 @@
 ﻿import { Page } from '@playwright/test';
 
+import dayjs from 'dayjs';
+
+import { TaskEntry } from '../interfaces/taskEntry.js';
 import { XeroConfig } from '../interfaces/xeroConfig.js';
 
 async function loginXero(page: Page, config: XeroConfig) {
@@ -107,8 +110,23 @@ function convertMinutesToHourMinutes(minutes: number): string {
   return `${hours}:${mins.toString().padStart(2, '0')}`;
 }
 
+/** Xero has no task-less time entry — default a blank task to the entry's project name. */
+function defaultBlankTasksToProject(entries: TaskEntry[]): void {
+  for (const entry of entries) entry.task = entry.task || entry.project;
+}
+
+/** One progress line for a logged entry: date · duration · "description" (when present). */
+function formatLoggedEntry(entry: TaskEntry): string {
+  const date = dayjs(entry.date).format('YYYY-MM-DD');
+  const duration = convertMinutesToHourMinutes(entry.duration!);
+  const desc = entry.description ? ` · "${entry.description}"` : '';
+  return `${date} · ${duration}${desc}`;
+}
+
 export {
   loginXero,
+  defaultBlankTasksToProject,
+  formatLoggedEntry,
   filter200ProjectsPerPage,
   openDetailedTimeReport,
   convertMinutesToHourMinutes,

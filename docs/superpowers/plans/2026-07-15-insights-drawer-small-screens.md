@@ -1,5 +1,7 @@
 # Insights Drawer (Small Screens) Implementation Plan
 
+> **Status (2026-09-24):** Shipped (5f169fe). Step checkboxes below were not kept up to date.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let users open the Home page's Insights panel on screens where it is hidden (`!lgAndUp`), via a contextual chart-icon toggle in the header dock that opens a right `VNavigationDrawer`.

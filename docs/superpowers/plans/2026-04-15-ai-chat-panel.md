@@ -1,5 +1,7 @@
 # AI Chat Panel Implementation Plan
 
+> **Status (2026-09-24):** Shipped. The Web Crypto identity and Vercel KV parts were later replaced by Neon Auth + Postgres (670f4c5, da15553), which is still WIP. Step checkboxes below were not kept up to date.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a secure AI-powered chat panel to Daybook that extracts time logs from natural language and images, backed by a Web Crypto identity system and Vercel KV for server-side credential storage.

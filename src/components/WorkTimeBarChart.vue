@@ -15,6 +15,7 @@ import { NO_TASK, useTaskBreakdown } from '@/composables/useTaskBreakdown';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
+import type { TooltipItem } from 'chart.js';
 import { chain } from 'lodash';
 
 // Theme integration
@@ -250,11 +251,11 @@ const chartOptions = computed(() => ({
     tooltip: {
       enabled: true,
       callbacks: {
-        title: (tooltipItems: any[]) => {
+        title: (tooltipItems: TooltipItem<'bar'>[]) => {
           const dataset = tooltipItems[0]?.dataset;
           return dataset?.label || '';
         },
-        label: (tooltipItem: any) => `${tooltipItem.parsed.y}h`,
+        label: (tooltipItem: TooltipItem<'bar'>) => `${tooltipItem.parsed.y}h`,
       },
     },
   },

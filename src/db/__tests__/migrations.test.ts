@@ -30,13 +30,13 @@ describe('migration 001: legacy localStorage -> unified collections', () => {
     await adapter.init();
     await runMigrations(adapter);
 
-    const logs = (await adapter.getAll('timeLogs')).sort((a: any, b: any) => a.id.localeCompare(b.id));
+    const logs = (await adapter.getAll('timeLogs')).sort((a, b) => a.id.localeCompare(b.id));
     expect(logs).toEqual([
       { id: 'l1', date: '2026-06-15', project: 'Alpha', task: 'Dev', duration: 2, type: 'log' },
       { id: 'l2', date: '2026-07-01', project: 'Beta', task: 'QA', type: 'plan' },
     ]);
 
-    const projects = (await adapter.getAll('projects')).map((p: any) => p.id).sort();
+    const projects = (await adapter.getAll('projects')).map((p) => p.id).sort();
     expect(projects).toEqual(['Alpha', 'Beta']);
 
     expect(await adapter.getAll('tasks')).toEqual([{ id: 'Alpha::Dev', project: 'Alpha', title: 'Dev' }]);

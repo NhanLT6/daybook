@@ -1,5 +1,7 @@
 # Events Page Table + Filters Implementation Plan
 
+> **Status (2026-09-24):** Shipped (891fd33, 608a7a9, 30ad169). Step checkboxes below were not kept up to date.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rework the Events page to a full-bleed layout matching the Tasks page, render events as a filterable table, and add type + time filters — all without touching the add/edit/delete flow.

@@ -26,6 +26,8 @@ const props = withDefaults(
   }>(),
   {
     singleDateMode: false,
+    // Undefined means "use the remembered view", so it stays the default
+    view: undefined,
   },
 );
 

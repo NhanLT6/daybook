@@ -10,7 +10,12 @@ import { getTaskEntries, saveTaskEntriesWithLoggedStatus } from './logHelpers/fi
 import { ProgressTracker } from './logHelpers/progressTracker.js';
 import { createOrOpenProject, goBackToAllProjects } from './logHelpers/projectHelper.js';
 import { addTimeSpentToTask, createTask } from './logHelpers/taskHelper.js';
-import { convertMinutesToHourMinutes, filter200ProjectsPerPage, loginXero } from './logHelpers/utils.js';
+import {
+  defaultBlankTasksToProject,
+  filter200ProjectsPerPage,
+  formatLoggedEntry,
+  loginXero,
+} from './logHelpers/utils.js';
 
 test.describe('Xero Work Logger', () => {
   // eslint-disable-next-line playwright/expect-expect
@@ -26,8 +31,7 @@ test.describe('Xero Work Logger', () => {
     const templateFilePath = path.join(config.templatePath, fileName);
 
     const taskEntries = getTaskEntries(templateFilePath);
-    // Xero has no task-less time entry — default a blank task to the entry's project name.
-    for (const entry of taskEntries) entry.task = entry.task || entry.project;
+    defaultBlankTasksToProject(taskEntries);
     console.log(`\n📊 Total records to log: ${taskEntries.length}\n`);
 
     // eslint-disable-next-line playwright/no-skipped-test
@@ -56,11 +60,7 @@ test.describe('Xero Work Logger', () => {
             // Plan entries are filtered out by getTaskEntries before reaching here
             await addTimeSpentToTask(page, entry.task, entry.duration!, entry.date, entry.description);
             entry.isLogged = true;
-            const label = progress.increment();
-            const duration = convertMinutesToHourMinutes(entry.duration!);
-            const date = dayjs(entry.date).format('YYYY-MM-DD');
-            const desc = entry.description ? ` · "${entry.description}"` : '';
-            console.log(`    ${label} ⏱  ${date} · ${duration}${desc}`);
+            console.log(`    ${progress.increment()} ⏱  ${formatLoggedEntry(entry)}`);
           }
         }
 

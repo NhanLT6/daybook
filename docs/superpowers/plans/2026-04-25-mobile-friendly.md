@@ -1,5 +1,7 @@
 # Mobile-Friendly UI Implementation Plan
 
+> **Status (2026-09-24):** Shipped. Step checkboxes below were not kept up to date.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix three mobile layout breakages — app bar nav overflow, overly complex chart, and clipped card-header buttons — without touching any desktop behavior.

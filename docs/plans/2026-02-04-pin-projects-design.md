@@ -1,5 +1,7 @@
 # Pin Projects Feature — Design
 
+> **Status (2026-09-24):** Shipped.
+
 **Date:** 2026-02-04
 
 ## Summary

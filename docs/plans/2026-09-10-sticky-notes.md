@@ -1,5 +1,7 @@
 # Sticky Notes — v1 Plan
 
+> **Status (2026-09-24):** Shipped (bb88e0c, 5cfb64e); see `docs/features/notes.md`. Only the AI items of the v2 backlog remain.
+
 ## Context
 
 User wants a lightweight notes feature (Windows Sticky Notes / OneNote feel) next to the Chat tab.
