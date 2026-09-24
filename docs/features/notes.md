@@ -201,8 +201,21 @@ than changing that store behavior, the notes code dismisses its own toast with `
   focus: the command applies, but the next keystrokes don't reach the editor (observed: text typed after
   clicking Checklist landed outside the list).
 
+## Chat reads notes (`searchNotes` tool)
+
+Chat answers questions from notes through a tool, not by sending every note with every message.
+- The tool is declared in `api/chat.ts` without `execute`: notes live only in the browser's IndexedDB, so the
+  server can't read them. `useAiChat`'s `onToolCall` runs `searchNotes()` (`src/common/searchNotes.ts`) and
+  `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls` sends the result back for the answer.
+  The request body (projects, tasks, date) lives on the transport so that follow-up request carries it too.
+- Notes are messy shorthand, so the search stays dumb on purpose: the query only ranks notes (match count,
+  then pinned, then most recent), and non-matching notes still fill the ~12k-char budget. The model matches
+  by meaning. Checklist lines become `[ ]` / `[x]` so it can tell open questions from resolved ones.
+- `extractLogs` never gets an output, so a turn that extracts logs never auto-resubmits.
+- Covered by `src/common/__tests__/searchNotes.test.ts` and `e2e/chatSearchNotes.spec.ts` (mocked stream).
+
 ## Backlog (not built)
 
-- AI (parked): note → time logs (send note text to the Chat tab, reuse `extractLogs`); AI tidy/summarize
-  note (new `/api` endpoint); notes as context for Catch-up/standup (`api/standup.ts`); Chat answering
-  questions from saved notes. Any AI output written into a note must go through the same sanitizer.
+- Catch-up/standup reusing `searchNotes` for open (`[ ]`) checklist items.
+- Dropped after review (2026-09-24): select-text / right-click AI actions, AI tidy/summarize. Not worth the
+  clicks for short reminder notes. Any AI output written into a note must go through the same sanitizer.

@@ -28,3 +28,25 @@ export const extractLogsInputSchema = z.object({
 
 export type ExtractedLog = z.infer<typeof extractedLogSchema>;
 export type ExtractLogsInput = z.infer<typeof extractLogsInputSchema>;
+
+/**
+ * `searchNotes` runs in the browser (notes live in IndexedDB, the server can't read them).
+ * The query only ranks notes; the model reads the messy text itself, so matching stays loose.
+ */
+export const searchNotesInputSchema = z.object({
+  query: z
+    .string()
+    .optional()
+    .describe('A few keywords from the question, used only to rank notes. Omit to get the most recent notes.'),
+});
+
+export interface SearchNotesOutput {
+  totalNotes: number;
+  notes: Array<{
+    updated: string; // YYYY-MM-DD
+    pinned: boolean;
+    text: string; // plain text; checklist lines start with "[ ]" (open) or "[x]" (done)
+  }>;
+}
+
+export type SearchNotesInput = z.infer<typeof searchNotesInputSchema>;

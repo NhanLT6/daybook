@@ -5,6 +5,8 @@ import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { FileUIPart, TextUIPart } from 'ai';
 
+import { getToolName, isToolUIPart } from 'ai';
+
 import AiLogCard from './AiLogCard.vue';
 
 const props = defineProps<{
@@ -21,11 +23,22 @@ const emit = defineEmits<{
   retry: [];
 }>();
 
-const textPart = computed(() => props.message.parts.find((p): p is TextUIPart => p.type === 'text'));
+// A reply that used a tool has text in several steps (before and after the tool call)
+const textParts = computed(() => props.message.parts.filter((p): p is TextUIPart => p.type === 'text'));
 
 const filePart = computed(() => props.message.parts.find((p): p is FileUIPart => p.type === 'file'));
 
-const displayText = computed(() => textPart.value?.text ?? '');
+const displayText = computed(() =>
+  textParts.value
+    .map((p) => p.text.trim())
+    .filter(Boolean)
+    .join('\n\n'),
+);
+
+// Shows the user the answer came from their notes, not from the model's guess
+const readNotes = computed(() =>
+  props.message.parts.some((p) => isToolUIPart(p) && getToolName(p) === 'searchNotes'),
+);
 
 const tool = computed(() => props.message.metadata?.tool);
 const extractedLogs = computed(() => props.message.metadata?.extractedLogs);
@@ -123,6 +136,12 @@ const copyMessage = () => {
       :style="{ maxWidth: '88%' }"
     >
       <VCardText class="pa-3">
+        <!-- searchNotes marker -->
+        <div v-if="readNotes" class="d-flex align-center ga-1 mb-1 text-caption text-medium-emphasis">
+          <VIcon icon="mdi-note-text-outline" size="14" />
+          Checked your notes
+        </div>
+
         <!-- Plain text (conversational or streaming) — hidden for catchUp (text is AI context only) -->
         <p
           v-if="displayText && tool !== 'catchUp'"

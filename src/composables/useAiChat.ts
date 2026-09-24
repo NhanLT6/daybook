@@ -8,9 +8,13 @@ import type { Task } from '@/interfaces/Task';
 import type { FileUIPart } from 'ai';
 
 import { Chat } from '@ai-sdk/vue';
-import { DefaultChatTransport, getToolName, isToolUIPart } from 'ai';
+import { DefaultChatTransport, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
+
+import { searchNotes } from '@/common/searchNotes';
+import { searchNotesInputSchema } from '@/interfaces/aiTools';
 
 import { authHeaders } from './useAuth';
+import { useNotes } from './useNotes';
 
 // ── Image helper ──────────────────────────────────────────────────────────
 
@@ -52,10 +56,39 @@ export function useAiChat() {
   // App-specific metadata keyed by message id — SDK messages carry no app state
   const metadataMap = ref(new Map<string, DaybookMessageMetadata>());
 
+  // Kept on the transport (not per sendMessage) so the automatic follow-up request
+  // after a client-side tool result carries the same context.
+  let requestBody: Record<string, unknown> = {};
+
   const chat = new Chat<DaybookUIMessage>({
     transport: new DefaultChatTransport<DaybookUIMessage>({
       headers: async () => (await authHeaders()) ?? {},
+      body: () => requestBody,
     }),
+    // searchNotes runs here because notes only exist in this browser's IndexedDB
+    onToolCall: async ({ toolCall }) => {
+      if (toolCall.dynamic || toolCall.toolName !== 'searchNotes') return;
+      const { notes, ready } = useNotes();
+      try {
+        await ready;
+        // Not awaited: awaiting addToolOutput inside onToolCall can deadlock the chat job queue
+        void chat.addToolOutput({
+          tool: 'searchNotes',
+          toolCallId: toolCall.toolCallId,
+          output: searchNotes(notes.value, searchNotesInputSchema.parse(toolCall.input)),
+        });
+      } catch {
+        void chat.addToolOutput({
+          tool: 'searchNotes',
+          toolCallId: toolCall.toolCallId,
+          state: 'output-error',
+          errorText: 'Could not read notes',
+        });
+      }
+    },
+    // Send the searchNotes result back so the model can answer. extractLogs never gets an
+    // output, so a turn that extracted logs does not resubmit.
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onFinish: ({ messages: finished }) => {
       const last = finished[finished.length - 1];
       if (!last || last.role !== 'assistant') return;
@@ -110,19 +143,16 @@ export function useAiChat() {
       });
     }
 
-    await chat.sendMessage(
-      {
-        ...(text.trim() ? { text } : {}),
-        ...(fileParts.length > 0 ? { files: fileParts } : {}),
-      } as Parameters<typeof chat.sendMessage>[0],
-      {
-        body: {
-          projects: projects.map((p) => p.title),
-          tasks: tasks.map((t) => ({ project: t.project, title: t.title })),
-          currentDate: new Date().toISOString().split('T')[0],
-        },
-      },
-    );
+    requestBody = {
+      projects: projects.map((p) => p.title),
+      tasks: tasks.map((t) => ({ project: t.project, title: t.title })),
+      currentDate: new Date().toISOString().split('T')[0],
+    };
+
+    await chat.sendMessage({
+      ...(text.trim() ? { text } : {}),
+      ...(fileParts.length > 0 ? { files: fileParts } : {}),
+    } as Parameters<typeof chat.sendMessage>[0]);
   };
 
   const markSaved = (id: string) => {

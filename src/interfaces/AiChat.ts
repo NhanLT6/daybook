@@ -1,4 +1,4 @@
-import type { ExtractLogsInput, ExtractedLog } from './aiTools';
+import type { ExtractLogsInput, ExtractedLog, SearchNotesInput, SearchNotesOutput } from './aiTools';
 import type { CatchUpRenderItem } from './CatchUp';
 import type { UIDataTypes, UIMessage } from 'ai';
 
@@ -14,11 +14,12 @@ export interface DaybookMessageMetadata {
   catchUpItems?: CatchUpRenderItem[];
 }
 
-// Tools the client knows about — types the `tool-extractLogs` message parts so
-// `part.input` is `ExtractLogsInput` instead of `unknown`. Must be a `type`
+// Tools the client knows about — types the `tool-<name>` message parts so
+// `part.input` is typed instead of `unknown`. Must be a `type`
 // (not `interface`) to satisfy the SDK's `UITools = Record<string, UITool>`.
 export type DaybookUITools = {
   extractLogs: { input: ExtractLogsInput; output: never };
+  searchNotes: { input: SearchNotesInput; output: SearchNotesOutput };
 };
 
 // Typed UIMessage used throughout this app

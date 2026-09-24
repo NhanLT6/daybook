@@ -3,7 +3,7 @@ import type { UIMessage } from 'ai';
 
 import { convertToModelMessages, streamText, tool } from 'ai';
 
-import { extractLogsInputSchema } from '../src/interfaces/aiTools.js';
+import { extractLogsInputSchema, searchNotesInputSchema } from '../src/interfaces/aiTools.js';
 import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js';
 import { isAiEnabled, requireAiModel } from './_lib/ai.js';
 import { getSettings } from './_lib/settingsRepo.js';
@@ -19,6 +19,13 @@ const extractLogsTool = tool({
   description:
     "Extract one or more time log entries from the user's message. Call this whenever the user describes work they did (via text or screenshot).",
   inputSchema: extractLogsInputSchema,
+});
+
+// No execute: notes live in the user's browser, so the client runs the search and sends the result back
+const searchNotesTool = tool({
+  description:
+    "Read the user's sticky notes. Call this when the answer may be in their notes: reminders, open questions, what they noted about a ticket or person.",
+  inputSchema: searchNotesInputSchema,
 });
 
 function buildSystemPrompt(
@@ -52,7 +59,15 @@ When the user describes work they did (via text or screenshot), call the extract
 - description is optional — use it for meaningful detail only.
 - Do NOT include a JSON block in your text response. Use the extractLogs tool instead.
 
-If you cannot find any time log data in the message, reply conversationally and ask for clarification. Do NOT call extractLogs in that case.`;
+If you cannot find any time log data in the message, reply conversationally and ask for clarification. Do NOT call extractLogs in that case.
+
+The user also keeps quick sticky notes: reminders, questions for the daily meeting, things to follow up.
+- When a question may be answered by those notes, call searchNotes instead of guessing or saying you don't know.
+- Notes are messy shorthand with typos and abbreviations. Read them generously and match by meaning, not exact words.
+- Checklist lines start with "[ ]" (still open) or "[x]" (done). An open line or a line ending in "?" is usually an open question or to-do.
+- Quote or closely paraphrase the note you rely on, with its date. If a note is ambiguous, say what it says rather than inventing details.
+- If nothing relevant is in the notes, say so plainly.
+- Do not call extractLogs from note content unless the user asks to log it.`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -79,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       model: requireAiModel(aiConfig),
       system: buildSystemPrompt(body.projects, body.tasks, body.currentDate),
       messages: await convertToModelMessages(body.messages),
-      tools: { extractLogs: extractLogsTool },
+      tools: { extractLogs: extractLogsTool, searchNotes: searchNotesTool },
     });
 
     // Stream to Node.js ServerResponse using the AI SDK helper
