@@ -1,7 +1,7 @@
 // Applies db/migrations/*.sql to the Neon database in order, once each.
 //
 // Usage: node scripts/db-migrate.mjs [--status]
-// Reads NEON_CONNECTION_STRING from .env / .env.local / .env.development.local.
+// Reads DATABASE_URL (or the older NEON_CONNECTION_STRING) from .env / .env.local / .env.development.local.
 
 import { Client } from '@neondatabase/serverless';
 import dotenv from 'dotenv';
@@ -14,9 +14,9 @@ for (const f of ['.env', '.env.local', '.env.development.local']) {
   dotenv.config({ path: resolve(root, f) });
 }
 
-const url = process.env.NEON_CONNECTION_STRING;
+const url = process.env.DATABASE_URL || process.env.NEON_CONNECTION_STRING;
 if (!url) {
-  console.error('NEON_CONNECTION_STRING is not set (checked .env, .env.local, .env.development.local)');
+  console.error('DATABASE_URL (or NEON_CONNECTION_STRING) is not set (checked .env, .env.local, .env.development.local)');
   process.exit(1);
 }
 

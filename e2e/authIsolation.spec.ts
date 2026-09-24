@@ -22,7 +22,7 @@ const userB = { email: `daybook-b-${stamp}@example.com`, password: 'test-passwor
 const KEY_A = `AIza-fake-key-${stamp}-A`;
 
 async function db<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-  const client = new Client(process.env.NEON_CONNECTION_STRING);
+  const client = new Client(process.env.DATABASE_URL || process.env.NEON_CONNECTION_STRING);
   await client.connect();
   try {
     return (await client.query(sql, params)).rows as T[];

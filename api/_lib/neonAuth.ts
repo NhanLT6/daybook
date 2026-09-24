@@ -45,7 +45,9 @@ export async function requireUser(headers: { get(name: string): string | null })
 
   let payload
   try {
-    ;({ payload } = await jwtVerify(token, getJwks()))
+    // Neon's managed Better Auth issues tokens with the auth URL's origin as `iss`;
+    // pinning it rejects tokens signed for any other issuer.
+    ;({ payload } = await jwtVerify(token, getJwks(), { issuer: new URL(neonAuthUrl()).origin }))
   } catch {
     // Covers a bad signature, an expired token, and an unknown key alike — the
     // caller gets the same answer either way so nothing is leaked about which.

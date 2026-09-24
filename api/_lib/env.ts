@@ -21,5 +21,9 @@ export function requireEnv(name: string): string {
  */
 export const neonAuthUrl = () => requireEnv('VITE_NEON_AUTH_URL').replace(/\/+$/, '')
 
-/** Owner-level Postgres connection. Server only — never expose to the client. */
-export const neonConnectionString = () => requireEnv('NEON_CONNECTION_STRING')
+/**
+ * Owner-level Postgres connection. Server only — never expose to the client.
+ * DATABASE_URL is what the Neon-on-Vercel integration injects; NEON_CONNECTION_STRING
+ * is kept as a fallback so existing local .env files keep working.
+ */
+export const neonConnectionString = () => process.env.DATABASE_URL || requireEnv('NEON_CONNECTION_STRING')
