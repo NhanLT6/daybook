@@ -5,8 +5,9 @@
 A lightweight, Windows-Sticky-Notes-style scratchpad next to the Chat tab: day-to-day work memory for
 things like reminders about the ticket in progress, questions to raise in daily standup, or whether a
 workaround is still needed. Notes render as flat cards in a grid (not a list) under a toolbar (note count
-left, search + `+` right); pinned notes sort first in the same grid. With no notes, an
-empty-state block mirrors LogList's "No data". Clicking a card expands it to fill the whole Notes tab for
+left, search + `+` right); pinned notes sort first in the same grid. With no notes, the toolbar is hidden and
+an empty-state card fills the tab like the Chat panel, with a "New note" button (the note editor grows out of
+it). Clicking a card expands it to fill the whole Notes tab for
 editing; clicking a checklist checkbox on a card ticks it in place.
 
 ## Data Model
@@ -63,7 +64,7 @@ there are no notes.
 - Case-insensitive substring match on the note's **visible text**, not its HTML: each note is parsed once per
   notes change with `DOMParser` (inert document, safe on raw note HTML) and `body.textContent` is cached in a
   `computed` Map. Searching "strong" doesn't match every bold note.
-- Count shows `N of M notes` while filtering; no match shows "No matching notes" in the empty-state block.
+- Count shows `N of M notes` while filtering; no match shows a centered "No matching notes" message.
 - **Drag is disabled while a query is active** (drag library re-initialized with `disabled`): `reorder(ids)`
   assigns `order = index` over the ids it gets, so reordering a filtered subset would collide with hidden
   notes' orders.

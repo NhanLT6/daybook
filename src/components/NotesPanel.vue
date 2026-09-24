@@ -36,7 +36,10 @@ const parser = new DOMParser();
 const plainTexts = computed(
   () =>
     new Map(
-      notes.value.map((n) => [n.id, (parser.parseFromString(n.content, 'text/html').body.textContent ?? '').toLowerCase()]),
+      notes.value.map((n) => [
+        n.id,
+        (parser.parseFromString(n.content, 'text/html').body.textContent ?? '').toLowerCase(),
+      ]),
     ),
 );
 
@@ -477,16 +480,16 @@ onBeforeUnmount(() => {
     <!-- Toolbar + grid. While a note is open they fade out and go inert, so nothing shows through the
          editor card's gutter or is reachable by Tab behind it. -->
     <div class="notes-body" :class="{ 'notes-body--behind': !!editing }" :inert="!!editing">
-      <!-- Toolbar: note count left, actions right -->
-      <VToolbar density="compact" class="notes-toolbar">
-        <span v-if="notes.length" class="text-caption text-medium-emphasis">
+      <!-- Toolbar: note count left, actions right. Hidden with no notes: the empty state carries the add action. -->
+      <VToolbar v-if="notes.length" density="compact" class="notes-toolbar">
+        <span class="text-caption text-medium-emphasis">
           <template v-if="searchQuery">{{ filteredNotes.length }} of </template>
           {{ notes.length }} {{ notes.length === 1 ? 'note' : 'notes' }}
         </span>
         <VSpacer />
         <div class="d-flex ga-2 align-center">
           <!-- Search: magnify button that expands into a field (button hides while open) -->
-          <div v-if="notes.length" class="notes-search" :class="{ 'notes-search--open': searchExpanded }">
+          <div class="notes-search" :class="{ 'notes-search--open': searchExpanded }">
             <VIconBtn
               v-if="!searchExpanded"
               icon="mdi-magnify"
@@ -537,15 +540,37 @@ onBeforeUnmount(() => {
       </VToolbar>
 
       <!-- Scrollable card grid (pinned notes first) -->
-      <div class="notes-scroll">
-        <!-- Empty state: same block as LogList's "No data" -->
+      <div class="notes-scroll" :class="{ 'notes-scroll--empty': !notes.length }">
         <VFadeTransition leave-absolute>
-          <VCard v-if="!filteredNotes.length" class="notes-empty">
-            <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
-              <VIcon :icon="notes.length ? 'mdi-magnify-close' : 'mdi-note-text-outline'" class="text-disabled" />
-              <div class="text-subtitle-1 text-disabled">{{ notes.length ? 'No matching notes' : 'No notes yet' }}</div>
+          <!-- No notes: fills the tab like the Chat panel, with the add action right there -->
+          <VCard v-if="!notes.length" class="notes-empty">
+            <div class="d-flex flex-column align-center justify-center text-center pa-6 h-100">
+              <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
+              <p class="text-body-2 text-medium-emphasis mb-1">Jot down what you need to remember today</p>
+              <p class="text-caption text-disabled mb-5">e.g. "Ask Bob about the T-123 deploy in standup"</p>
+              <VBtn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addNote">New note</VBtn>
+              <VBtn
+                v-if="isDev"
+                size="small"
+                variant="text"
+                prepend-icon="mdi-flask-outline"
+                class="mt-2"
+                aria-label="Add 20 sample notes"
+                @click="addSampleNotes"
+              >
+                Sample notes
+              </VBtn>
             </div>
           </VCard>
+
+          <!-- Search with no hits -->
+          <div
+            v-else-if="!filteredNotes.length"
+            class="notes-no-match d-flex flex-column align-center text-center pt-10"
+          >
+            <VIcon icon="mdi-magnify-close" size="36" class="mb-3 text-disabled" />
+            <p class="text-body-2 text-medium-emphasis">No matching notes</p>
+          </div>
         </VFadeTransition>
 
         <div ref="gridEl" class="notes-grid" @pointerdown.capture="onGridPointerDown">
@@ -683,6 +708,19 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   padding: 12px 12px 12px;
+}
+
+/* No notes: same 8px inset as the Chat panel's card, which the empty state mirrors */
+.notes-scroll--empty {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.notes-empty {
+  flex: 1;
+  min-height: 0;
 }
 
 .notes-grid {
