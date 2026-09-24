@@ -179,8 +179,8 @@ const navItems = [
 
           <!-- Icon actions grouped with their own breathing room: text buttons get visual space from
                their padding, bare icons don't, so a shared 2px gap made these look cramped -->
-          <div class="dock-icons">
-            <VIconBtn v-if="!smAndDown" :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
+          <div v-if="!smAndDown" class="dock-icons">
+            <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
             <!-- Insights drawer toggle — Home only, when the inline panel is hidden -->
             <VIconBtn
@@ -219,8 +219,15 @@ const navItems = [
                 <VListItemTitle>{{ item.text }}</VListItemTitle>
               </VListItem>
 
-              <!-- Theme and account live here on small screens so the dock has room for the notification pill -->
+              <!-- Insights, theme and account live here on small screens so the dock has room for the notification pill -->
               <VDivider class="my-1" />
+              <VListItem
+                v-if="route.path === '/' && !insightsInline"
+                rounded="lg"
+                prepend-icon="mdi-chart-box-outline"
+                title="Insights"
+                @click="insightsDrawerOpen = !insightsDrawerOpen"
+              />
               <VListItem
                 rounded="lg"
                 :prepend-icon="themeIcon"
