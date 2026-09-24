@@ -66,6 +66,13 @@ const vuetify = createVuetify({
           container: '#F5F5F5', // grey-lighten-4
           surface: '#FFFFFF',
           background: '#EBEEF1',
+          // Sticky note pastels
+          'note-yellow': '#FFF3B0',
+          'note-green': '#D7F2D0',
+          'note-blue': '#D3E6FB',
+          'note-pink': '#FADBE4',
+          'note-purple': '#E6DCF7',
+          'note-orange': '#FFE0C2',
         },
       },
       dark: {
@@ -77,6 +84,13 @@ const vuetify = createVuetify({
           container: '#424242', // grey-darken-3
           surface: '#2D2D2D',
           background: '#1E1E1E',
+          // Sticky note tints: muted so light text stays readable
+          'note-yellow': '#4D4523',
+          'note-green': '#2F4630',
+          'note-blue': '#2A3D52',
+          'note-pink': '#4F3039',
+          'note-purple': '#3C3350',
+          'note-orange': '#523A26',
         },
       },
     },

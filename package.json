@@ -22,6 +22,7 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.63",
     "@ai-sdk/vue": "^3.0.168",
+    "@formkit/drag-and-drop": "^0.6.1",
     "@neondatabase/neon-js": "^0.6.2-beta",
     "@neondatabase/serverless": "^1.1.0",
     "@popperjs/core": "^2.11.8",

@@ -16,7 +16,7 @@
 
 ## Key Dependencies
 - **Vue Ecosystem**: vue, vue-router, pinia
-- **UI/UX**: vuetify, @vueuse/core, v-calendar, vue-sonner
+- **UI/UX**: vuetify, @vueuse/core, v-calendar, vue-sonner, @formkit/drag-and-drop (notes drag, mouse + touch)
 - **Charts**: chart.js, chartjs-plugin-datalabels
 - **Data Processing**: papaparse, file-saver, dayjs, lodash
 - **Forms**: vee-validate, yup
@@ -49,7 +49,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Charts**: Visual time tracking with Chart.js
 - **Dark Theme**: Toggle in app toolbar, persisted to localStorage
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
-- **Sticky Notes**: Card-based rich-text notes tab with drag reorder / drag-to-trash (see `docs/features/notes.md`)
+- **Sticky Notes**: Card-based rich-text notes tab with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch) (see `docs/features/notes.md`)
 
 ## Feature Documentation
 Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.

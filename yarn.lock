@@ -1025,6 +1025,11 @@
   resolved "https://registry.yarnpkg.com/@floating-ui/utils/-/utils-0.2.12.tgz#afefe785949f16ac4cdd1e695935a321572dd56a"
   integrity sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==
 
+"@formkit/drag-and-drop@^0.6.1":
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/@formkit/drag-and-drop/-/drag-and-drop-0.6.1.tgz#8b46f033cef9ef704626ba9076ede686a1ce78d6"
+  integrity sha512-DNKoPqdg9RW7k0zZlF2FH636Cc16V3tuGDVKWNHpSXr3amF4nmQZfieoLNVRxqWxXVFJq2DY+vf8SCD10JyjAA==
+
 "@hcaptcha/loader@^2.3.0":
   version "2.4.2"
   resolved "https://registry.yarnpkg.com/@hcaptcha/loader/-/loader-2.4.2.tgz#684decfdffe1d3f57017e24ee77ae522f90eaed4"

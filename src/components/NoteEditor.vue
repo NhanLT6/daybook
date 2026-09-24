@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { NOTE_COLORS, type NoteColor } from '@/interfaces/Note';
+
 import dayjs from 'dayjs';
 
 import { TaskItem, TaskList } from '@tiptap/extension-list';
@@ -9,12 +11,14 @@ import StarterKit from '@tiptap/starter-kit';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 
 // content is the INITIAL value only — never watched back into the editor (would reset cursor/selection)
-const props = defineProps<{ content: string; updatedAt?: number }>();
+const props = defineProps<{ content: string; updatedAt?: number; pinned?: boolean; color?: NoteColor }>();
 
 const emit = defineEmits<{
   update: [html: string, isEmpty: boolean];
   back: [];
   delete: [];
+  togglePin: [];
+  color: [color: NoteColor | undefined];
 }>();
 
 const editor = useEditor({
@@ -40,6 +44,41 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
       <VBtn icon="mdi-arrow-left" variant="text" size="small" aria-label="Back to notes" @click="emit('back')" />
       <VSpacer />
       <span v-if="updatedAtLabel" class="text-caption text-medium-emphasis mr-1">{{ updatedAtLabel }}</span>
+      <VBtn
+        :icon="pinned ? 'mdi-pin' : 'mdi-pin-outline'"
+        variant="text"
+        size="small"
+        :aria-label="pinned ? 'Unpin note' : 'Pin note'"
+        :title="pinned ? 'Unpin' : 'Pin'"
+        @click="emit('togglePin')"
+      />
+      <!-- Color: default surface + fixed pastel set (theme colors, so dark mode has its own tints) -->
+      <VMenu location="bottom end" offset="4">
+        <template #activator="{ props: menuProps }">
+          <VBtn
+            v-bind="menuProps"
+            icon="mdi-palette-outline"
+            variant="text"
+            size="small"
+            aria-label="Note color"
+            title="Color"
+          />
+        </template>
+        <VCard elevation="6" class="d-flex ga-2 pa-2">
+          <button
+            v-for="c in [undefined, ...NOTE_COLORS]"
+            :key="c ?? 'default'"
+            type="button"
+            class="note-swatch"
+            :class="[c ? `bg-note-${c}` : 'bg-surface', { 'note-swatch--active': c === color }]"
+            :aria-label="c ? `Color ${c}` : 'Default color'"
+            :title="c ?? 'default'"
+            @click="emit('color', c)"
+          >
+            <VIcon v-if="c === color" icon="mdi-check" size="16" />
+          </button>
+        </VCard>
+      </VMenu>
       <VBtn icon="mdi-delete-outline" variant="text" size="small" aria-label="Delete note" @click="emit('delete')" />
     </div>
 
@@ -114,6 +153,21 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+.note-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  cursor: pointer;
+}
+
+.note-swatch--active {
+  border: 2px solid rgb(var(--v-theme-primary));
 }
 
 /* Full height so clicking empty space below the text still focuses the editor */

@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 /**
  * Sticky Notes (Steps 8 & 10 of docs/plans/2026-09-10-sticky-notes.md): create/persist,
  * empty-note discard, checklist formatting, delete+undo, XSS-safe rendering, and
- * drag & drop (reorder + trash).
+ * drag & drop (reorder + trash), search, pin + color, ticking checklist items from the card.
  */
 
 async function openNotesTab(page: Page) {
@@ -200,4 +200,85 @@ test('drags a note onto the trash and undo restores it', async ({ page }) => {
 
   await expect(page.locator('.note-card')).toHaveCount(1);
   await expect(page.locator('.note-card .note-preview')).toContainText('Drag me to the trash');
+});
+
+test('search filters notes by visible text and clearing restores all', async ({ page }) => {
+  await page.goto('/');
+  await openNotesTab(page);
+
+  for (const text of ['Ask Bob about T-123', 'Standup: login bug workaround']) {
+    await openNewNoteEditor(page);
+    await page.keyboard.type(text);
+    await page.locator('[aria-label="Back to notes"]').click();
+  }
+  await expect(page.locator('.note-card')).toHaveCount(2);
+
+  await page.locator('[aria-label="Search notes"]').click();
+  const search = page.locator('.notes-search__field input');
+  await search.fill('t-123'); // case-insensitive
+  await expect(page.locator('.note-card')).toHaveCount(1);
+  await expect(page.locator('.note-card .note-preview')).toContainText('Ask Bob about T-123');
+  await expect(page.locator('.notes-toolbar')).toContainText('1 of 2 notes');
+  // Reordering a filtered subset is undefined, so drag is off while searching
+  await expect(page.locator('.note-card')).toHaveAttribute('draggable', 'false');
+
+  await search.fill('nothing matches');
+  await expect(page.locator('.note-card')).toHaveCount(0);
+  await expect(page.locator('.notes-empty')).toContainText('No matching notes');
+
+  await search.fill('');
+  await expect(page.locator('.note-card')).toHaveCount(2);
+});
+
+test('pins and colors a note; both survive a reload', async ({ page }) => {
+  await page.goto('/');
+  await openNotesTab(page);
+
+  for (const text of ['Plain note', 'Pin me']) {
+    await openNewNoteEditor(page);
+    await page.keyboard.type(text);
+    await page.locator('[aria-label="Back to notes"]').click();
+  }
+
+  await page.locator('.note-card', { hasText: 'Plain note' }).click();
+  await page.locator('[aria-label="Pin note"]').click();
+  await page.locator('[aria-label="Note color"]').click();
+  await page.locator('[aria-label="Color yellow"]').click();
+  await page.locator('[aria-label="Back to notes"]').click();
+
+  // Pinned notes come first (Plain note was created first, so it started second)
+  const first = page.locator('.note-card').first();
+  await expect(first).toContainText('Plain note');
+  await expect(first.locator('.note-pin')).toBeVisible();
+  await expect(first).toHaveClass(/bg-note-yellow/);
+
+  await page.reload();
+  await openNotesTab(page);
+  const reloadedFirst = page.locator('.note-card').first();
+  await expect(reloadedFirst).toContainText('Plain note');
+  await expect(reloadedFirst).toHaveClass(/bg-note-yellow/);
+});
+
+test('ticks a checklist item straight from the card without opening the editor', async ({ page }) => {
+  await page.goto('/');
+  await openNotesTab(page);
+
+  await openNewNoteEditor(page);
+  await page.locator('[aria-label="Checklist"]').click();
+  await page.keyboard.type('Ask in daily');
+  await page.locator('[aria-label="Back to notes"]').click();
+
+  const item = page.locator('.note-card li[data-type="taskItem"]');
+  await expect(item).toHaveAttribute('data-checked', 'false');
+
+  // The preview is inert, so click by position on the checkbox's label box
+  const box = await page.locator('.note-card li[data-type="taskItem"] > label').boundingBox();
+  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+
+  await expect(page.locator('.notes-editor-overlay')).toHaveCount(0);
+  await expect(item).toHaveAttribute('data-checked', 'true');
+
+  await page.reload();
+  await openNotesTab(page);
+  await expect(page.locator('.note-card li[data-type="taskItem"]')).toHaveAttribute('data-checked', 'true');
 });
