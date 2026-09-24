@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue'
 
+import { useEventListener } from '@vueuse/core'
+
 // createAuthClient returns the Better Auth client bare; createInternalNeonAuth wraps
 // it as { adapter, getJWTToken } — and getJWTToken is what our own API needs for the
 // Authorization header, so that is the one to build on.
@@ -62,9 +64,37 @@ async function loadSession(): Promise<void> {
   }
 }
 
+/**
+ * Pick up a session the first load missed. Reloading right after sign-up can
+ * read "no session" even though a later load finds it, and nothing asked again,
+ * so the app stayed signed out. Only ever upgrades signed-out → signed-in: a
+ * failed or empty re-check never signs anyone out.
+ */
+async function recheckSession(): Promise<void> {
+  if (!client || user.value) return
+  try {
+    const result = await client.adapter.getSession()
+    const found = toUser((result as { data?: { user?: unknown } })?.data?.user)
+    if (found) user.value = found
+  } catch {
+    // Still signed out; the next focus tries again.
+  }
+}
+
+const RECHECK_DELAY_MS = 2000
+
 // Resolve the initial session once, at module load, so callers can await a
-// settled auth state instead of racing it.
-const ready: Promise<void> = loadSession()
+// settled auth state instead of racing it. A signed-out start gets one delayed
+// re-check, and returning to the tab re-checks too (Better Auth's own session
+// store refetches on focus for the same reason).
+const ready: Promise<void> = loadSession().then(() => {
+  if (client && !user.value) setTimeout(() => void recheckSession(), RECHECK_DELAY_MS)
+})
+if (client) {
+  useEventListener(document, 'visibilitychange', () => {
+    if (document.visibilityState === 'visible') void recheckSession()
+  })
+}
 
 async function run<T>(fallbackMessage: string, fn: () => Promise<T>): Promise<boolean> {
   if (!client) {
