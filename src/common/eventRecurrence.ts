@@ -29,9 +29,25 @@ const toDay = (date: string | Date): string => dayjs(date).format('YYYY-MM-DD');
 const toUtcDate = (date: string): Date => new Date(`${toDay(date)}T00:00:00Z`);
 const fromUtcDate = (date: Date): string => date.toISOString().slice(0, 10);
 
+type EventShape = Pick<AppEvent, 'date' | 'endDate' | 'dates'>;
+
+/** Days picked for one occurrence: the separate `dates` of a multiple-day event, else just its start. */
+export const eventDays = (event: Pick<AppEvent, 'date' | 'dates'>): string[] =>
+  event.dates && event.dates.length > 1 ? [...new Set(event.dates.map(toDay))].sort() : [toDay(event.date)];
+
 /** Number of extra days an occurrence spans (0 for single-day events). */
-export const spanDays = (event: Pick<AppEvent, 'date' | 'endDate'>): number =>
-  event.endDate ? Math.max(0, dayjs(event.endDate).diff(dayjs(event.date), 'day')) : 0;
+export const spanDays = (event: EventShape): number => {
+  const days = eventDays(event);
+  if (days.length > 1) return dayjs(days.at(-1)).diff(dayjs(days[0]), 'day');
+  return event.endDate ? Math.max(0, dayjs(event.endDate).diff(dayjs(event.date), 'day')) : 0;
+};
+
+// Monday-first order for listing weekdays (dayjs().day() puts Sunday at 0)
+const mondayFirst = (day: number) => (day + 6) % 7;
+
+// "a", "a and b", "a, b and c"
+const joinList = (items: string[]) =>
+  items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 
 /** Which week of the month a date falls in: 1–5 ("the 2nd Tuesday"). */
 export const nthWeekdayOfMonth = (date: string): number => Math.ceil(dayjs(date).date() / 7);
@@ -52,8 +68,9 @@ function toRRule(date: string, rule: RepeatRule): RRule {
       options.freq = RRule.DAILY;
       break;
     case 'week':
+      // Only the first picked day drives rrule; the rest follow it (see atOccurrence)
       options.freq = RRule.WEEKLY;
-      options.byweekday = (rule.weekdays?.length ? rule.weekdays : [start.day()]).map((d) => RRULE_WEEKDAYS[d]);
+      options.byweekday = [RRULE_WEEKDAYS[start.day()]];
       break;
     case 'month':
       options.freq = RRule.MONTHLY;
@@ -131,13 +148,24 @@ export function getNextOccurrence(event: AppEvent, from: string = dayjs().format
   return null;
 }
 
-/** Copy of the event moved to a given occurrence, so date formatters/renderers work unchanged. */
+/**
+ * Copy of the event moved to a given occurrence, so date formatters/renderers work unchanged.
+ * Ranges keep their length. Multiple-day events keep their spacing: monthly/yearly series keep each
+ * day's day-of-month (the 5th and 20th stay the 5th and 20th), shorter ones shift by whole days.
+ */
 export function atOccurrence(event: AppEvent, occurrence: string): AppEvent {
-  const span = spanDays(event);
+  const start = toDay(event.date);
+  const byMonth = event.repeat?.freq === 'month' || event.repeat?.freq === 'year';
+  const months = dayjs(occurrence).diff(dayjs(start), 'month');
+  const days = dayjs(occurrence).diff(dayjs(start), 'day');
+  const shift = (day: string) =>
+    (byMonth ? dayjs(day).add(months, 'month') : dayjs(day).add(days, 'day')).format('YYYY-MM-DD');
+
   return {
     ...event,
     date: occurrence,
-    ...(event.endDate ? { endDate: dayjs(occurrence).add(span, 'day').format('YYYY-MM-DD') } : {}),
+    ...(event.endDate ? { endDate: dayjs(occurrence).add(spanDays(event), 'day').format('YYYY-MM-DD') } : {}),
+    ...(event.dates && event.dates.length > 1 ? { dates: eventDays(event).map(shift) } : {}),
   };
 }
 
@@ -145,7 +173,7 @@ export function atOccurrence(event: AppEvent, occurrence: string): AppEvent {
  * Returns an error message when occurrences of a multi-day event would overlap each other
  * (e.g. a 10-day range repeating weekly), otherwise ''.
  */
-export function validateRepeat(event: Pick<AppEvent, 'date' | 'endDate'>, rule: RepeatRule): string {
+export function validateRepeat(event: EventShape, rule: RepeatRule): string {
   const span = spanDays(event);
   if (span === 0) return '';
 
@@ -157,25 +185,30 @@ export function validateRepeat(event: Pick<AppEvent, 'date' | 'endDate'>, rule: 
   return '';
 }
 
-/** Human-readable summary, e.g. "Every 2 weeks on Tuesday, until Dec 31". */
-export function describeRepeat(date: string, rule: RepeatRule): string {
-  const start = dayjs(date);
+/**
+ * Human-readable summary, e.g. "Every 2 weeks on Tuesday, until Dec 31". `days` are the picked days
+ * of the first occurrence (see eventDays) — or just its start date.
+ */
+export function describeRepeat(days: string | string[], rule: RepeatRule): string {
+  const picked = Array.isArray(days) ? days : [days];
+  const start = dayjs(picked[0]);
   const interval = Math.max(1, Math.floor(rule.interval || 1));
   const unit = FREQ_UNIT[rule.freq];
   let text = interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`;
 
   if (rule.freq === 'week') {
-    const days = [...(rule.weekdays?.length ? rule.weekdays : [start.day()])].sort((a, b) => a - b);
-    const isWorkweek = days.join() === '1,2,3,4,5';
+    const weekdays = [...new Set(picked.map((d) => dayjs(d).day()))].sort((a, b) => mondayFirst(a) - mondayFirst(b));
+    const isWorkweek = weekdays.join() === '1,2,3,4,5';
     if (isWorkweek && interval === 1) text = 'Every weekday (Mon–Fri)';
-    else text += ` on ${isWorkweek ? 'weekdays' : days.map((d) => WEEKDAY_NAMES[d]).join(', ')}`;
+    else text += ` on ${isWorkweek ? 'weekdays' : joinList(weekdays.map((d) => WEEKDAY_NAMES[d]))}`;
   } else if (rule.freq === 'month') {
     const weekday = WEEKDAY_NAMES[start.day()];
-    if (rule.monthlyBy === 'nthWeekday') text += ` on the ${ORDINALS[nthWeekdayOfMonth(date) - 1]} ${weekday}`;
+    if (rule.monthlyBy === 'nthWeekday') text += ` on the ${ORDINALS[nthWeekdayOfMonth(picked[0]) - 1]} ${weekday}`;
     else if (rule.monthlyBy === 'lastWeekday') text += ` on the last ${weekday}`;
+    else if (picked.length > 1) text += ` on days ${joinList(picked.map((d) => String(dayjs(d).date())))}`;
     else text += ` on day ${start.date()}`;
   } else if (rule.freq === 'year') {
-    text += ` on ${start.format('MMM D')}`;
+    text += ` on ${joinList(picked.map((d) => dayjs(d).format('MMM D')))}`;
   }
 
   if (rule.end && 'until' in rule.end) text += `, until ${dayjs(rule.end.until).format('MMM D, YYYY')}`;
@@ -184,19 +217,28 @@ export function describeRepeat(date: string, rule: RepeatRule): string {
   return text;
 }
 
-/** Quick picks for the Repeat dropdown, derived from the chosen start date. */
-export function repeatPresets(date: string): { title: string; value: RepeatRule }[] {
+/**
+ * Quick picks for the Repeat dropdown, derived from the chosen date(s). Only rules the event's shape
+ * allows are offered — e.g. no "every week" for a 12-day sprint, no "nth weekday" for several days.
+ */
+export function repeatPresets(event: EventShape): { title: string; value: RepeatRule }[] {
+  const days = eventDays(event);
+  const date = days[0];
+  const single = days.length === 1;
   const presets: RepeatRule[] = [
     { freq: 'day', interval: 1 },
     { freq: 'week', interval: 1 },
     { freq: 'week', interval: 2 },
-    { freq: 'week', interval: 1, weekdays: [1, 2, 3, 4, 5] },
-    { freq: 'month', interval: 1, monthlyBy: 'nthWeekday' },
-    ...(isLastWeekdayOfMonth(date) ? [{ freq: 'month', interval: 1, monthlyBy: 'lastWeekday' } as RepeatRule] : []),
+    ...(single ? [{ freq: 'month', interval: 1, monthlyBy: 'nthWeekday' } as RepeatRule] : []),
+    ...(single && isLastWeekdayOfMonth(date)
+      ? [{ freq: 'month', interval: 1, monthlyBy: 'lastWeekday' } as RepeatRule]
+      : []),
     { freq: 'month', interval: 1, monthlyBy: 'dayOfMonth' },
     { freq: 'year', interval: 1 },
   ];
-  return presets.map((value) => ({ title: describeRepeat(date, value), value }));
+  return presets
+    .filter((value) => !validateRepeat(event, value))
+    .map((value) => ({ title: describeRepeat(days, value), value }));
 }
 
 /** True when two rules produce the same series (ignores skip list), used to match a preset. */
@@ -205,7 +247,6 @@ export function isSameRule(a: RepeatRule, b: RepeatRule): boolean {
     JSON.stringify({
       freq: r.freq,
       interval: r.interval,
-      weekdays: r.freq === 'week' && r.weekdays?.length ? [...r.weekdays].sort() : undefined,
       monthlyBy: r.freq === 'month' ? (r.monthlyBy ?? 'dayOfMonth') : undefined,
       end: r.end,
     });

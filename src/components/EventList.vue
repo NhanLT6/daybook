@@ -10,7 +10,7 @@ import { omit } from 'lodash';
 
 import holidayImg from '@/assets/summer-holidays.png';
 import { formatEventDate } from '@/common/DateHelpers';
-import { atOccurrence, describeRepeat, getNextOccurrence } from '@/common/eventRecurrence';
+import { atOccurrence, describeRepeat, eventDays, getNextOccurrence } from '@/common/eventRecurrence';
 import { useEvents } from '@/composables/useEvents';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { nanoid } from 'nanoid';
@@ -89,6 +89,10 @@ const onSaveEvent = (event: AppEvent) => {
   isModalOpen.value = false;
 };
 
+// Days of one occurrence without times, e.g. "Oct 6" or "Oct 5 – Oct 16" — a skip removes all of them
+const occurrenceLabel = (event: AppEvent, occurrence: string) =>
+  formatEventDate({ ...atOccurrence(event, occurrence), startTime: undefined, endTime: undefined });
+
 // Leave the next occurrence out of a repeating series. Undo removes just that date from the
 // event's CURRENT skip list, so a second skip made before undoing the first isn't lost.
 const skipNextOccurrence = (event: AppEvent, next: string) => {
@@ -102,7 +106,7 @@ const skipNextOccurrence = (event: AppEvent, next: string) => {
 
   addEvent(withSkip(event, [...(event.repeat.skip ?? []), next]));
 
-  const id = notificationCenter.success(`Skipped ${dayjs(next).format('MMM D')}`, {
+  const id = notificationCenter.success(`Skipped ${occurrenceLabel(event, next)}`, {
     message: event.title,
     expandOnEnqueue: true, // actions only render in the expanded island
     actions: [
@@ -240,7 +244,7 @@ const deleteEvent = (event: AppEvent) => {
                 }}</span>
                 <div v-if="item.event.repeat" class="text-caption text-medium-emphasis text-no-wrap">
                   <VIcon icon="mdi-repeat" size="x-small" class="mr-1" />{{
-                    describeRepeat(item.event.date, item.event.repeat)
+                    describeRepeat(eventDays(item.event), item.event.repeat)
                   }}
                 </div>
               </div>
@@ -250,14 +254,14 @@ const deleteEvent = (event: AppEvent) => {
             <template #item.actions="{ item }">
               <div v-if="item.event.type === 'custom'" class="d-flex ga-1 justify-end">
                 <!-- Tooltip wraps the button: VIconBtn's default slot would replace its icon -->
-                <VTooltip v-if="item.event.repeat && item.next" :text="`Skip ${dayjs(item.next).format('MMM D')}`">
+                <VTooltip v-if="item.event.repeat && item.next" :text="`Skip ${occurrenceLabel(item.event, item.next)}`">
                   <template #activator="{ props }">
                     <VIconBtn
                       v-bind="props"
                       icon="mdi-calendar-remove-outline"
                       size="small"
                       variant="text"
-                      :aria-label="`Skip ${dayjs(item.next).format('MMM D')}`"
+                      :aria-label="`Skip ${occurrenceLabel(item.event, item.next)}`"
                       @click="skipNextOccurrence(item.event, item.next)"
                     />
                   </template>
@@ -272,7 +276,7 @@ const deleteEvent = (event: AppEvent) => {
     </div>
 
     <!-- Add / Edit Modal -->
-    <VDialog v-model="isModalOpen" max-width="400" persistent scrollable>
+    <VDialog v-model="isModalOpen" max-width="520" persistent scrollable>
       <EventForm :item="editingEvent" @save-event="onSaveEvent" @cancel-modify-event="onCancelModifyEvent" />
     </VDialog>
   </VCard>

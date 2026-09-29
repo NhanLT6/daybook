@@ -32,8 +32,13 @@ export const minutesToHourWithMinutes = (minutes: number): string => {
  * Range all-day:        "Jan 29 – Feb 1"
  * Single day timed:     "Jan 29, 09:00 – 11:30"
  * Multi-day timed:      "Jan 29, 09:00 – Feb 1, 17:00"
+ * Separate days:        "Jan 29, 30, Feb 2" (+ ", 09:00 – 11:30" when timed)
  */
 export function formatEventDate(event: AppEvent): string {
+  if (event.dates && event.dates.length > 1) {
+    return formatDayList(event.dates, event.startTime ? `${event.startTime} – ${event.endTime}` : undefined);
+  }
+
   const start = dayjs(event.date);
   const hasEnd = event.endDate && event.endDate !== event.date;
   const hasTime = event.startTime !== undefined;
@@ -45,4 +50,13 @@ export function formatEventDate(event: AppEvent): string {
   if (!hasEnd && hasTime) return `${start.format('MMM D')}, ${event.startTime} – ${event.endTime}`;
 
   return `${start.format('MMM D')}, ${event.startTime} – ${dayjs(event.endDate).format('MMM D')}, ${event.endTime}`;
+}
+
+// "Jan 29, 30, Feb 2" — the month is only repeated when it changes
+function formatDayList(dates: string[], time?: string): string {
+  const days = [...dates].sort();
+  const text = days
+    .map((d, i) => (i > 0 && dayjs(d).isSame(days[i - 1], 'month') ? dayjs(d).format('D') : dayjs(d).format('MMM D')))
+    .join(', ');
+  return time ? `${text}, ${time}` : text;
 }

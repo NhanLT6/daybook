@@ -9,7 +9,7 @@ import { useNow, useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { atOccurrence, getOccurrences } from '@/common/eventRecurrence';
+import { atOccurrence, eventDays, getOccurrences } from '@/common/eventRecurrence';
 import { storageKeys } from '@/common/storageKeys';
 import { useEvents } from '@/composables/useEvents';
 import type { AppEvent } from '@/interfaces/Event';
@@ -81,37 +81,31 @@ const selectedDateAttribute = computed(() => ({
 // matching a has-weekend-N class on the wrapper will apply
 const weekendClasses = computed(() => settingsStore.vCalendarWeekendDays.map((d) => `has-weekend-${d}`));
 
-// One dot per day of a single occurrence. Each colour has one meaning: accent (purple) = holiday,
-// info (blue) = your own event; green stays reserved for today/selected. Theme CSS vars (not hex,
-// which v-calendar ignores) keep dots in step with light/dark mode.
-const toDayAttributes = (event: AppEvent) => {
-  const startDate = dayjs(event.date);
-  const endDate = event.endDate ? dayjs(event.endDate) : startDate;
-  const dates: Date[] = [];
+// Each colour has one meaning: accent (purple) = holiday, info (blue) = your own event; green stays
+// reserved for today/selected. Theme CSS vars (not hex, which v-calendar ignores) follow light/dark.
+const markerColor = (event: AppEvent) => `rgb(var(--v-theme-${event.type === 'holiday' ? 'accent' : 'info'}))`;
 
-  // Generate array of dates from start to end (inclusive)
-  let currentDate = startDate;
-  while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
-    dates.push(currentDate.toDate());
-    currentDate = currentDate.add(1, 'day');
+// Calendar attributes for one occurrence. Single and separately picked days each get a dot; ranges
+// (e.g. back-to-back sprints) only mark their first and last day, so the calendar stays quiet.
+const toOccurrenceAttributes = (event: AppEvent) => {
+  const dot = { style: { backgroundColor: markerColor(event) } };
+  if (!event.endDate || event.endDate === event.date) {
+    return eventDays(event).map((day) => ({ dates: dayjs(day).toDate(), dot, popover: { label: event.title } }));
   }
 
-  // Create an attribute for each date in the range
-  return dates.map((date) => ({
-    dates: date,
-    dot: { style: { backgroundColor: `rgb(var(--v-theme-${event.type === 'holiday' ? 'accent' : 'info'}))` } },
-    popover: { label: event.title },
-  }));
+  return [
+    { dates: dayjs(event.date).toDate(), dot, popover: { label: `${event.title} starts` } },
+    { dates: dayjs(event.endDate).toDate(), dot, popover: { label: `${event.title} ends` } },
+  ];
 };
 
-// Event attributes — repeating events are expanded into their occurrences within the visible range,
-// and multi-day occurrences get a dot for each day in the range
+// Event attributes — repeating events are expanded into their occurrences within the visible range
 const eventAttributes = computed(() => {
   const { from, to } = visibleRange.value;
   return events.value
     .filter((event) => dayjs(event.date).isValid())
     .flatMap((event) =>
-      getOccurrences(event, from, to).flatMap((occurrence) => toDayAttributes(atOccurrence(event, occurrence))),
+      getOccurrences(event, from, to).flatMap((occurrence) => toOccurrenceAttributes(atOccurrence(event, occurrence))),
     );
 });
 
