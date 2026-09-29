@@ -18,7 +18,7 @@ import { authHeaders } from './useAuth';
 dayjs.extend(customParseFormat);
 
 const SETTINGS_WAIT_FALLBACK_MS = 5000;
-const CATCH_UP_VISIBLE_MS = 5000; // same as warning / release-note notifications
+const CATCH_UP_VISIBLE_MS = 5000; // same as warning notifications
 const HOURS_PER_DAY = 8; // for the "Xd Yh" effort metric
 const LONG_RUNNING_THRESHOLD_MINUTES = 15 * 60; // 15h accumulated effort
 const LOOKBACK_WORKING_DAYS = 15; // rolling window for accumulation (~3 weeks)

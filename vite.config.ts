@@ -1,5 +1,4 @@
 import { fileURLToPath, URL } from 'node:url';
-import { execSync } from 'child_process';
 
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
@@ -7,16 +6,8 @@ import vuetify from 'vite-plugin-vuetify';
 
 // import vueDevTools from 'vite-plugin-vue-devtools';
 
-// Get git version info for release tracking
-const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
-const commitMessage = execSync('git log -1 --pretty=%s').toString().trim();
-
 // https://vite.dev/config/
 export default defineConfig({
-  define: {
-    __APP_VERSION__: JSON.stringify(commitHash),
-    __COMMIT_MESSAGE__: JSON.stringify(commitMessage),
-  },
   plugins: [
     vue(),
     vuetify({
