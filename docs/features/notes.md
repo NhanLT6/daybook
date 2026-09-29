@@ -147,27 +147,23 @@ classes still animate the glide. ~4 KB gzip.
 - `.notes-trash` is a frosted round bin (blurred surface, soft shadow) with a custom inline SVG whose lid is a
   separate `<g>` hinged on its left end. Shown (`VSlideYReverseTransition`) while dragging or while
   `trashHold` is set; the lid opens on hover (`trashHover`) and while something falls in (`trashEating`).
-- **"Sucked in" (genie) effect** — `suckIntoTrash(source, from)`: a copy of the note is sliced into ~3px
-  horizontal strips (12–80), each strip a `cloneNode` copy clipped to its slice. Strips closest to the bin
-  start first (staggered over 170ms, 270ms each — ~440ms total) and each one pinches toward the bin's x while narrowing, then
-  accelerates down into it, so the note forms a funnel and pours into the bin rather than flying there as
-  one rigid card. Thin strips matter: at 10px the funnel edge showed a visible staircase. Strips overlap by
-  2px to hide seams (they start ~2ms apart, so on a tall editor card neighbours drift ~1px apart mid-flight), and an unscoped `.note-suck__strip *` rule disables animations/transitions on the copies
-  (the editor's content "pop" would otherwise replay). The bin (z-index 4) sits above the strips (3).
-- **Crumple + lift** — so a white note still reads against a white card, the paper gets a **few uneven
-  creases spread from left to right** (each crease a line running down the paper, along the pull), like
-  Photos' delete. `randomCreases(width)` builds one gradient per delete (`--creases`): 2–4 creases on a card,
-  3–5 on the editor, random spacing and depth, each soft on one side and sharp on the other (both under half
-  the gap to a neighbour, so stops never cross). Every strip's `.note-suck__shade` uses it, so each crease
-  stays one line as the strips narrow into the bin; the shade fades in as the strip pinches. The shade
-  covers the **whole** strip: leaving the 2px overlap unshaded drew thin lines stacked down the paper. A
-  `drop-shadow` filter on the strips' container (not a `box-shadow` per strip, which would stack into bands)
-  grows as it lifts off. Tried and rejected: regular accordion/pleat folds (too many), creases stacked top to
-  bottom (wrong direction), darkened left/right edges (read as extra folds).
+- **"Crumple and toss" effect** — `crumpleIntoTrash(source, from)`: one `cloneNode` copy of the note is
+  animated as a single piece. Over the first ~40% its `clip-path` polygon (18 points spaced along the edge)
+  morphs through a wrinkled midpoint into a lumpy ball, while the copy shrinks to 0.7 and twists and a few
+  random straight crease lines plus a soft ball shading fade in (`.note-crumple__creases`). The rest is the
+  toss: a parabola sampled into keyframes carries the ball to the bin, spinning and shrinking so it ends about
+  half the bin's width whatever the note's size (card or whole editor). ~980ms. A `drop-shadow` filter on the
+  wrapper (clip-path would clip a `box-shadow`) keeps a white note visible on a white card. An unscoped
+  `.note-crumple *` rule stops the copy replaying its own entry animations (the editor's content "pop"). The
+  bin (z-index 4) sits above the copy (3), so the ball drops *into* it.
+- **Why not the old genie**: it sliced the note into up to 80 ~3px strips, each animated with a small stagger.
+  At real frame rates the strips' staggered edges read as horizontal folds/bands, which no shading could fix
+  (tried: accordion folds, pleats, random creases in both directions). Three one-piece alternatives were
+  prototyped side by side (crumple and toss, fold in half and drop, shrink and drop); crumple and toss won.
 - **Drag to trash**: the copy starts where the card was released (last pointer minus the grab offset from
   `pointerdown`).
 - **Delete from editor**: the editor card is copied *before* `editing` is cleared (Tiptap empties its DOM on
-  unmount), sucked in the same way, and the overlay itself skips its close animation.
+  unmount), crumpled and tossed the same way, and the overlay itself skips its close animation.
 - `swallow()` then closes the lid with a squash-bounce and lets the bin slide away. The bin's target point is
   computed (`TRASH_SIZE`/`TRASH_BOTTOM`, kept in sync with CSS) rather than measured, because the bin may
   still be mid slide-in when an animation aims at it.

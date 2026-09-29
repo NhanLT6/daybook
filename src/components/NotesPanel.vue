@@ -93,7 +93,8 @@ const displayNotes = computed<Note[]>({
 // What the editor grows out of (clicked card or + button) and which note's card it shrinks back into.
 let originEl: HTMLElement | null = null;
 let closingId: string | null = null;
-// Deleted from the editor: a copy is sucked into the trash, so the overlay itself skips its close animation.
+// Deleted from the editor: a copy is crumpled and tossed into the trash, so the overlay itself skips its close
+// animation.
 let closingToTrash = false;
 
 const openNote = (note: Note, el: HTMLElement) => {
@@ -203,12 +204,12 @@ const deleteFromEditor = () => {
     return;
   }
   const note = { ...editing.value };
-  // Snapshot the editor card before it unmounts (Tiptap clears its DOM), then suck the copy into the trash.
+  // Snapshot the editor card before it unmounts (Tiptap clears its DOM), then crumple the copy into the trash.
   const editorCard = panelEl.value?.querySelector<HTMLElement>('.notes-editor-card');
   if (editorCard && !prefersReducedMotion()) {
     const p = panelEl.value!.getBoundingClientRect();
     const r = editorCard.getBoundingClientRect();
-    swallow(suckIntoTrash(editorCard, { left: r.left - p.left, top: r.top - p.top }));
+    swallow(crumpleIntoTrash(editorCard, { left: r.left - p.left, top: r.top - p.top }));
   } else {
     swallow(Promise.resolve());
   }
@@ -264,7 +265,7 @@ const onOverlayLeave = (el: Element, done: () => void) => {
   const toTrash = closingToTrash;
   closingId = null;
   closingToTrash = false;
-  // Deleted: the sucked-in copy already covers the editor, so the overlay just goes.
+  // Deleted: the crumpling copy already covers the editor, so the overlay just goes.
   if (toTrash || prefersReducedMotion()) return done();
   const editorCard = editorCardOf(el);
   // Tiptap clears its content on unmount, so fade the editor out first rather than let the body
@@ -324,119 +325,114 @@ const swallow = async (falling: Promise<unknown>) => {
   trashHold.value = false;
 };
 
-// A few uneven creases spread from left to right, like real paper crumpling as it's pulled in (think Photos'
-// delete): 2–4 on a card, 3–5 on the wide editor, at random spacing and depth. Each shades in gently on one
-// side and drops off sharply on the other (random side); both sides stay under half the gap to a neighbour,
-// so gradient stops never cross. Every strip shares the gradient, so each crease runs as one line down the
-// funnel.
-const randomCreases = (width: number) => {
-  const rand = (min: number, max: number) => min + Math.random() * (max - min);
-  const count = (width > 400 ? 3 : 2) + Math.floor(Math.random() * 3);
-  const weights = Array.from({ length: count + 1 }, () => rand(0.5, 1.5));
-  const total = weights.reduce((a, b) => a + b, 0);
-  const gaps = weights.map((wt) => (wt / total) * 100);
-  let x = 0;
-  const stops = gaps.slice(0, -1).flatMap((gap, i) => {
-    x += gap;
-    const room = Math.min(gap, gaps[i + 1]) * 0.45;
-    const soft = Math.min(room, rand(6, 14));
-    const sharp = Math.min(room, rand(0.8, 2));
-    const [left, right] = Math.random() < 0.5 ? [soft, sharp] : [sharp, soft];
-    const dark = rand(0.14, 0.32).toFixed(2);
-    return [
-      `transparent ${(x - left).toFixed(2)}%`,
-      `rgba(0, 0, 0, ${dark}) ${x.toFixed(2)}%`,
-      `transparent ${(x + right).toFixed(2)}%`,
-    ];
-  });
-  return `linear-gradient(to right, transparent 0%, ${stops.join(', ')}, transparent 100%)`;
-};
-
-// "Sucked in" (genie) effect: a copy of `source` is sliced into horizontal strips, each a clipped clone.
-// Strips nearest the trash leave first and every strip narrows as it goes, so the note funnels into the
-// bin instead of flying there as one rigid card. The paper creases as it's pulled in (a few folds spread from
-// left to right) and lifts off with a growing shadow, so a white note still reads against a white card.
-const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number }) => {
+// "Crumple and toss": the note is animated as one piece (no slicing, so no bands at low frame rates). Points
+// around its edge morph into a lumpy ball (clip-path polygon) while the copy shrinks and twists and a few
+// crease lines show up, then the ball flies along an arc into the bin. A drop shadow on the wrapper keeps a
+// white note visible on a white card. Prototyped against a fold and a plain drop; this one read best.
+const crumpleIntoTrash = (source: HTMLElement, from: { left: number; top: number }) => {
   const panel = panelEl.value!;
   const w = source.offsetWidth;
   const h = source.offsetHeight;
-  // ~3px strips: thick strips give the funnel a visible staircase edge instead of a smooth curve
-  const count = Math.min(80, Math.max(12, Math.round(h / 3)));
-  const stripH = h / count;
   const t = trashCenter();
+  const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
-  const container = document.createElement('div');
-  container.className = 'note-suck';
-  container.style.setProperty('--creases', randomCreases(w));
-  Object.assign(container.style, {
-    left: `${from.left}px`,
-    top: `${from.top}px`,
-    width: `${w}px`,
-    height: `${h}px`,
+  // Edge points (even spacing along the perimeter) → a lumpy ball around the centre, via a wrinkled midpoint.
+  // Same point count in every frame, so clip-path interpolates.
+  const POINTS = 18;
+  const perimeter = 2 * (w + h);
+  const edge = Array.from({ length: POINTS }, (_, i): [number, number] => {
+    const d = (i * perimeter) / POINTS;
+    if (d < w) return [d, 0];
+    if (d < w + h) return [w, d - w];
+    if (d < 2 * w + h) return [w - (d - w - h), h];
+    return [0, h - (d - 2 * w - h)];
   });
+  const cx = w / 2;
+  const cy = h / 2;
+  const m = Math.min(w, h);
+  const ball = edge.map(([x, y]): [number, number] => {
+    const a = Math.atan2(y - cy, x - cx);
+    const r = m * 0.4 * rand(0.72, 1.08);
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  });
+  const wrinkled = edge.map(([x, y], i): [number, number] => [
+    x + (ball[i][0] - x) * 0.5 + rand(-1, 1) * m * 0.07,
+    y + (ball[i][1] - y) * 0.5 + rand(-1, 1) * m * 0.07,
+  ]);
+  const polygon = (pts: [number, number][]) =>
+    `polygon(${pts.map(([x, y]) => `${x.toFixed(1)}px ${y.toFixed(1)}px`).join(', ')})`;
 
-  // Order strips by distance to the trash: the closest one starts first.
-  const strips = Array.from({ length: count }, (_, i) => {
-    const strip = document.createElement('div');
-    strip.className = 'note-suck__strip';
-    Object.assign(strip.style, { top: `${i * stripH}px`, height: `${stripH + 2}px` }); // +2: no seams, even as neighbours drift apart mid-flight
-    const copy = source.cloneNode(true) as HTMLElement;
-    copy.removeAttribute('data-note-id');
-    copy.classList.remove('note-card--dragging');
-    Object.assign(copy.style, {
-      position: 'absolute',
-      left: '0',
-      top: `${-i * stripH}px`,
-      width: `${w}px`,
-      height: `${h}px`,
-      margin: '0',
-    });
-    const shade = document.createElement('div');
-    shade.className = 'note-suck__shade';
-    strip.append(copy, shade);
-    container.appendChild(strip);
-    const dx = t.x - (from.left + w / 2);
-    const dy = t.y - (from.top + i * stripH + stripH / 2);
-    return { strip, shade, dx, dy, dist: Math.abs(dy) };
-  });
-  panel.appendChild(container);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'note-crumple';
+  Object.assign(wrapper.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${w}px`, height: `${h}px` });
 
-  const STAGGER_TOTAL = 170;
-  const stagger = STAGGER_TOTAL / (count - 1);
-  const byDistance = [...strips].sort((a, b) => a.dist - b.dist);
-  const DURATION = 270;
-  const animations = byDistance.flatMap(({ strip, shade, dx, dy }, rank) => {
-    const timing = {
-      duration: DURATION,
-      delay: rank * stagger,
-      easing: 'cubic-bezier(0.5, 0, 0.85, 0.5)',
-      fill: 'forwards',
-    } as const;
-    return [
-      strip.animate(
-        [
-          { transform: 'translate(0, 0) scale(1, 1)', opacity: 1 },
-          // Pinches in toward the bin's x first, then accelerates down into it.
-          { transform: `translate(${dx * 0.35}px, ${dy * 0.2}px) scale(0.45, 1)`, opacity: 1, offset: 0.4 },
-          { transform: `translate(${dx}px, ${dy}px) scale(0.04, 0.6)`, opacity: 0.3 },
-        ],
-        timing,
-      ),
-      // Creases deepen as the strip is pulled narrower
-      shade.animate([{ opacity: 0 }, { opacity: 0.7, offset: 0.4 }, { opacity: 1 }], timing),
-    ];
+  const copy = source.cloneNode(true) as HTMLElement;
+  copy.removeAttribute('data-note-id');
+  copy.classList.remove('note-card--dragging');
+  Object.assign(copy.style, { position: 'absolute', inset: '0', width: `${w}px`, height: `${h}px`, margin: '0' });
+
+  // A few straight creases at random angles and offsets, over a soft ball shading
+  const creases = document.createElement('div');
+  creases.className = 'note-crumple__creases';
+  const lines = Array.from({ length: 5 }, () => {
+    const at = rand(28, 72);
+    return `linear-gradient(${Math.round(rand(0, 180))}deg, transparent ${at.toFixed(1)}%, rgba(0, 0, 0, ${rand(0.14, 0.26).toFixed(2)}) ${(at + 0.8).toFixed(1)}%, transparent ${(at + 5).toFixed(1)}%)`;
   });
-  // Lifts off the card: one drop shadow on the whole funnel's silhouette (a filter on the container, so the
-  // strips don't stack their own shadows into bands)
-  container.animate(
+  lines.push('radial-gradient(circle at 38% 32%, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.2) 78%)');
+  creases.style.background = lines.join(', ');
+  copy.appendChild(creases);
+  wrapper.appendChild(copy);
+  panel.appendChild(wrapper);
+
+  const CRUMPLE = 0.42; // share of the timeline spent crumpling in place, the rest is the toss
+  const DURATION = 980;
+  const BALL_SCALE = 0.7;
+  // The ball ends about half the bin's width, whatever the note's size (a card or the whole editor)
+  const endScale = Math.min(0.38, (TRASH_SIZE * 0.55) / (m * 0.8 * BALL_SCALE));
+  const timing = { duration: DURATION, fill: 'forwards' } as const;
+
+  const shape = copy.animate(
     [
-      { filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18))' },
-      { filter: 'drop-shadow(0 6px 8px rgba(0, 0, 0, 0.3))', offset: 0.35 },
-      { filter: 'drop-shadow(0 3px 4px rgba(0, 0, 0, 0.25))' },
+      { clipPath: polygon(edge), transform: 'scale(1) rotate(0deg)', easing: 'cubic-bezier(0.3, 0, 0.3, 1)' },
+      { clipPath: polygon(wrinkled), transform: 'scale(0.86) rotate(-5deg)', offset: CRUMPLE * 0.45 },
+      { clipPath: polygon(ball), transform: `scale(${BALL_SCALE}) rotate(-12deg)`, offset: CRUMPLE },
+      { clipPath: polygon(ball), transform: `scale(${BALL_SCALE}) rotate(-12deg)` },
     ],
-    { duration: STAGGER_TOTAL + DURATION, fill: 'forwards' },
+    timing,
   );
-  return Promise.all(animations.map((a) => a.finished)).finally(() => container.remove());
+  const shading = creases.animate(
+    [{ opacity: 0 }, { opacity: 0.7, offset: CRUMPLE * 0.45 }, { opacity: 1, offset: CRUMPLE }, { opacity: 1 }],
+    timing,
+  );
+
+  // Toss: a parabola sampled into keyframes, from the note's centre to the bin, speeding up as it falls
+  const dx = t.x - (from.left + cx);
+  const dy = t.y - (from.top + cy);
+  const ARC = 46;
+  const toss = Array.from({ length: 10 }, (_, i) => {
+    const u = (i + 1) / 10;
+    const e = u * u * (1.6 - 0.6 * u);
+    const x = dx * e;
+    const y = -6 + (dy + 6) * e - ARC * 4 * e * (1 - e);
+    return {
+      transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${Math.round(260 * e)}deg) scale(${(1 - (1 - endScale) * e).toFixed(3)})`,
+      filter: `drop-shadow(0 ${(6 - 3 * e).toFixed(1)}px ${(10 - 5 * e).toFixed(1)}px rgba(0, 0, 0, 0.28))`,
+      offset: CRUMPLE + (1 - CRUMPLE) * u,
+    };
+  });
+  const flight = wrapper.animate(
+    [
+      { transform: 'translate(0, 0) rotate(0deg) scale(1)', filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18))' },
+      {
+        transform: 'translate(0, -6px) rotate(0deg) scale(1)',
+        filter: 'drop-shadow(0 6px 10px rgba(0, 0, 0, 0.28))',
+        offset: CRUMPLE,
+      },
+      ...toss,
+    ],
+    timing,
+  );
+  return Promise.all([shape.finished, shading.finished, flight.finished]).finally(() => wrapper.remove());
 };
 
 // ── Drag & drop (@formkit/drag-and-drop) ────────────────────────────────────
@@ -490,7 +486,7 @@ const endDrag = async () => {
     const card = panelEl.value?.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note.id)}"]`);
     const p = panelEl.value!.getBoundingClientRect();
     const from = { left: lastPoint.x - grabOffset.x - p.left, top: lastPoint.y - grabOffset.y - p.top };
-    swallow(card && !prefersReducedMotion() ? suckIntoTrash(card, from) : Promise.resolve());
+    swallow(card && !prefersReducedMotion() ? crumpleIntoTrash(card, from) : Promise.resolve());
     deleteWithUndo({ ...note });
     return;
   }
@@ -799,7 +795,7 @@ onBeforeUnmount(() => {
 }
 
 /* Full-width wrapper centers the circle; Vuetify's slide transition owns `transform` on this element.
-   Above the editor overlay (2) and the suck strips (3), so a deleted note disappears *into* the bin. */
+   Above the editor overlay (2) and the crumpled copy (3), so a deleted note disappears *into* the bin. */
 .notes-trash-zone {
   position: absolute;
   left: 0;
@@ -902,34 +898,24 @@ onBeforeUnmount(() => {
 </style>
 
 <!-- Unscoped: shared by card previews (NoteCard) and NoteEditor's EditorContent, both render `.note-content`;
-     plus the trash "suck" strips, which are built in JS and so carry no scoped attribute. -->
+     plus the trash "crumple" copy, which is built in JS and so carries no scoped attribute. -->
 <style>
-/* Above the editor overlay (2), below the trash (4): strips disappear into the bin */
-.note-suck {
+/* Above the editor overlay (2), below the trash (4): the ball disappears into the bin */
+.note-crumple {
   position: absolute;
   z-index: 3;
   pointer-events: none;
-}
-
-.note-suck__strip {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  overflow: hidden;
   will-change: transform;
 }
 
-/* Crease shading over each strip, the same for every strip (suckIntoTrash sets --creases). Covers the whole
-   strip: an unshaded sliver where strips overlap showed as thin lines stacked down the paper. */
-.note-suck__shade {
+.note-crumple__creases {
   position: absolute;
   inset: 0;
   opacity: 0;
-  background: var(--creases, none);
 }
 
-/* Copies must not replay their own entry animations/transitions (e.g. the editor's content pop) */
-.note-suck__strip * {
+/* The copy must not replay its own entry animations/transitions (e.g. the editor's content pop) */
+.note-crumple * {
   animation: none !important;
   transition: none !important;
 }
