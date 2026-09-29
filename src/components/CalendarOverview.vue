@@ -93,9 +93,18 @@ const toOccurrenceAttributes = (event: AppEvent) => {
     return eventDays(event).map((day) => ({ dates: dayjs(day).toDate(), dot, popover: { label: event.title } }));
   }
 
+  // Half circles bracket the range: ◖ on the first day, ◗ on the last (see .range-edge styles)
   return [
-    { dates: dayjs(event.date).toDate(), dot, popover: { label: `${event.title} starts` } },
-    { dates: dayjs(event.endDate).toDate(), dot, popover: { label: `${event.title} ends` } },
+    {
+      dates: dayjs(event.date).toDate(),
+      dot: { ...dot, class: 'range-edge range-edge--start' },
+      popover: { label: `${event.title} starts` },
+    },
+    {
+      dates: dayjs(event.endDate).toDate(),
+      dot: { ...dot, class: 'range-edge range-edge--end' },
+      popover: { label: `${event.title} ends` },
+    },
   ];
 };
 
@@ -260,6 +269,24 @@ const goToToday = async () => {
 <style scoped>
 .calendar-overview-card {
   position: relative;
+}
+
+/* Range edges: halves of one 8px circle either side of the day's centre line — the start half on the
+   left, the end half on the right — so a range reads ◖ … ◗ and stands apart from 5px event dots */
+.calendar-overview-card :deep(.range-edge) {
+  --range-edge-size: 8px;
+  width: calc(var(--range-edge-size) / 2);
+  height: var(--range-edge-size);
+}
+
+.calendar-overview-card :deep(.range-edge--start) {
+  border-radius: var(--range-edge-size) 0 0 var(--range-edge-size);
+  margin-right: calc(var(--range-edge-size) / 2);
+}
+
+.calendar-overview-card :deep(.range-edge--end) {
+  border-radius: 0 var(--range-edge-size) var(--range-edge-size) 0;
+  margin-left: calc(var(--range-edge-size) / 2);
 }
 
 .calendar-view-toggle {
