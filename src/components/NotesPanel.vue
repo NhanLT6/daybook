@@ -324,11 +324,37 @@ const swallow = async (falling: Promise<unknown>) => {
   trashHold.value = false;
 };
 
+// A few uneven vertical creases, like real paper pulled through a gap (think Photos' delete): 2–4 on a card,
+// 3–5 on the wide editor, at random spacing and depth. Each shades in gently on one side and drops off
+// sharply on the other (random side). Both sides stay under half the gap to a neighbour, so stops never cross.
+const randomFolds = (width: number) => {
+  const rand = (min: number, max: number) => min + Math.random() * (max - min);
+  const count = (width > 400 ? 3 : 2) + Math.floor(Math.random() * 3);
+  const weights = Array.from({ length: count + 1 }, () => rand(0.5, 1.5));
+  const total = weights.reduce((a, b) => a + b, 0);
+  const gaps = weights.map((wt) => (wt / total) * 100);
+  let x = 0;
+  const stops = gaps.slice(0, -1).flatMap((gap, i) => {
+    x += gap;
+    const room = Math.min(gap, gaps[i + 1]) * 0.45;
+    const soft = Math.min(room, rand(6, 14));
+    const sharp = Math.min(room, rand(0.8, 2));
+    const [left, right] = Math.random() < 0.5 ? [soft, sharp] : [sharp, soft];
+    const dark = rand(0.14, 0.32).toFixed(2);
+    return [
+      `transparent ${(x - left).toFixed(2)}%`,
+      `rgba(0, 0, 0, ${dark}) ${x.toFixed(2)}%`,
+      `transparent ${(x + right).toFixed(2)}%`,
+    ];
+  });
+  return `linear-gradient(to right, transparent 0%, ${stops.join(', ')}, transparent 100%)`;
+};
+
 // "Sucked in" (genie) effect: a copy of `source` is sliced into horizontal strips, each a clipped clone.
 // Strips nearest the trash leave first and every strip narrows as it goes, so the note funnels into the
-// bin instead of flying there as one rigid card. The paper gathers into vertical pleats as it's pulled in
-// (creases run along the pull, bunching up as each strip narrows) and lifts off with a growing shadow, so a
-// white note still reads against a white card.
+// bin instead of flying there as one rigid card. The paper creases as it's pulled in (a few vertical folds
+// along the pull, bunching up as each strip narrows) and lifts off with a growing shadow, so a white note
+// still reads against a white card.
 const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number }) => {
   const panel = panelEl.value!;
   const w = source.offsetWidth;
@@ -340,9 +366,8 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
 
   const container = document.createElement('div');
   container.className = 'note-suck';
-  // ~18px pleats, fitted to a whole number across the width so both edges end on the same facet. Every
-  // strip shares the pattern, so the creases line up into continuous lines down the funnel.
-  container.style.setProperty('--pleat', `${w / Math.max(4, Math.round(w / 18))}px`);
+  // Every strip shares one set of folds, so each crease runs as one line down the funnel
+  container.style.setProperty('--folds', randomFolds(w));
   Object.assign(container.style, {
     left: `${from.left}px`,
     top: `${from.top}px`,
@@ -397,7 +422,7 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
         ],
         timing,
       ),
-      // Pleats deepen as the strip is pulled narrower
+      // Creases deepen as the strip is pulled narrower
       shade.animate([{ opacity: 0 }, { opacity: 0.7, offset: 0.4 }, { opacity: 1 }], timing),
     ];
   });
@@ -894,7 +919,7 @@ onBeforeUnmount(() => {
   will-change: transform;
 }
 
-/* Fold shading over each strip: darker toward the curled edges, opacity animated per strip (suckIntoTrash) */
+/* Fold shading over each strip: creases + darker curled edges, opacity animated per strip (suckIntoTrash) */
 /* Stops 2px short: strips overlap by 2px (no seams), and two shades stacked there drew a dark line */
 .note-suck__shade {
   position: absolute;
@@ -903,14 +928,8 @@ onBeforeUnmount(() => {
   background:
     /* Edges curl away from the light */
     linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.35)),
-    /* Vertical pleats: a lit facet then a shaded one, with a sharp crease between */
-    repeating-linear-gradient(
-      to right,
-      rgba(0, 0, 0, 0.02) 0,
-      rgba(0, 0, 0, 0.12) calc(var(--pleat) / 2),
-      rgba(0, 0, 0, 0.36) calc(var(--pleat) / 2),
-      rgba(0, 0, 0, 0.16) var(--pleat)
-    );
+    /* A few uneven vertical creases, generated per delete (randomFolds) */
+    var(--folds, none);
 }
 
 /* Copies must not replay their own entry animations/transitions (e.g. the editor's content pop) */

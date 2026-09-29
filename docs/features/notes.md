@@ -155,10 +155,12 @@ classes still animate the glide. ~4 KB gzip.
   2px to hide seams (they start ~2ms apart, so on a tall editor card neighbours drift ~1px apart mid-flight), and an unscoped `.note-suck__strip *` rule disables animations/transitions on the copies
   (the editor's content "pop" would otherwise replay). The bin (z-index 4) sits above the strips (3).
 - **Paper pulled in + lift** — so a white note still reads against a white card: each strip carries a
-  `.note-suck__shade` overlay of **vertical** pleats (a lit facet, then a shaded one, ~18px, fitted to a whole
-  number across the width via `--pleat`) plus darker curled edges. Every strip shares the pattern, so the
-  creases line up along the pull and bunch together as each strip narrows — the paper is gathered into the
-  bin, not folded horizontally first. The shade fades in as the strip pinches and stops 2px short of the
+  `.note-suck__shade` overlay of a **few uneven vertical creases** plus darker curled edges, like Photos'
+  delete. `randomFolds(width)` builds the gradient per delete (`--folds`): 2–4 creases on a card, 3–5 on the
+  editor, random spacing and depth, each soft on one side and sharp on the other; both sides stay under
+  half the gap to a neighbour so stops never cross. Every strip shares it, so each crease runs along the
+  pull and bunches up as the strips narrow — the paper is pulled into the bin, not folded horizontally
+  first. A regular pleat pattern (every ~18px) was tried and read as too many folds. The shade fades in as the strip pinches and stops 2px short of the
   strip bottom (strips overlap by 2px; two shades stacked there drew dark lines). A `drop-shadow` filter on
   the strips' container (not a `box-shadow` per strip, which would stack into bands) grows as it lifts off.
 - **Drag to trash**: the copy starts where the card was released (last pointer minus the grab offset from
