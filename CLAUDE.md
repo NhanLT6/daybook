@@ -18,7 +18,7 @@
 - **Vue Ecosystem**: vue, vue-router, pinia
 - **UI/UX**: vuetify, @vueuse/core, v-calendar, vue-sonner, @formkit/drag-and-drop (notes drag, mouse + touch)
 - **Charts**: chart.js, chartjs-plugin-datalabels
-- **Data Processing**: papaparse, file-saver, dayjs, lodash
+- **Data Processing**: papaparse, file-saver, dayjs, lodash, rrule
 - **Forms**: vee-validate, yup
 - **HTTP**: axios
 
@@ -50,12 +50,14 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Dark Theme**: Toggle in app toolbar, persisted to localStorage
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
 - **Sticky Notes**: Card-based rich-text notes tab with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch); Chat reads notes via the client-side `searchNotes` tool and Catch-up includes open note items (see `docs/features/notes.md`)
+- **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates (see `docs/features/events.md`)
 
 ## Feature Documentation
 Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.
 - `docs/features/categories.md` — Category grouping for projects, VCombobox grouping pattern, BulkLogForm category rules
 - `docs/features/log-list-filters.md` — LogList filter bar (project/task/date/search), Insights↔chart project sync, panel-expansion coordination
 - `docs/features/notes.md` — Note data model + IndexedDB versioning, HTML sanitization rules, native drag & drop (reorder/trash) design, undo mechanism
+- `docs/features/events.md` — Event/RepeatRule data model (no migration), `eventRecurrence.ts` date logic, repeat form rules, skip dates, timezone/UTC-midnight and day-of-month gotchas
 
 ## Important Notes
 - **Type Safety**: Full TypeScript coverage required

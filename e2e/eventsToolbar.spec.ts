@@ -9,6 +9,8 @@ import { expect, test } from '@playwright/test';
 test.use({ viewport: { width: 375, height: 812 } });
 
 test('events header stays readable and filters work on mobile', async ({ page }) => {
+  // Pinned so the seeded events stay "upcoming" regardless of when the suite runs
+  await page.clock.setFixedTime(new Date('2026-09-01T10:00:00'));
   await page.addInitScript(() => {
     localStorage.setItem(
       'events',
