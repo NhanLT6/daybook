@@ -324,37 +324,38 @@ const swallow = async (falling: Promise<unknown>) => {
   trashHold.value = false;
 };
 
-// A few uneven vertical creases, like real paper pulled through a gap (think Photos' delete): 2–4 on a card,
-// 3–5 on the wide editor, at random spacing and depth. Each shades in gently on one side and drops off
-// sharply on the other (random side). Both sides stay under half the gap to a neighbour, so stops never cross.
-const randomFolds = (width: number) => {
+// A few uneven horizontal creases, like real paper crumpling as it's pulled in (think Photos' delete): 2–4 on
+// a card, 3–5 on the tall editor, at random heights and depths. Each shades in gently on one side and drops
+// off sharply on the other (random side). Returns the crease darkness at a y position (px); each strip samples
+// it down its own height, so the creases run left to right across the paper.
+const randomCreases = (height: number) => {
   const rand = (min: number, max: number) => min + Math.random() * (max - min);
-  const count = (width > 400 ? 3 : 2) + Math.floor(Math.random() * 3);
+  const count = (height > 400 ? 3 : 2) + Math.floor(Math.random() * 3);
   const weights = Array.from({ length: count + 1 }, () => rand(0.5, 1.5));
   const total = weights.reduce((a, b) => a + b, 0);
-  const gaps = weights.map((wt) => (wt / total) * 100);
-  let x = 0;
-  const stops = gaps.slice(0, -1).flatMap((gap, i) => {
-    x += gap;
+  const gaps = weights.map((wt) => (wt / total) * height);
+  let y = 0;
+  const creases = gaps.slice(0, -1).map((gap, i) => {
+    y += gap;
     const room = Math.min(gap, gaps[i + 1]) * 0.45;
-    const soft = Math.min(room, rand(6, 14));
-    const sharp = Math.min(room, rand(0.8, 2));
-    const [left, right] = Math.random() < 0.5 ? [soft, sharp] : [sharp, soft];
-    const dark = rand(0.14, 0.32).toFixed(2);
-    return [
-      `transparent ${(x - left).toFixed(2)}%`,
-      `rgba(0, 0, 0, ${dark}) ${x.toFixed(2)}%`,
-      `transparent ${(x + right).toFixed(2)}%`,
-    ];
+    const soft = Math.min(room, height * rand(0.06, 0.14));
+    const sharp = Math.min(room, Math.max(2, height * rand(0.008, 0.02)));
+    const [above, below] = Math.random() < 0.5 ? [soft, sharp] : [sharp, soft];
+    return { y, above, below, dark: rand(0.14, 0.32) };
   });
-  return `linear-gradient(to right, transparent 0%, ${stops.join(', ')}, transparent 100%)`;
+  return (at: number) =>
+    Math.max(
+      0,
+      ...creases.map((c) =>
+        at <= c.y ? c.dark * Math.max(0, 1 - (c.y - at) / c.above) : c.dark * Math.max(0, 1 - (at - c.y) / c.below),
+      ),
+    );
 };
 
 // "Sucked in" (genie) effect: a copy of `source` is sliced into horizontal strips, each a clipped clone.
 // Strips nearest the trash leave first and every strip narrows as it goes, so the note funnels into the
-// bin instead of flying there as one rigid card. The paper creases as it's pulled in (a few vertical folds
-// along the pull, bunching up as each strip narrows) and lifts off with a growing shadow, so a white note
-// still reads against a white card.
+// bin instead of flying there as one rigid card. The paper creases as it's pulled in (a few horizontal folds)
+// and lifts off with a growing shadow, so a white note still reads against a white card.
 const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number }) => {
   const panel = panelEl.value!;
   const w = source.offsetWidth;
@@ -366,8 +367,7 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
 
   const container = document.createElement('div');
   container.className = 'note-suck';
-  // Every strip shares one set of folds, so each crease runs as one line down the funnel
-  container.style.setProperty('--folds', randomFolds(w));
+  const creaseAt = randomCreases(h);
   Object.assign(container.style, {
     left: `${from.left}px`,
     top: `${from.top}px`,
@@ -393,6 +393,11 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
     });
     const shade = document.createElement('div');
     shade.className = 'note-suck__shade';
+    // Sampled down the strip (not one flat value), so thick strips on the tall editor don't band the creases
+    const samples = [0, 0.25, 0.5, 0.75, 1].map(
+      (f) => `rgba(0, 0, 0, ${creaseAt(i * stripH + f * stripH).toFixed(3)}) ${f * 100}%`,
+    );
+    shade.style.background = `linear-gradient(to bottom, ${samples.join(', ')})`;
     strip.append(copy, shade);
     container.appendChild(strip);
     const dx = t.x - (from.left + w / 2);
@@ -919,17 +924,12 @@ onBeforeUnmount(() => {
   will-change: transform;
 }
 
-/* Fold shading over each strip: creases + darker curled edges, opacity animated per strip (suckIntoTrash) */
+/* Crease shading over each strip: background set per strip from the crease curve (suckIntoTrash) */
 /* Stops 2px short: strips overlap by 2px (no seams), and two shades stacked there drew a dark line */
 .note-suck__shade {
   position: absolute;
   inset: 0 0 2px;
   opacity: 0;
-  background:
-    /* Edges curl away from the light */
-    linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.35)),
-    /* A few uneven vertical creases, generated per delete (randomFolds) */
-    var(--folds, none);
 }
 
 /* Copies must not replay their own entry animations/transitions (e.g. the editor's content pop) */
