@@ -22,7 +22,11 @@ const RRULE_WEEKDAYS: Weekday[] = [RRule.SU, RRule.MO, RRule.TU, RRule.WE, RRule
 // Cap on consecutive skipped dates walked past when looking for the next occurrence
 const MAX_SCAN = 500;
 
-const toUtcDate = (date: string): Date => new Date(`${date}T00:00:00Z`);
+// Events created through the date picker before dates were normalized hold a JS Date at runtime
+// despite the `string` type — funnel every read through toDay so both shapes work.
+const toDay = (date: string | Date): string => dayjs(date).format('YYYY-MM-DD');
+
+const toUtcDate = (date: string): Date => new Date(`${toDay(date)}T00:00:00Z`);
 const fromUtcDate = (date: Date): string => date.toISOString().slice(0, 10);
 
 /** Number of extra days an occurrence spans (0 for single-day events). */
@@ -84,8 +88,9 @@ export function getOccurrences(event: AppEvent, from: string, to: string): strin
   const span = spanDays(event);
 
   if (!event.repeat) {
-    const end = dayjs(event.date).add(span, 'day').format('YYYY-MM-DD');
-    return event.date <= to && end >= from ? [event.date] : [];
+    const start = toDay(event.date);
+    const end = dayjs(start).add(span, 'day').format('YYYY-MM-DD');
+    return start <= to && end >= from ? [start] : [];
   }
 
   // Occurrences starting up to `span` days before the window still reach into it
@@ -105,7 +110,10 @@ export function getOccurrences(event: AppEvent, from: string, to: string): strin
 export function getNextOccurrence(event: AppEvent, from: string = dayjs().format('YYYY-MM-DD')): string | null {
   const span = spanDays(event);
 
-  if (!event.repeat) return dayjs(event.date).add(span, 'day').format('YYYY-MM-DD') >= from ? event.date : null;
+  if (!event.repeat) {
+    const start = toDay(event.date);
+    return dayjs(start).add(span, 'day').format('YYYY-MM-DD') >= from ? start : null;
+  }
 
   // Occurrences starting up to `span` days before `from` are still running on it
   const rrule = toRRule(event.date, event.repeat);

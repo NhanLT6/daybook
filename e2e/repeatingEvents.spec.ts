@@ -59,3 +59,30 @@ test('repeat preset and custom rule save from the form', async ({ page }) => {
 
   await expect(row).toContainText('Every 3 weeks on Wednesday, 4 times');
 });
+
+// Uses the real clock: Vuetify's date picker menu doesn't open under page.clock
+test('range picked in the date picker repeats via the custom panel', async ({ page }) => {
+  await page.goto('/events');
+  await page.getByRole('button', { name: 'New Event' }).click();
+  const dialog = page.locator('.v-dialog');
+  await dialog.getByLabel('Title').fill('Sprint');
+
+  // The picker emits Date objects; picking a range here used to crash the Repeat field
+  await dialog.getByRole('textbox', { name: 'Date' }).click();
+  await page.getByRole('button', { name: 'Range' }).click();
+  await page.getByRole('button', { name: 'Next month' }).click();
+  await page.locator('.v-date-picker-month__day', { hasText: /^5$/ }).first().locator('button').click();
+  await page.locator('.v-date-picker-month__day', { hasText: /^16$/ }).first().locator('button').click();
+  await page.keyboard.press('Escape');
+
+  await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
+  await page.getByRole('option', { name: 'Custom…' }).click();
+
+  // A 12-day range can't repeat weekly; every 2 weeks fits
+  await expect(dialog).toContainText('longer than the time between repeats');
+  await dialog.locator('input[type="number"]').first().fill('2');
+  await expect(dialog).not.toContainText('longer than the time between repeats');
+  await dialog.getByRole('button', { name: 'Add' }).click();
+
+  await expect(page.locator('main tr', { hasText: 'Sprint' })).toContainText(/Every 2 weeks on \w+day/);
+});
