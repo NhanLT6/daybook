@@ -41,8 +41,9 @@ const { resetForm, handleSubmit } = useForm({
     title: item?.title ?? '',
     description: item?.description ?? '',
     allDay: item ? !item.startTime : true,
-    date: item?.date ?? dayjs().format('YYYY-MM-DD'),
-    endDate: item?.endDate ?? null,
+    // Older events may hold a Date here (see datePickerModel) — normalize to YYYY-MM-DD on open
+    date: dayjs(item?.date).format('YYYY-MM-DD'),
+    endDate: item?.endDate ? dayjs(item.endDate).format('YYYY-MM-DD') : null,
     startTime: item?.startTime ?? '09:00',
     endTime: item?.endTime ?? '10:00',
   },
@@ -180,7 +181,11 @@ const unskipDate = (date: string) => {
 
 // ─── Computed ─────────────────────────────────────────────────
 
-// VDatePicker model: string in single mode, [start, end] in range mode
+// VDatePicker model: string in single mode, [start, end] in range mode.
+// The picker emits Date objects; store them as YYYY-MM-DD so saved events (and the repeat math,
+// which compares date strings) never see a Date.
+const toDay = (d: unknown) => dayjs(d as Date | string).format('YYYY-MM-DD');
+
 const datePickerModel = computed({
   get: () =>
     dateMode.value === 'range'
@@ -188,14 +193,14 @@ const datePickerModel = computed({
       : dateField.value.value,
   set: (val) => {
     if (dateMode.value === 'range') {
-      const arr = val as string[];
+      const arr = (val as unknown[]).map(toDay);
       const from = arr[0];
       const to = arr.length > 1 ? (arr.at(-1) ?? null) : arr[0];
 
       dateField.setValue(from);
       endDateField.setValue(arr.length > 1 && to !== from ? to : null);
     } else {
-      dateField.setValue(val as string);
+      dateField.setValue(toDay(val));
       endDateField.setValue(null);
     }
   },

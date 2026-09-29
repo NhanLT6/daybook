@@ -81,6 +81,24 @@ describe('getOccurrences', () => {
   });
 });
 
+describe('legacy Date-typed dates', () => {
+  // The event form used to save the date picker's raw Date objects; those events must keep working
+  const legacy = (overrides: Partial<AppEvent> = {}) =>
+    event({ date: new Date(2026, 9, 6) as unknown as string, ...overrides });
+
+  it('still appears for one-off events', () => {
+    expect(getOccurrences(legacy(), '2026-10-01', '2026-10-31')).toEqual(['2026-10-06']);
+    expect(getNextOccurrence(legacy(), '2026-10-01')).toBe('2026-10-06');
+  });
+
+  it('repeats from the local calendar day', () => {
+    expect(getOccurrences(legacy({ repeat: biweekly }), '2026-10-01', '2026-10-31')).toEqual([
+      '2026-10-06',
+      '2026-10-20',
+    ]);
+  });
+});
+
 describe('getNextOccurrence', () => {
   it('finds the next occurrence on or after a date', () => {
     const e = event({ repeat: biweekly });
