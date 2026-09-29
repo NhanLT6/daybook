@@ -56,15 +56,16 @@ defineProps<{ note: Note; previewHtml: string }>();
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28) !important;
 }
 
+/* Ends above the date caption (bottom 8px + ~20px line) instead of running under it, so a long note fades
+   out on its own and never overlaps the date. The fade sits on the last 24px of the text area. */
 .note-preview {
   position: absolute;
-  inset: 0;
-  padding: 12px;
-  padding-bottom: 28px;
+  inset: 0 0 30px;
+  padding: 12px 12px 0;
   overflow: hidden;
   pointer-events: none;
-  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
 }
 
 /* Keep text clear of the pin icon */

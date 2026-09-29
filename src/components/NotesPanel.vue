@@ -118,10 +118,14 @@ const addNote = (e: MouseEvent) => {
 const onCardClick = (note: Note, e: MouseEvent) => {
   const card = e.currentTarget as HTMLElement;
   const SLOP = 4;
+  // Checkboxes clipped off the preview or mostly faded out (mid-fade = 12px above its bottom, see NoteCard)
+  // can't be seen, so they can't be ticked either — a click there opens the note.
+  const visibleBottom = (card.querySelector('.note-preview')?.getBoundingClientRect().bottom ?? Infinity) - 12;
   const labels = [...card.querySelectorAll<HTMLElement>('li[data-type="taskItem"] > label')];
   const hit = labels.findIndex((l) => {
     const r = l.getBoundingClientRect();
     return (
+      (r.top + r.bottom) / 2 <= visibleBottom &&
       e.clientX >= r.left - SLOP &&
       e.clientX <= r.right + SLOP &&
       e.clientY >= r.top - SLOP &&
@@ -322,7 +326,8 @@ const swallow = async (falling: Promise<unknown>) => {
 
 // "Sucked in" (genie) effect: a copy of `source` is sliced into horizontal strips, each a clipped clone.
 // Strips nearest the trash leave first and every strip narrows as it goes, so the note funnels into the
-// bin instead of flying there as one rigid card.
+// bin instead of flying there as one rigid card. The paper also folds as it goes (a shade per strip, darker
+// in each crease) and lifts off with a growing shadow, so a white note still reads against a white card.
 const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number }) => {
   const panel = panelEl.value!;
   const w = source.offsetWidth;
@@ -331,6 +336,12 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
   const count = Math.min(80, Math.max(12, Math.round(h / 3)));
   const stripH = h / count;
   const t = trashCenter();
+  // Accordion folds ~14px tall: shade rises from 0 on a ridge to 1 in the crease, then back
+  const foldStrips = Math.max(2, Math.round(14 / stripH));
+  const foldShade = (i: number) => {
+    const p = (i % (2 * foldStrips)) / foldStrips;
+    return p <= 1 ? p : 2 - p;
+  };
 
   const container = document.createElement('div');
   container.className = 'note-suck';
@@ -357,27 +368,50 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
       height: `${h}px`,
       margin: '0',
     });
-    strip.appendChild(copy);
+    const shade = document.createElement('div');
+    shade.className = 'note-suck__shade';
+    strip.append(copy, shade);
     container.appendChild(strip);
     const dx = t.x - (from.left + w / 2);
     const dy = t.y - (from.top + i * stripH + stripH / 2);
-    return { strip, dx, dy, dist: Math.abs(dy) };
+    return { strip, shade, fold: 0.1 + 0.7 * foldShade(i), dx, dy, dist: Math.abs(dy) };
   });
   panel.appendChild(container);
 
   const STAGGER_TOTAL = 170;
   const stagger = STAGGER_TOTAL / (count - 1);
   const byDistance = [...strips].sort((a, b) => a.dist - b.dist);
-  const animations = byDistance.map(({ strip, dx, dy }, rank) =>
-    strip.animate(
-      [
-        { transform: 'translate(0, 0) scale(1, 1)', opacity: 1 },
-        // Pinches in toward the bin's x first, then accelerates down into it.
-        { transform: `translate(${dx * 0.35}px, ${dy * 0.2}px) scale(0.45, 1)`, opacity: 1, offset: 0.4 },
-        { transform: `translate(${dx}px, ${dy}px) scale(0.04, 0.6)`, opacity: 0.3 },
-      ],
-      { duration: 270, delay: rank * stagger, easing: 'cubic-bezier(0.5, 0, 0.85, 0.5)', fill: 'forwards' },
-    ),
+  const DURATION = 270;
+  const animations = byDistance.flatMap(({ strip, shade, fold, dx, dy }, rank) => {
+    const timing = {
+      duration: DURATION,
+      delay: rank * stagger,
+      easing: 'cubic-bezier(0.5, 0, 0.85, 0.5)',
+      fill: 'forwards',
+    } as const;
+    return [
+      strip.animate(
+        [
+          { transform: 'translate(0, 0) scale(1, 1)', opacity: 1 },
+          // Pinches in toward the bin's x first, then accelerates down into it.
+          { transform: `translate(${dx * 0.35}px, ${dy * 0.2}px) scale(0.45, 1)`, opacity: 1, offset: 0.4 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0.04, 0.6)`, opacity: 0.3 },
+        ],
+        timing,
+      ),
+      // Creases deepen as the strip pinches
+      shade.animate([{ opacity: 0 }, { opacity: fold * 0.8, offset: 0.4 }, { opacity: fold }], timing),
+    ];
+  });
+  // Lifts off the card: one drop shadow on the whole funnel's silhouette (a filter on the container, so the
+  // strips don't stack their own shadows into bands)
+  container.animate(
+    [
+      { filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18))' },
+      { filter: 'drop-shadow(0 6px 8px rgba(0, 0, 0, 0.3))', offset: 0.35 },
+      { filter: 'drop-shadow(0 3px 4px rgba(0, 0, 0, 0.25))' },
+    ],
+    { duration: STAGGER_TOTAL + DURATION, fill: 'forwards' },
   );
   return Promise.all(animations.map((a) => a.finished)).finally(() => container.remove());
 };
@@ -565,10 +599,7 @@ onBeforeUnmount(() => {
         </VCard>
 
         <!-- Search with no hits -->
-        <div
-          v-else-if="!filteredNotes.length"
-          class="notes-no-match d-flex flex-column align-center text-center pt-10"
-        >
+        <div v-else-if="!filteredNotes.length" class="notes-no-match d-flex flex-column align-center text-center pt-10">
           <VIcon icon="mdi-magnify-close" size="36" class="mb-3 text-disabled" />
           <p class="text-body-2 text-medium-emphasis">No matching notes</p>
         </div>
@@ -863,6 +894,20 @@ onBeforeUnmount(() => {
   width: 100%;
   overflow: hidden;
   will-change: transform;
+}
+
+/* Fold shading over each strip: darker toward the curled edges, opacity animated per strip (suckIntoTrash) */
+.note-suck__shade {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.6),
+    rgba(0, 0, 0, 0.26) 30%,
+    rgba(0, 0, 0, 0.26) 70%,
+    rgba(0, 0, 0, 0.6)
+  );
 }
 
 /* Copies must not replay their own entry animations/transitions (e.g. the editor's content pop) */

@@ -270,6 +270,8 @@ test('ticks a checklist item straight from the card without opening the editor',
 
   const item = page.locator('.note-card li[data-type="taskItem"]');
   await expect(item).toHaveAttribute('data-checked', 'false');
+  // The closing editor overlay covers the card until its shrink animation ends
+  await expect(page.locator('.notes-editor-overlay')).toHaveCount(0);
 
   // The preview is inert, so click by position on the checkbox's label box
   const box = await page.locator('.note-card li[data-type="taskItem"] > label').boundingBox();

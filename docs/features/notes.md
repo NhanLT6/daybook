@@ -37,7 +37,7 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 | File | Role |
 |---|---|
 | `src/components/NotesPanel.vue` | Owns persistence (autosave/empty-discard), pinned-first order, search, drag & drop, trash, tick-from-card, and undo. The only place notes are read from/written to the store. |
-| `src/components/NoteCard.vue` | UI only — one card: color, sanitized preview (`previewHtml` must already be sanitized), pin icon, drag-state classes. Ripple is off (the card grows into the editor; a ripple on top reads as noise). |
+| `src/components/NoteCard.vue` | UI only — one card: color, sanitized preview (`previewHtml` must already be sanitized), pin icon, drag-state classes. Ripple is off (the card grows into the editor; a ripple on top reads as noise). The preview box ends 30px above the card bottom, above the date caption, and fades over its last 24px, so long notes never run under the date. |
 | `src/components/NoteEditor.vue` | UI only — the Tiptap instance, toolbar, and pin/color controls (emit `togglePin` / `color`), no persistence. `content` prop is **initial value only**: never watched back into the editor (would reset cursor/selection), so the parent keys the component by note id to force remount when switching notes. Loaded lazily (`defineAsyncComponent`): Tiptap (~120 kB gzip) is kept out of the Home chunk and fetched when NotesPanel mounts, i.e. the first time the Notes tab opens, so the first note still opens instantly. |
 | `src/common/devSampleNotes.ts` | Dev-only random notes (checklists, lists, colors, some pinned) behind the flask button in the Notes toolbar. The button is `v-if="isDev"` (`import.meta.env.DEV`) and the module is dynamically imported, so neither ships in production builds. |
 | `src/common/sanitizeNoteHtml.ts` | DOMPurify allowlist used to render card previews via `v-html`. |
@@ -85,8 +85,9 @@ there are no notes.
   bounding boxes of `li[data-type="taskItem"] > label` (4px slop) instead of the event target. A hit toggles
   the nth taskItem in the stored HTML (parsed with `DOMParser`, `data-checked` + the `checked` attr flipped,
   serialized via `body.innerHTML` — a read, not an assignment) and saves; a miss opens the editor. The nth
-  preview checkbox is the nth stored taskItem because the sanitizer keeps every taskItem. Keyboard users tick
-  in the editor instead.
+  preview checkbox is the nth stored taskItem because the sanitizer keeps every taskItem. Only checkboxes you
+  can see count: one clipped off the preview or past the middle of its bottom fade isn't a hit (the click
+  opens the note). Keyboard users tick in the editor instead.
 
 ## Security Rules
 
@@ -153,6 +154,11 @@ classes still animate the glide. ~4 KB gzip.
   one rigid card. Thin strips matter: at 10px the funnel edge showed a visible staircase. Strips overlap by
   1px to hide seams, and an unscoped `.note-suck__strip *` rule disables animations/transitions on the copies
   (the editor's content "pop" would otherwise replay). The bin (z-index 4) sits above the strips (3).
+- **Paper fold + lift** — so a white note still reads against a white card: each strip carries a
+  `.note-suck__shade` overlay (darker toward the curled left/right edges) whose opacity follows a triangle
+  wave over ~14px folds (0 on a ridge, max in a crease) and deepens as the strip pinches, giving accordion
+  creases. A `drop-shadow` filter on the strips' container (not a `box-shadow` per strip, which would
+  stack into bands) grows as the paper lifts off.
 - **Drag to trash**: the copy starts where the card was released (last pointer minus the grab offset from
   `pointerdown`).
 - **Delete from editor**: the editor card is copied *before* `editing` is cleared (Tiptap empties its DOM on
