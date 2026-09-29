@@ -51,7 +51,7 @@ test('repeat preset and custom rule save from the form', async ({ page }) => {
   await row.locator('button:has(.mdi-pencil-outline)').click();
   await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
   await page.getByRole('option', { name: 'Custom…' }).click();
-  await dialog.locator('input[type="number"]').first().fill('3');
+  await dialog.getByLabel('Repeat interval').fill('3');
   await dialog.getByRole('button', { name: 'After' }).click();
   await dialog.getByLabel('Occurrences').fill('4');
   await expect(dialog).toContainText('Every 3 weeks on Wednesday, 4 times');
@@ -80,7 +80,7 @@ test('range picked in the date picker repeats via the custom panel', async ({ pa
 
   // A 12-day range can't repeat weekly; every 2 weeks fits
   await expect(dialog).toContainText('longer than the time between repeats');
-  await dialog.locator('input[type="number"]').first().fill('2');
+  await dialog.getByLabel('Repeat interval').fill('2');
   await expect(dialog).not.toContainText('longer than the time between repeats');
   await dialog.getByRole('button', { name: 'Add' }).click();
 

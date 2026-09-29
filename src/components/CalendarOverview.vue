@@ -81,7 +81,9 @@ const selectedDateAttribute = computed(() => ({
 // matching a has-weekend-N class on the wrapper will apply
 const weekendClasses = computed(() => settingsStore.vCalendarWeekendDays.map((d) => `has-weekend-${d}`));
 
-// One dot per day of a single occurrence — holidays in deep-purple, custom events in indigo
+// One dot per day of a single occurrence. Each colour has one meaning: accent (purple) = holiday,
+// info (blue) = your own event; green stays reserved for today/selected. Theme CSS vars (not hex,
+// which v-calendar ignores) keep dots in step with light/dark mode.
 const toDayAttributes = (event: AppEvent) => {
   const startDate = dayjs(event.date);
   const endDate = event.endDate ? dayjs(event.endDate) : startDate;
@@ -97,7 +99,7 @@ const toDayAttributes = (event: AppEvent) => {
   // Create an attribute for each date in the range
   return dates.map((date) => ({
     dates: date,
-    dot: { color: event.type === 'holiday' ? '#673AB7' : '#3F51B5' },
+    dot: { style: { backgroundColor: `rgb(var(--v-theme-${event.type === 'holiday' ? 'accent' : 'info'}))` } },
     popover: { label: event.title },
   }));
 };

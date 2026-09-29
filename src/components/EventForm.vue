@@ -369,14 +369,14 @@ const onCancelModifyEvent = () => {
         <!-- Every N units -->
         <div class="d-flex align-center ga-2">
           <span class="text-body-2">Every</span>
-          <VTextField
+          <VNumberInput
             :model-value="repeatRule.interval"
-            type="number"
-            min="1"
+            :min="1"
+            aria-label="Repeat interval"
             density="compact"
             hide-details
             class="repeat-interval"
-            @update:model-value="updateRule({ interval: Number($event) })"
+            @update:model-value="updateRule({ interval: $event })"
           />
           <VSelect
             :model-value="repeatRule.freq"
@@ -437,15 +437,14 @@ const onCancelModifyEvent = () => {
             hide-details
             @update:model-value="updateRule({ end: { until: $event } })"
           />
-          <VTextField
+          <VNumberInput
             v-if="repeatRule.end && 'count' in repeatRule.end"
             :model-value="repeatRule.end.count"
-            type="number"
-            min="1"
+            :min="1"
             label="Occurrences"
             density="compact"
             hide-details
-            @update:model-value="updateRule({ end: { count: Number($event) } })"
+            @update:model-value="updateRule({ end: { count: $event } })"
           />
         </div>
 
@@ -482,7 +481,7 @@ const onCancelModifyEvent = () => {
 
 <style scoped>
 .repeat-interval {
-  max-width: 72px;
+  max-width: 128px;
   flex: 0 0 auto;
 }
 </style>
