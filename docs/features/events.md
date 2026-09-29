@@ -91,6 +91,9 @@ the rule is untouched.
   the `describeRepeat` summary. "Upcoming" also uses the next occurrence, so a running series appears once.
 - **Calendar**: expands occurrences only for the visible range (`getOccurrences`) — never enumerate a series
   unbounded (`never` ends means infinite).
+- **Dot colours carry one meaning each**: `accent` (purple) = holiday, `info` (blue) = your own event; green
+  (`primary`) is reserved for today/selected. Dots are styled with `rgb(var(--v-theme-…))` because v-calendar
+  ignores hex values in `dot.color` (they all fell back to the theme green).
 
 ## Rules and Gotchas
 
