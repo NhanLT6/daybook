@@ -63,7 +63,10 @@ Two **independent** choices:
 
 1. **When one occurrence happens** — the date picker's Single / Multiple / Range toggle (Vuetify `VDatePicker`
    `multiple`: `false` / `true` / `'range'`), all-day or timed. Picker output is Date objects; the form stores
-   `YYYY-MM-DD` strings.
+   `YYYY-MM-DD` strings. In range mode the picker's model is **every day** from start to end (what Vuetify
+   itself emits; it highlights only the days in its model), or `[date, date]` before an end is picked — a
+   single entry would read as a half-picked range, and the next click would end it at the old date. The
+   picker starts the week on the Settings first day of week, like the calendar.
 2. **Repeat** — a pattern applied to that occurrence.
 
 A range + repeat copies the range length to every occurrence: a sprint Mon→Fri of next week, every 2 weeks.

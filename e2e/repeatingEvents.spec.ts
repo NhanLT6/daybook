@@ -117,24 +117,36 @@ test('"When it ends" repeats a range back to back and follows date changes', asy
   await dialog.getByLabel('Title').fill('Sprint');
 
   // Reopening shows the picked month in Range mode already
-  const pickRange = async (from: number, to: number, first = false) => {
-    await dialog.getByRole('textbox', { name: 'Date' }).click();
-    if (first) {
-      await page.getByRole('button', { name: 'Range' }).click();
-      await page.getByRole('button', { name: 'Next month' }).click();
-    }
+  const pickRange = async (from: number, to: number) => {
     await pickDay(page, nextMonthDay(from));
     await pickDay(page, nextMonthDay(to));
     await page.keyboard.press('Escape');
   };
+  const dateField = dialog.getByRole('textbox', { name: 'Date' });
 
-  await pickRange(5, 16, true);
+  await dateField.click();
+  await page.getByRole('button', { name: 'Range' }).click();
+  await page.getByRole('button', { name: 'Next month' }).click();
+  await pickRange(5, 16);
   const repeat = dialog.locator('.v-select', { hasText: 'Repeat' });
   await repeat.click();
   await page.getByRole('option', { name: /^When it ends/ }).click();
   await expect(repeat).toContainText(/When it ends \(every (2 weeks on \w+day|12 days)\)/);
 
   // Shorter range: the pick follows it instead of turning into a custom rule
+  // The days between a range's ends show as picked too
+  await dateField.click();
+  const midLabel = nextMonthDay(10).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  await expect(
+    page.locator('.v-date-picker-month__day--selected:not(.v-date-picker-month__day--adjacent)', {
+      has: page.getByRole('button', { name: new RegExp(`${midLabel}$`) }),
+    }),
+  ).toHaveCount(1);
   await pickRange(5, 8);
   await expect(repeat).toContainText(/When it ends \(every (week on \w+day|4 days)\)/);
 

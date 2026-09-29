@@ -373,6 +373,7 @@ const readCsv = (file?: File) => {
                 <VDatePicker
                   :model-value="dateRangeModel"
                   multiple="range"
+                  :first-day-of-week="settingsStore.firstDayOfWeek"
                   :min="monthMin"
                   :max="monthMax"
                   hide-title

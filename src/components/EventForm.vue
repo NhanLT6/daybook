@@ -96,7 +96,8 @@ const repeatRule = ref<RepeatRule | null>(item?.repeat ? { ...item.repeat } : nu
 const isCustomRepeat = ref(false);
 const skipDates = ref<string[]>([...(item?.repeat?.skip ?? [])].sort());
 
-// Weekend days decide whether a back-to-back range restarts on the same weekday (see backToBackRule)
+// Settings: weekend days decide whether a back-to-back range restarts on the same weekday (see
+// backToBackRule); the first day of week lines the date picker up with the calendar
 const settingsStore = useSettingsStore();
 const presets = computed(() => repeatPresets(shape.value, settingsStore.weekendDays));
 const backToBack = computed(() => backToBackRule(shape.value, settingsStore.weekendDays));
@@ -210,11 +211,19 @@ const unskipDate = (date: string) => {
 
 // ─── Computed ─────────────────────────────────────────────────
 
-// VDatePicker model: a date in single mode, the picked days in multiple mode, [start, end] in range mode
+// VDatePicker model: a date in single mode, the picked days in multiple mode, every day from start to end in
+// range mode — the shape Vuetify itself emits for a range, which it needs to highlight the days in between
 const datePickerModel = computed({
   get: () => {
     if (dateMode.value === 'multiple') return pickedDays.value;
-    if (dateMode.value === 'range') return [dateField.value.value, endDateField.value.value ?? dateField.value.value];
+    if (dateMode.value === 'range') {
+      // No end yet: [date, date], a complete one-day range, so the next click starts a new range. A single
+      // entry would read as half-picked and the next click would end a range at the old date.
+      if (!endDateField.value.value) return [dateField.value.value, dateField.value.value];
+      const start = dayjs(dateField.value.value);
+      const length = dayjs(endDateField.value.value).diff(start, 'day') + 1;
+      return Array.from({ length }, (_, i) => start.add(i, 'day').format('YYYY-MM-DD'));
+    }
     return dateField.value.value;
   },
   set: (val) => {
@@ -328,6 +337,7 @@ const onCancelModifyEvent = () => {
           <VDatePicker
             :model-value="datePickerModel"
             :multiple="dateMode === 'range' ? 'range' : dateMode === 'multiple'"
+            :first-day-of-week="settingsStore.firstDayOfWeek"
             hide-title
             class="mx-auto"
             @update:model-value="datePickerModel = $event"
