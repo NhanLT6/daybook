@@ -6,9 +6,11 @@ import EventForm from '@/components/EventForm.vue';
 import type { AppEvent } from '@/interfaces/Event';
 
 import dayjs from 'dayjs';
+import { omit } from 'lodash';
 
 import holidayImg from '@/assets/summer-holidays.png';
 import { formatEventDate } from '@/common/DateHelpers';
+import { atOccurrence, describeRepeat, getNextOccurrence } from '@/common/eventRecurrence';
 import { useEvents } from '@/composables/useEvents';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { nanoid } from 'nanoid';
@@ -21,12 +23,22 @@ const notificationCenter = useNotificationCenterStore();
 const typeFilter = ref<'all' | 'custom' | 'holiday'>('all');
 const timeFilter = ref<'upcoming' | 'all'>('upcoming');
 
-// Events filtered by type + time, sorted chronologically
-const filteredEvents = computed<AppEvent[]>(() =>
+// One table row per event; `next` is its next occurrence (null once the series is over).
+// Computed once per event here so the template never recomputes it.
+interface EventRow {
+  id: string;
+  event: AppEvent;
+  next: string | null;
+}
+
+// Events filtered by type + time, sorted by next occurrence (ended events fall back to their first date)
+const filteredEvents = computed<EventRow[]>(() =>
   events.value
     .filter((e) => typeFilter.value === 'all' || e.type === typeFilter.value)
-    .filter((e) => timeFilter.value === 'all' || !isPastEvent(e.date))
-    .sort((a, b) => dayjs(a.date).diff(dayjs(b.date))),
+    .map((event) => ({ id: event.id, event, next: getNextOccurrence(event) }))
+    // An event is past iff it has no occurrence left
+    .filter((row) => timeFilter.value === 'all' || row.next !== null)
+    .sort((a, b) => dayjs(a.next ?? a.event.date).diff(dayjs(b.next ?? b.event.date))),
 );
 
 // Empty-state copy reflects the active time filter
@@ -37,15 +49,13 @@ const headers = [
   { title: '', key: 'type', sortable: false, width: 56 },
   { title: 'Event', key: 'title', sortable: false },
   { title: 'When', key: 'when', sortable: false },
-  { title: '', key: 'actions', sortable: false, width: 96 },
+  { title: '', key: 'actions', sortable: false, width: 136 },
 ];
 
 // Dim past events at the row level
-const rowProps = ({ item }: { item: AppEvent }) => ({
-  class: isPastEvent(item.date) ? 'text-disabled' : '',
+const rowProps = ({ item }: { item: EventRow }) => ({
+  class: item.next === null ? 'text-disabled' : '',
 });
-
-const isPastEvent = (date: string): boolean => dayjs(date).isBefore(dayjs(), 'day');
 
 // ─── Modal state ─────────────────────────────────────────────
 const isModalOpen = ref(false);
@@ -77,6 +87,39 @@ const onSaveEvent = (event: AppEvent) => {
   addEvent(savedEvent);
 
   isModalOpen.value = false;
+};
+
+// Leave the next occurrence out of a repeating series. Undo removes just that date from the
+// event's CURRENT skip list, so a second skip made before undoing the first isn't lost.
+const skipNextOccurrence = (event: AppEvent, next: string) => {
+  if (!event.repeat) return;
+
+  // Build new objects rather than mutating the reactive event; an empty list drops the key
+  const withSkip = (target: AppEvent, skip: string[]): AppEvent => {
+    const rule = omit(target.repeat!, 'skip');
+    return { ...target, repeat: skip.length ? { ...rule, skip } : rule };
+  };
+
+  addEvent(withSkip(event, [...(event.repeat.skip ?? []), next]));
+
+  const id = notificationCenter.success(`Skipped ${dayjs(next).format('MMM D')}`, {
+    message: event.title,
+    expandOnEnqueue: true, // actions only render in the expanded island
+    actions: [
+      {
+        id: 'undo',
+        label: 'Undo',
+        tone: 'primary',
+        closeOnComplete: true,
+        onClick: () => {
+          const current = events.value.find((e) => e.id === event.id);
+          if (current?.repeat) addEvent(withSkip(current, (current.repeat.skip ?? []).filter((d) => d !== next)));
+        },
+      },
+    ],
+  });
+  // Store forces actionable notifications persistent by design; auto-close the undo offer ourselves.
+  setTimeout(() => notificationCenter.dismiss(id), 6000);
 };
 
 const deleteEvent = (event: AppEvent) => {
@@ -164,6 +207,7 @@ const deleteEvent = (event: AppEvent) => {
           <VDataTable
             :items="filteredEvents"
             :headers="headers"
+            item-value="id"
             :items-per-page="-1"
             :row-props="rowProps"
             class="bg-container events-table"
@@ -173,7 +217,7 @@ const deleteEvent = (event: AppEvent) => {
             <!-- Type avatar: holiday image vs custom icon -->
             <template #item.type="{ item }">
               <VAvatar size="small" variant="tonal">
-                <VImg v-if="item.type === 'holiday'" :src="holidayImg" alt="Holiday" />
+                <VImg v-if="item.event.type === 'holiday'" :src="holidayImg" alt="Holiday" />
                 <VIcon v-else icon="mdi-account-outline" class="text-disabled" />
               </VAvatar>
             </template>
@@ -181,21 +225,45 @@ const deleteEvent = (event: AppEvent) => {
             <!-- Title + optional muted description line -->
             <template #item.title="{ item }">
               <div class="py-1">
-                <div>{{ item.title }}</div>
-                <div v-if="item.description" class="text-caption text-medium-emphasis">{{ item.description }}</div>
+                <div>{{ item.event.title }}</div>
+                <div v-if="item.event.description" class="text-caption text-medium-emphasis">
+                  {{ item.event.description }}
+                </div>
               </div>
             </template>
 
-            <!-- Formatted date/time — keep on one line -->
+            <!-- Next occurrence (or first date once the series ended) + repeat summary -->
             <template #item.when="{ item }">
-              <span class="text-no-wrap">{{ formatEventDate(item) }}</span>
+              <div class="py-1">
+                <span class="text-no-wrap">{{
+                  formatEventDate(item.next ? atOccurrence(item.event, item.next) : item.event)
+                }}</span>
+                <div v-if="item.event.repeat" class="text-caption text-medium-emphasis text-no-wrap">
+                  <VIcon icon="mdi-repeat" size="x-small" class="mr-1" />{{
+                    describeRepeat(item.event.date, item.event.repeat)
+                  }}
+                </div>
+              </div>
             </template>
 
-            <!-- Edit / delete — custom events only -->
+            <!-- Skip next / edit / delete — custom events only -->
             <template #item.actions="{ item }">
-              <div v-if="item.type === 'custom'" class="d-flex ga-1 justify-end">
-                <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(item)" />
-                <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(item)" />
+              <div v-if="item.event.type === 'custom'" class="d-flex ga-1 justify-end">
+                <!-- Tooltip wraps the button: VIconBtn's default slot would replace its icon -->
+                <VTooltip v-if="item.event.repeat && item.next" :text="`Skip ${dayjs(item.next).format('MMM D')}`">
+                  <template #activator="{ props }">
+                    <VIconBtn
+                      v-bind="props"
+                      icon="mdi-calendar-remove-outline"
+                      size="small"
+                      variant="text"
+                      :aria-label="`Skip ${dayjs(item.next).format('MMM D')}`"
+                      @click="skipNextOccurrence(item.event, item.next)"
+                    />
+                  </template>
+                </VTooltip>
+                <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(item.event)" />
+                <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(item.event)" />
               </div>
             </template>
           </VDataTable>
@@ -204,7 +272,7 @@ const deleteEvent = (event: AppEvent) => {
     </div>
 
     <!-- Add / Edit Modal -->
-    <VDialog v-model="isModalOpen" max-width="400" persistent>
+    <VDialog v-model="isModalOpen" max-width="400" persistent scrollable>
       <EventForm :item="editingEvent" @save-event="onSaveEvent" @cancel-modify-event="onCancelModifyEvent" />
     </VDialog>
   </VCard>

@@ -9,8 +9,10 @@ import { useNow, useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
+import { atOccurrence, getOccurrences } from '@/common/eventRecurrence';
 import { storageKeys } from '@/common/storageKeys';
 import { useEvents } from '@/composables/useEvents';
+import type { AppEvent } from '@/interfaces/Event';
 import { useSettingsStore } from '@/stores/settings';
 
 // Theme integration
@@ -51,7 +53,18 @@ const isTodayVisible = ref(true);
 
 const { events } = useEvents();
 
-// Calendar attributes - static, not reactive to displayed month to avoid recursion
+// Visible date range (YYYY-MM-DD), kept in sync with v-calendar's pages so repeating events only
+// expand into the days on screen. The default (current month + a week of padding each side, enough
+// for leading/trailing days) gives the first render dots before the first update:pages event fires.
+const DATE_FORMAT = 'YYYY-MM-DD';
+const visibleRange = ref({
+  from: dayjs().startOf('month').subtract(7, 'day').format(DATE_FORMAT),
+  to: dayjs().endOf('month').add(7, 'day').format(DATE_FORMAT),
+});
+
+// Calendar attributes - depend on the visible range only through `visibleRange`, which onPageChange
+// updates solely when the range really changes, so attributes -> update:pages -> attributes settles
+// after one pass instead of recursing
 const todayAttribute = computed(() => ({
   key: 'today',
   highlight: { color: 'green', fillMode: 'outline' },
@@ -68,30 +81,36 @@ const selectedDateAttribute = computed(() => ({
 // matching a has-weekend-N class on the wrapper will apply
 const weekendClasses = computed(() => settingsStore.vCalendarWeekendDays.map((d) => `has-weekend-${d}`));
 
-// Event attributes — holidays in deep-purple, custom events in indigo
-// For multi-day events, create dots for each day in the range
+// One dot per day of a single occurrence — holidays in deep-purple, custom events in indigo
+const toDayAttributes = (event: AppEvent) => {
+  const startDate = dayjs(event.date);
+  const endDate = event.endDate ? dayjs(event.endDate) : startDate;
+  const dates: Date[] = [];
+
+  // Generate array of dates from start to end (inclusive)
+  let currentDate = startDate;
+  while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
+    dates.push(currentDate.toDate());
+    currentDate = currentDate.add(1, 'day');
+  }
+
+  // Create an attribute for each date in the range
+  return dates.map((date) => ({
+    dates: date,
+    dot: { color: event.type === 'holiday' ? '#673AB7' : '#3F51B5' },
+    popover: { label: event.title },
+  }));
+};
+
+// Event attributes — repeating events are expanded into their occurrences within the visible range,
+// and multi-day occurrences get a dot for each day in the range
 const eventAttributes = computed(() => {
+  const { from, to } = visibleRange.value;
   return events.value
     .filter((event) => dayjs(event.date).isValid())
-    .flatMap((event) => {
-      const startDate = dayjs(event.date);
-      const endDate = event.endDate ? dayjs(event.endDate) : startDate;
-      const dates: Date[] = [];
-
-      // Generate array of dates from start to end (inclusive)
-      let currentDate = startDate;
-      while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
-        dates.push(currentDate.toDate());
-        currentDate = currentDate.add(1, 'day');
-      }
-
-      // Create an attribute for each date in the range
-      return dates.map((date) => ({
-        dates: date,
-        dot: { color: event.type === 'holiday' ? '#673AB7' : '#3F51B5' },
-        popover: { label: event.title },
-      }));
-    });
+    .flatMap((event) =>
+      getOccurrences(event, from, to).flatMap((occurrence) => toDayAttributes(atOccurrence(event, occurrence))),
+    );
 });
 
 const calendarAttrs = computed(() => [todayAttribute.value, selectedDateAttribute.value, ...eventAttributes.value]);
@@ -148,6 +167,19 @@ const onPageChange = (pages: Page[]) => {
   }
   const todayStr = dayjs().format('YYYY-MM-DD');
   isTodayVisible.value = pages[0].viewDays?.some((day) => dayjs(day.date).format('YYYY-MM-DD') === todayStr) ?? false;
+
+  // First page's first day to last page's last day. Assign only on a real change: the attributes
+  // this triggers make v-calendar re-emit update:pages with the same range, which must be a no-op
+  const firstDay = pages[0].viewDays?.[0];
+  const lastViewDays = pages[pages.length - 1].viewDays;
+  const lastDay = lastViewDays?.[lastViewDays.length - 1];
+  if (firstDay && lastDay) {
+    const from = dayjs(firstDay.date).format(DATE_FORMAT);
+    const to = dayjs(lastDay.date).format(DATE_FORMAT);
+    if (from !== visibleRange.value.from || to !== visibleRange.value.to) {
+      visibleRange.value = { from, to };
+    }
+  }
 };
 
 // Navigate to today using v-calendar's move API
