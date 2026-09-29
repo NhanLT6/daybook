@@ -10,20 +10,24 @@ start/end markers are planned next (a Mon→Fri range repeating every 2 weeks).
 ## Data Model
 
 ```
-AppEvent   { id, title, date, endDate?, startTime?, endTime?, type, description?, repeat? }   ← IndexedDB via useEvents ('events')
-RepeatRule { freq, interval, weekdays?, monthlyBy?, end?, skip? }                             ← optional field on AppEvent
+AppEvent   { id, title, date, endDate?, dates?, startTime?, endTime?, type, description?, repeat? }   ← IndexedDB via useEvents ('events')
+RepeatRule { freq, interval, monthlyBy?, end?, skip? }                                               ← optional field on AppEvent
 ```
 
 Interfaces: `src/interfaces/Event.ts`
 
-- `date` / `endDate` describe the **first occurrence**. Every later occurrence copies its length
-  (`spanDays`) and its `startTime`/`endTime`. One-off events are unchanged: no `repeat` = single event.
+- `date` / `endDate` / `dates` describe the **first occurrence**, in one of three shapes: a single day, a
+  range (`endDate`), or separate days (`dates`, sorted, `dates[0] === date`, never together with `endDate`).
+  Every later occurrence copies that shape (`atOccurrence`) and its `startTime`/`endTime`. No `repeat` =
+  one-off event.
+- **Which weekdays a weekly series hits comes from the picked days**, not from the rule — pick Mon, Tue, Fri in
+  Multiple mode and "every week" repeats that set. Weekly/daily series shift each day by whole days;
+  monthly/yearly keep each day's day-of-month.
 - `RepeatRule` is a typed, friendly layer. **Never store raw RRULE strings**; `rrule` (npm) only does the date
   math inside `src/common/eventRecurrence.ts`.
-- `weekdays` uses `dayjs().day()` numbering (0 = Sun … 6 = Sat), weekly only; undefined = start date's weekday.
-  `monthlyBy` is monthly only; undefined = `dayOfMonth`. `end` is `{ until }` (inclusive) or `{ count }`;
+- `monthlyBy` is monthly only, and nth/last weekday only applies to a single start day; undefined = `dayOfMonth`. `end` is `{ until }` (inclusive) or `{ count }`;
   undefined = never. `skip` holds occurrence **start** dates left out of the series.
-- **Storage**: `repeat` is an optional field on existing records, so there is **no IndexedDB version bump and no
+- **Storage**: `repeat` and `dates` are optional fields on existing records, so there is **no IndexedDB version bump and no
   migration**; old events simply lack it. Backups carry it as-is (`useBackup` snapshots whole records).
 
 ## Where Logic Lives
@@ -33,7 +37,7 @@ Interfaces: `src/interfaces/Event.ts`
 | `src/common/eventRecurrence.ts` | All date logic. Components never touch `rrule` or do their own recurrence math. |
 | `src/common/__tests__/eventRecurrence.test.ts` | Unit tests for every function below. |
 | `src/composables/useEvents.ts` | Thin wrapper over `useCollection<AppEvent>('events')` (add/remove/replaceAll). |
-| `src/components/EventForm.vue` | Add/edit form: date choice, Repeat field, skipped-date chips. |
+| `src/components/EventForm.vue` | Add/edit form: Single/Multiple/Range date picker, Repeat field, skipped-date chips. |
 | `src/components/EventList.vue` | Events list: one row per series, "Skip next date" action. |
 | `src/components/CalendarOverview.vue` | Calendar dots/markers; expands occurrences for the visible range only. |
 
@@ -43,35 +47,36 @@ Interfaces: `src/interfaces/Event.ts`
   (calendar) uses this.
 - `getNextOccurrence(event, from = today)` — first occurrence still running on/after `from`; `null` when over.
   Powers list rows and "Upcoming".
-- `atOccurrence(event, date)` — copy of the event moved to an occurrence (shifts `endDate` too), so existing
-  date formatters/renderers work unchanged.
-- `validateRepeat(event, rule)` — error string when a range would overlap its next occurrence, else `''`.
-- `describeRepeat(date, rule)` — the summary sentence ("Every 2 weeks on Tuesday, until Dec 31, 2026").
-- `repeatPresets(date)` — the dropdown quick picks; `isSameRule(a, b)` matches a stored rule back to a preset
-  (ignores `skip`, weekday order).
-- `spanDays`, `nthWeekdayOfMonth`, `isLastWeekdayOfMonth` — small helpers shared with the form.
+- `atOccurrence(event, date)` — copy of the event moved to an occurrence (shifts `endDate` / `dates` too), so
+  existing date formatters/renderers work unchanged.
+- `validateRepeat(event, rule)` — error string when an occurrence (range or picked days) would overlap the next
+  one, else `''`.
+- `describeRepeat(days, rule)` — the summary sentence ("Every 2 weeks on Monday and Friday, until Dec 31, 2026").
+- `repeatPresets(event)` — the dropdown quick picks, **filtered to rules the event's shape allows** (no "every
+  week" for a 12-day sprint); `isSameRule(a, b)` matches a stored rule back to a preset (ignores `skip`).
+- `eventDays`, `spanDays`, `nthWeekdayOfMonth`, `isLastWeekdayOfMonth` — small helpers shared with the form.
 
 ## Event Form
 
 Two **independent** choices:
 
-1. **When one occurrence happens** — single day or range (the existing Single/Range toggle), all-day or timed.
+1. **When one occurrence happens** — the date picker's Single / Multiple / Range toggle (Vuetify `VDatePicker`
+   `multiple`: `false` / `true` / `'range'`), all-day or timed. Picker output is Date objects; the form stores
+   `YYYY-MM-DD` strings.
 2. **Repeat** — a pattern applied to that occurrence.
 
 A range + repeat copies the range length to every occurrence: a sprint Mon→Fri of next week, every 2 weeks.
 
 Repeat field:
 
-- **Dropdown of presets** derived from the chosen date (`repeatPresets`): every day, every week on <day>, every
-  2 weeks, every weekday (Mon–Fri), monthly on the nth <weekday>, monthly on the last <weekday>, monthly on
-  day N, yearly. The "last <weekday>" preset is offered **only when the date is the last such weekday** of its
-  month (`isLastWeekdayOfMonth`). Presets are recomputed when the date changes.
-- **Custom…** panel: every N day/week/month/year; weekday chips (weekly); day-of-month vs nth/last weekday
-  (monthly); ends never / on date / after N times.
-- A live summary (`describeRepeat`) shows under the field.
-- For **ranges the weekday picker is hidden** and the start date's weekday is used (a multi-weekday range
-  series makes no sense).
-- `validateRepeat` blocks saving a range longer than the gap between repeats.
+- **Dropdown of presets** derived from the chosen date(s) (`repeatPresets`): every day, every week on <days>,
+  every 2 weeks, monthly on the nth <weekday>, monthly on the last <weekday>, monthly on day(s) N, yearly. The
+  "last <weekday>" preset is offered **only when the date is the last such weekday** of its month
+  (`isLastWeekdayOfMonth`). Presets are recomputed when the dates change.
+- **Custom…** panel: every N day/week/month/year (`VNumberInput`); day-of-month vs nth/last weekday (monthly,
+  single start day); ends never / on date / after N times. It opens on a rule that fits the dates.
+- The selected rule's summary (`describeRepeat`) shows in the Repeat field.
+- `validateRepeat` blocks saving an occurrence longer than the gap between repeats.
 
 ## Skipping
 
@@ -90,7 +95,9 @@ the rule is untouched.
 - **Events list**: a series is one row showing its next occurrence (`getNextOccurrence` + `atOccurrence`) plus
   the `describeRepeat` summary. "Upcoming" also uses the next occurrence, so a running series appears once.
 - **Calendar**: expands occurrences only for the visible range (`getOccurrences`) — never enumerate a series
-  unbounded (`never` ends means infinite).
+  unbounded (`never` ends means infinite). Single and separately picked days get a dot each; **ranges only
+  mark their first and last day** ("Sprint starts" / "Sprint ends" popovers) so back-to-back sprints don't
+  cover the calendar in dots.
 - **Dot colours carry one meaning each**: `accent` (purple) = holiday, `info` (blue) = your own event; green
   (`primary`) is reserved for today/selected. Dots are styled with `rgb(var(--v-theme-…))` because v-calendar
   ignores hex values in `dot.color` (they all fell back to the theme green).

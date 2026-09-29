@@ -62,9 +62,18 @@ describe('getOccurrences', () => {
     ).toEqual(['2026-10-06', '2026-10-20', '2026-11-03']);
   });
 
-  it('supports several weekdays per week', () => {
-    const e = event({ date: '2026-10-05', repeat: { freq: 'week', interval: 1, weekdays: [1, 3, 5] } });
-    expect(getOccurrences(e, '2026-10-05', '2026-10-11')).toEqual(['2026-10-05', '2026-10-07', '2026-10-09']);
+  it('repeats a set of separately picked days together', () => {
+    // Mon, Wed, Fri of one week, every week
+    const e = event({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-07', '2026-10-09'], repeat: { freq: 'week', interval: 1 } });
+    expect(getOccurrences(e, '2026-10-05', '2026-10-18')).toEqual(['2026-10-05', '2026-10-12']);
+    expect(atOccurrence(e, '2026-10-12').dates).toEqual(['2026-10-12', '2026-10-14', '2026-10-16']);
+    // A window touching only the Friday of an occurrence still returns that occurrence
+    expect(getOccurrences(e, '2026-10-16', '2026-10-16')).toEqual(['2026-10-12']);
+  });
+
+  it('keeps day-of-month for separately picked days repeating monthly', () => {
+    const e = event({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-20'], repeat: { freq: 'month', interval: 1 } });
+    expect(atOccurrence(e, '2026-11-05').dates).toEqual(['2026-11-05', '2026-11-20']);
   });
 
   it('repeats monthly on the nth and last weekday', () => {
@@ -141,8 +150,14 @@ describe('validateRepeat', () => {
 describe('describeRepeat', () => {
   it('reads naturally', () => {
     expect(describeRepeat('2026-10-06', biweekly)).toBe('Every 2 weeks on Tuesday');
-    expect(describeRepeat('2026-10-06', { freq: 'week', interval: 1, weekdays: [1, 2, 3, 4, 5] })).toBe(
-      'Every weekday (Mon–Fri)',
+    const monToFri = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09'];
+    expect(describeRepeat(monToFri, { freq: 'week', interval: 1 })).toBe('Every weekday (Mon–Fri)');
+    // Sunday lists last (Monday-first week)
+    expect(describeRepeat(['2026-10-04', '2026-10-05', '2026-10-09'], biweekly)).toBe(
+      'Every 2 weeks on Monday, Friday and Sunday',
+    );
+    expect(describeRepeat(['2026-10-05', '2026-10-20'], { freq: 'month', interval: 1 })).toBe(
+      'Every month on days 5 and 20',
     );
     expect(describeRepeat('2026-10-06', { freq: 'month', interval: 1, monthlyBy: 'nthWeekday' })).toBe(
       'Every month on the first Tuesday',
@@ -156,15 +171,35 @@ describe('describeRepeat', () => {
 
 describe('repeatPresets / isSameRule', () => {
   it('offers "last weekday" only when the date is the last of its weekday', () => {
-    expect(repeatPresets('2026-10-06').some((p) => p.value.monthlyBy === 'lastWeekday')).toBe(false);
-    expect(repeatPresets('2026-10-27').some((p) => p.value.monthlyBy === 'lastWeekday')).toBe(true);
+    expect(repeatPresets({ date: '2026-10-06' }).some((p) => p.value.monthlyBy === 'lastWeekday')).toBe(false);
+    expect(repeatPresets({ date: '2026-10-27' }).some((p) => p.value.monthlyBy === 'lastWeekday')).toBe(true);
   });
 
-  it('matches rules regardless of weekday order and skip list', () => {
+  it('only offers rules the dates fit', () => {
+    // A 12-day sprint can't repeat daily or weekly
+    const sprint = repeatPresets({ date: '2026-10-05', endDate: '2026-10-16' }).map((p) => p.title);
+    expect(sprint).toEqual([
+      'Every 2 weeks on Monday',
+      'Every month on the first Monday',
+      'Every month on day 5',
+      'Every year on Oct 5',
+    ]);
+
+    // Several picked days: no "nth weekday" (it describes one start day)
+    const days = repeatPresets({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-09'] }).map((p) => p.title);
+    expect(days).toEqual([
+      'Every week on Monday and Friday',
+      'Every 2 weeks on Monday and Friday',
+      'Every month on days 5 and 9',
+      'Every year on Oct 5 and Oct 9',
+    ]);
+  });
+
+  it('matches rules regardless of the skip list', () => {
     expect(
       isSameRule(
-        { freq: 'week', interval: 1, weekdays: [5, 1], skip: ['2026-10-09'] },
-        { freq: 'week', interval: 1, weekdays: [1, 5] },
+        { freq: 'week', interval: 1, skip: ['2026-10-09'] },
+        { freq: 'week', interval: 1 },
       ),
     ).toBe(true);
     expect(isSameRule(biweekly, { freq: 'week', interval: 1 })).toBe(false);

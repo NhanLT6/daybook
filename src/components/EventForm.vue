@@ -8,8 +8,10 @@ import { object, string } from 'yup';
 
 import dayjs from 'dayjs';
 
+import { formatEventDate } from '@/common/DateHelpers';
 import {
   describeRepeat,
+  eventDays,
   isLastWeekdayOfMonth,
   isSameRule,
   nthWeekdayOfMonth,
@@ -31,6 +33,10 @@ const isDatePickerOpen = ref(false);
 const isStartTimeOpen = ref(false);
 const isEndTimeOpen = ref(false);
 
+// The date picker emits Date objects, and older events may hold one too: keep every date a
+// YYYY-MM-DD string so saved events (and the repeat math, which compares strings) never see a Date
+const toDay = (d: unknown) => dayjs(d as Date | string).format('YYYY-MM-DD');
+
 // ─── Form (vee-validate) ──────────────────────────────────────
 const validationSchema = object({
   title: string().required('Required'),
@@ -41,9 +47,9 @@ const { resetForm, handleSubmit } = useForm({
     title: item?.title ?? '',
     description: item?.description ?? '',
     allDay: item ? !item.startTime : true,
-    // Older events may hold a Date here (see datePickerModel) — normalize to YYYY-MM-DD on open
-    date: dayjs(item?.date).format('YYYY-MM-DD'),
-    endDate: item?.endDate ? dayjs(item.endDate).format('YYYY-MM-DD') : null,
+    date: toDay(item?.date),
+    endDate: item?.endDate ? toDay(item.endDate) : null,
+    dates: item?.dates && item.dates.length > 1 ? item.dates.map(toDay) : null,
     startTime: item?.startTime ?? '09:00',
     endTime: item?.endTime ?? '10:00',
   },
@@ -56,16 +62,30 @@ const descriptionField = useField<string>('description');
 const allDayField = useField<boolean>('allDay');
 const dateField = useField<string>('date');
 const endDateField = useField<string | null>('endDate');
+const datesField = useField<string[] | null>('dates');
 const startTimeField = useField<string>('startTime');
 const endTimeField = useField<string>('endTime');
 
-// ─── Date mode (single / range) ──────────────────────────────
-const dateMode = ref<'single' | 'range'>(item?.endDate && item.endDate !== item.date ? 'range' : 'single');
+// ─── Date mode (single / multiple / range) ───────────────────
+// Multiple = separate days (Mon, Tue, Fri); range = one continuous span. One occurrence is either.
+const dateMode = ref<'single' | 'multiple' | 'range'>(
+  item?.dates && item.dates.length > 1 ? 'multiple' : item?.endDate && item.endDate !== item.date ? 'range' : 'single',
+);
 
-// Switching back to single clears end date
+// Each mode keeps only its own shape: a range has an end date, multiple has a day list
 watch(dateMode, (mode) => {
-  if (mode === 'single') endDateField.setValue(null);
+  if (mode !== 'range') endDateField.setValue(null);
+  if (mode !== 'multiple') datesField.setValue(null);
 });
+
+// Current date selection in the shape the repeat helpers take
+const shape = computed(() => ({
+  date: dateField.value.value,
+  endDate: endDateField.value.value ?? undefined,
+  dates: datesField.value.value ?? undefined,
+}));
+const pickedDays = computed(() => eventDays(shape.value));
+const isMultiple = computed(() => pickedDays.value.length > 1);
 
 // ─── Repeat ───────────────────────────────────────────────────
 // Kept outside vee-validate: it's a nested object edited through several controls, and the
@@ -74,7 +94,7 @@ const repeatRule = ref<RepeatRule | null>(item?.repeat ? { ...item.repeat } : nu
 const isCustomRepeat = ref(false);
 const skipDates = ref<string[]>([...(item?.repeat?.skip ?? [])].sort());
 
-const presets = computed(() => repeatPresets(dateField.value.value));
+const presets = computed(() => repeatPresets(shape.value));
 
 // Dropdown value: 'none' | 'preset-N' | 'custom'. A saved rule that matches no preset opens as custom.
 const repeatSelect = computed({
@@ -87,7 +107,9 @@ const repeatSelect = computed({
   set: (value: string) => {
     isCustomRepeat.value = value === 'custom';
     if (value === 'none') repeatRule.value = null;
-    else if (value === 'custom') repeatRule.value ??= { freq: 'week', interval: 1 };
+    // Start Custom from a rule that fits the dates (a 12-day sprint can't repeat weekly)
+    else if (value === 'custom')
+      repeatRule.value ??= { ...(presets.value.find((p) => p.value.freq === 'week')?.value ?? { freq: 'week', interval: 1 }) };
     else repeatRule.value = { ...presets.value[Number(value.replace('preset-', ''))].value };
   },
 });
@@ -104,19 +126,6 @@ const showCustomPanel = computed(() => repeatSelect.value === 'custom');
 const freqItems = computed(() => {
   const plural = (repeatRule.value?.interval ?? 1) > 1;
   return (['day', 'week', 'month', 'year'] as RepeatFreq[]).map((f) => ({ title: plural ? `${f}s` : f, value: f }));
-});
-
-// Monday-first weekday chips; values follow dayjs().day() (0 = Sunday)
-const weekdayChips = [1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: dayjs().day(d).format('dd') }));
-
-const isRange = computed(() => !!endDateField.value.value);
-
-// Weekly: an empty selection means "the start date's weekday", so show that chip as selected
-const selectedWeekdays = computed({
-  get: () => (repeatRule.value?.weekdays?.length ? repeatRule.value.weekdays : [dayjs(dateField.value.value).day()]),
-  set: (days: number[]) => {
-    if (repeatRule.value) repeatRule.value = { ...repeatRule.value, weekdays: days.length ? days : undefined };
-  },
 });
 
 const monthlyItems = computed(() => {
@@ -155,16 +164,17 @@ const normalizedRule = computed<RepeatRule | null>(() => {
   return {
     freq: rule.freq,
     interval: Math.max(1, Math.floor(Number(rule.interval) || 1)),
-    // Ranges repeat on their start weekday; a multi-weekday range would overlap itself
-    ...(rule.freq === 'week' && rule.weekdays?.length && !isRange.value ? { weekdays: [...rule.weekdays].sort((a, b) => a - b) } : {}),
-    ...(rule.freq === 'month' && rule.monthlyBy && rule.monthlyBy !== 'dayOfMonth' ? { monthlyBy: rule.monthlyBy } : {}),
+    // Several picked days repeat by day of month; "nth weekday" only describes a single start day
+    ...(rule.freq === 'month' && rule.monthlyBy && rule.monthlyBy !== 'dayOfMonth' && !isMultiple.value
+      ? { monthlyBy: rule.monthlyBy }
+      : {}),
     ...(rule.end ? { end: rule.end } : {}),
     ...(skipDates.value.length ? { skip: skipDates.value } : {}),
   };
 });
 
 const repeatSummary = computed(() =>
-  normalizedRule.value ? describeRepeat(dateField.value.value, normalizedRule.value) : '',
+  normalizedRule.value ? describeRepeat(pickedDays.value, normalizedRule.value) : '',
 );
 
 const repeatError = computed(() => {
@@ -172,7 +182,7 @@ const repeatError = computed(() => {
   if (!rule) return '';
   if (rule.end && 'until' in rule.end && rule.end.until < dateField.value.value) return 'End date is before the start';
   if (rule.end && 'count' in rule.end && !(rule.end.count >= 1)) return 'Must repeat at least once';
-  return validateRepeat({ date: dateField.value.value, endDate: endDateField.value.value ?? undefined }, rule);
+  return validateRepeat(shape.value, rule);
 });
 
 const unskipDate = (date: string) => {
@@ -181,18 +191,21 @@ const unskipDate = (date: string) => {
 
 // ─── Computed ─────────────────────────────────────────────────
 
-// VDatePicker model: string in single mode, [start, end] in range mode.
-// The picker emits Date objects; store them as YYYY-MM-DD so saved events (and the repeat math,
-// which compares date strings) never see a Date.
-const toDay = (d: unknown) => dayjs(d as Date | string).format('YYYY-MM-DD');
-
+// VDatePicker model: a date in single mode, the picked days in multiple mode, [start, end] in range mode
 const datePickerModel = computed({
-  get: () =>
-    dateMode.value === 'range'
-      ? [dateField.value.value, endDateField.value.value ?? dateField.value.value]
-      : dateField.value.value,
+  get: () => {
+    if (dateMode.value === 'multiple') return pickedDays.value;
+    if (dateMode.value === 'range') return [dateField.value.value, endDateField.value.value ?? dateField.value.value];
+    return dateField.value.value;
+  },
   set: (val) => {
-    if (dateMode.value === 'range') {
+    if (dateMode.value === 'multiple') {
+      const days = [...new Set((val as unknown[]).map(toDay))].sort();
+      if (!days.length) return; // keep at least one day picked
+
+      dateField.setValue(days[0]);
+      datesField.setValue(days.length > 1 ? days : null);
+    } else if (dateMode.value === 'range') {
       const arr = (val as unknown[]).map(toDay);
       const from = arr[0];
       const to = arr.length > 1 ? (arr.at(-1) ?? null) : arr[0];
@@ -206,13 +219,8 @@ const datePickerModel = computed({
   },
 });
 
-// Text shown in the date trigger field
-const displayDate = computed(() => {
-  if (endDateField.value.value) {
-    return `${dayjs(dateField.value.value).format('MMM D')} – ${dayjs(endDateField.value.value).format('MMM D')}`;
-  }
-  return dayjs(dateField.value.value).format('MMM D');
-});
+// Text shown in the date trigger field: "Oct 5", "Oct 5, 6, 9" or "Oct 5 – Oct 16"
+const displayDate = computed(() => formatEventDate({ id: '', title: '', type: 'custom', ...shape.value }));
 
 // Title shown in the date picker
 const datePickerTitle = computed(() => displayDate.value);
@@ -235,6 +243,7 @@ const onSaveEvent = handleSubmit((values) => {
     title: values.title.trim(),
     date: values.date,
     ...(values.endDate ? { endDate: values.endDate } : {}),
+    ...(values.dates && values.dates.length > 1 ? { dates: values.dates } : {}),
     type: 'custom',
     // VTimePicker may emit "HH:mm:ss" — slice to "HH:mm"
     ...(values.allDay
@@ -289,17 +298,19 @@ const onCancelModifyEvent = () => {
         </template>
 
         <VSheet rounded="lg" class="pa-2">
-          <!-- Single / Range toggle -->
+          <!-- Single / Multiple / Range toggle -->
           <VBtnToggle v-model="dateMode" variant="tonal" density="compact" rounded="lg" class="d-flex justify-center">
             <VBtn value="single" size="small">Single</VBtn>
+            <VBtn value="multiple" size="small">Multiple</VBtn>
             <VBtn value="range" size="small">Range</VBtn>
           </VBtnToggle>
 
           <!-- Date picker — range prop driven by toggle -->
           <VDatePicker
             :model-value="datePickerModel"
-            :multiple="dateMode === 'range' ? 'range' : false"
+            :multiple="dateMode === 'range' ? 'range' : dateMode === 'multiple'"
             hide-title
+            class="mx-auto"
             @update:model-value="datePickerModel = $event"
           >
             <!-- Replace "2 selected" with actual date range, using Vuetify's transition -->
@@ -387,22 +398,9 @@ const onCancelModifyEvent = () => {
           />
         </div>
 
-        <!-- Weekly: which weekdays (ranges always repeat on their start weekday) -->
-        <VChipGroup
-          v-if="repeatRule.freq === 'week' && !isRange"
-          v-model="selectedWeekdays"
-          multiple
-          column
-          color="primary"
-        >
-          <VChip v-for="d in weekdayChips" :key="d.value" :value="d.value" size="small" variant="tonal">
-            {{ d.label }}
-          </VChip>
-        </VChipGroup>
-
-        <!-- Monthly: same day number vs same weekday position -->
+        <!-- Monthly: same day number vs same weekday position (a single start day only) -->
         <VSelect
-          v-if="repeatRule.freq === 'month'"
+          v-if="repeatRule.freq === 'month' && !isMultiple"
           :model-value="repeatRule.monthlyBy ?? 'dayOfMonth'"
           :items="monthlyItems"
           label="On"
