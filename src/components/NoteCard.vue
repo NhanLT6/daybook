@@ -57,15 +57,15 @@ defineProps<{ note: Note; previewHtml: string }>();
 }
 
 /* Ends above the date caption (bottom 8px + ~20px line) instead of running under it, so a long note fades
-   out on its own and never overlaps the date. The fade sits on the last 24px of the text area. */
+   out on its own and never overlaps the date. The fade sits on the last 36px of the text area. */
 .note-preview {
   position: absolute;
   inset: 0 0 30px;
   padding: 12px 12px 0;
   overflow: hidden;
   pointer-events: none;
-  mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 36px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 36px), transparent 100%);
 }
 
 /* Keep text clear of the pin icon */

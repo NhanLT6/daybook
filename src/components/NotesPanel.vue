@@ -118,9 +118,9 @@ const addNote = (e: MouseEvent) => {
 const onCardClick = (note: Note, e: MouseEvent) => {
   const card = e.currentTarget as HTMLElement;
   const SLOP = 4;
-  // Checkboxes clipped off the preview or mostly faded out (mid-fade = 12px above its bottom, see NoteCard)
+  // Checkboxes clipped off the preview or mostly faded out (mid-fade = 18px above its bottom, see NoteCard)
   // can't be seen, so they can't be ticked either — a click there opens the note.
-  const visibleBottom = (card.querySelector('.note-preview')?.getBoundingClientRect().bottom ?? Infinity) - 12;
+  const visibleBottom = (card.querySelector('.note-preview')?.getBoundingClientRect().bottom ?? Infinity) - 18;
   const labels = [...card.querySelectorAll<HTMLElement>('li[data-type="taskItem"] > label')];
   const hit = labels.findIndex((l) => {
     const r = l.getBoundingClientRect();
@@ -326,8 +326,9 @@ const swallow = async (falling: Promise<unknown>) => {
 
 // "Sucked in" (genie) effect: a copy of `source` is sliced into horizontal strips, each a clipped clone.
 // Strips nearest the trash leave first and every strip narrows as it goes, so the note funnels into the
-// bin instead of flying there as one rigid card. The paper also folds as it goes (a shade per strip, darker
-// in each crease) and lifts off with a growing shadow, so a white note still reads against a white card.
+// bin instead of flying there as one rigid card. The paper gathers into vertical pleats as it's pulled in
+// (creases run along the pull, bunching up as each strip narrows) and lifts off with a growing shadow, so a
+// white note still reads against a white card.
 const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number }) => {
   const panel = panelEl.value!;
   const w = source.offsetWidth;
@@ -336,15 +337,12 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
   const count = Math.min(80, Math.max(12, Math.round(h / 3)));
   const stripH = h / count;
   const t = trashCenter();
-  // Accordion folds ~14px tall: shade rises from 0 on a ridge to 1 in the crease, then back
-  const foldStrips = Math.max(2, Math.round(14 / stripH));
-  const foldShade = (i: number) => {
-    const p = (i % (2 * foldStrips)) / foldStrips;
-    return p <= 1 ? p : 2 - p;
-  };
 
   const container = document.createElement('div');
   container.className = 'note-suck';
+  // ~18px pleats, fitted to a whole number across the width so both edges end on the same facet. Every
+  // strip shares the pattern, so the creases line up into continuous lines down the funnel.
+  container.style.setProperty('--pleat', `${w / Math.max(4, Math.round(w / 18))}px`);
   Object.assign(container.style, {
     left: `${from.left}px`,
     top: `${from.top}px`,
@@ -356,7 +354,7 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
   const strips = Array.from({ length: count }, (_, i) => {
     const strip = document.createElement('div');
     strip.className = 'note-suck__strip';
-    Object.assign(strip.style, { top: `${i * stripH}px`, height: `${stripH + 1}px` }); // +1: no seams
+    Object.assign(strip.style, { top: `${i * stripH}px`, height: `${stripH + 2}px` }); // +2: no seams, even as neighbours drift apart mid-flight
     const copy = source.cloneNode(true) as HTMLElement;
     copy.removeAttribute('data-note-id');
     copy.classList.remove('note-card--dragging');
@@ -374,7 +372,7 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
     container.appendChild(strip);
     const dx = t.x - (from.left + w / 2);
     const dy = t.y - (from.top + i * stripH + stripH / 2);
-    return { strip, shade, fold: 0.1 + 0.7 * foldShade(i), dx, dy, dist: Math.abs(dy) };
+    return { strip, shade, dx, dy, dist: Math.abs(dy) };
   });
   panel.appendChild(container);
 
@@ -382,7 +380,7 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
   const stagger = STAGGER_TOTAL / (count - 1);
   const byDistance = [...strips].sort((a, b) => a.dist - b.dist);
   const DURATION = 270;
-  const animations = byDistance.flatMap(({ strip, shade, fold, dx, dy }, rank) => {
+  const animations = byDistance.flatMap(({ strip, shade, dx, dy }, rank) => {
     const timing = {
       duration: DURATION,
       delay: rank * stagger,
@@ -399,8 +397,8 @@ const suckIntoTrash = (source: HTMLElement, from: { left: number; top: number })
         ],
         timing,
       ),
-      // Creases deepen as the strip pinches
-      shade.animate([{ opacity: 0 }, { opacity: fold * 0.8, offset: 0.4 }, { opacity: fold }], timing),
+      // Pleats deepen as the strip is pulled narrower
+      shade.animate([{ opacity: 0 }, { opacity: 0.7, offset: 0.4 }, { opacity: 1 }], timing),
     ];
   });
   // Lifts off the card: one drop shadow on the whole funnel's silhouette (a filter on the container, so the
@@ -897,17 +895,22 @@ onBeforeUnmount(() => {
 }
 
 /* Fold shading over each strip: darker toward the curled edges, opacity animated per strip (suckIntoTrash) */
+/* Stops 2px short: strips overlap by 2px (no seams), and two shades stacked there drew a dark line */
 .note-suck__shade {
   position: absolute;
-  inset: 0;
+  inset: 0 0 2px;
   opacity: 0;
-  background: linear-gradient(
-    to right,
-    rgba(0, 0, 0, 0.6),
-    rgba(0, 0, 0, 0.26) 30%,
-    rgba(0, 0, 0, 0.26) 70%,
-    rgba(0, 0, 0, 0.6)
-  );
+  background:
+    /* Edges curl away from the light */
+    linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.35)),
+    /* Vertical pleats: a lit facet then a shaded one, with a sharp crease between */
+    repeating-linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.02) 0,
+      rgba(0, 0, 0, 0.12) calc(var(--pleat) / 2),
+      rgba(0, 0, 0, 0.36) calc(var(--pleat) / 2),
+      rgba(0, 0, 0, 0.16) var(--pleat)
+    );
 }
 
 /* Copies must not replay their own entry animations/transitions (e.g. the editor's content pop) */

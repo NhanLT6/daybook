@@ -37,7 +37,7 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 | File | Role |
 |---|---|
 | `src/components/NotesPanel.vue` | Owns persistence (autosave/empty-discard), pinned-first order, search, drag & drop, trash, tick-from-card, and undo. The only place notes are read from/written to the store. |
-| `src/components/NoteCard.vue` | UI only — one card: color, sanitized preview (`previewHtml` must already be sanitized), pin icon, drag-state classes. Ripple is off (the card grows into the editor; a ripple on top reads as noise). The preview box ends 30px above the card bottom, above the date caption, and fades over its last 24px, so long notes never run under the date. |
+| `src/components/NoteCard.vue` | UI only — one card: color, sanitized preview (`previewHtml` must already be sanitized), pin icon, drag-state classes. Ripple is off (the card grows into the editor; a ripple on top reads as noise). The preview box ends 30px above the card bottom, above the date caption, and fades over its last 36px, so long notes never run under the date. |
 | `src/components/NoteEditor.vue` | UI only — the Tiptap instance, toolbar, and pin/color controls (emit `togglePin` / `color`), no persistence. `content` prop is **initial value only**: never watched back into the editor (would reset cursor/selection), so the parent keys the component by note id to force remount when switching notes. Loaded lazily (`defineAsyncComponent`): Tiptap (~120 kB gzip) is kept out of the Home chunk and fetched when NotesPanel mounts, i.e. the first time the Notes tab opens, so the first note still opens instantly. |
 | `src/common/devSampleNotes.ts` | Dev-only random notes (checklists, lists, colors, some pinned) behind the flask button in the Notes toolbar. The button is `v-if="isDev"` (`import.meta.env.DEV`) and the module is dynamically imported, so neither ships in production builds. |
 | `src/common/sanitizeNoteHtml.ts` | DOMPurify allowlist used to render card previews via `v-html`. |
@@ -152,13 +152,15 @@ classes still animate the glide. ~4 KB gzip.
   start first (staggered over 170ms, 270ms each — ~440ms total) and each one pinches toward the bin's x while narrowing, then
   accelerates down into it, so the note forms a funnel and pours into the bin rather than flying there as
   one rigid card. Thin strips matter: at 10px the funnel edge showed a visible staircase. Strips overlap by
-  1px to hide seams, and an unscoped `.note-suck__strip *` rule disables animations/transitions on the copies
+  2px to hide seams (they start ~2ms apart, so on a tall editor card neighbours drift ~1px apart mid-flight), and an unscoped `.note-suck__strip *` rule disables animations/transitions on the copies
   (the editor's content "pop" would otherwise replay). The bin (z-index 4) sits above the strips (3).
-- **Paper fold + lift** — so a white note still reads against a white card: each strip carries a
-  `.note-suck__shade` overlay (darker toward the curled left/right edges) whose opacity follows a triangle
-  wave over ~14px folds (0 on a ridge, max in a crease) and deepens as the strip pinches, giving accordion
-  creases. A `drop-shadow` filter on the strips' container (not a `box-shadow` per strip, which would
-  stack into bands) grows as the paper lifts off.
+- **Paper pulled in + lift** — so a white note still reads against a white card: each strip carries a
+  `.note-suck__shade` overlay of **vertical** pleats (a lit facet, then a shaded one, ~18px, fitted to a whole
+  number across the width via `--pleat`) plus darker curled edges. Every strip shares the pattern, so the
+  creases line up along the pull and bunch together as each strip narrows — the paper is gathered into the
+  bin, not folded horizontally first. The shade fades in as the strip pinches and stops 2px short of the
+  strip bottom (strips overlap by 2px; two shades stacked there drew dark lines). A `drop-shadow` filter on
+  the strips' container (not a `box-shadow` per strip, which would stack into bands) grows as it lifts off.
 - **Drag to trash**: the copy starts where the card was released (last pointer minus the grab offset from
   `pointerdown`).
 - **Delete from editor**: the editor card is copied *before* `editing` is cleared (Tiptap empties its DOM on
