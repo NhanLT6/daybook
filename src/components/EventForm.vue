@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 
 import { formatEventDate } from '@/common/DateHelpers';
 import {
+  backToBackRule,
   describeRepeat,
   eventDays,
   isLastWeekdayOfMonth,
@@ -18,6 +19,7 @@ import {
   repeatPresets,
   validateRepeat,
 } from '@/common/eventRecurrence';
+import { useSettingsStore } from '@/stores/settings';
 
 const { item } = defineProps<{
   item?: AppEvent | null;
@@ -94,7 +96,19 @@ const repeatRule = ref<RepeatRule | null>(item?.repeat ? { ...item.repeat } : nu
 const isCustomRepeat = ref(false);
 const skipDates = ref<string[]>([...(item?.repeat?.skip ?? [])].sort());
 
-const presets = computed(() => repeatPresets(shape.value));
+// Weekend days decide whether a back-to-back range restarts on the same weekday (see backToBackRule)
+const settingsStore = useSettingsStore();
+const presets = computed(() => repeatPresets(shape.value, settingsStore.weekendDays));
+const backToBack = computed(() => backToBackRule(shape.value, settingsStore.weekendDays));
+
+// "When it ends" is stored as a plain rule (every 2 weeks, every N days); this flag only makes the form
+// keep it in step with the range while the dates are edited. A saved event matching it reopens with it on.
+// Not-a-range moments (the first click of a new range) keep the last rule and the flag, so the next
+// complete range is followed again.
+const followsRangeEnd = ref(!!item?.repeat && !!backToBack.value && isSameRule(item.repeat, backToBack.value));
+watch(backToBack, (rule) => {
+  if (followsRangeEnd.value && rule) repeatRule.value = { ...rule };
+});
 
 // Dropdown value: 'none' | 'preset-N' | 'custom'. A saved rule that matches no preset opens as custom.
 const repeatSelect = computed({
@@ -106,11 +120,16 @@ const repeatSelect = computed({
   },
   set: (value: string) => {
     isCustomRepeat.value = value === 'custom';
+    followsRangeEnd.value = false;
     if (value === 'none') repeatRule.value = null;
     // Start Custom from a rule that fits the dates (a 12-day sprint can't repeat weekly)
     else if (value === 'custom')
       repeatRule.value ??= { ...(presets.value.find((p) => p.value.freq === 'week')?.value ?? { freq: 'week', interval: 1 }) };
-    else repeatRule.value = { ...presets.value[Number(value.replace('preset-', ''))].value };
+    else {
+      const preset = presets.value[Number(value.replace('preset-', ''))];
+      followsRangeEnd.value = !!preset.backToBack;
+      repeatRule.value = { ...preset.value };
+    }
   },
 });
 

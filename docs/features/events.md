@@ -52,8 +52,9 @@ Interfaces: `src/interfaces/Event.ts`
 - `validateRepeat(event, rule)` — error string when an occurrence (range or picked days) would overlap the next
   one, else `''`.
 - `describeRepeat(days, rule)` — the summary sentence ("Every 2 weeks on Monday and Friday, until Dec 31, 2026").
-- `repeatPresets(event)` — the dropdown quick picks, **filtered to rules the event's shape allows** (no "every
-  week" for a 12-day sprint); `isSameRule(a, b)` matches a stored rule back to a preset (ignores `skip`).
+- `repeatPresets(event, weekendDays?)` — the dropdown quick picks, **filtered to rules the event's shape allows**
+  (no "every week" for a 12-day sprint); `isSameRule(a, b)` matches a stored rule back to a preset (ignores `skip`).
+- `backToBackRule(event, weekendDays?)` — the "When it ends" rule for a range (see below); null otherwise.
 - `eventDays`, `spanDays`, `nthWeekdayOfMonth`, `isLastWeekdayOfMonth` — small helpers shared with the form.
 
 ## Event Form
@@ -73,6 +74,13 @@ Repeat field:
   every 2 weeks, monthly on the nth <weekday>, monthly on the last <weekday>, monthly on day(s) N, yearly. The
   "last <weekday>" preset is offered **only when the date is the last such weekday** of its month
   (`isLastWeekdayOfMonth`). Presets are recomputed when the dates change.
+- **When it ends (…)** — ranges only, listed first: the next occurrence starts once this one ends (sprints).
+  Stored as a **plain rule, no new field**: the same weekday N weeks later when only weekend days lie
+  between (Mon→Fri 2-week sprint → every 2 weeks; weekend = the Settings weekend days, so a Mon→Thu sprint
+  also restarts Monday under the default Fri–Sun weekend), else every `length` days (a Wed→Mon range restarts
+  Tuesday). It replaces the plain preset for the same rule. While picked, `followsRangeEnd` makes the form
+  recompute the rule as the range is edited (a mid-pick moment with no end date keeps the last rule); a saved
+  event whose rule matches reopens with it on. Picking anything else, or Custom, turns it off.
 - **Custom…** panel: every N day/week/month/year (`VNumberInput`); day-of-month vs nth/last weekday (monthly,
   single start day); ends never / on date / after N times. It opens on a rule that fits the dates.
 - The selected rule's summary (`describeRepeat`) shows in the Repeat field.
@@ -100,6 +108,12 @@ the rule is untouched.
   end ("Sprint starts" / "Sprint ends" popovers), so back-to-back sprints don't cover the calendar in dots.
   Half circles and brackets were tried and rejected: at 1× they blur into plain dots; a larger size or a
   bar looked out of place.
+- **Adjacent months' days** are shown, dimmed to 0.5 and clickable, in both the calendar and every
+  `VDatePicker` (global `showAdjacentMonths` default in `main.ts`). v-calendar has no prop for it — it hides
+  them with `.vc-monthly .is-not-in-month * { opacity: 0 }`, which `CalendarOverview` overrides. Markers on
+  those days already work: `visibleRange` spans the whole grid (`viewDays`). In e2e, scope day buttons to
+  `.v-date-picker-month__day:not(.v-date-picker-month__day--adjacent)`: while the picker slides months, the
+  outgoing grid holds the same date as an adjacent day.
 - **Dot colours carry one meaning each**: `accent` (purple) = holiday, `info` (blue) = your own event; green
   (`primary`) is reserved for today/selected. Dots are styled with `rgb(var(--v-theme-…))` because v-calendar
   ignores hex values in `dot.color` (they all fell back to the theme green).

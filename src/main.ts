@@ -53,6 +53,11 @@ const vuetify = createVuetify({
     VExpansionPanel: {
       rounded: 'lg',
     },
+    // Fill the grid with the neighbouring months' days (dimmed, still pickable), so a range across a month
+    // edge doesn't need paging. CalendarOverview shows v-calendar's the same way.
+    VDatePicker: {
+      showAdjacentMonths: true,
+    },
   },
   theme: {
     defaultTheme: 'light',

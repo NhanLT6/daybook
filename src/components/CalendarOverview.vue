@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+import { useEvents } from '@/composables/useEvents';
+import type { AppEvent } from '@/interfaces/Event';
 import type { Page } from 'v-calendar/dist/types/src/utils/page.d.ts';
 
 import { useTheme } from 'vuetify';
@@ -11,8 +13,6 @@ import dayjs from 'dayjs';
 
 import { atOccurrence, eventDays, getOccurrences } from '@/common/eventRecurrence';
 import { storageKeys } from '@/common/storageKeys';
-import { useEvents } from '@/composables/useEvents';
-import type { AppEvent } from '@/interfaces/Event';
 import { useSettingsStore } from '@/stores/settings';
 
 // Theme integration
@@ -304,6 +304,18 @@ const goToToday = async () => {
 /* Calendar day interaction styles */
 :deep(.vc-day) {
   cursor: pointer;
+}
+
+/* Show adjacent months' days (v-calendar hides them with opacity 0 and has no prop for it), dimmed to
+   Vuetify's VDatePicker show-adjacent-months look (opacity 0.5) and still clickable. Event markers show too:
+   eventAttributes already covers the whole grid (visibleRange comes from viewDays). */
+:deep(.vc-monthly .is-not-in-month *) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+:deep(.vc-monthly .is-not-in-month) {
+  opacity: 0.5;
 }
 
 /* Constrain calendar to its parent container width so chips in the footer wrap correctly */

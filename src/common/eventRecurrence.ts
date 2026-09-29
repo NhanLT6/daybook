@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+
 import { RRule, type Options, type Weekday } from 'rrule';
 
 import type { AppEvent, RepeatRule } from '@/interfaces/Event';
@@ -48,6 +49,8 @@ const mondayFirst = (day: number) => (day + 6) % 7;
 // "a", "a and b", "a, b and c"
 const joinList = (items: string[]) =>
   items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 /** Which week of the month a date falls in: 1–5 ("the 2nd Tuesday"). */
 export const nthWeekdayOfMonth = (date: string): number => Math.ceil(dayjs(date).date() / 7);
@@ -218,13 +221,40 @@ export function describeRepeat(days: string | string[], rule: RepeatRule): strin
 }
 
 /**
+ * Rule that starts the next occurrence of a range as soon as this one ends — back-to-back sprints.
+ * The next one starts on the same weekday when only weekend days lie between (a Mon→Fri sprint restarts
+ * on Monday, every 2 weeks); otherwise the day right after the end (every N days). Null for anything
+ * but a range. `weekendDays` are dayjs day numbers (0 = Sunday), the app's weekend setting.
+ */
+export function backToBackRule(event: EventShape, weekendDays: number[] = [0, 6]): RepeatRule | null {
+  if (!event.endDate || eventDays(event).length > 1) return null;
+  const length = spanDays(event) + 1;
+  if (length < 2) return null;
+
+  const weeks = Math.ceil(length / 7);
+  const end = dayjs(toDay(event.date)).add(length - 1, 'day');
+  const gap = Array.from({ length: weeks * 7 - length }, (_, i) => end.add(i + 1, 'day').day());
+  return gap.every((day) => weekendDays.includes(day))
+    ? { freq: 'week', interval: weeks }
+    : { freq: 'day', interval: length };
+}
+
+export interface RepeatPreset {
+  title: string;
+  value: RepeatRule;
+  backToBack?: boolean; // The "When it ends" pick: follows the range if its dates change
+}
+
+/**
  * Quick picks for the Repeat dropdown, derived from the chosen date(s). Only rules the event's shape
  * allows are offered — e.g. no "every week" for a 12-day sprint, no "nth weekday" for several days.
+ * Ranges get "When it ends" first, replacing the plain preset for the same rule.
  */
-export function repeatPresets(event: EventShape): { title: string; value: RepeatRule }[] {
+export function repeatPresets(event: EventShape, weekendDays?: number[]): RepeatPreset[] {
   const days = eventDays(event);
   const date = days[0];
   const single = days.length === 1;
+  const backToBack = backToBackRule(event, weekendDays);
   const presets: RepeatRule[] = [
     { freq: 'day', interval: 1 },
     { freq: 'week', interval: 1 },
@@ -236,9 +266,20 @@ export function repeatPresets(event: EventShape): { title: string; value: Repeat
     { freq: 'month', interval: 1, monthlyBy: 'dayOfMonth' },
     { freq: 'year', interval: 1 },
   ];
-  return presets
-    .filter((value) => !validateRepeat(event, value))
-    .map((value) => ({ title: describeRepeat(days, value), value }));
+  return [
+    ...(backToBack
+      ? [
+          {
+            title: `When it ends (${lowerFirst(describeRepeat(days, backToBack))})`,
+            value: backToBack,
+            backToBack: true,
+          },
+        ]
+      : []),
+    ...presets
+      .filter((value) => !validateRepeat(event, value) && !(backToBack && isSameRule(value, backToBack)))
+      .map((value) => ({ title: describeRepeat(days, value), value })),
+  ];
 }
 
 /** True when two rules produce the same series (ignores skip list), used to match a preset. */

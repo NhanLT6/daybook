@@ -7,8 +7,11 @@ import { expect, type Page, test } from '@playwright/test';
 
 // Clicks a day in the open date picker by its accessible label ("Monday, October 5, 2026"), which
 // stays unambiguous while the month-change transition briefly shows two months
+// In-month days only: adjacent months' days are shown too, so while the picker slides to the next month the
+// outgoing grid still holds the same date as an adjacent day
 const pickDay = (page: Page, date: Date) =>
   page
+    .locator('.v-date-picker-month__day:not(.v-date-picker-month__day--adjacent)')
     .getByRole('button', {
       name: new RegExp(`${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}$`),
     })
@@ -105,6 +108,40 @@ test('range picked in the date picker repeats via the custom panel', async ({ pa
   await expect(page.locator('main tr', { hasText: 'Sprint' })).toContainText(/Every 2 weeks on \w+day/);
 });
 
+// Uses the real clock (see above), so the weekday of day 5 varies: a range restarts on the same weekday when
+// only weekend days lie between, else the day after it ends
+test('"When it ends" repeats a range back to back and follows date changes', async ({ page }) => {
+  await page.goto('/events');
+  await page.getByRole('button', { name: 'New Event' }).click();
+  const dialog = page.locator('.v-dialog');
+  await dialog.getByLabel('Title').fill('Sprint');
+
+  // Reopening shows the picked month in Range mode already
+  const pickRange = async (from: number, to: number, first = false) => {
+    await dialog.getByRole('textbox', { name: 'Date' }).click();
+    if (first) {
+      await page.getByRole('button', { name: 'Range' }).click();
+      await page.getByRole('button', { name: 'Next month' }).click();
+    }
+    await pickDay(page, nextMonthDay(from));
+    await pickDay(page, nextMonthDay(to));
+    await page.keyboard.press('Escape');
+  };
+
+  await pickRange(5, 16, true);
+  const repeat = dialog.locator('.v-select', { hasText: 'Repeat' });
+  await repeat.click();
+  await page.getByRole('option', { name: /^When it ends/ }).click();
+  await expect(repeat).toContainText(/When it ends \(every (2 weeks on \w+day|12 days)\)/);
+
+  // Shorter range: the pick follows it instead of turning into a custom rule
+  await pickRange(5, 8);
+  await expect(repeat).toContainText(/When it ends \(every (week on \w+day|4 days)\)/);
+
+  await dialog.getByRole('button', { name: 'Add' }).click();
+  await expect(page.locator('main tr', { hasText: 'Sprint' })).toContainText(/Every (week on \w+day|4 days)/);
+});
+
 test('separate days picked in Multiple mode repeat as a set', async ({ page }) => {
   await page.goto('/events');
   await page.getByRole('button', { name: 'New Event' }).click();
@@ -117,7 +154,10 @@ test('separate days picked in Multiple mode repeat as a set', async ({ page }) =
   for (const day of [5, 6, 9]) await pickDay(page, nextMonthDay(day));
   // Today starts out picked; untick it
   await page.getByRole('button', { name: 'Previous month' }).click();
-  await page.getByRole('button', { name: /^Today, / }).click();
+  await page
+    .locator('.v-date-picker-month__day:not(.v-date-picker-month__day--adjacent)')
+    .getByRole('button', { name: /^Today, / })
+    .click();
   await page.keyboard.press('Escape');
   await expect(dialog.getByRole('textbox', { name: 'Date' })).toHaveValue(/\w{3} 5, 6, 9/);
 

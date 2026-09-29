@@ -4,6 +4,7 @@ import type { AppEvent, RepeatRule } from '@/interfaces/Event';
 
 import {
   atOccurrence,
+  backToBackRule,
   describeRepeat,
   getNextOccurrence,
   getOccurrences,
@@ -179,7 +180,7 @@ describe('repeatPresets / isSameRule', () => {
     // A 12-day sprint can't repeat daily or weekly
     const sprint = repeatPresets({ date: '2026-10-05', endDate: '2026-10-16' }).map((p) => p.title);
     expect(sprint).toEqual([
-      'Every 2 weeks on Monday',
+      'When it ends (every 2 weeks on Monday)',
       'Every month on the first Monday',
       'Every month on day 5',
       'Every year on Oct 5',
@@ -195,6 +196,17 @@ describe('repeatPresets / isSameRule', () => {
     ]);
   });
 
+  it('offers "When it ends" only for ranges, in place of the plain preset for the same rule', () => {
+    const [first, ...rest] = repeatPresets({ date: '2026-10-05', endDate: '2026-10-16' });
+    expect(first).toMatchObject({ backToBack: true, value: { freq: 'week', interval: 2 } });
+    expect(rest.some((p) => isSameRule(p.value, first.value))).toBe(false);
+
+    expect(repeatPresets({ date: '2026-10-05' }).some((p) => p.backToBack)).toBe(false);
+    expect(repeatPresets({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-09'] }).some((p) => p.backToBack)).toBe(
+      false,
+    );
+  });
+
   it('matches rules regardless of the skip list', () => {
     expect(
       isSameRule(
@@ -203,5 +215,40 @@ describe('repeatPresets / isSameRule', () => {
       ),
     ).toBe(true);
     expect(isSameRule(biweekly, { freq: 'week', interval: 1 })).toBe(false);
+  });
+});
+
+describe('backToBackRule', () => {
+  it('restarts a Mon→Fri sprint on Monday when only the weekend lies between', () => {
+    // 2-week sprint Mon Oct 5 → Fri Oct 16
+    expect(backToBackRule({ date: '2026-10-05', endDate: '2026-10-16' })).toEqual({ freq: 'week', interval: 2 });
+    // 1-week Mon → Fri
+    expect(backToBackRule({ date: '2026-10-05', endDate: '2026-10-09' })).toEqual({ freq: 'week', interval: 1 });
+  });
+
+  it('restarts the day after a range that fills whole weeks', () => {
+    // Mon Oct 5 → Sun Oct 18
+    expect(backToBackRule({ date: '2026-10-05', endDate: '2026-10-18' })).toEqual({ freq: 'week', interval: 2 });
+  });
+
+  it('follows the weekend setting', () => {
+    // Mon → Thu with a Fri–Sun weekend restarts Monday; with Sat–Sun, Friday is a gap day
+    const monThu = { date: '2026-10-05', endDate: '2026-10-15' };
+    expect(backToBackRule(monThu, [5, 6, 0])).toEqual({ freq: 'week', interval: 2 });
+    expect(backToBackRule(monThu, [6, 0])).toEqual({ freq: 'day', interval: 11 });
+  });
+
+  it('restarts the very next day when weekdays would be left out', () => {
+    // Wed Oct 7 → Mon Oct 12 (6 days): Tuesday isn't a weekend day
+    const rule = backToBackRule({ date: '2026-10-07', endDate: '2026-10-12' });
+    expect(rule).toEqual({ freq: 'day', interval: 6 });
+    expect(
+      getOccurrences(event({ date: '2026-10-07', endDate: '2026-10-12', repeat: rule! }), '2026-10-01', '2026-10-31'),
+    ).toEqual(['2026-10-07', '2026-10-13', '2026-10-19', '2026-10-25', '2026-10-31']);
+  });
+
+  it('is null for anything but a range', () => {
+    expect(backToBackRule({ date: '2026-10-05' })).toBeNull();
+    expect(backToBackRule({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-09'] })).toBeNull();
   });
 });
