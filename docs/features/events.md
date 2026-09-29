@@ -96,9 +96,10 @@ the rule is untouched.
   the `describeRepeat` summary. "Upcoming" also uses the next occurrence, so a running series appears once.
 - **Calendar**: expands occurrences only for the visible range (`getOccurrences`) — never enumerate a series
   unbounded (`never` ends means infinite). Single and separately picked days get a dot each; **ranges only
-  mark their first and last day** with half circles, ◖ on the start and ◗ on the end ("Sprint starts" /
-  "Sprint ends" popovers), so back-to-back sprints don't cover the calendar in dots and edges stand apart
-  from one-day dots.
+  mark their first and last day** with dot-sized triangles pointing into the range, ▸ on the start and ◂ on the
+  end ("Sprint starts" / "Sprint ends" popovers), so back-to-back sprints don't cover the calendar in dots.
+  Half circles and brackets were tried and rejected: at 1× they blur into plain dots; a larger size or a
+  bar looked out of place.
 - **Dot colours carry one meaning each**: `accent` (purple) = holiday, `info` (blue) = your own event; green
   (`primary`) is reserved for today/selected. Dots are styled with `rgb(var(--v-theme-…))` because v-calendar
   ignores hex values in `dot.color` (they all fell back to the theme green).
