@@ -155,14 +155,15 @@ classes still animate the glide. ~4 KB gzip.
   2px to hide seams (they start ~2ms apart, so on a tall editor card neighbours drift ~1px apart mid-flight), and an unscoped `.note-suck__strip *` rule disables animations/transitions on the copies
   (the editor's content "pop" would otherwise replay). The bin (z-index 4) sits above the strips (3).
 - **Crumple + lift** — so a white note still reads against a white card, the paper gets a **few uneven
-  horizontal creases** (lines running left to right), like Photos' delete. `randomCreases(height)` picks 2–4
-  on a card, 3–5 on the editor, at random heights and depths, each soft on one side and sharp on the other
-  (both under half the gap to a neighbour). Each strip's `.note-suck__shade` is a top-to-bottom gradient
-  sampled from that curve (not one flat value, which banded on the editor's ~10px strips) and fades in as
-  the strip pinches. The shade stops 2px short of the strip bottom (strips overlap by 2px; two shades
-  stacked there drew dark lines). A `drop-shadow` filter on the strips' container (not a `box-shadow` per
-  strip, which would stack into bands) grows as it lifts off. Tried and rejected: regular accordion folds,
-  and vertical creases/pleats (read as a second kind of fold) — keep creases horizontal only.
+  creases spread from left to right** (each crease a line running down the paper, along the pull), like
+  Photos' delete. `randomCreases(width)` builds one gradient per delete (`--creases`): 2–4 creases on a card,
+  3–5 on the editor, random spacing and depth, each soft on one side and sharp on the other (both under half
+  the gap to a neighbour, so stops never cross). Every strip's `.note-suck__shade` uses it, so each crease
+  stays one line as the strips narrow into the bin; the shade fades in as the strip pinches. The shade
+  covers the **whole** strip: leaving the 2px overlap unshaded drew thin lines stacked down the paper. A
+  `drop-shadow` filter on the strips' container (not a `box-shadow` per strip, which would stack into bands)
+  grows as it lifts off. Tried and rejected: regular accordion/pleat folds (too many), creases stacked top to
+  bottom (wrong direction), darkened left/right edges (read as extra folds).
 - **Drag to trash**: the copy starts where the card was released (last pointer minus the grab offset from
   `pointerdown`).
 - **Delete from editor**: the editor card is copied *before* `editing` is cleared (Tiptap empties its DOM on
