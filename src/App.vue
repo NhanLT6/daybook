@@ -31,7 +31,6 @@ const userInitial = computed(() => (user.value?.name || user.value?.email || '?'
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
 const { startCatchUpNotifications } = useCatchUpSummary();
 const { startGreetingNotifications } = useGreetingNotifications();
-const lastSeenVersion = useStorage('app-last-seen-version', '');
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
 const { loadSettings, migrateJiraFromLocalStorage } = useServerSettings();
@@ -77,19 +76,6 @@ const autoSyncJiraTickets = async () => {
   }
 };
 
-const showReleaseNotification = () => {
-  if (lastSeenVersion.value !== __APP_VERSION__) {
-    notificationCenter.enqueue({
-      kind: 'info',
-      title: 'New Update',
-      message: __COMMIT_MESSAGE__,
-      autoDismissMs: 5000,
-      expandOnEnqueue: true,
-    });
-    lastSeenVersion.value = __APP_VERSION__;
-  }
-};
-
 /**
  * Load server-side settings (AI + Jira) for the signed-in user.
  * Also handles one-time migration of Jira config from localStorage.
@@ -110,7 +96,6 @@ onMounted(async () => {
   stopCatchUpNotifications = startCatchUpNotifications();
   await autoFetchEvents();
   await autoSyncJiraTickets();
-  showReleaseNotification();
 });
 
 // Credentials live per account, so re-read them whenever the signed-in user changes.
