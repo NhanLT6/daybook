@@ -1,54 +1,39 @@
 ﻿import { Page } from '@playwright/test';
 
 import dayjs from 'dayjs';
+import truncate from 'lodash/truncate.js';
 
 import { TaskEntry } from '../interfaces/taskEntry.js';
 import { XeroConfig } from '../interfaces/xeroConfig.js';
+
+const XERO_NAME_MAX_LENGTH = 100;
 
 async function loginXero(page: Page, config: XeroConfig) {
   await page.goto('https://go.xero.com/app/!lep5g/projects/');
 
   // Xero may do a client-side JS redirect to login when the session is expired.
   // Checking the URL immediately after goto is unreliable because the initial URL
-  // already matches /projects/ before the redirect fires. Instead, wait to see
-  // whether the login form actually appears on screen.
-  const emailInput = page.getByPlaceholder('Email address');
-  const isLoginPage = await emailInput
-    .waitFor({ state: 'visible', timeout: 15000 })
-    .then(() => true)
-    .catch(() => false);
+  // already matches /projects/ before the redirect fires. Instead, wait for something
+  // that only one of the two pages renders: the login form or the projects toolbar.
+  // A slow or unexpected login page must not be mistaken for a restored session.
+  const emailInput = page.locator('[data-automationid="Username--input"]');
+  const newProjectButton = page.getByRole('button', { name: 'New project' });
+  await emailInput.or(newProjectButton).first().waitFor({ state: 'visible', timeout: 120000 });
 
-  if (!isLoginPage) {
+  if (!(await emailInput.isVisible())) {
     console.log('✅ Restored session — skipping login');
     return;
   }
 
   await emailInput.fill(config.userName);
-  await page.getByPlaceholder('Password').fill(config.password);
+  await page.locator('[data-automationid="PassWord--input"]').fill(config.password);
 
-  await page.getByRole('button', { name: 'Log in' }).click();
+  await page.locator('[data-automationid="LoginSubmit--button"]').click();
 
-  // Wait for 2FA if needed
-  try {
-    // Wait for 2FA prompt to appear (30 second timeout)
-    await page.getByPlaceholder('123456').waitFor({ state: 'visible', timeout: 30000 });
-
-    // Check "Trust this device"
-    await page.getByLabel('Trust this device', { exact: true }).check();
-
-    // Click on 2FA input field to focus it
-    await page.getByPlaceholder('123456').click();
-
-    // Wait for user to enter 2FA code and submit (up to 2 minutes)
-    // The page will redirect after successful 2FA
-    await page.waitForURL('**/projects/', { timeout: 120000 });
-  } catch {
-    // If 2FA timeout occurs, check if we're already logged in
-    const isLoggedIn = page.url().includes('/projects/');
-    if (!isLoggedIn) {
-      throw new Error('2FA authentication failed or timed out. Please ensure you can complete 2FA within 2 minutes.');
-    }
-  }
+  // Wait for the user to enter the 2FA code; the projects page shows once it is accepted
+  await newProjectButton.waitFor({ state: 'visible', timeout: 120000 }).catch(() => {
+    throw new Error('2FA authentication failed or timed out. Please ensure you can complete 2FA within 2 minutes.');
+  });
 
   // Save auth cookies so the next run can skip login
   await page.context().storageState({ path: './auth-state.json' });
@@ -115,6 +100,21 @@ function defaultBlankTasksToProject(entries: TaskEntry[]): void {
   for (const entry of entries) entry.task = entry.task || entry.project;
 }
 
+/**
+ * Xero cuts names off at its limit on save, so a later lookup by the full name never matches
+ * and the run hangs — shorten them up front. Trailing space is dropped because Xero trims it.
+ */
+function truncateNamesToXeroLimit(entries: TaskEntry[]): void {
+  // Cut at the last space inside the limit so the name ends on a whole word
+  const fitToLimit = (name: string) =>
+    truncate(name, { length: XERO_NAME_MAX_LENGTH, separator: ' ', omission: '' }).trimEnd();
+
+  for (const entry of entries) {
+    entry.project = fitToLimit(entry.project);
+    entry.task = fitToLimit(entry.task);
+  }
+}
+
 /** One progress line for a logged entry: date · duration · "description" (when present). */
 function formatLoggedEntry(entry: TaskEntry): string {
   const date = dayjs(entry.date).format('YYYY-MM-DD');
@@ -126,6 +126,7 @@ function formatLoggedEntry(entry: TaskEntry): string {
 export {
   loginXero,
   defaultBlankTasksToProject,
+  truncateNamesToXeroLimit,
   formatLoggedEntry,
   filter200ProjectsPerPage,
   openDetailedTimeReport,

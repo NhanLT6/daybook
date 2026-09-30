@@ -52,6 +52,7 @@ export default defineConfig({
         channel: 'msedge', // Use real Edge browser to avoid bot detection
         viewport: null, // This will maximize the browser window
         launchOptions: {
+          ignoreDefaultArgs: ['--disable-extensions'],
           args: [
             '--start-maximized',
             '--disable-blink-features=AutomationControlled', // Hides navigator.webdriver from bot detection

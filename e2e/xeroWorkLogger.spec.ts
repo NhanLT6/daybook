@@ -15,6 +15,7 @@ import {
   filter200ProjectsPerPage,
   formatLoggedEntry,
   loginXero,
+  truncateNamesToXeroLimit,
 } from './logHelpers/utils.js';
 
 test.describe('Xero Work Logger', () => {
@@ -32,6 +33,7 @@ test.describe('Xero Work Logger', () => {
 
     const taskEntries = getTaskEntries(templateFilePath);
     defaultBlankTasksToProject(taskEntries);
+    truncateNamesToXeroLimit(taskEntries);
     console.log(`\n📊 Total records to log: ${taskEntries.length}\n`);
 
     // eslint-disable-next-line playwright/no-skipped-test
