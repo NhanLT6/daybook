@@ -26,6 +26,7 @@
     "@neondatabase/neon-js": "^0.6.2-beta",
     "@neondatabase/serverless": "^1.1.0",
     "@popperjs/core": "^2.11.8",
+    "@tiptap/core": "3.31.3",
     "@tiptap/extension-file-handler": "^3.31.3",
     "@tiptap/extension-image": "^3.31.3",
     "@tiptap/extension-list": "^3.31.3",

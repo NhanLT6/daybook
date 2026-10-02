@@ -17,7 +17,7 @@
 ## Key Dependencies
 - **Vue Ecosystem**: vue, vue-router, pinia
 - **UI/UX**: vuetify, @vueuse/core, v-calendar, vue-sonner, @formkit/drag-and-drop (notes drag, mouse + touch)
-- **Notes editor**: @tiptap (starter-kit, extension-list, extension-image, extension-file-handler)
+- **Notes editor**: @tiptap (core pinned to starter-kit's exact version, starter-kit, extension-list, extension-image, extension-file-handler)
 - **Charts**: chart.js, chartjs-plugin-datalabels
 - **Data Processing**: papaparse, file-saver, dayjs, lodash, rrule
 - **Forms**: vee-validate, yup
@@ -50,7 +50,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Charts**: Visual time tracking with Chart.js
 - **Dark Theme**: Toggle in app toolbar, persisted to localStorage
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
-- **Sticky Notes**: Card-based rich-text notes tab with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch), pasted images (Blobs in a separate `daybook-images` IndexedDB, click to zoom); Chat reads notes via the client-side `searchNotes` tool and Catch-up includes open note items (see `docs/features/notes.md`)
+- **Sticky Notes**: Card-based rich-text notes tab with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch), pasted images (Blobs in a separate `daybook-images` IndexedDB, corner-drag resize, click to zoom); Chat reads notes via the client-side `searchNotes` tool and Catch-up includes open note items (see `docs/features/notes.md`)
 - **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates (see `docs/features/events.md`)
 
 ## Feature Documentation

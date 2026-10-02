@@ -42,7 +42,7 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 | `src/components/NoteCard.vue` | UI only — one card: color, sanitized preview (`previewHtml` must already be sanitized), pin icon, drag-state classes. Ripple is off (the card grows into the editor; a ripple on top reads as noise). The preview box ends 30px above the card bottom, above the date caption, and fades over its last 36px, so long notes never run under the date. |
 | `src/components/NoteEditor.vue` | UI only — the Tiptap instance, toolbar, and pin/color controls (emit `togglePin` / `color`), no note persistence (it does store pasted image blobs, see Images). `content` prop is **initial value only**: never watched back into the editor (would reset cursor/selection), so the parent keys the component by note id to force remount when switching notes. Loaded lazily (`defineAsyncComponent`): Tiptap (~120 kB gzip) is kept out of the Home chunk and fetched when NotesPanel mounts, i.e. the first time the Notes tab opens, so the first note still opens instantly. |
 | `src/components/NoteImageViewer.vue` | Click-to-zoom VDialog for an editor image (Esc / outside click / click the image to close), grows out of the clicked image via `target`. |
-| `src/common/noteImageExtension.ts` | Tiptap `Image` extended to store `data-image-id` instead of `src`, with a node view that loads the blob URL. |
+| `src/common/noteImageExtension.ts` | Tiptap `Image` extended to store `data-image-id` instead of `src`, with a resizable node view that loads the blob URL. |
 | `src/composables/useNoteImages.ts` | Add an image (compress + store), id → object URL cache shared by cards and editor, orphan sweep. |
 | `src/common/prepareNoteImage.ts` | Re-encodes pasted images to WebP (max 2560px side) before storing. |
 | `src/db/noteImageStore.ts` | The `daybook-images` IndexedDB database: Blob records + `createdAt` index. |
@@ -120,6 +120,17 @@ Paste (Ctrl+V), drop, or the toolbar image button (the way in on phones) inserts
   an old backup restored without images) shows a dashed "Image not found" box.
 - **Insertion** moves the cursor into the text after the image (Tiptap leaves the inserted image node-selected,
   so the next keystroke would replace it).
+- **Resize**: hover an image in the editor → drag a bottom corner handle (always shown on touch screens).
+  Aspect ratio is locked. `width`/`height` attrs then hold the dragged size (pasted = natural size), so
+  card previews follow it, capped to the card width. Uses Tiptap's `ResizableNodeView` (`@tiptap/core`)
+  directly: Image's own `resize` option can't be enabled because its node view loads `src`, ours loads the
+  blob by id. Two differences from Image's version: the commit doesn't leave the image node-selected (the
+  next keystroke would replace it), and a `touchend` → synthetic `mouseup` bridge, because
+  ResizableNodeView only ends a resize on `mouseup`, so a touch resize would never commit. The editor CSS
+  forces `height: auto !important` on images: the view writes an inline px height, which would squash an
+  image whose width is clamped by `max-width: 100%`.
+  `@tiptap/core` is pinned to the exact version `@tiptap/starter-kit` pins: a caret range resolves a newer
+  core and yarn installs two copies.
 - **Zoom**: clicking an image in the editor opens `NoteImageViewer` (`editorProps.handleClickOn`, returns true
   so the click doesn't select the node; Backspace/Delete next to it still removes it). Not on cards: a card
   thumbnail can fill most of the card, and clicking the card must still open the note.

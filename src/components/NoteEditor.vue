@@ -268,14 +268,55 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
   border: 2px solid rgb(var(--v-theme-primary));
 }
 
-/* Images zoom on click; a keyboard-selected one gets a ring */
+/* Images zoom on click; a keyboard-selected one gets a ring. The resize view sets an inline px height;
+   height stays auto so a width clamped by max-width never squashes the image. */
 .note-editor :deep(.ProseMirror img) {
+  height: auto !important;
   cursor: zoom-in;
 }
 
-.note-editor :deep(.ProseMirror img.ProseMirror-selectednode) {
+.note-editor :deep(.ProseMirror-selectednode img) {
   outline: 2px solid rgb(var(--v-theme-primary));
   outline-offset: 2px;
+}
+
+/* Resize (ResizableNodeView markup): the wrapper hugs the image and never outgrows the note */
+.note-editor :deep([data-resize-wrapper]) {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Corner handles: shown on hover / while dragging; always on touch screens (no hover there) */
+.note-editor :deep([data-resize-handle]) {
+  width: 14px;
+  height: 14px;
+  margin: 2px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--v-theme-surface));
+  background: rgb(var(--v-theme-primary));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1;
+}
+
+.note-editor :deep([data-resize-handle='bottom-right']) {
+  cursor: nwse-resize;
+}
+
+.note-editor :deep([data-resize-handle='bottom-left']) {
+  cursor: nesw-resize;
+}
+
+.note-editor :deep([data-resize-container]:hover [data-resize-handle]),
+.note-editor :deep([data-resize-state='true'] [data-resize-handle]) {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .note-editor :deep([data-resize-handle]) {
+    opacity: 1;
+  }
 }
 
 /* Full height so clicking empty space below the text still focuses the editor */

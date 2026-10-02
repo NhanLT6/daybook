@@ -311,7 +311,7 @@ test('pasted image is stored outside the note, previews on the card, and zooms o
 
   // Typing right after the paste goes below the image instead of replacing it
   await page.keyboard.type('after');
-  await expect(editor.locator('img + p')).toHaveText('after');
+  await expect(editor.locator('[data-resize-container] + p')).toHaveText('after');
 
   // Zoom: click opens the viewer (it takes focus once fully open), Esc closes it and leaves the note open
   const viewer = page.locator('.note-image-viewer__img');
@@ -370,4 +370,56 @@ test('pasted image is stored outside the note, previews on the card, and zooms o
   await page.reload();
   await openNotesTab(page);
   await expect(page.locator('.note-card .note-preview img')).toHaveAttribute('src', /^blob:/);
+});
+
+test('resizes a pasted image by dragging its corner handle; the size is saved', async ({ page }) => {
+  await page.goto('/');
+  await openNotesTab(page);
+  const editor = await openNewNoteEditor(page);
+
+  await editor.evaluate(async (el) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 200;
+    canvas.getContext('2d')!.fillRect(0, 0, 400, 200);
+    const blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
+    const data = new DataTransfer();
+    data.items.add(new File([blob], 'shot.png', { type: 'image/png' }));
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  const image = editor.locator('img[data-image-id]');
+  await expect(image).toHaveAttribute('src', /^blob:/);
+
+  // Drag the bottom-right handle 200px to the left: half width, aspect ratio kept
+  await image.hover();
+  const handle = editor.locator('[data-resize-handle="bottom-right"]');
+  await expect(handle).toBeVisible();
+  const box = (await handle.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 100, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.move(box.x + box.width / 2 - 200, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  await expect.poll(async () => (await image.boundingBox())!.width).toBeCloseTo(200, -1);
+  expect((await image.boundingBox())!.height).toBeCloseTo(100, -1);
+  await expect(page.locator('.note-image-viewer')).toHaveCount(0); // a resize is not a zoom click
+
+  // Typing afterwards doesn't replace the image (the resize must not leave it node-selected)
+  await editor.locator('p').first().click();
+  await page.keyboard.type('caption');
+  await expect(image).toBeVisible();
+
+  await page.locator('[aria-label="Back to notes"]').click();
+  const preview = page.locator('.note-card .note-preview img');
+  await expect(preview).toHaveAttribute('width', /^(19\d|20\d)$/);
+  await expect(preview).toHaveAttribute('height', /^(9\d|10\d)$/);
+
+  // Survives a reload at the new size
+  await page.reload();
+  await openNotesTab(page);
+  await page.locator('.note-card').click();
+  const reopened = page.locator('.notes-editor-overlay img[data-image-id]');
+  await expect(reopened).toHaveAttribute('src', /^blob:/);
+  await expect.poll(async () => (await reopened.boundingBox())!.width).toBeCloseTo(200, -1);
 });
