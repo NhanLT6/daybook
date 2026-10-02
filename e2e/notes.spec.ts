@@ -284,3 +284,90 @@ test('ticks a checklist item straight from the card without opening the editor',
   await openNotesTab(page);
   await expect(page.locator('.note-card li[data-type="taskItem"]')).toHaveAttribute('data-checked', 'true');
 });
+
+test('pasted image is stored outside the note, previews on the card, and zooms on click', async ({ page }) => {
+  await page.goto('/');
+  await openNotesTab(page);
+  const editor = await openNewNoteEditor(page);
+  await page.keyboard.type('Screenshot of the bug');
+
+  // Paste a 400x200 PNG the way a screenshot tool puts it on the clipboard (a file, no html)
+  await editor.evaluate(async (el) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 200;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#c33';
+    ctx.fillRect(0, 0, 400, 200);
+    const blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
+    const data = new DataTransfer();
+    data.items.add(new File([blob], 'shot.png', { type: 'image/png' }));
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+
+  const editorImage = editor.locator('img[data-image-id]');
+  await expect(editorImage).toHaveAttribute('src', /^blob:/);
+  await expect(editorImage).toHaveAttribute('width', '400');
+
+  // Typing right after the paste goes below the image instead of replacing it
+  await page.keyboard.type('after');
+  await expect(editor.locator('img + p')).toHaveText('after');
+
+  // Zoom: click opens the viewer (it takes focus once fully open), Esc closes it and leaves the note open
+  const viewer = page.locator('.note-image-viewer__img');
+  const viewerOpen = async () => {
+    await editorImage.click();
+    await expect(page.locator('.note-image-viewer .v-overlay__content')).toBeFocused();
+  };
+  await viewerOpen();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.note-image-viewer')).toHaveCount(0);
+  await expect(editor).toBeFocused();
+
+  // Clicking outside the image (the scrim) also closes it, and so does clicking the image itself
+  await viewerOpen();
+  await page.mouse.click(5, 5);
+  await expect(page.locator('.note-image-viewer')).toHaveCount(0);
+  await viewerOpen();
+  await viewer.click();
+  await expect(page.locator('.note-image-viewer')).toHaveCount(0);
+  await expect(editor).toBeVisible();
+
+  await page.locator('[aria-label="Back to notes"]').click();
+  await expect(page.locator('.note-card .note-preview img')).toHaveAttribute('src', /^blob:/);
+
+  // Note HTML holds only the reference; the bytes are in the image database
+  const stored = await page.evaluate(
+    () =>
+      new Promise<{ content: string; images: number }>((resolve, reject) => {
+        const open = (name: string) =>
+          new Promise<IDBDatabase>((res, rej) => {
+            const r = indexedDB.open(name);
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+          });
+        const all = (db: IDBDatabase, store: string) =>
+          new Promise<{ content?: string }[]>((res, rej) => {
+            const r = db.transaction(store).objectStore(store).getAll();
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+          });
+        Promise.all([open('daybook'), open('daybook-images')])
+          .then(async ([main, images]) => {
+            const [notes, imgs] = await Promise.all([all(main, 'notes'), all(images, 'images')]);
+            main.close();
+            images.close();
+            resolve({ content: notes[0]?.content ?? '', images: imgs.length });
+          })
+          .catch(reject);
+      }),
+  );
+  expect(stored.content).toMatch(/<img data-image-id="[\w-]+" width="400" height="200">/);
+  expect(stored.content).not.toContain('src=');
+  expect(stored.images).toBe(1);
+
+  // Survives a reload (blob comes back from the image store)
+  await page.reload();
+  await openNotesTab(page);
+  await expect(page.locator('.note-card .note-preview img')).toHaveAttribute('src', /^blob:/);
+});

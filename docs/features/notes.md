@@ -24,6 +24,8 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 - `pinned`, `color` — optional because notes saved before v2 lack them; no migration needed. `color` is one
   of `NOTE_COLORS` (`src/interfaces/Note.ts`), each mapped to a `note-<color>` theme color in `main.ts`
   with separate light (pastel) and dark (muted) values. Unset = default surface.
+- Images are **not** in `content`: it holds `<img data-image-id width height>` only, the bytes live in a
+  separate database (see Images below).
 - `notes` is a new IndexedDB object store. `indexedDbAdapter.ts` bumps `DB_VERSION` 1 → 2 — required
   because `upgrade()` only runs on a version bump; without it, existing users' DBs stay at v1 and any read
   from `notes` throws `NotFoundError`.
@@ -38,7 +40,12 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 |---|---|
 | `src/components/NotesPanel.vue` | Owns persistence (autosave/empty-discard), pinned-first order, search, drag & drop, trash, tick-from-card, and undo. The only place notes are read from/written to the store. |
 | `src/components/NoteCard.vue` | UI only — one card: color, sanitized preview (`previewHtml` must already be sanitized), pin icon, drag-state classes. Ripple is off (the card grows into the editor; a ripple on top reads as noise). The preview box ends 30px above the card bottom, above the date caption, and fades over its last 36px, so long notes never run under the date. |
-| `src/components/NoteEditor.vue` | UI only — the Tiptap instance, toolbar, and pin/color controls (emit `togglePin` / `color`), no persistence. `content` prop is **initial value only**: never watched back into the editor (would reset cursor/selection), so the parent keys the component by note id to force remount when switching notes. Loaded lazily (`defineAsyncComponent`): Tiptap (~120 kB gzip) is kept out of the Home chunk and fetched when NotesPanel mounts, i.e. the first time the Notes tab opens, so the first note still opens instantly. |
+| `src/components/NoteEditor.vue` | UI only — the Tiptap instance, toolbar, and pin/color controls (emit `togglePin` / `color`), no note persistence (it does store pasted image blobs, see Images). `content` prop is **initial value only**: never watched back into the editor (would reset cursor/selection), so the parent keys the component by note id to force remount when switching notes. Loaded lazily (`defineAsyncComponent`): Tiptap (~120 kB gzip) is kept out of the Home chunk and fetched when NotesPanel mounts, i.e. the first time the Notes tab opens, so the first note still opens instantly. |
+| `src/components/NoteImageViewer.vue` | Click-to-zoom VDialog for an editor image (Esc / outside click / click the image to close), grows out of the clicked image via `target`. |
+| `src/common/noteImageExtension.ts` | Tiptap `Image` extended to store `data-image-id` instead of `src`, with a node view that loads the blob URL. |
+| `src/composables/useNoteImages.ts` | Add an image (compress + store), id → object URL cache shared by cards and editor, orphan sweep. |
+| `src/common/prepareNoteImage.ts` | Re-encodes pasted images to WebP (max 2560px side) before storing. |
+| `src/db/noteImageStore.ts` | The `daybook-images` IndexedDB database: Blob records + `createdAt` index. |
 | `src/common/devSampleNotes.ts` | Dev-only random notes (checklists, lists, colors, some pinned) behind the flask button in the Notes toolbar. The button is `v-if="isDev"` (`import.meta.env.DEV`) and the module is dynamically imported, so neither ships in production builds. |
 | `src/common/sanitizeNoteHtml.ts` | DOMPurify allowlist used to render card previews via `v-html`. |
 | `src/composables/useNotes.ts` | Thin wrapper over `useCollection<Note>('notes')`: sorted list, `saveNote`/`removeNote`/`reorder`/`nextTopOrder`. |
@@ -89,6 +96,40 @@ there are no notes.
   can see count: one clipped off the preview or past the middle of its bottom fade isn't a hit (the click
   opens the note). Keyboard users tick in the editor instead.
 
+## Images
+
+Paste (Ctrl+V), drop, or the toolbar image button (the way in on phones) inserts an image into the open note.
+
+- **Storage**: a separate IndexedDB database `daybook-images` (`noteImageStore.ts`), one record per image:
+  `{ id, blob, width, height, createdAt }`. The note HTML keeps only `<img data-image-id width height>`.
+  - Why not inline base64: every notes reload, search (`DOMParser` over all notes), Chat `searchNotes` and
+    Catch-up read whole note contents; a few screenshots would make each of those MBs. Blobs in IndexedDB
+    are stored as files by the browser and only read when an image is shown.
+  - Why a separate database instead of a store in `daybook`: the main adapter's `snapshot()`/`getAll()`
+    load whole stores, and it would need a `DB_VERSION` bump; images don't fit the `useCollection` model.
+  - Why not a folder on disk (File System Access API): Chromium-only, not on phones, and the user has to
+    re-grant folder permission each session. The quota is the same origin quota either way, roughly: Chrome/Edge
+    up to ~60% of the disk, Firefox 10% of the disk (max 10 GB), Safari 17+ ~60%.
+- **Compression** (`prepareNoteImage.ts`): PNG/JPEG/BMP/WebP are redrawn on a canvas and encoded as WebP at 0.9,
+  longest side capped at 2560px; the original is kept if it's smaller (or the browser can't encode WebP,
+  i.e. Safari). GIFs keep their bytes (canvas would drop the animation). Over 20 MB is rejected. A full-screen
+  PNG screenshot typically ends up 5–10x smaller.
+- **Display**: `noteImageUrl(id)` / `loadNoteImageUrl(id)` turn a stored blob into an object URL once and cache
+  it (reactive map), so card previews re-render when it loads. The editor's node view sets `src` itself;
+  `width`/`height` attrs + `height: auto` reserve the right box before the blob loads. A missing blob (e.g.
+  an old backup restored without images) shows a dashed "Image not found" box.
+- **Insertion** moves the cursor into the text after the image (Tiptap leaves the inserted image node-selected,
+  so the next keystroke would replace it).
+- **Zoom**: clicking an image in the editor opens `NoteImageViewer` (`editorProps.handleClickOn`, returns true
+  so the click doesn't select the node; Backspace/Delete next to it still removes it). Not on cards: a card
+  thumbnail can fill most of the card, and clicking the card must still open the note.
+- **Cleanup**: removing an image from a note (or deleting the note) doesn't delete the blob — editor undo
+  and the delete-undo toast need it back. `sweepOrphanNoteImages` runs when NotesPanel mounts and deletes
+  images no note references that are older than 24h (also covers a note that isn't saved yet, other tabs).
+- **Backup**: `useBackup` exports images as base64 under a top-level `noteImages` key (outside `collections`)
+  and imports them back (added, not replaced; unreferenced ones get swept). Malformed entries are skipped.
+  Backups grow with images (~1.33x their stored size).
+
 ## Security Rules
 
 Untrusted HTML can enter a note via pasted clipboard HTML or a crafted backup JSON someone imports (AI
@@ -101,7 +142,11 @@ output is v2, but must follow the same rules when it lands). Four controls:
 2. **Preview path** — the card grid only ever renders note HTML via `v-html` after passing it through
    `sanitizeNoteHtml()`, an allowlist of exactly what the Tiptap config emits (no `style`/`class`/`on*`
    attrs). DOMPurify's default URI allowlist strips `javascript:`/`vbscript:`/`data:` hrefs; no `style` attr
-   means no CSS overlay/redress tricks; no `form`/`button`/`iframe`/`svg`/`img` tags are allowed at all.
+   means no CSS overlay/redress tricks; no `form`/`button`/`iframe`/`svg` tags are allowed at all. `img` is
+   allowed without `src`: one lacking a well-formed `data-image-id` is removed, and `src` is only ever set
+   afterwards from our own `blob:` object URL. So note HTML can't load a remote URL (tracking pixel) or a
+   `data:` payload. The editor side matches: `NoteImage` only parses `img[data-image-id]`, so pasted web HTML
+   with `<img src>` loses its images.
 3. Card previews are `inert` with `pointer-events: none` — any surviving link or checkbox is unclickable.
    Tick-from-card deliberately does **not** relax this (it hit-tests positions instead).
 4. Hard rules: never `v-html` note content without `sanitizeNoteHtml`; never assign note HTML to
@@ -204,6 +249,10 @@ than changing that store behavior, the notes code dismisses its own toast with `
   transform on every pointer move, and a transition makes it trail the finger.
 - The library copies computed styles inline onto its touch clone (incl. a flat `box-shadow`), so
   `note-card--lifted` needs `!important`.
+- `NoteImageViewer` (VDialog) only takes focus after its open transition, so opening blurs the editor (keys
+  would otherwise still edit the note) and `NoteEditor`'s Esc handler ignores Esc while the viewer is open
+  (otherwise one Esc closes the viewer *and* the note). An Esc in the first ~50ms after opening is ignored by
+  Vuetify (its overlay stack updates on a `setTimeout`); e2e tests wait for the dialog to take focus first.
 - `NoteEditor`'s toolbar buttons bind `@mousedown.prevent`. Without it the clicked button takes and keeps
   focus: the command applies, but the next keystrokes don't reach the editor (observed: text typed after
   clicking Checklist landed outside the list).

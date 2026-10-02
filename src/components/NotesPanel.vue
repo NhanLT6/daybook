@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import NoteCard from '@/components/NoteCard.vue';
-
+import { noteImageUrl, sweepOrphanNoteImages } from '@/composables/useNoteImages';
 import { useNotes } from '@/composables/useNotes';
 
+import NoteCard from '@/components/NoteCard.vue';
+
 import type { Note, NoteColor } from '@/interfaces/Note';
+import type { DragState } from '@formkit/drag-and-drop';
 
 import { sanitizeNoteHtml } from '@/common/sanitizeNoteHtml';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
-import { type DragState, parents, tearDown } from '@formkit/drag-and-drop';
+import { parents, tearDown } from '@formkit/drag-and-drop';
 import { dragAndDrop } from '@formkit/drag-and-drop/vue';
 import { debounce } from 'lodash';
 import { nanoid } from 'nanoid';
@@ -19,15 +21,25 @@ const loadNoteEditor = () => import('./NoteEditor.vue');
 const NoteEditor = defineAsyncComponent(loadNoteEditor);
 onMounted(loadNoteEditor);
 
-const { notes, saveNote, removeNote, reorder, nextTopOrder } = useNotes();
+const { notes, ready, saveNote, removeNote, reorder, nextTopOrder } = useNotes();
 const notificationCenter = useNotificationCenterStore();
+
+// Images are kept when removed from a note (editor undo, delete-undo) and swept here once no note uses them
+onMounted(async () => {
+  await ready;
+  sweepOrphanNoteImages(notes.value.map((n) => n.content)).catch((err) =>
+    console.warn('[notes] image sweep failed', err),
+  );
+});
 
 const panelEl = ref<HTMLElement | null>(null);
 const editing = ref<Note | null>(null);
 const editorEmpty = ref(false);
 
 // Sanitized once per notes change rather than re-running DOMPurify on every render.
-const sanitizedPreviews = computed(() => new Map(notes.value.map((n) => [n.id, sanitizeNoteHtml(n.content)])));
+const sanitizedPreviews = computed(
+  () => new Map(notes.value.map((n) => [n.id, sanitizeNoteHtml(n.content, noteImageUrl)])),
+);
 
 // ── Search ──────────────────────────────────────────────────────────────────
 // Matches visible text only, so searching "strong" doesn't hit every bold note's markup.
@@ -261,7 +273,9 @@ const onOverlayEnter = (el: Element, done: () => void) => {
 };
 
 const onOverlayLeave = (el: Element, done: () => void) => {
-  const card = closingId ? panelEl.value?.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(closingId)}"]`) : null;
+  const card = closingId
+    ? panelEl.value?.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(closingId)}"]`)
+    : null;
   const toTrash = closingToTrash;
   closingId = null;
   closingToTrash = false;
@@ -317,7 +331,12 @@ const swallow = async (falling: Promise<unknown>) => {
   if (!prefersReducedMotion()) {
     await trashEl.value
       ?.animate(
-        [{ transform: 'scale(1)' }, { transform: 'scale(0.86, 0.9)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }],
+        [
+          { transform: 'scale(1)' },
+          { transform: 'scale(0.86, 0.9)' },
+          { transform: 'scale(1.06)' },
+          { transform: 'scale(1)' },
+        ],
         { duration: 320, easing: 'ease-out' },
       )
       .finished.catch(() => {});
@@ -958,6 +977,23 @@ onBeforeUnmount(() => {
 
 .note-content .ProseMirror {
   outline: none;
+}
+
+/* width/height attrs hold the natural size: with height:auto the box keeps its aspect ratio before the blob loads */
+.note-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 4px 0;
+  border-radius: 6px;
+}
+
+/* Referenced image is gone from the image store (e.g. a backup restored without it) */
+.note-content img.note-image--missing {
+  min-height: 48px;
+  padding: 12px;
+  border: 1px dashed rgba(var(--v-border-color), var(--v-border-opacity));
+  font-size: 0.75rem;
 }
 
 .note-content p.is-editor-empty:first-child::before {

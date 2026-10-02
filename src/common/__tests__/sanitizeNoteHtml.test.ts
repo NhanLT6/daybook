@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-
 import { sanitizeNoteHtml } from '@/common/sanitizeNoteHtml';
+import { describe, expect, it } from 'vitest';
 
 describe('sanitizeNoteHtml', () => {
   it('keeps a paragraph with bold/italic/strike marks intact', () => {
@@ -65,5 +64,40 @@ describe('sanitizeNoteHtml', () => {
 
   it('strips unknown data-* attributes', () => {
     expect(sanitizeNoteHtml('<p data-foo="bar">hi</p>')).toBe('<p>hi</p>');
+  });
+});
+
+describe('sanitizeNoteHtml images', () => {
+  const resolve = (id: string) => (id === 'img_1' ? 'blob:http://localhost/abc' : undefined);
+
+  it('keeps a stored image and fills src from the resolver', () => {
+    const out = sanitizeNoteHtml('<img data-image-id="img_1" width="800" height="600" alt="">', resolve);
+    expect(out).toBe('<img data-image-id="img_1" width="800" height="600" alt="" src="blob:http://localhost/abc">');
+  });
+
+  it('keeps a stored image without src until its blob is loaded', () => {
+    expect(sanitizeNoteHtml('<img data-image-id="img_2">', resolve)).toBe('<img data-image-id="img_2">');
+  });
+
+  it('never keeps a src from the stored html', () => {
+    expect(sanitizeNoteHtml('<img data-image-id="img_2" src="https://evil.com/pixel.gif">', resolve)).toBe(
+      '<img data-image-id="img_2">',
+    );
+  });
+
+  it('strips images that are not ours', () => {
+    expect(sanitizeNoteHtml('<p>a</p><img src="https://evil.com/pixel.gif"><img src="data:image/png;base64,AA">')).toBe(
+      '<p>a</p>',
+    );
+  });
+
+  it('strips images with a malformed id', () => {
+    expect(sanitizeNoteHtml('<img data-image-id="x&quot; onerror=&quot;alert(1)">', resolve)).toBe('');
+  });
+
+  it('ignores resolver output that is not a blob url', () => {
+    expect(sanitizeNoteHtml('<img data-image-id="img_3">', () => 'javascript:alert(1)')).toBe(
+      '<img data-image-id="img_3">',
+    );
   });
 });

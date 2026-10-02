@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
-import { NOTE_COLORS, type NoteColor } from '@/interfaces/Note';
+import { addNoteImage } from '@/composables/useNoteImages';
+
+import NoteImageViewer from '@/components/NoteImageViewer.vue';
+
+import { NOTE_COLORS } from '@/interfaces/Note';
+
+import type { NoteColor } from '@/interfaces/Note';
 
 import dayjs from 'dayjs';
 
+import { NoteImage } from '@/common/noteImageExtension';
+import { NOTE_IMAGE_MIME_TYPES } from '@/common/prepareNoteImage';
+import { useNotificationCenterStore } from '@/stores/notificationCenter';
+import { FileHandler } from '@tiptap/extension-file-handler';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extensions';
+import { Selection, TextSelection } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 
@@ -21,6 +32,37 @@ const emit = defineEmits<{
   color: [color: NoteColor | undefined];
 }>();
 
+const notificationCenter = useNotificationCenterStore();
+
+// Stores each file in the image store, then inserts the nodes in one go (at the drop point, or the cursor)
+async function insertImages(files: File[], pos?: number) {
+  const results = await Promise.allSettled(files.map((f) => addNoteImage(f)));
+  const nodes = results.flatMap((r) => (r.status === 'fulfilled' ? [{ type: 'image', attrs: r.value }] : []));
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) {
+    const quota = failed.reason instanceof DOMException && failed.reason.name === 'QuotaExceededError';
+    notificationCenter.error('Could not add image', {
+      message: quota ? 'Browser storage is full' : failed.reason instanceof Error ? failed.reason.message : undefined,
+    });
+  }
+  const e = editor.value;
+  if (!nodes.length || !e || e.isDestroyed) return;
+  e.chain()
+    .focus()
+    .insertContentAt(pos ?? e.state.selection, nodes)
+    // Insertion leaves the last image node-selected, so the next keystroke would replace it: move the
+    // cursor into the text after it, adding a paragraph when the image ended up last
+    .command(({ tr }) => {
+      const end = tr.selection.to;
+      const next = Selection.findFrom(tr.doc.resolve(end), 1, true);
+      if (next) tr.setSelection(next);
+      else
+        tr.insert(end, tr.doc.type.schema.nodes.paragraph.create()).setSelection(TextSelection.create(tr.doc, end + 1));
+      return true;
+    })
+    .run();
+}
+
 const editor = useEditor({
   content: props.content,
   autofocus: 'end',
@@ -29,16 +71,46 @@ const editor = useEditor({
     TaskList,
     TaskItem.configure({ nested: true }),
     Placeholder.configure({ placeholder: 'Ticket reminder, question for daily…' }),
+    NoteImage,
+    FileHandler.configure({
+      allowedMimeTypes: NOTE_IMAGE_MIME_TYPES,
+      // "Copy image" in a browser also puts `<img src=remote>` HTML on the clipboard; the file is enough
+      consumePasteEvent: true,
+      onPaste: (_e, files) => void insertImages(files),
+      onDrop: (_e, files, pos) => void insertImages(files, pos),
+    }),
   ],
+  editorProps: {
+    // Click an image to zoom it (instead of selecting it); Backspace/Delete next to it still removes it
+    handleClickOn: (_view, _pos, node, _nodePos, event) => {
+      const img = event.target;
+      if (node.type.name !== 'image' || !(img instanceof HTMLImageElement) || !img.currentSrc) return false;
+      viewer.value = { open: true, src: img.currentSrc, alt: img.alt, target: img };
+      // VDialog only takes focus after its open transition: until then keys would still edit the note
+      (document.activeElement as HTMLElement | null)?.blur();
+      return true;
+    },
+  },
   onUpdate: ({ editor: e }) => emit('update', e.getHTML(), e.isEmpty),
 });
+
+const viewer = ref<{ open: boolean; src?: string; alt?: string; target?: HTMLElement }>({ open: false });
+
+// Toolbar image button (also the way in on phones, where paste is awkward)
+const fileInput = ref<HTMLInputElement>();
+function onPickImages(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files ?? [])].filter((f) => NOTE_IMAGE_MIME_TYPES.includes(f.type));
+  input.value = '';
+  if (files.length) void insertImages(files);
+}
 
 const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).format('MMM D, HH:mm') : null));
 </script>
 
 <template>
   <!-- Root fills its container; header/toolbar are fixed rows, content scrolls in the remaining space -->
-  <div class="note-editor" @keydown.esc="emit('back')">
+  <div class="note-editor" @keydown.esc="!viewer.open && emit('back')">
     <!-- Header: back/delete + last-updated timestamp -->
     <div class="d-flex align-center px-2 py-1">
       <VBtn icon="mdi-arrow-left" variant="text" size="small" aria-label="Back to notes" @click="emit('back')" />
@@ -135,9 +207,35 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         @mousedown.prevent
         @click="editor?.chain().focus().toggleTaskList().run()"
       />
+      <VBtn
+        icon="mdi-image-outline"
+        variant="text"
+        size="small"
+        aria-label="Insert image"
+        title="Insert image (or paste / drop one)"
+        @mousedown.prevent
+        @click="fileInput?.click()"
+      />
+      <input
+        ref="fileInput"
+        type="file"
+        :accept="NOTE_IMAGE_MIME_TYPES.join(',')"
+        multiple
+        hidden
+        @change="onPickImages"
+      />
     </div>
 
     <EditorContent :editor="editor" class="note-content" />
+
+    <!-- Zoomed image; focus goes back to the text once it's gone -->
+    <NoteImageViewer
+      v-model="viewer.open"
+      :src="viewer.src"
+      :alt="viewer.alt"
+      :target="viewer.target"
+      @closed="editor?.commands.focus()"
+    />
   </div>
 </template>
 
@@ -168,6 +266,16 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
 
 .note-swatch--active {
   border: 2px solid rgb(var(--v-theme-primary));
+}
+
+/* Images zoom on click; a keyboard-selected one gets a ring */
+.note-editor :deep(.ProseMirror img) {
+  cursor: zoom-in;
+}
+
+.note-editor :deep(.ProseMirror img.ProseMirror-selectednode) {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
 }
 
 /* Full height so clicking empty space below the text still focuses the editor */
