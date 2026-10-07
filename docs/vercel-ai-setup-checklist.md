@@ -39,6 +39,19 @@ different `AI_GATEWAY_MODEL` rather than loosening the options.
 Users who bring their own key bypass the gateway, so these options do not apply to them — their data is governed by
 their own Google terms.
 
+### Model check (Vercel model browser, saved 2026-10-07)
+
+Filter: free-tier credit + no-training provider + zero-data-retention provider + vision + tool use. Both Gemini 2.5
+models pass; p50 latency/throughput are Vercel's measured figures.
+
+| Model | Input / output per 1M tokens | Time to first token | Tokens/s |
+|---|---|---|---|
+| `google/gemini-2.5-flash` (default) | $0.30 / $2.50 | ~380 ms | ~185 |
+| `google/gemini-2.5-flash-lite` | $0.10 / $0.40 | ~270 ms | ~405 |
+
+Newer Gemini models (3.x) are not on the free-tier credit. Flash-Lite is cheaper and faster but weaker at tool calls —
+try it via `AI_GATEWAY_MODEL` and check that chat still extracts logs (including "the rest of the day") correctly.
+
 ## 3. Cost and limits
 
 - Each Vercel team gets **$5 of gateway credit per month** on the free-tier model list, at provider list price with no
