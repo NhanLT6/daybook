@@ -5,13 +5,12 @@ import type { AppEvent, RepeatRule } from '@/interfaces/Event';
 import {
   atOccurrence,
   backToBackRule,
-  daysFromMonthEnd,
-  describeDayFromEnd,
   describeRepeat,
   getNextOccurrence,
   getOccurrences,
   isSameRule,
-  lastWorkdayOfMonth,
+  normalizeRule,
+  nthWorkdayOfMonth,
   repeatPresets,
   validateRepeat,
 } from '@/common/eventRecurrence';
@@ -80,7 +79,7 @@ describe('getOccurrences', () => {
     expect(atOccurrence(e, '2026-11-05').dates).toEqual(['2026-11-05', '2026-11-20']);
   });
 
-  it('repeats monthly on the nth and last weekday', () => {
+  it('reads legacy nth / last weekday rules', () => {
     const nth = event({ repeat: { freq: 'month', interval: 1, monthlyBy: 'nthWeekday' } }); // 1st Tuesday
     expect(getOccurrences(nth, '2026-10-01', '2026-12-31')).toEqual(['2026-10-06', '2026-11-03', '2026-12-01']);
 
@@ -88,31 +87,20 @@ describe('getOccurrences', () => {
     expect(getOccurrences(last, '2026-10-01', '2026-12-31')).toEqual(['2026-10-30', '2026-11-27', '2026-12-25']);
   });
 
-  it('repeats monthly on the same distance from month end', () => {
-    // Last day: follows month length, including a leap-year February
-    const last = event({ date: '2027-12-31', repeat: { freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' } });
+  it('repeats monthly on the last day, following month length', () => {
+    const last = event({ date: '2027-12-31', repeat: { freq: 'month', interval: 1, monthlyOn: { nth: -1, day: 'day' } } });
     expect(getOccurrences(last, '2028-01-01', '2028-04-30')).toEqual([
       '2028-01-31',
       '2028-02-29',
       '2028-03-31',
       '2028-04-30',
     ]);
-
-    // 3rd to last day (Oct 29)
-    const third = event({ date: '2026-10-29', repeat: { freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' } });
-    expect(getOccurrences(third, '2026-10-01', '2027-03-31')).toEqual([
-      '2026-10-29',
-      '2026-11-28',
-      '2026-12-29',
-      '2027-01-29',
-      '2027-02-26',
-      '2027-03-29',
-    ]);
   });
 
-  it('skips months without the day for day-of-month rules', () => {
-    const e = event({ date: '2026-01-31', repeat: { freq: 'month', interval: 1 } });
-    expect(getOccurrences(e, '2026-01-01', '2026-04-30')).toEqual(['2026-01-31', '2026-03-31']);
+  it('repeats on a monthly position whatever the start date is', () => {
+    // Second Tuesday, from a Wednesday start: Oct 13, Nov 10
+    const second = event({ date: '2026-10-07', repeat: { freq: 'month', interval: 1, monthlyOn: { nth: 2, day: 2 } } });
+    expect(getOccurrences(second, '2026-10-01', '2026-11-30')).toEqual(['2026-10-13', '2026-11-10']);
   });
 });
 
@@ -195,43 +183,87 @@ describe('describeRepeat', () => {
   });
 });
 
-describe('month-end helpers', () => {
-  it('measures the distance from month end', () => {
-    expect(daysFromMonthEnd('2026-10-31')).toBe(0);
-    expect(daysFromMonthEnd('2026-10-29')).toBe(2);
-    expect(daysFromMonthEnd('2028-02-01')).toBe(28);
+describe('normalizeRule', () => {
+  it('converts legacy monthlyBy using the start date', () => {
+    const month = { freq: 'month', interval: 1 } as const;
+    expect(normalizeRule({ ...month, monthlyBy: 'nthWeekday' }, '2026-10-13')).toEqual({ ...month, monthlyOn: { nth: 2, day: 2 } });
+    expect(normalizeRule({ ...month, monthlyBy: 'lastWeekday' }, '2026-10-30')).toEqual({ ...month, monthlyOn: { nth: -1, day: 5 } });
+    // A 5th weekday becomes the last
+    expect(normalizeRule({ ...month, monthlyBy: 'nthWeekday' }, '2026-10-30')).toEqual({ ...month, monthlyOn: { nth: -1, day: 5 } });
+    expect(normalizeRule({ ...month, monthlyBy: 'lastWorkday' }, '2026-10-30')).toEqual({
+      ...month,
+      monthlyOn: { nth: -1, day: 'workday' },
+    });
+    expect(normalizeRule({ ...month, monthlyBy: 'dayOfMonth' }, '2026-10-30')).toEqual(month);
   });
 
-  it('names the day counting back from month end', () => {
-    expect(describeDayFromEnd('2026-10-31')).toBe('last day');
-    expect(describeDayFromEnd('2026-10-30')).toBe('2nd to last day');
-    expect(describeDayFromEnd('2026-10-29')).toBe('3rd to last day');
-    expect(describeDayFromEnd('2026-10-21')).toBe('11th to last day');
-  });
-
-  it('describes first-day and last-day rules', () => {
+  it('describes positions', () => {
     expect(describeRepeat('2026-10-01', { freq: 'month', interval: 1 })).toBe('Every month on the first day');
-    expect(describeRepeat('2026-10-31', { freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' })).toBe(
+    expect(describeRepeat('2026-10-07', { freq: 'month', interval: 1, monthlyOn: { nth: -1, day: 'day' } })).toBe(
       'Every month on the last day',
+    );
+    expect(describeRepeat('2026-10-07', { freq: 'month', interval: 2, monthlyOn: { nth: 1, day: 'workday' } })).toBe(
+      'Every 2 months on the first work day',
+    );
+  });
+});
+
+describe('weekends and holidays (onNonWorkday)', () => {
+  const calendar = { weekendDays: [6, 0], holidays: new Set(['2026-11-25']) };
+  // Day 25: Oct 25 2026 is a Sunday, Nov 25 a holiday (Wed), Dec 25 a Friday
+  const on25 = (onNonWorkday?: RepeatRule['onNonWorkday']) =>
+    event({ date: '2026-10-25', repeat: { freq: 'month', interval: 1, ...(onNonWorkday ? { onNonWorkday } : {}) } });
+
+  it('keeps, skips or moves occurrences on days off', () => {
+    expect(getOccurrences(on25(), '2026-10-01', '2026-12-31', calendar)).toEqual(['2026-10-25', '2026-11-25', '2026-12-25']);
+    expect(getOccurrences(on25('skip'), '2026-10-01', '2026-12-31', calendar)).toEqual(['2026-12-25']);
+    expect(getOccurrences(on25('before'), '2026-10-01', '2026-12-31', calendar)).toEqual(['2026-10-23', '2026-11-24', '2026-12-25']);
+    expect(getOccurrences(on25('after'), '2026-10-01', '2026-12-31', calendar)).toEqual(['2026-10-26', '2026-11-26', '2026-12-25']);
+  });
+
+  it('finds moved occurrences across window edges', () => {
+    // Oct 25 moved back to Fri Oct 23: still found from a window that starts on the 23rd
+    expect(getOccurrences(on25('before'), '2026-10-23', '2026-10-23', calendar)).toEqual(['2026-10-23']);
+    expect(getNextOccurrence(on25('before'), '2026-10-20', calendar)).toBe('2026-10-23');
+    expect(getNextOccurrence(on25('skip'), '2026-10-01', calendar)).toBe('2026-12-25');
+  });
+
+  it('skips moved dates listed in skip', () => {
+    const series = event({ date: '2026-10-25', repeat: { freq: 'month', interval: 1, onNonWorkday: 'before', skip: ['2026-10-23'] } });
+    expect(getNextOccurrence(series, '2026-10-01', calendar)).toBe('2026-11-24');
+  });
+
+  it('applies to single days only, and says so in the summary', () => {
+    const range = event({ date: '2026-10-24', endDate: '2026-10-25', repeat: { freq: 'month', interval: 1, onNonWorkday: 'skip' } });
+    expect(getOccurrences(range, '2026-10-01', '2026-10-31', calendar)).toEqual(['2026-10-24']);
+    expect(describeRepeat('2026-10-25', { freq: 'month', interval: 1, onNonWorkday: 'before' })).toBe(
+      'Every month on day 25, or the work day before if off',
+    );
+    expect(describeRepeat('2026-10-25', { freq: 'week', interval: 1, onNonWorkday: 'skip' })).toBe(
+      'Every week on Sunday, skipping days off',
     );
   });
 
-  it('leaves from-month-end out of the presets (Custom panel only)', () => {
-    expect(repeatPresets({ date: '2026-10-31' }).some((p) => p.value.monthlyBy === 'dayFromEnd')).toBe(false);
+  it('ends a counted series', () => {
+    const twice = event({ date: '2026-10-25', repeat: { freq: 'month', interval: 1, onNonWorkday: 'after', end: { count: 2 } } });
+    expect(getNextOccurrence(twice, '2026-12-01', calendar)).toBeNull();
   });
 });
 
 describe('last work day of the month', () => {
-  const lastWorkday: RepeatRule = { freq: 'month', interval: 1, monthlyBy: 'lastWorkday' };
+  const lastWorkday: RepeatRule = { freq: 'month', interval: 1, monthlyOn: { nth: -1, day: 'workday' } };
   const satSun = { weekendDays: [6, 0], holidays: new Set<string>() };
 
   it('steps back over weekend days and holidays', () => {
     // Sat Oct 31 2026 → Fri Oct 30; with a Fri–Sun weekend → Thu Oct 29
-    expect(lastWorkdayOfMonth('2026-10-05', satSun)).toBe('2026-10-30');
-    expect(lastWorkdayOfMonth('2026-10-05', { ...satSun, weekendDays: [5, 6, 0] })).toBe('2026-10-29');
+    expect(nthWorkdayOfMonth('2026-10-05', -1, satSun)).toBe('2026-10-30');
+    // Oct 1 2026 is a Thursday: 1st work day Oct 1, 2nd Oct 2, 3rd Mon Oct 5
+    expect(nthWorkdayOfMonth('2026-10-20', 1, satSun)).toBe('2026-10-01');
+    expect(nthWorkdayOfMonth('2026-10-20', 3, satSun)).toBe('2026-10-05');
+    expect(nthWorkdayOfMonth('2026-10-05', -1, { ...satSun, weekendDays: [5, 6, 0] })).toBe('2026-10-29');
     // Fri Apr 30 2027 is a holiday → Thu Apr 29
-    expect(lastWorkdayOfMonth('2027-04-01', { ...satSun, holidays: new Set(['2027-04-30']) })).toBe('2027-04-29');
-    expect(lastWorkdayOfMonth('2026-10-05', { weekendDays: [0, 1, 2, 3, 4, 5, 6], holidays: new Set() })).toBeNull();
+    expect(nthWorkdayOfMonth('2027-04-01', -1, { ...satSun, holidays: new Set(['2027-04-30']) })).toBe('2027-04-29');
+    expect(nthWorkdayOfMonth('2026-10-05', -1, { weekendDays: [0, 1, 2, 3, 4, 5, 6], holidays: new Set() })).toBeNull();
   });
 
   it('repeats on each month\'s last work day, following the calendar', () => {
@@ -282,7 +314,7 @@ describe('last work day of the month', () => {
   it('describes and offers the rule for a single day only', () => {
     expect(describeRepeat('2026-10-30', lastWorkday)).toBe('Every month on the last work day');
     const offered = (shape: Parameters<typeof repeatPresets>[0]) =>
-      repeatPresets(shape).some((p) => p.value.monthlyBy === 'lastWorkday');
+      repeatPresets(shape).some((p) => p.value.monthlyOn?.day === 'workday');
     expect(offered({ date: '2026-10-05' })).toBe(true);
     expect(offered({ date: '2026-10-05', endDate: '2026-10-07' })).toBe(false);
     expect(offered({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-09'] })).toBe(false);
@@ -291,8 +323,9 @@ describe('last work day of the month', () => {
 
 describe('repeatPresets / isSameRule', () => {
   it('offers "last weekday" only when the date is the last of its weekday', () => {
-    expect(repeatPresets({ date: '2026-10-06' }).some((p) => p.value.monthlyBy === 'lastWeekday')).toBe(false);
-    expect(repeatPresets({ date: '2026-10-27' }).some((p) => p.value.monthlyBy === 'lastWeekday')).toBe(true);
+    const offersLast = (date: string) => repeatPresets({ date }).some((p) => p.value.monthlyOn?.nth === -1 && p.value.monthlyOn.day !== 'workday');
+    expect(offersLast('2026-10-06')).toBe(false);
+    expect(offersLast('2026-10-27')).toBe(true);
   });
 
   it('only offers rules the dates fit', () => {

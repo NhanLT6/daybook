@@ -11,7 +11,7 @@ start/end markers are planned next (a Mon→Fri range repeating every 2 weeks).
 
 ```
 AppEvent   { id, title, date, endDate?, dates?, startTime?, endTime?, type, description?, repeat? }   ← IndexedDB via useEvents ('events')
-RepeatRule { freq, interval, monthlyBy?, end?, skip? }                                               ← optional field on AppEvent
+RepeatRule { freq, interval, monthlyOn?, onNonWorkday?, end?, skip? }                               ← optional field on AppEvent
 WorkCalendar { weekendDays, holidays }                                                               ← derived live, never stored
 ```
 
@@ -26,7 +26,17 @@ Interfaces: `src/interfaces/Event.ts`
   monthly/yearly keep each day's day-of-month.
 - `RepeatRule` is a typed, friendly layer. **Never store raw RRULE strings**; `rrule` (npm) only does the date
   math inside `src/common/eventRecurrence.ts`.
-- `monthlyBy` is monthly only, and nth/last weekday and `dayFromEnd` only apply to a single start day; undefined = `dayOfMonth`. `dayFromEnd` keeps the start date's distance from month end (0 = last day, 2 = 3rd to last), stored with no extra field — it maps to rrule's negative `bymonthday` (-1 = last day), so it follows month length (Jan 31 → Feb 28/29 → Mar 31). `lastWorkday` = the month's last day that is neither a Settings weekend day nor a holiday event (see Work Days below). `end` is `{ until }` (inclusive) or `{ count }`;
+- `monthlyOn` (monthly only) = "the `nth` `day` of each month": `nth` 1–4 or -1 (last); `day` = `'day'` (any
+  day, so `{ -1, 'day' }` is the last day and follows month length), `'workday'` (see Work Days), or a weekday
+  number (0 = Sunday). It doesn't depend on the start date. Undefined = the start date's day of month. Not for
+  separately picked days (they repeat by their own days of month).
+- `onNonWorkday` (single-day events only) = what happens when an occurrence lands on a weekend day or holiday:
+  `'skip'`, `'before'` / `'after'` (move to the nearest work day, up to `MAX_SHIFT` = 31 days). Undefined = kept.
+- **Legacy `monthlyBy`** (`nthWeekday` / `lastWeekday` / `lastWorkday`, saved before `monthlyOn`) is read only:
+  `normalizeRule(rule, date)` converts it using the start date (a 5th weekday becomes the last). Every
+  `eventRecurrence` entry point normalizes first, and the form normalizes on open, so a legacy event is
+  rewritten in the new shape the next time it's saved. No migration needed.
+- `end` is `{ until }` (inclusive) or `{ count }`;
   undefined = never. `skip` holds occurrence **start** dates left out of the series.
 - **Storage**: `repeat` and `dates` are optional fields on existing records, so there is **no IndexedDB version bump and no
   migration**; old events simply lack it. Backups carry it as-is (`useBackup` snapshots whole records).
@@ -50,8 +60,9 @@ Interfaces: `src/interfaces/Event.ts`
   Window-based work (calendar) uses this.
 - `getNextOccurrence(event, from = today, workCalendar?)` — first occurrence still running on/after `from`;
   `null` when over. Powers list rows and "Upcoming".
-- Both take the `WorkCalendar` for work-day rules only; callers in the UI pass `useWorkCalendar()`. Without it
-  they assume a Sat–Sun weekend and no holidays (tests, validation).
+- Both take the `WorkCalendar` for work-day positions and `onNonWorkday`; callers in the UI pass
+  `useWorkCalendar()`. Without it they assume a Sat–Sun weekend and no holidays (tests, validation).
+  `getNextOccurrence` searches a year at a time, up to `MAX_YEARS` (50), stopping early past a series' end.
 - `atOccurrence(event, date)` — copy of the event moved to an occurrence (shifts `endDate` / `dates` too), so
   existing date formatters/renderers work unchanged.
 - `validateRepeat(event, rule)` — error string when an occurrence (range or picked days) would overlap the next
@@ -60,26 +71,31 @@ Interfaces: `src/interfaces/Event.ts`
 - `repeatPresets(event, weekendDays?)` — the dropdown quick picks, **filtered to rules the event's shape allows**
   (no "every week" for a 12-day sprint); `isSameRule(a, b)` matches a stored rule back to a preset (ignores `skip`).
 - `backToBackRule(event, weekendDays?)` — the "When it ends" rule for a range (see below); null otherwise.
-- `lastWorkdayOfMonth(date, workCalendar?)` — the month's last work day, or `null` if it has none.
+- `normalizeRule(rule, date)` — converts a legacy `monthlyBy` (see Data Model).
+- `nthWorkdayOfMonth(date, nth, workCalendar?)` — the month's nth / last work day, or `null` if it has fewer.
+- `describeNth`, `describeDayKind` — the words the form's position selects use.
 - `eventDays`, `spanDays`, `nthWeekdayOfMonth`, `isLastWeekdayOfMonth` — small helpers shared with the form.
 
 ## Work Days
 
-"Every month on the last work day" (`monthlyBy: 'lastWorkday'`) is for month-end chores: syncing logs to
-Xero, giving Bonusly points. The plain "last day of the month" (`dayFromEnd`) proved not useful for these —
-it lands on weekends — so the presets offer the work-day rule instead and `dayFromEnd` is only in Custom.
+"The last work day" is for month-end chores: syncing logs to Xero, giving Bonusly points. A plain "last day of
+the month" lands on weekends, so it was dropped as an option of its own (it's still `{ nth: -1, day: 'day' }`).
 
-- **Holiday-aware.** A work day is not a Settings weekend day and not covered by a `holiday` event, so
-  Reunification Day (Fri Apr 30 2027) moves April's occurrence to Thu Apr 29. rrule can't know holidays, so
-  these series are walked month by month in `workdaySeries` instead of going through `toRRule`.
+- **Work day** = not a Settings weekend day and not covered by a `holiday` event, so Reunification Day (Fri Apr
+  30 2027) moves April's last work day to Thu Apr 29. rrule can't know holidays, so:
+  - **Work-day positions** (`monthlyOn.day === 'workday'`) are walked month by month (`workdayStarts`)
+    instead of going through `toRRule`. The start date only bounds the series: the first occurrence is the first
+    match on or after `date`. `end.count` counts from the series start, like rrule.
+  - **`onNonWorkday`** runs after rrule (`shiftOffDay`): each raw start is kept, dropped, or moved. The search
+    window is padded by `MAX_SHIFT` so a date moved into the window from just outside is found. Moving keeps the
+    order (dates collapsing onto one work day are deduped). `skip` matches the **moved** date, which is what the
+    user sees and what "Skip next date" stores. `end.count` counts raw starts, so a skipped day-off still counts.
 - **Read live, never stored.** The work calendar isn't saved on the rule: a series follows holidays fetched
   later and weekend changes. Dates far ahead may shift once that year's holidays are fetched.
-- **Single day only.** `validateRepeat` rejects it for a range; presets don't offer it for multiple days.
-- **The start date only bounds the series.** The first occurrence is the first last-work-day on or after
-  `date`. The form keeps `date` = first occurrence anyway by moving it there (`seriesStart`) when the rule is
-  picked and on save, so pick any day in the first month.
-- `skip` and `end` work as for rrule rules; a skipped date still counts toward `end.count`.
-- `getNextOccurrence` scans at most `MAX_SCAN` months, so a calendar with no work days returns `null`.
+- **The start date stays the first occurrence.** For any `monthlyOn` rule the form moves the start (and a
+  range's end, keeping its length) to the first occurrence on or after the picked day (`seriesStart`), when
+  the rule is picked and again on save. Other rules keep the picked date, since they take their day from it — so
+  with `onNonWorkday` the stored `date` can be a day off whose occurrence was moved.
 
 ## Event Form
 
@@ -98,10 +114,10 @@ A range + repeat copies the range length to every occurrence: a sprint Mon→Fri
 Repeat field:
 
 - **Dropdown of presets** derived from the chosen date(s) (`repeatPresets`): every day, every week on <days>,
-  every 2 weeks, monthly on the nth <weekday>, monthly on the last <weekday>, monthly on day(s) N, monthly on the
-  last work day, yearly. The
+  every 2 weeks, monthly on the nth <weekday> (1st–4th), monthly on the last <weekday>, monthly on day(s) N,
+  monthly on the last work day, yearly. The
   "last <weekday>" preset is offered **only when the date is the last such weekday** of its month
-  (`isLastWeekdayOfMonth`); the last work day for any single day (the start moves to it). The first of a month
+  (`isLastWeekdayOfMonth`); the last work day for any single day, not a range (the start moves to it). The first of a month
   needs no preset of its own: "day 1" reads "on the first day". Presets are recomputed when the dates change.
 - **Grouped** under subheaders — Back to back, Daily & weekly, Monthly, Yearly — with Custom… after a divider.
   `VSelect` renders `{ type: 'subheader' | 'divider' }` items itself; the group comes from each preset's `freq`
@@ -115,9 +131,17 @@ Repeat field:
   Tuesday). It replaces the plain preset for the same rule. While picked, `followsRangeEnd` makes the form
   recompute the rule as the range is edited (a mid-pick moment with no end date keeps the last rule); a saved
   event whose rule matches reopens with it on. Picking anything else, or Custom, turns it off.
-- **Custom…** panel: every N day/week/month/year (`VNumberInput`); day-of-month vs nth/last weekday vs last
-  work day vs from month end (monthly, single start day; last work day not for ranges); ends never / on date /
-  after N times. It opens on a rule that fits the dates.
+- **Custom…** panel, the place for anything the presets don't cover:
+  - every N day/week/month/year (`VNumberInput`);
+  - monthly (not for separately picked days): **On day N** (the start date's) or **On the [first … fourth /
+    last] [day / work day / Monday … Sunday]** — radios, with the two selects beside the second radio (inside its
+    label they'd lose their clicks to it). Switching to the position starts from the picked day's own
+    (e.g. the second Tuesday);
+  - **On a weekend or holiday**: keep it / skip it / move to the work day before / after — single days only, and
+    hidden for a work-day position, which never lands on a day off;
+  - ends never / on date / after N times.
+
+  It opens on a rule that fits the dates.
 - The selected rule's summary (`describeRepeat`) shows in the Repeat field.
 - `validateRepeat` blocks saving an occurrence longer than the gap between repeats.
 
@@ -189,5 +213,4 @@ Deliberately out of scope; each can be added later **without changing stored dat
 
 - **Editing a single occurrence differently** ("this event only" overrides — a different time or title for one
   date).
-- **Auto-skip on holidays.**
 - **Notifications / reminders** — events stay passive markers.

@@ -8,6 +8,10 @@ The **Project** filter is shared two-way with the **Insights** panel and the **b
 
 When any filter is active, LogList auto-expands every surviving date panel so the detail is visible immediately.
 
+The Insights **Overview** card also lists past workdays with nothing logged ("Not logged") as chips (first 8, then a "+N more" chip that expands). Clicking a chip toggles that date in `HomeView.selectedDates` exactly like a calendar click (replaces it while editing a log), switches to the Form tab and closes the Insights drawer on small screens; "Select all" (create mode, 2+ days) selects every gap for one bulk entry. `CalendarOverview` moves to a newly added date that is outside the visible range.
+
+The rest of the Overview compares **at the same point**, never a partial period against a whole one: this week so far vs the same days last week (current month only), and the viewed month so far vs the previous month up to the same day (a past month is compared in full, by name), plus average per logged day. Deltas stay neutral in colour — more hours isn't better by itself. Workdays exclude Settings weekend days and holiday events (`useWorkCalendar`); plan entries (no duration) don't count as logged. Rows are separated by space, not dividers.
+
 ## Data Flow
 
 ```

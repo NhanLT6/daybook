@@ -267,6 +267,20 @@ watch(
   },
 );
 
+// A date added from outside the calendar (e.g. an Insights "Not logged" chip) may sit in another month;
+// bring it into view. Only additions react, so removing or clicking a visible day never moves the calendar.
+watch(selectedDates, async (dates, previous) => {
+  const known = new Set(previous.map((d) => dayjs(d).format(DATE_FORMAT)));
+  const { from, to } = visibleRange.value;
+  const added = dates.map((d) => dayjs(d).format(DATE_FORMAT)).find((d) => !known.has(d) && (d < from || d > to));
+  if (!added || !calendar.value) return;
+  try {
+    await calendar.value.move(dayjs(added).toDate());
+  } catch (error) {
+    console.warn('Failed to navigate to the selected date:', error);
+  }
+});
+
 // Navigate to today using v-calendar's move API
 const goToToday = async () => {
   if (calendar.value) {
