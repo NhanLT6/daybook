@@ -146,6 +146,7 @@ const navItems = [
 
 <template>
   <VApp :style="glassStyle">
+    <!-- 53px: sized for the dock row; see the geometry note at .dock-row below before changing it -->
     <VAppBar height="53" class="elevation-0" color="transparent">
       <!-- Centered glass pill: brand + theme toggle + nav (desktop) / hamburger (mobile) -->
       <div class="dock-row">
@@ -287,7 +288,15 @@ const navItems = [
   overflow: visible !important;
 }
 
-/* Dock layout */
+/* Dock layout.
+   Vertical geometry, measured (signed in or out, they must match — see AuthMenu's avatar button):
+     dock       = 4 + 28 (tallest child: a small button) + 4 = 42px
+     dock-row   = 12 (padding-top) + 42 = 54px, centred in the 53px app bar, so it overhangs by 1px and
+                  sits 0.5px high (row top -0.5, dock 11.5 -> 53.5)
+     content    = starts at 65px (53px app bar + the page's own 12px padding)
+   So the dock-to-content gap is 11.5px, half a pixel under the 12px gap between cards. That is the
+   leftover of the 1px overhang, not a bug; to make it exactly 12px, set the VAppBar height to 54. If the
+   dock's height ever changes, the gap changes with it: a taller child stretches the dock and shrinks the gap. */
 .dock-row {
   position: relative;
   width: 100%;
