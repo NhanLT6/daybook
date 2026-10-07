@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { type ComponentPublicInstance, computed, nextTick, ref, watch } from 'vue';
 
 import EventForm from '@/components/EventForm.vue';
 
@@ -10,13 +10,26 @@ import { omit } from 'lodash';
 
 import holidayImg from '@/assets/summer-holidays.png';
 import { formatEventDate } from '@/common/DateHelpers';
-import { atOccurrence, describeRepeat, eventDays, getNextOccurrence } from '@/common/eventRecurrence';
+import { atOccurrence, describeRepeat, eventDays, getNextOccurrence, getOccurrences } from '@/common/eventRecurrence';
 import { useEvents } from '@/composables/useEvents';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { nanoid } from 'nanoid';
 
+// The page's calendar owns the selection: a picked day highlights the events on it, a clicked row
+// highlights that event on the calendar. One of the two at a time (EventView keeps them exclusive).
+const { selectedDay = null, selectedEventId = null } = defineProps<{
+  selectedDay?: string | null; // YYYY-MM-DD
+  selectedEventId?: string | null;
+}>();
+
+const emit = defineEmits<{
+  selectEvent: [id: string];
+}>();
+
 // ─── Events from shared db collection ─────────────────────────
 const { events, addEvent, removeEvent } = useEvents();
+const workCalendar = useWorkCalendar();
 const notificationCenter = useNotificationCenterStore();
 
 // ─── Filters ─────────────────────────────────────────────────
@@ -35,7 +48,7 @@ interface EventRow {
 const filteredEvents = computed<EventRow[]>(() =>
   events.value
     .filter((e) => typeFilter.value === 'all' || e.type === typeFilter.value)
-    .map((event) => ({ id: event.id, event, next: getNextOccurrence(event) }))
+    .map((event) => ({ id: event.id, event, next: getNextOccurrence(event, undefined, workCalendar.value) }))
     // An event is past iff it has no occurrence left
     .filter((row) => timeFilter.value === 'all' || row.next !== null)
     .sort((a, b) => dayjs(a.next ?? a.event.date).diff(dayjs(b.next ?? b.event.date))),
@@ -52,10 +65,36 @@ const headers = [
   { title: '', key: 'actions', sortable: false, width: 136 },
 ];
 
-// Dim past events at the row level
-const rowProps = ({ item }: { item: EventRow }) => ({
-  class: item.next === null ? 'text-disabled' : '',
+// Rows highlighted for the calendar selection: the events occurring on the picked day, or the clicked event
+const activeIds = computed(() => {
+  const day = selectedDay;
+  if (!day) return new Set(selectedEventId ? [selectedEventId] : []);
+  return new Set(
+    filteredEvents.value
+      .filter((row) => getOccurrences(row.event, day, day, workCalendar.value).length > 0)
+      .map((row) => row.id),
+  );
 });
+
+// Rows are clickable; past events dim, calendar-selected ones get the green tint
+const rowProps = ({ item }: { item: EventRow }) => ({
+  class: ['event-row', { 'text-disabled': item.next === null, 'event-row--active': activeIds.value.has(item.id) }],
+});
+
+const onRowClick = (_: Event, { item }: { item: EventRow }) => emit('selectEvent', item.id);
+
+// Scroll the first event on a newly picked day into view
+const tableCard = ref<ComponentPublicInstance | null>(null);
+watch(
+  () => selectedDay,
+  async (day) => {
+    if (!day) return;
+    await nextTick();
+    (tableCard.value?.$el as HTMLElement | undefined)
+      ?.querySelector('.event-row--active')
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  },
+);
 
 // ─── Modal state ─────────────────────────────────────────────
 const isModalOpen = ref(false);
@@ -207,7 +246,7 @@ const deleteEvent = (event: AppEvent) => {
         </div>
 
         <!-- Events table -->
-        <VCard v-else class="elevation-0 rounded-lg overflow-hidden event-table-card">
+        <VCard v-else ref="tableCard" class="elevation-0 rounded-lg overflow-hidden event-table-card">
           <VDataTable
             :items="filteredEvents"
             :headers="headers"
@@ -215,6 +254,7 @@ const deleteEvent = (event: AppEvent) => {
             :items-per-page="-1"
             :row-props="rowProps"
             class="bg-container events-table"
+            @click:row="onRowClick"
             fixed-header
             hide-default-footer
           >
@@ -250,9 +290,9 @@ const deleteEvent = (event: AppEvent) => {
               </div>
             </template>
 
-            <!-- Skip next / edit / delete — custom events only -->
+            <!-- Skip next / edit / delete — custom events only. Clicks stop here so they don't select the row -->
             <template #item.actions="{ item }">
-              <div v-if="item.event.type === 'custom'" class="d-flex ga-1 justify-end">
+              <div v-if="item.event.type === 'custom'" class="d-flex ga-1 justify-end" @click.stop>
                 <!-- Tooltip wraps the button: VIconBtn's default slot would replace its icon -->
                 <VTooltip v-if="item.event.repeat && item.next" :text="`Skip ${occurrenceLabel(item.event, item.next)}`">
                   <template #activator="{ props }">
@@ -358,6 +398,16 @@ const deleteEvent = (event: AppEvent) => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Rows select their event on the calendar */
+.events-table :deep(.event-row) {
+  cursor: pointer;
+}
+
+/* Same green as the calendar's selected day */
+.events-table :deep(.event-row--active) {
+  background: rgba(var(--v-theme-primary), 0.16);
 }
 
 /* Sticky header needs an opaque fill so scrolled rows don't bleed through the

@@ -14,13 +14,17 @@ import {
   describeDayFromEnd,
   describeRepeat,
   eventDays,
+  getNextOccurrence,
+  getOccurrences,
   isLastWeekdayOfMonth,
   isNearMonthEnd,
   isSameRule,
   nthWeekdayOfMonth,
   repeatPresets,
   validateRepeat,
+  type RepeatPreset,
 } from '@/common/eventRecurrence';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useSettingsStore } from '@/stores/settings';
 
 const { item } = defineProps<{
@@ -104,6 +108,23 @@ const settingsStore = useSettingsStore();
 const presets = computed(() => repeatPresets(shape.value, settingsStore.weekendDays));
 const backToBack = computed(() => backToBackRule(shape.value, settingsStore.weekendDays));
 
+// Weekend days + holidays, for "the last work day" rules
+const workCalendar = useWorkCalendar();
+
+// A last-work-day rule doesn't land on whatever day was picked: start the series at its first occurrence on
+// or after that day, so the saved date stays the first occurrence like every other rule's
+const seriesStart = (date: string, rule: RepeatRule | null) => {
+  if (rule?.freq !== 'month' || rule.monthlyBy !== 'lastWorkday') return date;
+  const series: AppEvent = { id: '', title: '', type: 'custom', date, repeat: { ...rule, skip: undefined } };
+  return getNextOccurrence(series, date, workCalendar.value) ?? date;
+};
+
+const applyRule = (rule: RepeatRule | null) => {
+  repeatRule.value = rule;
+  const start = seriesStart(dateField.value.value, rule);
+  if (start !== dateField.value.value) dateField.setValue(start);
+};
+
 // "When it ends" is stored as a plain rule (every 2 weeks, every N days); this flag only makes the form
 // keep it in step with the range while the dates are edited. A saved event matching it reopens with it on.
 // Not-a-range moments (the first click of a new range) keep the last rule and the flag, so the next
@@ -131,16 +152,39 @@ const repeatSelect = computed({
     else {
       const preset = presets.value[Number(value.replace('preset-', ''))];
       followsRangeEnd.value = !!preset.backToBack;
-      repeatRule.value = { ...preset.value };
+      applyRule({ ...preset.value });
     }
   },
 });
 
-const repeatItems = computed(() => [
-  { title: 'Does not repeat', value: 'none' },
-  ...presets.value.map((p, i) => ({ title: p.title, value: `preset-${i}` })),
-  { title: 'Custom…', value: 'custom' },
-]);
+// Presets grouped under subheaders (VSelect renders `type: 'subheader' | 'divider'` items as such).
+// repeatPresets already lists them in this group order.
+const presetGroup = (preset: RepeatPreset) => {
+  if (preset.backToBack) return 'Back to back';
+  if (preset.value.freq === 'month') return 'Monthly';
+  if (preset.value.freq === 'year') return 'Yearly';
+  return 'Daily & weekly';
+};
+
+interface RepeatItem {
+  title?: string;
+  value?: string;
+  type?: 'subheader' | 'divider';
+}
+
+const repeatItems = computed(() => {
+  const items: RepeatItem[] = [{ title: 'Does not repeat', value: 'none' }];
+  let group = '';
+  presets.value.forEach((preset, i) => {
+    if (presetGroup(preset) !== group) {
+      group = presetGroup(preset);
+      items.push({ type: 'subheader', title: group });
+    }
+    items.push({ title: preset.title, value: `preset-${i}` });
+  });
+  items.push({ type: 'divider' }, { title: 'Custom…', value: 'custom' });
+  return items;
+});
 
 // Custom panel is shown for custom picks and for saved rules no preset describes
 const showCustomPanel = computed(() => repeatSelect.value === 'custom');
@@ -159,6 +203,8 @@ const monthlyItems = computed(() => {
     { title: `The ${ordinal} ${weekday}`, value: 'nthWeekday' },
     ...(isLastWeekdayOfMonth(date) ? [{ title: `The last ${weekday}`, value: 'lastWeekday' }] : []),
     ...(isNearMonthEnd(date) ? [{ title: `The ${describeDayFromEnd(date)} of the month`, value: 'dayFromEnd' }] : []),
+    // A range can't follow the last work day (validateRepeat), so it's only listed for a single day
+    ...(!endDateField.value.value ? [{ title: 'The last work day', value: 'lastWorkday' }] : []),
   ];
 });
 
@@ -177,7 +223,7 @@ const endMode = computed({
 });
 
 const updateRule = (patch: Partial<RepeatRule>) => {
-  if (repeatRule.value) repeatRule.value = { ...repeatRule.value, ...patch };
+  if (repeatRule.value) applyRule({ ...repeatRule.value, ...patch });
 };
 
 // Rule as it will be saved: drops fields that don't apply to the chosen frequency / date mode
@@ -206,6 +252,19 @@ const repeatError = computed(() => {
   if (rule.end && 'until' in rule.end && rule.end.until < dateField.value.value) return 'End date is before the start';
   if (rule.end && 'count' in rule.end && !(rule.end.count >= 1)) return 'Must repeat at least once';
   return validateRepeat(shape.value, rule);
+});
+
+// The next few dates, shown under the Repeat field so a rule can be checked at a glance — work-day
+// rules move around weekends and holidays, which the summary sentence can't show
+const upcomingDates = computed(() => {
+  const rule = normalizedRule.value;
+  if (!rule || repeatError.value) return '';
+  const series: AppEvent = { id: '', title: '', type: 'custom', ...shape.value, repeat: rule };
+  const today = dayjs().format('YYYY-MM-DD');
+  const from = dateField.value.value > today ? dateField.value.value : today;
+  const to = dayjs(from).add(2, 'year').format('YYYY-MM-DD');
+  const next = getOccurrences(series, from, to, workCalendar.value).slice(0, 3);
+  return next.length ? `Next: ${next.map((d) => dayjs(d).format('ddd, MMM D')).join(' · ')}` : 'No upcoming dates';
 });
 
 const unskipDate = (date: string) => {
@@ -272,7 +331,7 @@ const onSaveEvent = handleSubmit((values) => {
   const event: AppEvent = {
     id: item?.id ?? '', // parent assigns ID for new events
     title: values.title.trim(),
-    date: values.date,
+    date: seriesStart(values.date, normalizedRule.value),
     ...(values.endDate ? { endDate: values.endDate } : {}),
     ...(values.dates && values.dates.length > 1 ? { dates: values.dates } : {}),
     type: 'custom',
@@ -401,6 +460,8 @@ const onCancelModifyEvent = () => {
         :items="repeatItems"
         label="Repeat"
         :error-messages="!showCustomPanel && repeatError ? [repeatError] : []"
+        :hint="upcomingDates"
+        persistent-hint
         class="mb-3"
       >
         <!-- Show the saved rule's own wording when it came from the custom panel -->

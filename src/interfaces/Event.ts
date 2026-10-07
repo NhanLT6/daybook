@@ -8,7 +8,9 @@ export type RepeatFreq = 'day' | 'week' | 'month' | 'year';
 export interface RepeatRule {
   freq: RepeatFreq;
   interval: number; // Every N units (>= 1)
-  monthlyBy?: 'dayOfMonth' | 'nthWeekday' | 'lastWeekday' | 'dayFromEnd'; // Monthly only. Undefined = dayOfMonth. dayFromEnd keeps the start date's distance from month end (0 = last day)
+  // Monthly only. Undefined = dayOfMonth. dayFromEnd keeps the start date's distance from month end (0 = last day).
+  // lastWorkday = the month's last day that is neither a weekend day nor a holiday (see WorkCalendar)
+  monthlyBy?: 'dayOfMonth' | 'nthWeekday' | 'lastWeekday' | 'dayFromEnd' | 'lastWorkday';
   end?: { until: string } | { count: number }; // Undefined = never ends. until: YYYY-MM-DD, inclusive
   skip?: string[]; // Occurrence start dates (YYYY-MM-DD) left out of the series
 }
@@ -24,4 +26,14 @@ export interface AppEvent {
   type: 'holiday' | 'custom'
   description?: string
   repeat?: RepeatRule // Undefined = one-off event
+}
+
+/**
+ * Which days count as work days, for rules like "the last work day of the month". Read live from the
+ * Settings weekend days and the holiday events (see useWorkCalendar), never stored on the rule, so a
+ * series follows newly fetched holidays and weekend changes.
+ */
+export interface WorkCalendar {
+  weekendDays: number[]; // dayjs day numbers (0 = Sunday)
+  holidays: ReadonlySet<string>; // YYYY-MM-DD
 }

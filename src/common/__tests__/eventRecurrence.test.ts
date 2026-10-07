@@ -11,6 +11,7 @@ import {
   getNextOccurrence,
   getOccurrences,
   isSameRule,
+  lastWorkdayOfMonth,
   repeatPresets,
   validateRepeat,
 } from '@/common/eventRecurrence';
@@ -215,12 +216,76 @@ describe('month-end helpers', () => {
     );
   });
 
-  it('offers from-month-end only for dates nearer the end than the start', () => {
-    const offered = (date: string) => repeatPresets({ date }).some((p) => p.value.monthlyBy === 'dayFromEnd');
-    expect(offered('2026-10-31')).toBe(true);
-    expect(offered('2026-10-20')).toBe(true);
-    expect(offered('2026-10-05')).toBe(false);
-    expect(offered('2026-10-01')).toBe(false);
+  it('leaves from-month-end out of the presets (Custom panel only)', () => {
+    expect(repeatPresets({ date: '2026-10-31' }).some((p) => p.value.monthlyBy === 'dayFromEnd')).toBe(false);
+  });
+});
+
+describe('last work day of the month', () => {
+  const lastWorkday: RepeatRule = { freq: 'month', interval: 1, monthlyBy: 'lastWorkday' };
+  const satSun = { weekendDays: [6, 0], holidays: new Set<string>() };
+
+  it('steps back over weekend days and holidays', () => {
+    // Sat Oct 31 2026 → Fri Oct 30; with a Fri–Sun weekend → Thu Oct 29
+    expect(lastWorkdayOfMonth('2026-10-05', satSun)).toBe('2026-10-30');
+    expect(lastWorkdayOfMonth('2026-10-05', { ...satSun, weekendDays: [5, 6, 0] })).toBe('2026-10-29');
+    // Fri Apr 30 2027 is a holiday → Thu Apr 29
+    expect(lastWorkdayOfMonth('2027-04-01', { ...satSun, holidays: new Set(['2027-04-30']) })).toBe('2027-04-29');
+    expect(lastWorkdayOfMonth('2026-10-05', { weekendDays: [0, 1, 2, 3, 4, 5, 6], holidays: new Set() })).toBeNull();
+  });
+
+  it('repeats on each month\'s last work day, following the calendar', () => {
+    const series = event({ date: '2026-10-30', repeat: lastWorkday });
+    expect(getOccurrences(series, '2026-10-01', '2027-04-30', satSun)).toEqual([
+      '2026-10-30',
+      '2026-11-30',
+      '2026-12-31',
+      '2027-01-29',
+      '2027-02-26',
+      '2027-03-31',
+      '2027-04-30',
+    ]);
+
+    const withHoliday = { ...satSun, holidays: new Set(['2027-04-30']) };
+    expect(getOccurrences(series, '2027-04-01', '2027-04-30', withHoliday)).toEqual(['2027-04-29']);
+    expect(getNextOccurrence(series, '2027-04-01', withHoliday)).toBe('2027-04-29');
+  });
+
+  it('starts at the first last-work-day on or after the start date', () => {
+    const series = event({ date: '2026-10-05', repeat: { ...lastWorkday, interval: 2 } });
+    expect(getNextOccurrence(series, '2026-10-01', satSun)).toBe('2026-10-30');
+    expect(getOccurrences(series, '2026-10-01', '2027-02-28', satSun)).toEqual([
+      '2026-10-30',
+      '2026-12-31',
+      '2027-02-26',
+    ]);
+  });
+
+  it('honours skip, until and count', () => {
+    const skipped = event({ date: '2026-10-30', repeat: { ...lastWorkday, skip: ['2026-11-30'] } });
+    expect(getNextOccurrence(skipped, '2026-11-01', satSun)).toBe('2026-12-31');
+
+    const until = event({ date: '2026-10-30', repeat: { ...lastWorkday, end: { until: '2026-12-30' } } });
+    expect(getOccurrences(until, '2026-10-01', '2027-03-31', satSun)).toEqual(['2026-10-30', '2026-11-30']);
+
+    // A skipped occurrence still counts toward `count`, as with rrule rules
+    const twice = event({ date: '2026-10-30', repeat: { ...lastWorkday, end: { count: 2 }, skip: ['2026-10-30'] } });
+    expect(getOccurrences(twice, '2026-10-01', '2027-03-31', satSun)).toEqual(['2026-11-30']);
+    expect(getNextOccurrence(twice, '2026-12-01', satSun)).toBeNull();
+  });
+
+  it('never loops when no day is a work day', () => {
+    const series = event({ date: '2026-10-30', repeat: lastWorkday });
+    expect(getNextOccurrence(series, '2026-10-01', { weekendDays: [0, 1, 2, 3, 4, 5, 6], holidays: new Set() })).toBeNull();
+  });
+
+  it('describes and offers the rule for a single day only', () => {
+    expect(describeRepeat('2026-10-30', lastWorkday)).toBe('Every month on the last work day');
+    const offered = (shape: Parameters<typeof repeatPresets>[0]) =>
+      repeatPresets(shape).some((p) => p.value.monthlyBy === 'lastWorkday');
+    expect(offered({ date: '2026-10-05' })).toBe(true);
+    expect(offered({ date: '2026-10-05', endDate: '2026-10-07' })).toBe(false);
+    expect(offered({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-09'] })).toBe(false);
   });
 });
 

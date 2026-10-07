@@ -1,8 +1,8 @@
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 
 import { RRule, type Options, type Weekday } from 'rrule';
 
-import type { AppEvent, RepeatRule } from '@/interfaces/Event';
+import type { AppEvent, RepeatRule, WorkCalendar } from '@/interfaces/Event';
 
 /**
  * Repeating events: our stored `RepeatRule` is a friendly, typed layer; rrule only does the date math.
@@ -22,6 +22,9 @@ const RRULE_WEEKDAYS: Weekday[] = [RRule.SU, RRule.MO, RRule.TU, RRule.WE, RRule
 
 // Cap on consecutive skipped dates walked past when looking for the next occurrence
 const MAX_SCAN = 500;
+
+// Used when a caller has no work calendar at hand (tests, validation): Sat–Sun weekend, no holidays
+const DEFAULT_WORK_CALENDAR: WorkCalendar = { weekendDays: [0, 6], holidays: new Set() };
 
 // Events created through the date picker before dates were normalized hold a JS Date at runtime
 // despite the `string` type — funnel every read through toDay so both shapes work.
@@ -77,6 +80,43 @@ export const describeDayFromEnd = (date: string): string => {
   return n === 1 ? 'last day' : `${n}${ordinalSuffix(n)} to last day`;
 };
 
+const isWorkday = (day: Dayjs, calendar: WorkCalendar) =>
+  !calendar.weekendDays.includes(day.day()) && !calendar.holidays.has(day.format('YYYY-MM-DD'));
+
+/** Last day of the date's month that is neither a weekend day nor a holiday; null when the month has none. */
+export function lastWorkdayOfMonth(date: string, calendar: WorkCalendar = DEFAULT_WORK_CALENDAR): string | null {
+  const first = dayjs(toDay(date)).startOf('month');
+  for (let day = first.endOf('month').startOf('day'); !day.isBefore(first); day = day.subtract(1, 'day')) {
+    if (isWorkday(day, calendar)) return day.format('YYYY-MM-DD');
+  }
+  return null;
+}
+
+// Work-day rules depend on holidays, which rrule can't know about, so they're walked here month by month
+const isWorkdayRule = (rule?: RepeatRule) => rule?.freq === 'month' && rule.monthlyBy === 'lastWorkday';
+
+/**
+ * Occurrence start dates of a work-day series in order, before `skip` is applied (so skips still count
+ * toward `end.count`, as with rrule). The start date only bounds the series: the first occurrence is
+ * the first last-work-day on or after it. Stops at the series end or after the month containing `through`.
+ */
+function* workdaySeries(event: AppEvent, calendar: WorkCalendar, through: string): Generator<string> {
+  const rule = event.repeat!;
+  const start = toDay(event.date);
+  const interval = Math.max(1, Math.floor(rule.interval || 1));
+  const until = rule.end && 'until' in rule.end ? rule.end.until : null;
+  let remaining = rule.end && 'count' in rule.end ? Math.max(1, Math.floor(rule.end.count)) : Infinity;
+
+  const last = dayjs(through).endOf('month');
+  for (let month = dayjs(start).startOf('month'); remaining > 0 && !month.isAfter(last); month = month.add(interval, 'month')) {
+    const day = lastWorkdayOfMonth(month.format('YYYY-MM-DD'), calendar);
+    if (!day || day < start) continue;
+    if (until && day > until) return;
+    remaining--;
+    yield day;
+  }
+}
+
 function toRRule(date: string, rule: RepeatRule): RRule {
   const start = dayjs(date);
   const options: Partial<Options> = {
@@ -123,9 +163,14 @@ function toRRule(date: string, rule: RepeatRule): RRule {
 /**
  * Start dates of every occurrence that overlaps [from, to] (inclusive), skipped dates excluded.
  * One-off events return their own date when it overlaps. Use this for anything window-based
- * (calendar dots, "what's on this week").
+ * (calendar dots, "what's on this week"). `calendar` only matters for work-day rules.
  */
-export function getOccurrences(event: AppEvent, from: string, to: string): string[] {
+export function getOccurrences(
+  event: AppEvent,
+  from: string,
+  to: string,
+  calendar: WorkCalendar = DEFAULT_WORK_CALENDAR,
+): string[] {
   const span = spanDays(event);
 
   if (!event.repeat) {
@@ -138,6 +183,10 @@ export function getOccurrences(event: AppEvent, from: string, to: string): strin
   const searchFrom = dayjs(from).subtract(span, 'day').format('YYYY-MM-DD');
   const skip = new Set(event.repeat.skip ?? []);
 
+  if (isWorkdayRule(event.repeat)) {
+    return [...workdaySeries(event, calendar, to)].filter((d) => d >= searchFrom && d <= to && !skip.has(d));
+  }
+
   return toRRule(event.date, event.repeat)
     .between(toUtcDate(searchFrom), toUtcDate(to), true)
     .map(fromUtcDate)
@@ -147,13 +196,28 @@ export function getOccurrences(event: AppEvent, from: string, to: string): strin
 /**
  * The first occurrence still running on or after `from` (default: today) — an occurrence that
  * started earlier but hasn't ended yet counts. Null once the series (or one-off event) is over.
+ * `calendar` only matters for work-day rules.
  */
-export function getNextOccurrence(event: AppEvent, from: string = dayjs().format('YYYY-MM-DD')): string | null {
+export function getNextOccurrence(
+  event: AppEvent,
+  from: string = dayjs().format('YYYY-MM-DD'),
+  calendar: WorkCalendar = DEFAULT_WORK_CALENDAR,
+): string | null {
   const span = spanDays(event);
 
   if (!event.repeat) {
     const start = toDay(event.date);
     return dayjs(start).add(span, 'day').format('YYYY-MM-DD') >= from ? start : null;
+  }
+
+  if (isWorkdayRule(event.repeat)) {
+    const skip = new Set(event.repeat.skip ?? []);
+    // Bounded by MAX_SCAN months past `from`, so a calendar with no work days at all can't loop forever
+    const through = dayjs(from).add(MAX_SCAN, 'month').format('YYYY-MM-DD');
+    for (const day of workdaySeries(event, calendar, through)) {
+      if (dayjs(day).add(span, 'day').format('YYYY-MM-DD') >= from && !skip.has(day)) return day;
+    }
+    return null;
   }
 
   // Occurrences starting up to `span` days before `from` are still running on it
@@ -200,6 +264,7 @@ export function atOccurrence(event: AppEvent, occurrence: string): AppEvent {
 export function validateRepeat(event: EventShape, rule: RepeatRule): string {
   const span = spanDays(event);
   if (span === 0) return '';
+  if (isWorkdayRule(rule)) return 'Only a single day can repeat on the last work day';
 
   const starts = toRRule(event.date, { ...rule, end: { count: 50 } }).all();
   for (let i = 1; i < starts.length; i++) {
@@ -230,6 +295,7 @@ export function describeRepeat(days: string | string[], rule: RepeatRule): strin
     if (rule.monthlyBy === 'nthWeekday') text += ` on the ${ORDINALS[nthWeekdayOfMonth(picked[0]) - 1]} ${weekday}`;
     else if (rule.monthlyBy === 'lastWeekday') text += ` on the last ${weekday}`;
     else if (rule.monthlyBy === 'dayFromEnd') text += ` on the ${describeDayFromEnd(picked[0])}`;
+    else if (rule.monthlyBy === 'lastWorkday') text += ' on the last work day';
     else if (picked.length > 1) text += ` on days ${joinList(picked.map((d) => String(dayjs(d).date())))}`;
     else text += start.date() === 1 ? ' on the first day' : ` on day ${start.date()}`;
   } else if (rule.freq === 'year') {
@@ -270,6 +336,8 @@ export interface RepeatPreset {
 /**
  * Quick picks for the Repeat dropdown, derived from the chosen date(s). Only rules the event's shape
  * allows are offered — e.g. no "every week" for a 12-day sprint, no "nth weekday" for several days.
+ * Month end is offered as the last work day; the calendar's last day (dayFromEnd) often falls on a
+ * weekend, so it's left to the form's Custom panel.
  * Ranges get "When it ends" first, replacing the plain preset for the same rule.
  */
 export function repeatPresets(event: EventShape, weekendDays?: number[]): RepeatPreset[] {
@@ -286,7 +354,8 @@ export function repeatPresets(event: EventShape, weekendDays?: number[]): Repeat
       ? [{ freq: 'month', interval: 1, monthlyBy: 'lastWeekday' } as RepeatRule]
       : []),
     { freq: 'month', interval: 1, monthlyBy: 'dayOfMonth' },
-    ...(single && isNearMonthEnd(date) ? [{ freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' } as RepeatRule] : []),
+    // Offered for any single day: the form moves the start to the first last-work-day on or after it
+    ...(single ? [{ freq: 'month', interval: 1, monthlyBy: 'lastWorkday' } as RepeatRule] : []),
     { freq: 'year', interval: 1 },
   ];
   return [
