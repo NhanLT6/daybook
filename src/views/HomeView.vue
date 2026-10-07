@@ -206,11 +206,6 @@ const onToggleMissingDate = (date: string) => {
   revealForm();
 };
 
-const onSelectMissingDates = (dates: string[]) => {
-  selectedDates.value = dates.map((date) => dayjs(date, isoDateFormat).toDate());
-  revealForm();
-};
-
 const onDeleteLog = async (log: TimeLog) => {
   await removeLog(log.id);
   notificationCenter.success('Log deleted');
@@ -379,9 +374,7 @@ const onAiUndoLogs = async () => {
       :filtered-time-logs="filteredTimeLogs"
       :has-active-filter="hasActiveFilter"
       :selected-dates="selectedDates"
-      :editing="!!editingLog"
       @toggle-date="onToggleMissingDate"
-      @select-dates="onSelectMissingDates"
       v-model:selected-project="selectedProject"
     />
 
@@ -401,9 +394,7 @@ const onAiUndoLogs = async () => {
         :filtered-time-logs="filteredTimeLogs"
         :has-active-filter="hasActiveFilter"
         :selected-dates="selectedDates"
-        :editing="!!editingLog"
         @toggle-date="onToggleMissingDate"
-        @select-dates="onSelectMissingDates"
         v-model:selected-project="selectedProject"
       />
     </VNavigationDrawer>

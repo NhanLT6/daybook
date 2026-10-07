@@ -24,15 +24,12 @@ const props = defineProps<{
   // see src/composables/useLogFilters.ts. Powers the "Filtered" stats section below.
   filteredTimeLogs: TimeLog[];
   hasActiveFilter: boolean;
-  // The log form's calendar selection and whether it's in edit (single-date) mode — drives the
-  // "Not logged" chips' selected state and whether "Select all" makes sense
+  // The log form's calendar selection — drives the "Not logged" chips' selected state
   selectedDates: Date[];
-  editing: boolean;
 }>();
 
 const emit = defineEmits<{
   toggleDate: [date: string];
-  selectDates: [dates: string[]];
 }>();
 
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
@@ -201,14 +198,15 @@ const formatDelta = (minutes: number) =>
   minutes === 0 ? 'same' : `${minutes > 0 ? '+' : '−'}${minutesToHourWithMinutes(Math.abs(minutes))}`;
 
 const comparisonRows = computed(() => {
-  const rows: { label: string; value: string; detail: string }[] = [];
+  const rows: { label: string; value: string; delta: string; vs: string }[] = [];
   const week = weekComparison.value;
   const month = monthComparison.value;
   if (week) {
     rows.push({
       label: 'This week',
       value: minutesToHourWithMinutes(week.minutes),
-      detail: `${formatDelta(week.delta)} vs ${week.previousLabel}`,
+      delta: formatDelta(week.delta),
+      vs: week.previousLabel,
     });
   }
   if (month) {
@@ -218,12 +216,14 @@ const comparisonRows = computed(() => {
         ? 'This month'
         : dayjs(currentMonthKey.value, yearAndMonthFormat).format('MMMM'),
       value: minutesToHourWithMinutes(month.minutes),
-      detail: `${formatDelta(month.delta)} vs ${month.previousLabel}`,
+      delta: formatDelta(month.delta),
+      vs: month.previousLabel,
     });
     rows.push({
       label: 'Avg per day',
       value: minutesToHourWithMinutes(month.avgPerDay),
-      detail: `${formatDelta(month.avgDelta)} vs ${month.previousLabel}`,
+      delta: formatDelta(month.avgDelta),
+      vs: month.previousLabel,
     });
   }
   return rows;
@@ -357,25 +357,21 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                 <VChip v-if="hiddenMissingCount > 0" size="small" variant="tonal" @click="showAllMissing = true">
                   +{{ hiddenMissingCount }} more
                 </VChip>
-                <!-- Bulk-log every gap in one entry (create mode only: edit mode is single-date) -->
-                <VBtn
-                  v-if="missingDays.length > 1 && !editing"
-                  size="x-small"
-                  variant="text"
-                  @click="emit('selectDates', missingDays)"
-                >
-                  Select all
-                </VBtn>
               </div>
             </div>
 
-            <!-- So far vs the same point of last week / last month: value right, comparison under it -->
+            <!-- So far vs the same point of last week / last month, one line each; the compared dates are in the
+                 delta's tooltip -->
             <div v-for="row in comparisonRows" :key="row.label" class="d-flex justify-space-between ga-4">
               <span class="text-medium-emphasis">{{ row.label }}</span>
-              <div class="text-end">
-                <div>{{ row.value }}</div>
-                <div class="text-medium-emphasis">{{ row.detail }}</div>
-              </div>
+              <span class="text-no-wrap">
+                {{ row.value }}
+                <VTooltip :text="`vs ${row.vs}`" location="top">
+                  <template #activator="{ props: tooltipProps }">
+                    <span v-bind="tooltipProps" class="text-medium-emphasis ms-1">{{ row.delta }}</span>
+                  </template>
+                </VTooltip>
+              </span>
             </div>
           </div>
         </VCard>
