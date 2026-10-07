@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js'
 import { getSettings, saveSettings } from './_lib/settingsRepo.js'
+import { isGatewayEnabled } from './_lib/ai.js'
 import type { AiConfig } from '../src/interfaces/ServerSettings.js'
 import type { JiraConfig } from '../src/interfaces/JiraConfig.js'
 
@@ -23,7 +24,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { userId } = await requireUser(headerReader(req))
 
     if (req.method === 'GET') {
-      return res.status(200).json(await getSettings(userId))
+      // aiGatewayAvailable tells the Settings page whether AI works without the user's own key
+      return res.status(200).json({ ...(await getSettings(userId)), aiGatewayAvailable: isGatewayEnabled() })
     }
 
     if (req.method === 'PUT') {

@@ -1,9 +1,9 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import type { AiConfig } from '../../src/interfaces/ServerSettings.js';
+import { resolveAiMode, type AiConfig, type AiMode } from '../../src/interfaces/ServerSettings.js';
 
-// Vercel AI Gateway model id (provider/model). Fast, multimodal (the chat takes screenshots), supports
-// tool calling, and on the gateway's free-tier list — the same model the BYOK default has always used.
-const DEFAULT_GATEWAY_MODEL = 'google/gemini-2.5-flash';
+// Vercel AI Gateway model id (provider/model). Cheap and fast, multimodal (the chat takes screenshots),
+// supports tool calling, and passes the gateway's free-tier + no-training + zero-data-retention filters.
+const DEFAULT_GATEWAY_MODEL = 'openai/gpt-5.4-nano';
 const FALLBACK_BYOK_MODEL = 'gemini-2.5-flash';
 
 /**
@@ -13,25 +13,47 @@ const FALLBACK_BYOK_MODEL = 'gemini-2.5-flash';
 export const MAX_OUTPUT_TOKENS = 2048;
 
 /**
- * True when the caller switched on their own Gemini key (Settings → AI Assistant). That key is billed to
- * them and overrides the shared gateway.
+ * The shared gateway is opt-in for the deployment: until the owner is ready to fund it (Vercel asks for a
+ * card before the free credit applies), leave AI_GATEWAY_ENABLED unset and AI runs on each user's own key only.
  */
+export function isGatewayEnabled(): boolean {
+  return process.env.AI_GATEWAY_ENABLED === 'true';
+}
+
+/** What the user chose in Settings, falling back to the old behaviour for settings saved before the choice existed. */
+export function aiModeOf(config: AiConfig): AiMode {
+  return resolveAiMode(config, isGatewayEnabled());
+}
+
+/** True when the request runs on the user's own Gemini key (billed to them). */
 export function usesOwnKey(config: AiConfig): boolean {
-  return config.enabled && !!config.apiKey;
+  return aiModeOf(config) === 'own' && !!config.apiKey;
 }
 
 /**
- * Which model answers, and the per-request routing options to pass alongside it.
+ * AI can answer when the user turned it on and it has something to run on: their own key, or the shared
+ * gateway (only if the deployment enabled it).
+ */
+export function isAiAvailable(config: AiConfig): boolean {
+  const mode = aiModeOf(config);
+  return mode === 'default' ? isGatewayEnabled() : mode === 'own' && !!config.apiKey;
+}
+
+/**
+ * Which model answers, and the per-request routing options to pass alongside it. Callers check
+ * isAiAvailable first.
  *
- * Default: Vercel AI Gateway — a plain `provider/model` string, authenticated by the deployment's OIDC
- * token (or AI_GATEWAY_API_KEY when running locally). Only the signed-in users of this app reach it, and
- * the gateway's own monthly credit is the spending ceiling.
+ * "own": the user's Gemini key, billed to them. "default": Vercel AI Gateway — a plain `provider/model`
+ * string, authenticated by the deployment's OIDC token (or AI_GATEWAY_API_KEY when running locally). Only
+ * the signed-in users of this app reach it, and the gateway's own monthly credit is the spending ceiling.
  *
  * Every gateway request is routed only to providers that don't train on prompts. Zero data retention is
  * on as well, but is a Pro/Enterprise gateway feature — set AI_GATEWAY_ZDR=false to turn it off on a Hobby
  * team, where requiring it would reject every request.
  */
 export function resolveAi(config: AiConfig) {
+  if (!isAiAvailable(config)) throw new Error('AI Assistant is not set up.');
+
   if (usesOwnKey(config)) {
     return {
       model: createGoogleGenerativeAI({ apiKey: config.apiKey })(config.model || FALLBACK_BYOK_MODEL),
@@ -49,6 +71,9 @@ export function resolveAi(config: AiConfig) {
     },
   };
 }
+
+/** The reply when AI isn't usable yet; the chat links its "Settings" word off this wording. */
+export const AI_NOT_SET_UP_MESSAGE = 'AI Assistant is not set up. Choose how it should run in Settings.';
 
 interface GatewayLikeError {
   statusCode?: number;

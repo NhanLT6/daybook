@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { authHeaders } from './useAuth'
-import type { ServerSettings } from '@/interfaces/ServerSettings'
+import type { ServerSettings, ServerSettingsResponse } from '@/interfaces/ServerSettings'
 import type { JiraConfig } from '@/interfaces/JiraConfig'
 
 // PUT body — either section may be omitted; the server keeps the stored value for anything absent.
@@ -31,13 +31,13 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
 }
 
 export function useServerSettings() {
-  const loadSettings = async (): Promise<ServerSettings | null> => {
+  const loadSettings = async (): Promise<ServerSettingsResponse | null> => {
     isLoading.value = true
     error.value = null
     try {
       const res = await apiFetch('/api/settings')
       if (!res.ok) throw new Error(`Settings load failed: ${res.status}`)
-      return (await res.json()) as ServerSettings
+      return (await res.json()) as ServerSettingsResponse
     } catch (e) {
       // Signed out is an ordinary state, not a failure worth showing.
       if (e instanceof NotSignedInError) return null

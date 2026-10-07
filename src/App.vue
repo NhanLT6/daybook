@@ -83,7 +83,7 @@ const initServerSettings = async () => {
   if (!serverSettings) return; // signed out, or the server is unreachable locally
 
   const jiraConfig = await migrateJiraFromLocalStorage(settingsStore.jiraConfig, serverSettings);
-  settingsStore.populateFromServer(jiraConfig, serverSettings.aiConfig);
+  settingsStore.populateFromServer(jiraConfig, serverSettings.aiConfig, serverSettings.aiGatewayAvailable);
 };
 
 onMounted(async () => {

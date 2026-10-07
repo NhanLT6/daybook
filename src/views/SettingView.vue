@@ -14,6 +14,7 @@ import dayjs from 'dayjs';
 
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
+import { resolveAiMode, type AiMode } from '@/interfaces/ServerSettings';
 
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
@@ -28,6 +29,57 @@ const { saveSettings } = useServerSettings();
 const showApiToken = ref(false);
 const showGeminiKey = ref(false);
 const isSavingSettings = ref(false);
+
+// How AI runs. Stored on the account as aiConfig.mode; `enabled` mirrors "own key" for older readers.
+const aiMode = computed<AiMode>({
+  get: () => resolveAiMode(settingsStore.aiConfig, settingsStore.aiGatewayAvailable),
+  set: (mode) => {
+    settingsStore.aiConfig.mode = mode;
+    settingsStore.aiConfig.enabled = mode === 'own';
+  },
+});
+
+// What the chosen mode means right now: a short label for the title chip and one sentence for the alert
+const aiStatus = computed(() => {
+  const hasKey = !!settingsStore.aiConfig.apiKey;
+  if (aiMode.value === 'off') {
+    return {
+      label: 'Off',
+      icon: 'mdi-power',
+      color: undefined,
+      alertType: 'info' as const,
+      description: settingsStore.aiGatewayAvailable
+        ? 'AI is off — Chat and Catch up are unavailable. Pick Shared or your own key to turn it on.'
+        : 'AI is off — Chat and Catch up are unavailable. Pick Own key to turn it on.',
+    };
+  }
+  if (aiMode.value === 'default') {
+    return {
+      label: 'Shared',
+      icon: 'mdi-check-circle-outline',
+      color: 'success',
+      alertType: 'success' as const,
+      description:
+        "Works with no setup. Prompts only go to providers that don't train on them. Shares a monthly quota with everyone on this site.",
+    };
+  }
+  return hasKey
+    ? {
+        label: 'Your key',
+        icon: 'mdi-check-circle-outline',
+        color: 'success',
+        alertType: 'success' as const,
+        description:
+          'Using your Gemini key, billed to your Google account. It is stored against your account and is only ever readable by you.',
+      }
+    : {
+        label: 'Needs a key',
+        icon: 'mdi-alert-outline',
+        color: 'warning',
+        alertType: 'warning' as const,
+        description: 'Paste your Gemini key below and save to start using AI.',
+      };
+});
 
 const GEMINI_MODELS = [
   'gemini-2.5-flash',
@@ -326,65 +378,85 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
 
       <!-- Second column: AI Assistant, then Backup & Restore -->
       <div class="d-flex flex-column settings-col">
-        <!-- AI Assistant island: runs on the shared Vercel AI Gateway; an own key is an optional override -->
+        <!-- AI Assistant island: one clear choice of how AI runs (off / shared / own Gemini key) -->
         <VCard class="glass-acrylic">
-          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
+          <VCardTitle class="d-flex align-center justify-space-between ga-2" style="min-height: 64px">
             AI Assistant
-            <VSwitch
-              v-model="settingsStore.aiConfig.enabled"
-              label="Use my own key"
-              color="primary"
-              hide-details
-              density="compact"
-              class="flex-grow-0"
-            />
+            <VChip :color="aiStatus.color" :prepend-icon="aiStatus.icon" size="small" variant="tonal">
+              {{ aiStatus.label }}
+            </VChip>
           </VCardTitle>
 
-          <VCardText class="d-flex flex-column ga-2">
-            <VAlert type="info" variant="tonal" density="compact" class="text-caption">
-              AI works out of the box once you are signed in — no setup. Prompts are sent only to providers that
-              don&apos;t train on them. To use your own Gemini account instead (billed to you, and not limited by
-              the shared monthly quota), turn on &ldquo;Use my own key&rdquo;. It is stored on the server against your
-              account and is only ever readable by you.
+          <VCardText class="d-flex flex-column ga-3">
+            <!-- Mode picker. Shared is greyed out until the deployment turns the gateway on -->
+            <VBtnToggle
+              v-model="aiMode"
+              mandatory
+              divided
+              color="primary"
+              variant="outlined"
+              density="comfortable"
+              class="ai-mode-toggle"
+            >
+              <VBtn value="off" prepend-icon="mdi-power" class="text-none">Off</VBtn>
+              <VBtn
+                value="default"
+                prepend-icon="mdi-shield-check-outline"
+                class="text-none"
+                :disabled="!settingsStore.aiGatewayAvailable"
+              >
+                Shared
+              </VBtn>
+              <VBtn value="own" prepend-icon="mdi-key-outline" class="text-none">Own key</VBtn>
+            </VBtnToggle>
+
+            <div v-if="!settingsStore.aiGatewayAvailable" class="text-caption text-medium-emphasis mt-n1">
+              Shared AI isn&apos;t turned on for this site yet.
+            </div>
+
+            <!-- One sentence for the chosen mode -->
+            <VAlert :type="aiStatus.alertType" variant="tonal" density="compact" class="text-caption">
+              {{ aiStatus.description }}
             </VAlert>
 
             <VAlert v-if="!isAuthenticated" type="warning" variant="tonal" density="compact" class="text-caption">
-              Sign in to use the AI Assistant and to save your own Gemini key.
+              Sign in to use the AI Assistant and to save your settings.
             </VAlert>
 
-            <VTextField
-              v-model="settingsStore.aiConfig.apiKey"
-              label="Gemini API Key"
-              :type="showGeminiKey ? 'text' : 'password'"
-              :disabled="!settingsStore.aiConfig.enabled"
-              :append-inner-icon="showGeminiKey ? 'mdi-eye-off' : 'mdi-eye'"
-              @click:append-inner="showGeminiKey = !showGeminiKey"
-              clearable
-              persistent-hint
-            >
-              <template #details>
-                <div class="text-caption text-medium-emphasis">
-                  Get your key at
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-primary text-decoration-none"
-                  >
-                    Google AI Studio
-                  </a>
-                </div>
-              </template>
-            </VTextField>
+            <!-- Own key: only shown when it is the chosen mode, so the form is as short as the choice -->
+            <template v-if="aiMode === 'own'">
+              <VTextField
+                v-model="settingsStore.aiConfig.apiKey"
+                label="Gemini API Key"
+                :type="showGeminiKey ? 'text' : 'password'"
+                :append-inner-icon="showGeminiKey ? 'mdi-eye-off' : 'mdi-eye'"
+                @click:append-inner="showGeminiKey = !showGeminiKey"
+                clearable
+                persistent-hint
+              >
+                <template #details>
+                  <div class="text-caption text-medium-emphasis">
+                    Get your key at
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary text-decoration-none"
+                    >
+                      Google AI Studio
+                    </a>
+                  </div>
+                </template>
+              </VTextField>
 
-            <VCombobox
-              v-model="settingsStore.aiConfig.model"
-              :items="GEMINI_MODELS"
-              label="Model"
-              :disabled="!settingsStore.aiConfig.enabled"
-              persistent-hint
-              hint="Select a model or type a custom model ID"
-            />
+              <VCombobox
+                v-model="settingsStore.aiConfig.model"
+                :items="GEMINI_MODELS"
+                label="Model"
+                persistent-hint
+                hint="Select a model or type a custom model ID"
+              />
+            </template>
 
             <div class="d-flex justify-end mt-2">
               <VBtn
@@ -590,6 +662,15 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   padding: 12px;
+}
+
+/* Mode picker spans the card, the three choices sharing the width equally */
+.ai-mode-toggle {
+  width: 100%;
+}
+
+.ai-mode-toggle :deep(.v-btn) {
+  flex: 1 1 0;
 }
 
 /* Stack the islands inside a column with the same gap as the grid */

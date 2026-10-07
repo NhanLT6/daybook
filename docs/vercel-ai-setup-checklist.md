@@ -1,15 +1,21 @@
-# AI Setup Checklist (Vercel AI Gateway, bring-your-own-key fallback)
+# AI Setup Checklist (own Gemini key, with an optional shared Vercel AI Gateway)
 
-Daybook's AI features (chat, extract logs, Catch up) run on the **Vercel AI Gateway** by default — signed-in
-users need no setup. A user can switch on **Settings → AI Assistant → Use my own key** to run on their own Gemini
-key instead; that key overrides the gateway for that user and is billed to them.
+Daybook's AI features (chat, extract logs, Catch up) run one of three ways, chosen per user in
+**Settings → AI Assistant**:
 
-## How a request picks its model (`api/_lib/ai.ts`)
-
-| User setting | Model | Billed to |
+| Mode | What runs | Billed to |
 |---|---|---|
-| "Use my own key" on, key saved | `aiConfig.model` via `@ai-sdk/google` (default `gemini-2.5-flash`) | the user's Google account |
-| otherwise | `AI_GATEWAY_MODEL` or `google/gemini-2.5-flash`, via the gateway | the deployment owner's gateway credit |
+| **Off** | nothing — chat and Catch up are unavailable | — |
+| **Shared** | the deployment's Vercel AI Gateway (`AI_GATEWAY_MODEL`, default `openai/gpt-5.4-nano`) | the deployment owner's gateway credit |
+| **Own key** | the user's Gemini key and model (`@ai-sdk/google`) | the user's Google account |
+
+The shared gateway is **off by default**: Vercel asks for a payment card before the free monthly credit applies.
+Until `AI_GATEWAY_ENABLED=true` is set on the deployment, the "Shared" button is greyed out and AI works only
+through users' own keys (exactly how the app behaved before the gateway existed). Turn it on when you're ready.
+
+Settings saved before modes existed keep working: an own key that was switched on stays "Own key"; otherwise the
+user gets "Shared" once the gateway is enabled, and "Off" until then. Mode is stored as `aiConfig.mode` in the
+existing JSON column — no migration (`resolveAiMode` in `src/interfaces/ServerSettings.ts`).
 
 Only signed-in users reach `/api/chat` and `/api/standup` (Neon Auth token), so the gateway credit is not open to
 anonymous traffic.
@@ -19,8 +25,9 @@ anonymous traffic.
 | Variable | Value | Required |
 |---|---|---|
 | `DATABASE_URL`, `VITE_NEON_AUTH_URL` | From the Neon integration | ✅ Yes (settings + auth) |
+| `AI_GATEWAY_ENABLED` | `true` to turn the shared gateway on | ❌ Optional — unset = own keys only |
 | `AI_GATEWAY_API_KEY` | Vercel dashboard → AI Gateway → API Keys | Local dev only. On Vercel the deployment's OIDC token is used automatically. |
-| `AI_GATEWAY_MODEL` | A gateway model id, e.g. `google/gemini-2.5-flash` | ❌ Optional — overrides the default model |
+| `AI_GATEWAY_MODEL` | A gateway model id, e.g. `google/gemini-2.5-flash` | ❌ Optional — overrides the default `openai/gpt-5.4-nano` |
 | `AI_GATEWAY_ZDR` | `false` | ❌ Optional — see the next section |
 
 ## 2. Privacy: no training, no retention
@@ -41,16 +48,17 @@ their own Google terms.
 
 ### Model check (Vercel model browser, saved 2026-10-07)
 
-Filter: free-tier credit + no-training provider + zero-data-retention provider + vision + tool use. Both Gemini 2.5
-models pass; p50 latency/throughput are Vercel's measured figures.
+Filter: free-tier credit + no-training provider + zero-data-retention provider + vision + tool use. All three pass; p50 latency/throughput are Vercel's measured figures.
 
 | Model | Input / output per 1M tokens | Time to first token | Tokens/s |
 |---|---|---|---|
-| `google/gemini-2.5-flash` (default) | $0.30 / $2.50 | ~380 ms | ~185 |
+| `google/gemini-2.5-flash` | $0.30 / $2.50 | ~380 ms | ~185 |
 | `google/gemini-2.5-flash-lite` | $0.10 / $0.40 | ~270 ms | ~405 |
+| `openai/gpt-5.4-nano` (default) | $0.20 / $1.25 | ~630 ms | ~165 |
 
-Newer Gemini models (3.x) are not on the free-tier credit. Flash-Lite is cheaper and faster but weaker at tool calls —
-try it via `AI_GATEWAY_MODEL` and check that chat still extracts logs (including "the rest of the day") correctly.
+Newer Gemini models (3.x) are not on the free-tier credit. The default is a small reasoning model, picked from the
+list rather than benchmarked — after turning the gateway on, check that chat still extracts logs (including "the
+rest of the day") correctly, and swap via `AI_GATEWAY_MODEL` if not.
 
 ## 3. Cost and limits
 
@@ -64,9 +72,10 @@ try it via `AI_GATEWAY_MODEL` and check that chat still extracts logs (including
 
 ## 4. Verify
 
-- [ ] Signed in, **without** an own key: AI Chat streams a reply (Vercel dashboard → AI Gateway shows the request)
+- [ ] With `AI_GATEWAY_ENABLED=true`, Settings → AI Assistant → **Shared**, saved: AI Chat streams a reply (Vercel dashboard → AI Gateway shows the request)
 - [ ] "Catch up" in the chat returns items
-- [ ] With "Use my own key" on and a valid key, the request does **not** show in the gateway log
+- [ ] With **Own key** and a valid key, the request does **not** show in the gateway log
+- [ ] Without `AI_GATEWAY_ENABLED`, "Shared" is greyed out and a user with no key sees "AI Assistant is not set up"
 - [ ] Signed out, AI requests fail with the sign-in error rather than reaching the gateway
 - [ ] On Hobby: if requests fail with the privacy message, set `AI_GATEWAY_ZDR=false` and redeploy
 
@@ -74,4 +83,4 @@ try it via `AI_GATEWAY_MODEL` and check that chat still extracts logs (including
 
 - Gateway model: set `AI_GATEWAY_MODEL` (browse https://vercel.com/ai-gateway/models; the model needs tool calling and
   image input for the chat). Redeploy.
-- BYOK provider: swap the SDK in `resolveAi` (`api/_lib/ai.ts`) and the model list in `src/views/SettingView.vue`.
+- Own-key provider: swap the SDK in `resolveAi` (`api/_lib/ai.ts`) and the model list in `src/views/SettingView.vue`.

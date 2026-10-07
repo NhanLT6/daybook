@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { generateText } from 'ai';
 
 import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js';
-import { MAX_OUTPUT_TOKENS, aiErrorMessage, resolveAi } from './_lib/ai.js';
+import { AI_NOT_SET_UP_MESSAGE, MAX_OUTPUT_TOKENS, aiErrorMessage, isAiAvailable, resolveAi } from './_lib/ai.js';
 import { getSettings } from './_lib/settingsRepo.js';
 import { DEFAULT_AI_CONFIG, type AiConfig } from '../src/interfaces/ServerSettings.js';
 
@@ -145,6 +145,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { aiConfig } = await getSettings(userId);
     aiConfigForError = aiConfig;
+    if (!isAiAvailable(aiConfig)) {
+      return res.status(400).json({ error: AI_NOT_SET_UP_MESSAGE });
+    }
 
     const body = req.body as StandupRequest;
 

@@ -9,6 +9,8 @@ import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { TextUIPart } from 'ai';
 
+import { useRouter } from 'vue-router';
+
 import AiChatMessage from './AiChatMessage.vue';
 
 const props = defineProps<{
@@ -33,6 +35,10 @@ const {
   markDiscarded,
   injectCatchUp,
 } = useAiChat();
+
+const router = useRouter();
+
+const isConfigError = computed(() => error.value?.includes('not set up') ?? false);
 
 const inputText = ref('');
 const attachedFile = ref<File | null>(null);
@@ -203,15 +209,22 @@ const handleCatchUp = async () => {
           </VAvatar>
           <VCard color="error" variant="tonal" elevation="0" rounded="lg rounded-ts-sm" style="max-width: 88%">
             <VCardText class="pa-3 d-flex align-center ga-2">
-              <span class="text-body-2 mb-0">{{ error }}</span>
-              <VBtn
-                icon="mdi-close"
-                size="x-small"
-                variant="text"
-                color="error"
-                class="flex-shrink-0"
-                @click="clearError"
-              />
+              <!-- Config error: render "Settings" as a clickable link, no dismiss button -->
+              <span v-if="isConfigError" class="text-body-2 mb-0">
+                AI Assistant is not set up. Choose how it should run in
+                <a class="error-link" @click.prevent="router.push('/setting')">Settings</a>.
+              </span>
+              <template v-else>
+                <span class="text-body-2 mb-0">{{ error }}</span>
+                <VBtn
+                  icon="mdi-close"
+                  size="x-small"
+                  variant="text"
+                  color="error"
+                  class="flex-shrink-0"
+                  @click="clearError"
+                />
+              </template>
             </VCardText>
           </VCard>
         </div>
@@ -371,4 +384,11 @@ const handleCatchUp = async () => {
   background-color: rgba(var(--v-theme-primary), 0.08);
 }
 
+.error-link {
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-underline-offset: 2px;
+  text-decoration: underline;
+}
 </style>

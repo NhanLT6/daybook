@@ -41,7 +41,7 @@ A statically-registered tool (`tools: { extractLogs }`) streams as a `tool-extra
 
 ## AI backend (`api/chat.ts`)
 - `streamText({ model: requireAiModel(aiConfig), tools: { extractLogs }, ... })`; `extractLogs` uses `inputSchema: extractLogsInputSchema`.
-- Model selection lives in `api/_lib/ai.ts` (`resolveAi(aiConfig)`): default is the **Vercel AI Gateway** (`AI_GATEWAY_MODEL` or `google/gemini-2.5-flash`, always with `disallowPromptTraining` + `zeroDataRetention` routing options); a user who switches on "Use my own key" in Settings (`aiConfig.enabled` + `apiKey`) runs on their own Gemini key instead. Setup and env vars: `docs/vercel-ai-setup-checklist.md`.
+- Per-user `aiConfig.mode` = `'off' | 'default' | 'own'` (Settings → AI Assistant; `resolveAiMode` in `src/interfaces/ServerSettings.ts` maps legacy configs). `'own'` runs on the user's Gemini key; `'default'` is the shared **Vercel AI Gateway** (`AI_GATEWAY_MODEL` or `openai/gpt-5.4-nano`, with `disallowPromptTraining` + `zeroDataRetention`), available only when the deployment sets `AI_GATEWAY_ENABLED=true` (GET `/api/settings` returns `aiGatewayAvailable`). Logic in `api/_lib/ai.ts` (`isAiAvailable`, `resolveAi`). Setup: `docs/vercel-ai-setup-checklist.md`.
 - `api/chat.ts` / `api/standup.ts` spread `resolveAi(...)` into `streamText` / `generateText` and map failures with `aiErrorMessage` (quota used up, rate limit, no provider meets privacy options).
 - Auth: Neon Auth bearer token (`requireUser`).
 - **Backend changes require a Vercel redeploy** to take effect.
