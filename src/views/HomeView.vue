@@ -186,6 +186,26 @@ const onCloneLog = (log: TimeLog) => {
   tab.value = 'form'; // reveal the form if the Chat tab is active
 };
 
+// Insights "Not logged" chips: act like a calendar click (replace while editing, else toggle), then
+// bring the form into view — closing the drawer when Insights is shown in it
+const revealForm = () => {
+  tab.value = 'form';
+  if (!insightsInline.value) insightsDrawerOpen.value = false;
+};
+
+const onToggleMissingDate = (date: string) => {
+  const fmt = (d: Date) => dayjs(d).format(isoDateFormat);
+  if (editingLog.value) {
+    selectedDates.value = [dayjs(date, isoDateFormat).toDate()];
+  } else {
+    const exists = selectedDates.value.some((d) => fmt(d) === date);
+    selectedDates.value = exists
+      ? selectedDates.value.filter((d) => fmt(d) !== date)
+      : [...selectedDates.value, dayjs(date, isoDateFormat).toDate()];
+  }
+  revealForm();
+};
+
 const onDeleteLog = async (log: TimeLog) => {
   await removeLog(log.id);
   notificationCenter.success('Log deleted');
@@ -353,6 +373,8 @@ const onAiUndoLogs = async () => {
       :current-month="currentMonth"
       :filtered-time-logs="filteredTimeLogs"
       :has-active-filter="hasActiveFilter"
+      :selected-dates="selectedDates"
+      @toggle-date="onToggleMissingDate"
       v-model:selected-project="selectedProject"
     />
 
@@ -371,6 +393,8 @@ const onAiUndoLogs = async () => {
         :current-month="currentMonth"
         :filtered-time-logs="filteredTimeLogs"
         :has-active-filter="hasActiveFilter"
+        :selected-dates="selectedDates"
+        @toggle-date="onToggleMissingDate"
         v-model:selected-project="selectedProject"
       />
     </VNavigationDrawer>

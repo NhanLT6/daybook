@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import type { AppEvent, RepeatFreq, RepeatRule } from '@/interfaces/Event';
+import type { AppEvent, MonthlyDayKind, MonthlyNth, RepeatFreq, RepeatRule } from '@/interfaces/Event';
 
 import { useField, useForm } from 'vee-validate';
 import { object, string } from 'yup';
@@ -11,16 +11,20 @@ import dayjs from 'dayjs';
 import { formatEventDate } from '@/common/DateHelpers';
 import {
   backToBackRule,
-  describeDayFromEnd,
+  describeDayKind,
+  describeNth,
   describeRepeat,
   eventDays,
-  isLastWeekdayOfMonth,
-  isNearMonthEnd,
+  getNextOccurrence,
+  getOccurrences,
   isSameRule,
+  normalizeRule,
   nthWeekdayOfMonth,
   repeatPresets,
   validateRepeat,
+  type RepeatPreset,
 } from '@/common/eventRecurrence';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useSettingsStore } from '@/stores/settings';
 
 const { item } = defineProps<{
@@ -94,7 +98,8 @@ const isMultiple = computed(() => pickedDays.value.length > 1);
 // ─── Repeat ───────────────────────────────────────────────────
 // Kept outside vee-validate: it's a nested object edited through several controls, and the
 // dialog remounts this form on every open, so plain refs seeded from `item` are enough.
-const repeatRule = ref<RepeatRule | null>(item?.repeat ? { ...item.repeat } : null);
+// Legacy rules are converted on open, so the form (and what it saves) only deals with the current shape
+const repeatRule = ref<RepeatRule | null>(item?.repeat ? normalizeRule(item.repeat, toDay(item.date)) : null);
 const isCustomRepeat = ref(false);
 const skipDates = ref<string[]>([...(item?.repeat?.skip ?? [])].sort());
 
@@ -103,6 +108,38 @@ const skipDates = ref<string[]>([...(item?.repeat?.skip ?? [])].sort());
 const settingsStore = useSettingsStore();
 const presets = computed(() => repeatPresets(shape.value, settingsStore.weekendDays));
 const backToBack = computed(() => backToBackRule(shape.value, settingsStore.weekendDays));
+
+// Weekend days + holidays, for work-day positions and "on a weekend or holiday"
+const workCalendar = useWorkCalendar();
+
+// A monthly position ("the last work day", "the second Tuesday") doesn't depend on the picked day: start the
+// series at its first occurrence on or after that day, so the saved date stays the first occurrence like
+// every other rule's. Other rules keep the date — they take their day from it.
+const seriesStart = (date: string, endDate: string | null, rule: RepeatRule | null) => {
+  if (rule?.freq !== 'month' || !rule.monthlyOn) return date;
+  const series: AppEvent = {
+    id: '',
+    title: '',
+    type: 'custom',
+    date,
+    ...(endDate ? { endDate } : {}),
+    repeat: { ...rule, skip: undefined },
+  };
+  return getNextOccurrence(series, date, workCalendar.value) ?? date;
+};
+
+// Same start move for an end date, so a range keeps its length
+const shiftDay = (day: string | null, from: string, to: string) =>
+  day ? dayjs(day).add(dayjs(to).diff(dayjs(from), 'day'), 'day').format('YYYY-MM-DD') : null;
+
+const applyRule = (rule: RepeatRule | null) => {
+  repeatRule.value = rule;
+  const date = dateField.value.value;
+  const start = seriesStart(date, endDateField.value.value, rule);
+  if (start === date) return;
+  endDateField.setValue(shiftDay(endDateField.value.value, date, start));
+  dateField.setValue(start);
+};
 
 // "When it ends" is stored as a plain rule (every 2 weeks, every N days); this flag only makes the form
 // keep it in step with the range while the dates are edited. A saved event matching it reopens with it on.
@@ -131,16 +168,39 @@ const repeatSelect = computed({
     else {
       const preset = presets.value[Number(value.replace('preset-', ''))];
       followsRangeEnd.value = !!preset.backToBack;
-      repeatRule.value = { ...preset.value };
+      applyRule({ ...preset.value });
     }
   },
 });
 
-const repeatItems = computed(() => [
-  { title: 'Does not repeat', value: 'none' },
-  ...presets.value.map((p, i) => ({ title: p.title, value: `preset-${i}` })),
-  { title: 'Custom…', value: 'custom' },
-]);
+// Presets grouped under subheaders (VSelect renders `type: 'subheader' | 'divider'` items as such).
+// repeatPresets already lists them in this group order.
+const presetGroup = (preset: RepeatPreset) => {
+  if (preset.backToBack) return 'Back to back';
+  if (preset.value.freq === 'month') return 'Monthly';
+  if (preset.value.freq === 'year') return 'Yearly';
+  return 'Daily & weekly';
+};
+
+interface RepeatItem {
+  title?: string;
+  value?: string;
+  type?: 'subheader' | 'divider';
+}
+
+const repeatItems = computed(() => {
+  const items: RepeatItem[] = [{ title: 'Does not repeat', value: 'none' }];
+  let group = '';
+  presets.value.forEach((preset, i) => {
+    if (presetGroup(preset) !== group) {
+      group = presetGroup(preset);
+      items.push({ type: 'subheader', title: group });
+    }
+    items.push({ title: preset.title, value: `preset-${i}` });
+  });
+  items.push({ type: 'divider' }, { title: 'Custom…', value: 'custom' });
+  return items;
+});
 
 // Custom panel is shown for custom picks and for saved rules no preset describes
 const showCustomPanel = computed(() => repeatSelect.value === 'custom');
@@ -150,16 +210,50 @@ const freqItems = computed(() => {
   return (['day', 'week', 'month', 'year'] as RepeatFreq[]).map((f) => ({ title: plural ? `${f}s` : f, value: f }));
 });
 
-const monthlyItems = computed(() => {
-  const date = dateField.value.value;
-  const weekday = dayjs(date).format('dddd');
-  const ordinal = ['first', 'second', 'third', 'fourth', 'fifth'][nthWeekdayOfMonth(date) - 1];
-  return [
-    { title: `Day ${dayjs(date).date()}`, value: 'dayOfMonth' },
-    { title: `The ${ordinal} ${weekday}`, value: 'nthWeekday' },
-    ...(isLastWeekdayOfMonth(date) ? [{ title: `The last ${weekday}`, value: 'lastWeekday' }] : []),
-    ...(isNearMonthEnd(date) ? [{ title: `The ${describeDayFromEnd(date)} of the month`, value: 'dayFromEnd' }] : []),
-  ];
+// Monthly: on the start date's day number, or on "the <nth> <day>" of each month whatever the start date is
+const monthlyMode = computed({
+  get: () => (repeatRule.value?.monthlyOn ? 'position' : 'dayOfMonth'),
+  set: (mode: 'dayOfMonth' | 'position') => {
+    const date = dateField.value.value;
+    const nth = nthWeekdayOfMonth(date);
+    // Start from the position the picked day already has (a 5th weekday is the last one)
+    const fromDate = { nth: (nth > 4 ? -1 : nth) as MonthlyNth, day: dayjs(date).day() as MonthlyDayKind };
+    updateRule({ monthlyOn: mode === 'position' ? (repeatRule.value?.monthlyOn ?? fromDate) : undefined });
+  },
+});
+
+const nthItems = ([1, 2, 3, 4, -1] as MonthlyNth[]).map((nth) => ({ title: describeNth(nth), value: nth }));
+
+// Monday-first weekdays after the two generic kinds
+const dayKindItems = (['day', 'workday', 1, 2, 3, 4, 5, 6, 0] as MonthlyDayKind[]).map((day) => ({
+  title: describeDayKind(day),
+  value: day,
+}));
+
+const updatePosition = (patch: Partial<NonNullable<RepeatRule['monthlyOn']>>) => {
+  const on = repeatRule.value?.monthlyOn;
+  if (on) updateRule({ monthlyOn: { ...on, ...patch } });
+};
+
+// "On a weekend or holiday" fits a single day whose rule can land on one — a work-day position never does
+const canAdjustNonWorkday = computed(
+  () =>
+    !isMultiple.value &&
+    !endDateField.value.value &&
+    !(repeatRule.value?.freq === 'month' && repeatRule.value.monthlyOn?.day === 'workday'),
+);
+
+const nonWorkdayItems = [
+  { title: 'Keep it', value: 'keep' },
+  { title: 'Skip it', value: 'skip' },
+  { title: 'Move to the work day before', value: 'before' },
+  { title: 'Move to the work day after', value: 'after' },
+];
+
+const nonWorkdayMode = computed({
+  get: () => repeatRule.value?.onNonWorkday ?? 'keep',
+  set: (mode: string) =>
+    updateRule({ onNonWorkday: mode === 'keep' ? undefined : (mode as RepeatRule['onNonWorkday']) }),
 });
 
 const endMode = computed({
@@ -177,7 +271,7 @@ const endMode = computed({
 });
 
 const updateRule = (patch: Partial<RepeatRule>) => {
-  if (repeatRule.value) repeatRule.value = { ...repeatRule.value, ...patch };
+  if (repeatRule.value) applyRule({ ...repeatRule.value, ...patch });
 };
 
 // Rule as it will be saved: drops fields that don't apply to the chosen frequency / date mode
@@ -187,10 +281,9 @@ const normalizedRule = computed<RepeatRule | null>(() => {
   return {
     freq: rule.freq,
     interval: Math.max(1, Math.floor(Number(rule.interval) || 1)),
-    // Several picked days repeat by day of month; "nth weekday" only describes a single start day
-    ...(rule.freq === 'month' && rule.monthlyBy && rule.monthlyBy !== 'dayOfMonth' && !isMultiple.value
-      ? { monthlyBy: rule.monthlyBy }
-      : {}),
+    // Several picked days repeat by day of month; a position only describes a single start day
+    ...(rule.freq === 'month' && rule.monthlyOn && !isMultiple.value ? { monthlyOn: rule.monthlyOn } : {}),
+    ...(rule.onNonWorkday && canAdjustNonWorkday.value ? { onNonWorkday: rule.onNonWorkday } : {}),
     ...(rule.end ? { end: rule.end } : {}),
     ...(skipDates.value.length ? { skip: skipDates.value } : {}),
   };
@@ -206,6 +299,19 @@ const repeatError = computed(() => {
   if (rule.end && 'until' in rule.end && rule.end.until < dateField.value.value) return 'End date is before the start';
   if (rule.end && 'count' in rule.end && !(rule.end.count >= 1)) return 'Must repeat at least once';
   return validateRepeat(shape.value, rule);
+});
+
+// The next few dates, shown under the Repeat field so a rule can be checked at a glance — work-day
+// rules move around weekends and holidays, which the summary sentence can't show
+const upcomingDates = computed(() => {
+  const rule = normalizedRule.value;
+  if (!rule || repeatError.value) return '';
+  const series: AppEvent = { id: '', title: '', type: 'custom', ...shape.value, repeat: rule };
+  const today = dayjs().format('YYYY-MM-DD');
+  const from = dateField.value.value > today ? dateField.value.value : today;
+  const to = dayjs(from).add(2, 'year').format('YYYY-MM-DD');
+  const next = getOccurrences(series, from, to, workCalendar.value).slice(0, 3);
+  return next.length ? `Next: ${next.map((d) => dayjs(d).format('ddd, MMM D')).join(' · ')}` : 'No upcoming dates';
 });
 
 const unskipDate = (date: string) => {
@@ -269,11 +375,14 @@ const hasError = computed(() => !!titleField.errors.value.length || !!timeError.
 const onSaveEvent = handleSubmit((values) => {
   if (hasError.value) return;
 
+  // The dates may have changed after a monthly position was picked: start at its first occurrence again
+  const start = seriesStart(values.date, values.endDate, normalizedRule.value);
+
   const event: AppEvent = {
     id: item?.id ?? '', // parent assigns ID for new events
     title: values.title.trim(),
-    date: values.date,
-    ...(values.endDate ? { endDate: values.endDate } : {}),
+    date: start,
+    ...(values.endDate ? { endDate: shiftDay(values.endDate, values.date, start) ?? values.endDate } : {}),
     ...(values.dates && values.dates.length > 1 ? { dates: values.dates } : {}),
     type: 'custom',
     // VTimePicker may emit "HH:mm:ss" — slice to "HH:mm"
@@ -401,6 +510,8 @@ const onCancelModifyEvent = () => {
         :items="repeatItems"
         label="Repeat"
         :error-messages="!showCustomPanel && repeatError ? [repeatError] : []"
+        :hint="upcomingDates"
+        persistent-hint
         class="mb-3"
       >
         <!-- Show the saved rule's own wording when it came from the custom panel -->
@@ -430,15 +541,41 @@ const onCancelModifyEvent = () => {
           />
         </div>
 
-        <!-- Monthly: same day number vs same weekday position (a single start day only) -->
+        <!-- Monthly: the start date's day number, or "the <nth> <day>" (a single start day or range only) -->
+        <VRadioGroup v-if="repeatRule.freq === 'month' && !isMultiple" v-model="monthlyMode" density="compact" hide-details>
+          <VRadio :label="`On day ${dayjs(dateField.value.value).date()}`" value="dayOfMonth" />
+          <!-- Selects sit beside the radio, not in its label, which would swallow their clicks -->
+          <div class="d-flex align-center ga-2">
+            <VRadio label="On the" value="position" class="flex-grow-0 text-no-wrap" />
+            <VSelect
+              :model-value="repeatRule.monthlyOn?.nth ?? 1"
+              :items="nthItems"
+              :disabled="!repeatRule.monthlyOn"
+              aria-label="Which one"
+              density="compact"
+              hide-details
+              @update:model-value="updatePosition({ nth: $event })"
+            />
+            <VSelect
+              :model-value="repeatRule.monthlyOn?.day ?? 'day'"
+              :items="dayKindItems"
+              :disabled="!repeatRule.monthlyOn"
+              aria-label="Day"
+              density="compact"
+              hide-details
+              @update:model-value="updatePosition({ day: $event })"
+            />
+          </div>
+        </VRadioGroup>
+
+        <!-- Weekend days and holidays: keep, skip, or move to the nearest work day (single days only) -->
         <VSelect
-          v-if="repeatRule.freq === 'month' && !isMultiple"
-          :model-value="repeatRule.monthlyBy ?? 'dayOfMonth'"
-          :items="monthlyItems"
-          label="On"
+          v-if="canAdjustNonWorkday"
+          v-model="nonWorkdayMode"
+          :items="nonWorkdayItems"
+          label="On a weekend or holiday"
           density="compact"
           hide-details
-          @update:model-value="updateRule({ monthlyBy: $event })"
         />
 
         <!-- Ends: never / on a date / after N occurrences -->

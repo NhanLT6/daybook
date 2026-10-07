@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
+
+import { useNow } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
@@ -11,6 +13,7 @@ import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { computeTaskBreakdown, type TaskBreakdownItem } from '@/composables/useTaskBreakdown';
 import { useTimeLogs } from '@/composables/useTimeLogs';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useSettingsStore } from '@/stores/settings';
 import { sumBy, uniqBy } from 'lodash';
 
@@ -21,12 +24,21 @@ const props = defineProps<{
   // see src/composables/useLogFilters.ts. Powers the "Filtered" stats section below.
   filteredTimeLogs: TimeLog[];
   hasActiveFilter: boolean;
+  // The log form's calendar selection — drives the "Not logged" chips' selected state
+  selectedDates: Date[];
+}>();
+
+const emit = defineEmits<{
+  toggleDate: [date: string];
 }>();
 
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
 
-const settingsStore = useSettingsStore();
 const { getProjectColor, getTaskColors } = useProjectColors();
+const workCalendar = useWorkCalendar();
+const now = useNow({ interval: 60_000 });
+const settingsStore = useSettingsStore();
+// Range reads reach past the viewed month, which `timeLogs` holds, for last week / last month
 const { inRange } = useTimeLogs();
 
 // Alpha-hex suffixes appended to a project colour for the selected-row tints
@@ -72,68 +84,150 @@ const currentMonthKey = computed(() => {
     .format(yearAndMonthFormat);
 });
 
-// Week-over-week delta
-const weekStartDate = computed(() => {
-  const today = dayjs();
-  const diff = (today.day() - settingsStore.firstDayOfWeek + 7) % 7;
-  return today.subtract(diff, 'day').startOf('day');
+// ── Overview: how complete the month's logging is ───────────────────────────────
+
+// Workdays of the month: not a weekend day (Settings) and not a holiday event
+const workdays = computed(() => {
+  const month = dayjs(currentMonthKey.value, yearAndMonthFormat);
+  const { weekendDays, holidays } = workCalendar.value;
+  return Array.from({ length: month.daysInMonth() }, (_, i) => month.date(i + 1))
+    .filter((day) => !weekendDays.includes(day.day()) && !holidays.has(day.format(isoDateFormat)))
+    .map((day) => day.format(isoDateFormat));
 });
 
-const thisWeekMinutes = computed(() => {
-  const weekStart = weekStartDate.value;
-  const today = dayjs().endOf('day');
-  return sumBy(
-    props.timeLogs.filter((log) => {
-      const d = dayjs(log.date, isoDateFormat);
-      return d.isValid() && !d.isBefore(weekStart) && !d.isAfter(today);
-    }),
-    'duration',
+// Days with logged time — plan entries have no duration and don't count
+const loggedDates = computed(
+  () => new Set(props.timeLogs.filter((l) => (l.duration ?? 0) > 0).map((l) => l.date)),
+);
+
+const daysLogged = computed(() => loggedDates.value.size);
+const daysProgress = computed(() =>
+  workdays.value.length > 0 ? Math.min(100, (daysLogged.value / workdays.value.length) * 100) : 0,
+);
+
+// Workdays before today with nothing logged — the gaps to fill before syncing the month to Xero.
+// Today is left out: it isn't missing while it's still being worked.
+const today = computed(() => dayjs(now.value).format(isoDateFormat));
+const pastWorkdays = computed(() => workdays.value.filter((day) => day < today.value));
+const missingDays = computed(() => pastWorkdays.value.filter((day) => !loggedDates.value.has(day)));
+
+// Chips shown before the rest collapse into a "+N more" chip
+const MISSING_SHOWN = 8;
+const showAllMissing = ref(false);
+const shownMissingDays = computed(() =>
+  showAllMissing.value ? missingDays.value : missingDays.value.slice(0, MISSING_SHOWN),
+);
+const hiddenMissingCount = computed(() => missingDays.value.length - shownMissingDays.value.length);
+const missingCountLabel = computed(() => {
+  const count = missingDays.value.length;
+  if (count === 0) return 'None';
+  return `${count} ${count === 1 ? 'day' : 'days'}`;
+});
+
+// Chips of dates already picked in the form's calendar render as selected
+const selectedDateKeys = computed(() => new Set(props.selectedDates.map((d) => dayjs(d).format(isoDateFormat))));
+const chipLabel = (day: string) => dayjs(day, isoDateFormat).format('ddd D');
+
+// ── Comparisons: so far vs the same point of the previous week / month ─────────
+
+// Logged minutes and days with logged time in [from, to]
+const periodStats = (from: string, to: string) => {
+  const logs = inRange(from, to).filter((l) => (l.duration ?? 0) > 0);
+  return { minutes: sumBy(logs, (l) => l.duration ?? 0), days: new Set(logs.map((l) => l.date)).size };
+};
+
+const shortDate = (date: string) => dayjs(date, isoDateFormat).format('MMM D');
+
+interface Comparison {
+  minutes: number;
+  avgPerDay: number;
+  delta: number; // minutes vs the previous period
+  avgDelta: number;
+  previousLabel: string; // "Sep 1 – 7"
+}
+
+const compare = (from: string, to: string, prevFrom: string, prevTo: string): Comparison => {
+  const current = periodStats(from, to);
+  const previous = periodStats(prevFrom, prevTo);
+  const avg = (stats: { minutes: number; days: number }) => (stats.days ? Math.round(stats.minutes / stats.days) : 0);
+  const sameMonth = dayjs(prevFrom).isSame(dayjs(prevTo), 'month');
+  return {
+    minutes: current.minutes,
+    avgPerDay: avg(current),
+    delta: current.minutes - previous.minutes,
+    avgDelta: previous.days && current.days ? avg(current) - avg(previous) : 0,
+    previousLabel:
+      prevFrom === prevTo
+        ? shortDate(prevFrom)
+        : `${shortDate(prevFrom)} – ${sameMonth ? dayjs(prevTo).format('D') : shortDate(prevTo)}`,
+  };
+};
+
+// The viewed month so far (a past month in full) against the previous month up to the same day
+const monthComparison = computed<Comparison | null>(() => {
+  const month = dayjs(currentMonthKey.value, yearAndMonthFormat);
+  const todayDay = dayjs(today.value, isoDateFormat);
+  if (month.isAfter(todayDay, 'month')) return null;
+  const end = month.isSame(todayDay, 'month') ? todayDay : month.endOf('month');
+  const prevStart = month.subtract(1, 'month');
+  // Day 31 has no match in a 30-day month: stop at its last day
+  const prevEnd = prevStart.date(Math.min(end.date(), prevStart.daysInMonth()));
+  return compare(
+    month.format(isoDateFormat),
+    end.format(isoDateFormat),
+    prevStart.format(isoDateFormat),
+    prevEnd.format(isoDateFormat),
   );
 });
 
-const lastWeekMinutes = computed(() => {
-  const lastWeekStart = weekStartDate.value.subtract(7, 'day');
-  const lastWeekEnd = weekStartDate.value.subtract(1, 'day').endOf('day');
-  // Range query spans the month boundary automatically since logs are sourced from the repo, not a per-month cache
-  return sumBy(inRange(lastWeekStart.format(isoDateFormat), lastWeekEnd.format(isoDateFormat)), 'duration');
+// This week so far against the same days of last week — only while viewing the current month
+const weekComparison = computed<Comparison | null>(() => {
+  const todayDay = dayjs(today.value, isoDateFormat);
+  if (!dayjs(currentMonthKey.value, yearAndMonthFormat).isSame(todayDay, 'month')) return null;
+  const start = todayDay.subtract((todayDay.day() - settingsStore.firstDayOfWeek + 7) % 7, 'day');
+  return compare(
+    start.format(isoDateFormat),
+    todayDay.format(isoDateFormat),
+    start.subtract(7, 'day').format(isoDateFormat),
+    todayDay.subtract(7, 'day').format(isoDateFormat),
+  );
 });
 
-const delta = computed(() => thisWeekMinutes.value - lastWeekMinutes.value);
+// "+4h 30m" / "−2h" / "same" — neutral: more hours isn't better or worse by itself
+const formatDelta = (minutes: number) =>
+  minutes === 0 ? 'same' : `${minutes > 0 ? '+' : '−'}${minutesToHourWithMinutes(Math.abs(minutes))}`;
 
-const deltaLabel = computed(() => {
-  if (lastWeekMinutes.value === 0) return null;
-  return `${minutesToHourWithMinutes(Math.abs(delta.value))} vs last week`;
-});
-
-const deltaIcon = computed(() => {
-  if (delta.value > 0) return 'mdi-chevron-up';
-  if (delta.value < 0) return 'mdi-chevron-down';
-  return null;
-});
-
-const deltaIconColor = computed(() => {
-  if (delta.value > 0) return 'success';
-  if (delta.value < 0) return 'error';
-  return '';
-});
-
-// ── Days logged ───────────────────────────────────────────────────────────────
-
-const daysLogged = computed(() => uniqBy(props.timeLogs, 'date').length);
-
-const workdaysInMonth = computed(() => {
-  const monthDate = dayjs(currentMonthKey.value, yearAndMonthFormat);
-  const daysInMonth = monthDate.daysInMonth();
-  const weekendDays = settingsStore.weekendDays;
-  let count = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = monthDate.date(d).day(); // 0=Sunday, 6=Saturday
-    if (!weekendDays.includes(dow)) count++;
+const comparisonRows = computed(() => {
+  const rows: { label: string; value: string; delta: string; vs: string }[] = [];
+  const week = weekComparison.value;
+  const month = monthComparison.value;
+  if (week) {
+    rows.push({
+      label: 'This week',
+      value: minutesToHourWithMinutes(week.minutes),
+      delta: formatDelta(week.delta),
+      vs: week.previousLabel,
+    });
   }
-  return count;
+  if (month) {
+    rows.push({
+      // A past month is compared in full, so it goes by its name
+      label: dayjs(currentMonthKey.value, yearAndMonthFormat).isSame(now.value, 'month')
+        ? 'This month'
+        : dayjs(currentMonthKey.value, yearAndMonthFormat).format('MMMM'),
+      value: minutesToHourWithMinutes(month.minutes),
+      delta: formatDelta(month.delta),
+      vs: month.previousLabel,
+    });
+    rows.push({
+      label: 'Avg per day',
+      value: minutesToHourWithMinutes(month.avgPerDay),
+      delta: formatDelta(month.avgDelta),
+      vs: month.previousLabel,
+    });
+  }
+  return rows;
 });
-
-const daysProgress = computed(() => (workdaysInMonth.value > 0 ? (daysLogged.value / workdaysInMonth.value) * 100 : 0));
 
 // ── Project breakdown ─────────────────────────────────────────────────────────
 
@@ -219,24 +313,66 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 
     <!-- Scrollable body -->
     <div class="overflow-y-auto flex-grow-1 px-2 pb-2 d-flex flex-column ga-3">
-      <!-- Total hours -->
-      <VCard>
-        <div class="pa-4">
-          <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(totalMinutes) }}</div>
-          <div v-if="deltaLabel" class="d-flex align-center ga-1 text-caption text-medium-emphasis mt-1">
-            <VIcon v-if="deltaIcon" :color="deltaIconColor" :icon="deltaIcon" size="14" />
-            {{ deltaLabel }}
-          </div>
-        </div>
-      </VCard>
-
-      <!-- Days logged -->
+      <!-- Overview: how complete the month's logging is, then how it compares. Rows are separated by space,
+           not dividers -->
       <div>
-        <div class="text-overline text-medium-emphasis ms-2">Days logged</div>
+        <div class="text-overline text-medium-emphasis ms-2">Overview</div>
         <VCard>
-          <div class="pa-4">
-            <div class="text-body-2 mb-2">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
-            <VProgressLinear :model-value="daysProgress" bg-color="rgba(var(--v-theme-on-surface), 0.08)" rounded />
+          <div class="pa-4 d-flex flex-column ga-4 text-caption">
+            <!-- Days logged + progress against the month's workdays -->
+            <div>
+              <div class="d-flex justify-space-between">
+                <span class="text-medium-emphasis">Days logged</span>
+                <span>{{ daysLogged }} / {{ workdays.length }} workdays</span>
+              </div>
+              <VProgressLinear
+                :model-value="daysProgress"
+                bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+                class="mt-2"
+                rounded
+              />
+            </div>
+
+            <!-- Past workdays with nothing logged (hidden for a month that hasn't started) -->
+            <div v-if="pastWorkdays.length">
+              <div class="d-flex justify-space-between ga-4">
+                <span class="text-medium-emphasis text-no-wrap">Not logged</span>
+                <span class="text-end" :class="missingDays.length ? 'text-warning' : 'text-success'">
+                  {{ missingCountLabel }}
+                </span>
+              </div>
+              <!-- Missing days as chips: click one to pick it in the form's calendar -->
+              <div v-if="missingDays.length" class="d-flex flex-wrap align-center ga-1 mt-2">
+                <!-- Neutral grey so the gaps inform without shouting; green only once picked in the form -->
+                <VChip
+                  v-for="day in shownMissingDays"
+                  :key="day"
+                  size="small"
+                  variant="tonal"
+                  :color="selectedDateKeys.has(day) ? 'primary' : undefined"
+                  @click="emit('toggleDate', day)"
+                >
+                  {{ chipLabel(day) }}
+                </VChip>
+                <VChip v-if="hiddenMissingCount > 0" size="small" variant="tonal" @click="showAllMissing = true">
+                  +{{ hiddenMissingCount }} more
+                </VChip>
+              </div>
+            </div>
+
+            <!-- So far vs the same point of last week / last month, one line each; the compared dates are in the
+                 delta's tooltip -->
+            <div v-for="row in comparisonRows" :key="row.label" class="d-flex justify-space-between ga-4">
+              <span class="text-medium-emphasis">{{ row.label }}</span>
+              <span class="text-no-wrap">
+                {{ row.value }}
+                <VTooltip :text="`vs ${row.vs}`" location="top">
+                  <template #activator="{ props: tooltipProps }">
+                    <span v-bind="tooltipProps" class="text-medium-emphasis ms-1">{{ row.delta }}</span>
+                  </template>
+                </VTooltip>
+              </span>
+            </div>
           </div>
         </VCard>
       </div>

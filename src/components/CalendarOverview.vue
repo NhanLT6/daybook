@@ -11,8 +11,9 @@ import { useNow, useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { atOccurrence, eventDays, getOccurrences } from '@/common/eventRecurrence';
+import { atOccurrence, eventDays, getNextOccurrence, getOccurrences } from '@/common/eventRecurrence';
 import { storageKeys } from '@/common/storageKeys';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useSettingsStore } from '@/stores/settings';
 
 // Theme integration
@@ -25,11 +26,20 @@ const props = withDefaults(
   defineProps<{
     singleDateMode?: boolean;
     view?: CalendarViewMode;
+    // Where the week/month toggle is remembered, and the view before anything is — lets a page keep
+    // its own view (Events opens on the month) without changing Home's
+    viewStorageKey?: string;
+    defaultView?: CalendarViewMode;
+    // Event whose occurrences get a highlight; the calendar moves to its next occurrence when it changes
+    highlightEvent?: AppEvent | null;
   }>(),
   {
     singleDateMode: false,
     // Undefined means "use the remembered view", so it stays the default
     view: undefined,
+    viewStorageKey: storageKeys.settings.calendarView,
+    defaultView: 'weekly',
+    highlightEvent: null,
   },
 );
 
@@ -44,7 +54,7 @@ const settingsStore = useSettingsStore();
 
 // Template ref for calendar component
 const calendar = ref();
-const calendarView = useStorage<CalendarViewMode>(storageKeys.settings.calendarView, props.view ?? 'weekly');
+const calendarView = useStorage<CalendarViewMode>(props.viewStorageKey, props.view ?? props.defaultView);
 
 const now = useNow({ interval: 60_000 });
 
@@ -52,6 +62,7 @@ const lastEmittedMonth = ref(new Date().getMonth() + 1);
 const isTodayVisible = ref(true);
 
 const { events } = useEvents();
+const workCalendar = useWorkCalendar();
 
 // Visible date range (YYYY-MM-DD), kept in sync with v-calendar's pages so repeating events only
 // expand into the days on screen. The default (current month + a week of padding each side, enough
@@ -140,11 +151,37 @@ const eventAttributes = computed(() => {
   return events.value
     .filter((event) => dayjs(event.date).isValid())
     .flatMap((event) =>
-      getOccurrences(event, from, to).flatMap((occurrence) => toOccurrenceAttributes(atOccurrence(event, occurrence))),
+      getOccurrences(event, from, to, workCalendar.value).flatMap((occurrence) =>
+        toOccurrenceAttributes(atOccurrence(event, occurrence)),
+      ),
     );
 });
 
-const calendarAttrs = computed(() => [todayAttribute.value, selectedDateAttribute.value, ...eventAttributes.value]);
+// Every day of the highlighted event's occurrences on screen; a range is one connected span
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+const highlightAttribute = computed(() => {
+  const event = props.highlightEvent;
+  if (!event) return [];
+  const { from, to } = visibleRange.value;
+  const dates = getOccurrences(event, from, to, workCalendar.value).flatMap((occurrence): (Date | DateRange)[] => {
+    const shown = atOccurrence(event, occurrence);
+    return shown.endDate && shown.endDate !== shown.date
+      ? [{ start: dayjs(shown.date).toDate(), end: dayjs(shown.endDate).toDate() }]
+      : eventDays(shown).map((day) => dayjs(day).toDate());
+  });
+  return [{ key: 'highlighted-event', highlight: { color: 'green', fillMode: 'light' }, dates }];
+});
+
+const calendarAttrs = computed(() => [
+  todayAttribute.value,
+  selectedDateAttribute.value,
+  ...highlightAttribute.value,
+  ...eventAttributes.value,
+]);
 const nextCalendarView = computed<CalendarViewMode>(() => (calendarView.value === 'weekly' ? 'monthly' : 'weekly'));
 const calendarViewButtonLabel = computed(() => (nextCalendarView.value === 'weekly' ? 'Week' : 'Month'));
 const calendarViewButtonIcon = computed(() =>
@@ -212,6 +249,37 @@ const onPageChange = (pages: Page[]) => {
     }
   }
 };
+
+// Bring a newly highlighted event into view: its next occurrence, or its first date once it's over
+watch(
+  () => props.highlightEvent?.id,
+  async () => {
+    const event = props.highlightEvent;
+    if (!event || !calendar.value) return;
+    const focus = getNextOccurrence(event, undefined, workCalendar.value) ?? dayjs(event.date).format(DATE_FORMAT);
+    const { from, to } = visibleRange.value;
+    if (focus >= from && focus <= to) return;
+    try {
+      await calendar.value.move(dayjs(focus).toDate());
+    } catch (error) {
+      console.warn('Failed to navigate to the event:', error);
+    }
+  },
+);
+
+// A date added from outside the calendar (e.g. an Insights "Not logged" chip) may sit in another month;
+// bring it into view. Only additions react, so removing or clicking a visible day never moves the calendar.
+watch(selectedDates, async (dates, previous) => {
+  const known = new Set(previous.map((d) => dayjs(d).format(DATE_FORMAT)));
+  const { from, to } = visibleRange.value;
+  const added = dates.map((d) => dayjs(d).format(DATE_FORMAT)).find((d) => !known.has(d) && (d < from || d > to));
+  if (!added || !calendar.value) return;
+  try {
+    await calendar.value.move(dayjs(added).toDate());
+  } catch (error) {
+    console.warn('Failed to navigate to the selected date:', error);
+  }
+});
 
 // Navigate to today using v-calendar's move API
 const goToToday = async () => {
