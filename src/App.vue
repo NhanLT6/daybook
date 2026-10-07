@@ -3,7 +3,6 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import { useAuth } from '@/composables/useAuth';
 import { useAuthDialog } from '@/composables/useAuthDialog';
-import { useCatchUpSummary } from '@/composables/useCatchUpSummary';
 import { useEvents } from '@/composables/useEvents';
 import { useGreetingNotifications } from '@/composables/useGreetingNotifications';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
@@ -29,13 +28,11 @@ const { openAuthDialog } = useAuthDialog();
 
 const userInitial = computed(() => (user.value?.name || user.value?.email || '?').slice(0, 1).toUpperCase());
 const { syncTicketsToLocalStorage, shouldAutoSync } = useJira();
-const { startCatchUpNotifications } = useCatchUpSummary();
 const { startGreetingNotifications } = useGreetingNotifications();
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
 const { loadSettings, migrateJiraFromLocalStorage } = useServerSettings();
 let stopGreetingNotifications: (() => void) | undefined;
-let stopCatchUpNotifications: (() => void) | undefined;
 
 // Single source of truth for all glass visuals — one slider drives both blur and opacity.
 // opacity(light) = 0.48 + s*0.44 → 0.48 at 0, 0.83 at 0.8, 0.92 at 1.0
@@ -93,7 +90,6 @@ onMounted(async () => {
   stopGreetingNotifications = startGreetingNotifications();
   await authReady; // settle the session first so the settings call carries a token
   await initServerSettings();
-  stopCatchUpNotifications = startCatchUpNotifications();
   await autoFetchEvents();
   await autoSyncJiraTickets();
 });
@@ -111,7 +107,6 @@ watch(isAuthenticated, async (signedIn, wasSignedIn) => {
 
 onUnmounted(() => {
   stopGreetingNotifications?.();
-  stopCatchUpNotifications?.();
 });
 
 const route = useRoute();
@@ -307,7 +302,7 @@ const navItems = [
   align-items: center;
   width: 100%;
   gap: 2px;
-  padding: 4px 8px;
+  padding: 4px;
   border-radius: 8px;
   overflow: visible;
 }

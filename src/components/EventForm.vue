@@ -11,9 +11,11 @@ import dayjs from 'dayjs';
 import { formatEventDate } from '@/common/DateHelpers';
 import {
   backToBackRule,
+  describeDayFromEnd,
   describeRepeat,
   eventDays,
   isLastWeekdayOfMonth,
+  isNearMonthEnd,
   isSameRule,
   nthWeekdayOfMonth,
   repeatPresets,
@@ -156,6 +158,7 @@ const monthlyItems = computed(() => {
     { title: `Day ${dayjs(date).date()}`, value: 'dayOfMonth' },
     { title: `The ${ordinal} ${weekday}`, value: 'nthWeekday' },
     ...(isLastWeekdayOfMonth(date) ? [{ title: `The last ${weekday}`, value: 'lastWeekday' }] : []),
+    ...(isNearMonthEnd(date) ? [{ title: `The ${describeDayFromEnd(date)} of the month`, value: 'dayFromEnd' }] : []),
   ];
 });
 

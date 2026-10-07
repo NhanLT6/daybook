@@ -1,5 +1,4 @@
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
-import type { AiConfig } from '@/interfaces/ServerSettings';
 import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
@@ -9,21 +8,15 @@ import { shortDateFormat } from '@/common/DateFormat';
 import { openNoteItems } from '@/common/searchNotes';
 import { storageKeys } from '@/common/storageKeys';
 import { db } from '@/db';
-import { useNotificationCenterStore } from '@/stores/notificationCenter';
-import { useSettingsStore } from '@/stores/settings';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 import { authHeaders } from './useAuth';
 
 dayjs.extend(customParseFormat);
 
-const SETTINGS_WAIT_FALLBACK_MS = 5000;
-const CATCH_UP_VISIBLE_MS = 5000; // same as warning notifications
 const HOURS_PER_DAY = 8; // for the "Xd Yh" effort metric
 const LONG_RUNNING_THRESHOLD_MINUTES = 15 * 60; // 15h accumulated effort
 const LOOKBACK_WORKING_DAYS = 15; // rolling window for accumulation (~3 weeks)
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -72,24 +65,6 @@ interface RequestPlan {
 }
 
 export type { CatchUpRenderItem };
-
-// ── Notification → Chat bridge (module-level singleton, no reactive signal) ──
-
-type CatchUpViewHandler = (items: CatchUpRenderItem[]) => void;
-const viewHandlers = new Set<CatchUpViewHandler>();
-
-export function onCatchUpView(handler: CatchUpViewHandler): () => void {
-  viewHandlers.add(handler);
-  return () => viewHandlers.delete(handler);
-}
-
-export function triggerCatchUpView(items: CatchUpRenderItem[]): void {
-  viewHandlers.forEach((h) => h(items));
-}
-
-export function markCatchUpViewed(date = dayjs().format('YYYY-MM-DD')): void {
-  localStorage.setItem(storageKeys.catchUp.dismissedDate, date);
-}
 
 export function buildCatchUpItems(didLogs: TimeLog[], accumulated: Map<string, number>): CatchUpItem[] {
   const byProject = new Map<string, TimeLog[]>();
@@ -322,94 +297,4 @@ export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {
   const cached = getCachedSummary(summaryKey(all, noteItems));
   if (cached) return cached;
   return callStandupApi(all, noteItems, dayjs().format('YYYY-MM-DD'));
-}
-
-export function isAiAvailable(config: AiConfig): boolean {
-  return config.enabled && !!config.apiKey;
-}
-
-export function shouldSkipCatchUp(today: string, dismissedDate: string | null, aiConfig: AiConfig): boolean {
-  return dismissedDate === today || !isAiAvailable(aiConfig);
-}
-
-export function useCatchUpSummary() {
-  const settingsStore = useSettingsStore();
-  const notificationCenter = useNotificationCenterStore();
-
-  let flowRunning = false;
-
-  const today = () => dayjs().format('YYYY-MM-DD');
-
-  function dismissCatchUp(date = today()) {
-    localStorage.setItem(storageKeys.catchUp.dismissedDate, date);
-    notificationCenter.dismiss(`catchup-${date}`);
-  }
-
-  function enqueueCatchUp(items: CatchUpRenderItem[], date = today()) {
-    const id = notificationCenter.catchup('Catch-up', {
-      id: `catchup-${date}`,
-      persistent: true,
-      message: 'Ready · click to view in Chat',
-      payload: { items },
-      actions: [
-        {
-          id: 'dismiss',
-          label: 'Dismiss',
-          closeOnComplete: true,
-          onClick: () => {
-            localStorage.setItem(storageKeys.catchUp.dismissedDate, date);
-          },
-        },
-      ],
-    });
-    // The store keeps actionable items persistent; hide it on the same timing as other passive notifications.
-    // Not marking it dismissed, so it comes back on the next load until the user presses Dismiss.
-    setTimeout(() => notificationCenter.dismiss(id), CATCH_UP_VISIBLE_MS);
-  }
-
-  async function prepareCatchUp(): Promise<void> {
-    if (flowRunning) return;
-    flowRunning = true;
-
-    try {
-      await Promise.race([settingsStore.waitForSettings(), sleep(SETTINGS_WAIT_FALLBACK_MS)]);
-
-      const date = today();
-      if (shouldSkipCatchUp(date, localStorage.getItem(storageKeys.catchUp.dismissedDate), settingsStore.aiConfig)) {
-        return;
-      }
-
-      const all = await allLogs();
-      const noteItems = await openNoteItemsFromDb();
-      const cached = getCachedSummary(summaryKey(all, noteItems));
-      if (cached) {
-        enqueueCatchUp(cached, date);
-        return;
-      }
-
-      const items = await callStandupApi(all, noteItems, date);
-      if (items?.length) enqueueCatchUp(items, date);
-    } catch {
-      // Foundation phase: catch-up failures do not create user-facing notifications.
-    } finally {
-      flowRunning = false;
-    }
-  }
-
-  function startCatchUpNotifications(): () => void {
-    void prepareCatchUp();
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void prepareCatchUp();
-    };
-
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }
-
-  return {
-    dismissCatchUp,
-    enqueueCatchUp,
-    startCatchUpNotifications,
-  };
 }

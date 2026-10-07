@@ -5,8 +5,9 @@ import { convertToModelMessages, streamText, tool } from 'ai';
 
 import { extractLogsInputSchema, searchNotesInputSchema } from '../src/interfaces/aiTools.js';
 import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js';
-import { isAiEnabled, requireAiModel } from './_lib/ai.js';
+import { MAX_OUTPUT_TOKENS, aiErrorMessage, resolveAi } from './_lib/ai.js';
 import { getSettings } from './_lib/settingsRepo.js';
+import { DEFAULT_AI_CONFIG, type AiConfig } from '../src/interfaces/ServerSettings.js';
 
 interface ChatApiRequest {
   messages: UIMessage[];
@@ -78,32 +79,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  let aiConfigForError: AiConfig = DEFAULT_AI_CONFIG;
+
   try {
     const { userId } = await requireUser(headerReader(req));
 
     const { aiConfig } = await getSettings(userId);
-    if (!isAiEnabled(aiConfig)) {
-      return res.status(400).json({
-        error: 'AI Assistant is not configured. Add your Gemini API key in Settings.',
-      });
-    }
+    aiConfigForError = aiConfig;
 
     const body = req.body as ChatApiRequest;
 
     const result = streamText({
-      model: requireAiModel(aiConfig),
+      ...resolveAi(aiConfig),
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
       system: buildSystemPrompt(body.projects, body.tasks, body.currentDate),
       messages: await convertToModelMessages(body.messages),
       tools: { extractLogs: extractLogsTool, searchNotes: searchNotesTool },
     });
 
-    // Stream to Node.js ServerResponse using the AI SDK helper
-    result.pipeUIMessageStreamToResponse(res);
+    // Stream to Node.js ServerResponse using the AI SDK helper. Failures after the stream has started
+    // (a quota or rate-limit rejection arrives here) reach the client through onError.
+    result.pipeUIMessageStreamToResponse(res, {
+      onError: (err) => {
+        console.error('Chat stream error:', err);
+        return aiErrorMessage(err, aiConfigForError);
+      },
+    });
   } catch (err) {
     if (err instanceof AuthError) {
       return res.status(err.status).json({ error: err.message });
     }
     console.error('Chat error:', err);
-    return res.status(500).json({ error: 'AI request failed. Check your API key in Settings.' });
+    return res.status(500).json({ error: aiErrorMessage(err, aiConfigForError) });
   }
 }

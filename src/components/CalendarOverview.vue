@@ -87,10 +87,20 @@ const markerColor = (event: AppEvent) => `rgb(var(--v-theme-${event.type === 'ho
 
 // Calendar attributes for one occurrence. Single and separately picked days each get a dot; ranges
 // (e.g. back-to-back sprints) only mark their first and last day, so the calendar stays quiet.
+// customData carries the marker's colour and shape to the day popover, whose own indicator is always a
+// plain circle in v-calendar's default colour — see the #day-popover slot.
+type MarkerShape = 'dot' | 'start' | 'end';
+
 const toOccurrenceAttributes = (event: AppEvent) => {
-  const dot = { style: { backgroundColor: markerColor(event) } };
+  const color = markerColor(event);
+  const dot = { style: { backgroundColor: color } };
   if (!event.endDate || event.endDate === event.date) {
-    return eventDays(event).map((day) => ({ dates: dayjs(day).toDate(), dot, popover: { label: event.title } }));
+    return eventDays(event).map((day) => ({
+      dates: dayjs(day).toDate(),
+      dot,
+      popover: { label: event.title },
+      customData: { color, shape: 'dot' satisfies MarkerShape },
+    }));
   }
 
   // Triangles point into the range: ▸ on the first day, ◂ on the last (see .range-edge styles)
@@ -99,14 +109,30 @@ const toOccurrenceAttributes = (event: AppEvent) => {
       dates: dayjs(event.date).toDate(),
       dot: { ...dot, class: 'range-edge range-edge--start' },
       popover: { label: `${event.title} starts` },
+      customData: { color, shape: 'start' satisfies MarkerShape },
     },
     {
       dates: dayjs(event.endDate).toDate(),
       dot: { ...dot, class: 'range-edge range-edge--end' },
       popover: { label: `${event.title} ends` },
+      customData: { color, shape: 'end' satisfies MarkerShape },
     },
   ];
 };
+
+// Only event attributes have a popover, so these are the rows shown; typed here because v-calendar
+// doesn't export its slot types
+interface PopoverAttribute {
+  key: string | number;
+  popover?: { label?: string };
+  customData?: { color: string; shape: MarkerShape };
+}
+
+const markerClass = (shape?: MarkerShape) => ({
+  'range-edge': shape === 'start' || shape === 'end',
+  'range-edge--start': shape === 'start',
+  'range-edge--end': shape === 'end',
+});
 
 // Event attributes — repeating events are expanded into their occurrences within the visible range
 const eventAttributes = computed(() => {
@@ -231,6 +257,24 @@ const goToToday = async () => {
       @dayclick="onDayClick"
       @update:pages="onPageChange"
     >
+      <!-- Same markup and classes as v-calendar's default popover, but the indicator reuses the day's marker
+           (colour and triangle/circle shape), which the default always draws as a plain blue circle -->
+      <template #day-popover="{ 'day-title': dayTitle, attributes }: { 'day-title': string; attributes: PopoverAttribute[] }">
+        <div class="vc-day-popover-container">
+          <div v-if="dayTitle" class="vc-day-popover-header">{{ dayTitle }}</div>
+          <div v-for="attribute in attributes" :key="attribute.key" class="vc-day-popover-row">
+            <div v-if="attribute.customData" class="vc-day-popover-row-indicator">
+              <span
+                class="vc-dot"
+                :class="markerClass(attribute.customData.shape)"
+                :style="{ backgroundColor: attribute.customData.color }"
+              />
+            </div>
+            <div class="vc-day-popover-row-label">{{ attribute.popover?.label }}</div>
+          </div>
+        </div>
+      </template>
+
       <!-- Calendar footer: chips + Today button as a flat wrapping row -->
       <template #footer>
         <div class="pa-2 d-flex flex-wrap ga-1">

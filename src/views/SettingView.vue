@@ -326,21 +326,30 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
 
       <!-- Second column: AI Assistant, then Backup & Restore -->
       <div class="d-flex flex-column settings-col">
-        <!-- AI Assistant island -->
+        <!-- AI Assistant island: runs on the shared Vercel AI Gateway; an own key is an optional override -->
         <VCard class="glass-acrylic">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             AI Assistant
-            <VSwitch v-model="settingsStore.aiConfig.enabled" color="primary" hide-details density="compact" />
+            <VSwitch
+              v-model="settingsStore.aiConfig.enabled"
+              label="Use my own key"
+              color="primary"
+              hide-details
+              density="compact"
+              class="flex-grow-0"
+            />
           </VCardTitle>
 
           <VCardText class="d-flex flex-column ga-2">
             <VAlert type="info" variant="tonal" density="compact" class="text-caption">
-              Bring your own key — AI runs on your Gemini account, billed to you. It is stored on the server against
-              your account and is only ever readable by you.
+              AI works out of the box once you are signed in — no setup. Prompts are sent only to providers that
+              don&apos;t train on them. To use your own Gemini account instead (billed to you, and not limited by
+              the shared monthly quota), turn on &ldquo;Use my own key&rdquo;. It is stored on the server against your
+              account and is only ever readable by you.
             </VAlert>
 
             <VAlert v-if="!isAuthenticated" type="warning" variant="tonal" density="compact" class="text-caption">
-              Sign in to save your Gemini key — it is stored against your account.
+              Sign in to use the AI Assistant and to save your own Gemini key.
             </VAlert>
 
             <VTextField

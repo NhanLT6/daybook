@@ -19,7 +19,6 @@ import { useNow } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
-import { onCatchUpView } from '@/composables/useCatchUpSummary';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
 import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
@@ -61,10 +60,6 @@ onUnmounted(() => {
 
 onMounted(() => {
   insightsDrawerOpen.value = false; // never auto-reopen when returning to Home
-  const off = onCatchUpView(() => {
-    tab.value = 'ai';
-  });
-  onUnmounted(off);
 });
 
 const initialDate = readRememberedDate();
@@ -300,8 +295,8 @@ const onAiUndoLogs = async () => {
           />
         </VTabsWindowItem>
 
-        <!-- AI Assistant tab — eager keeps AiChatPanel mounted so onCatchUpView fires immediately -->
-        <VTabsWindowItem value="ai" eager>
+        <!-- AI Assistant tab -->
+        <VTabsWindowItem value="ai">
           <AiChatPanel
             class="mobile-chat"
             :projects="projects"

@@ -10,8 +10,7 @@ export type NotificationKind =
   | 'warning'
   | 'error'
   | 'confirm'
-  | 'activity'
-  | 'catchup';
+  | 'activity';
 
 export interface NotificationAction {
   id: string;
@@ -46,7 +45,6 @@ export type NotificationOptions = Omit<NotificationInput, 'kind' | 'title'>;
 const DEFAULT_PRIORITIES: Record<NotificationKind, number> = {
   confirm: 90,
   error: 80,
-  catchup: 70,
   activity: 60,
   greeting: 50,
   warning: 45,
@@ -61,7 +59,7 @@ const DEFAULT_AUTO_DISMISS_MS: Partial<Record<NotificationKind, number>> = {
   warning: 5000,
 };
 
-const PERSISTENT_KINDS = new Set<NotificationKind>(['activity', 'catchup', 'confirm', 'error']);
+const PERSISTENT_KINDS = new Set<NotificationKind>(['activity', 'confirm', 'error']);
 const AUTO_EXPAND_KINDS = new Set<NotificationKind>(['confirm', 'greeting', 'warning', 'error']);
 
 export const useNotificationCenterStore = defineStore('notificationCenter', () => {
@@ -175,10 +173,6 @@ export const useNotificationCenterStore = defineStore('notificationCenter', () =
     return notify('activity', title, options);
   }
 
-  function catchup(title: string, options?: NotificationOptions): string {
-    return notify('catchup', title, options);
-  }
-
   function dismiss(id: string) {
     clearTimer(id);
     items.value = items.value.filter((item) => item.id !== id);
@@ -231,7 +225,6 @@ export const useNotificationCenterStore = defineStore('notificationCenter', () =
     error,
     confirm,
     activity,
-    catchup,
     dismiss,
     clear,
     runAction,

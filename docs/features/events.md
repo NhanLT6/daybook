@@ -25,7 +25,7 @@ Interfaces: `src/interfaces/Event.ts`
   monthly/yearly keep each day's day-of-month.
 - `RepeatRule` is a typed, friendly layer. **Never store raw RRULE strings**; `rrule` (npm) only does the date
   math inside `src/common/eventRecurrence.ts`.
-- `monthlyBy` is monthly only, and nth/last weekday only applies to a single start day; undefined = `dayOfMonth`. `end` is `{ until }` (inclusive) or `{ count }`;
+- `monthlyBy` is monthly only, and nth/last weekday and `dayFromEnd` only apply to a single start day; undefined = `dayOfMonth`. `dayFromEnd` keeps the start date's distance from month end (0 = last day, 2 = 3rd to last), stored with no extra field — it maps to rrule's negative `bymonthday` (-1 = last day), so it follows month length (Jan 31 → Feb 28/29 → Mar 31). `end` is `{ until }` (inclusive) or `{ count }`;
   undefined = never. `skip` holds occurrence **start** dates left out of the series.
 - **Storage**: `repeat` and `dates` are optional fields on existing records, so there is **no IndexedDB version bump and no
   migration**; old events simply lack it. Backups carry it as-is (`useBackup` snapshots whole records).
@@ -74,9 +74,11 @@ A range + repeat copies the range length to every occurrence: a sprint Mon→Fri
 Repeat field:
 
 - **Dropdown of presets** derived from the chosen date(s) (`repeatPresets`): every day, every week on <days>,
-  every 2 weeks, monthly on the nth <weekday>, monthly on the last <weekday>, monthly on day(s) N, yearly. The
+  every 2 weeks, monthly on the nth <weekday>, monthly on the last <weekday>, monthly on day(s) N, monthly on the
+  last / Nth-to-last day, yearly. The
   "last <weekday>" preset is offered **only when the date is the last such weekday** of its month
-  (`isLastWeekdayOfMonth`). Presets are recomputed when the dates change.
+  (`isLastWeekdayOfMonth`); the "last / Nth-to-last day" preset only when the date is nearer the end of its month
+  than the start (`isNearMonthEnd`). The first of a month needs no preset of its own: "day 1" reads "on the first day". Presets are recomputed when the dates change.
 - **When it ends (…)** — ranges only, listed first: the next occurrence starts once this one ends (sprints).
   Stored as a **plain rule, no new field**: the same weekday N weeks later when only weekend days lie
   between (Mon→Fri 2-week sprint → every 2 weeks; weekend = the Settings weekend days, so a Mon→Thu sprint
@@ -120,6 +122,9 @@ the rule is untouched.
 - **Dot colours carry one meaning each**: `accent` (purple) = holiday, `info` (blue) = your own event; green
   (`primary`) is reserved for today/selected. Dots are styled with `rgb(var(--v-theme-…))` because v-calendar
   ignores hex values in `dot.color` (they all fell back to the theme green).
+- **Hover popover**: v-calendar's default popover indicator is always a blue circle (it ignores the dot's style
+  and class), so `CalendarOverview` supplies its own `#day-popover` slot and draws the marker from the
+  attribute's `customData` (`color`, `shape`) — a triangle for range edges, a circle otherwise.
 
 ## Rules and Gotchas
 

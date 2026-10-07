@@ -7,7 +7,7 @@
 - `src/composables/useAiChat.ts` — all chat state + the pure `extractLogsFromMessage()` reader
 - `src/interfaces/AiChat.ts` — `DaybookMessageMetadata`, `DaybookUITools`, `DaybookUIMessage`; re-exports `ExtractedLog`
 - `src/interfaces/aiTools.ts` — **single source of truth** for the `extractLogs` tool contract (zod schema), imported by BOTH client and `api/chat.ts`
-- `api/chat.ts` — Vercel serverless chat endpoint (streamText + extractLogs tool)
+- `api/chat.ts` — Vercel serverless chat endpoint (streamText + extractLogs / searchNotes tools)
 
 ## Architecture (Vercel AI SDK v6)
 - Client uses the `Chat` class from `@ai-sdk/vue` with `DefaultChatTransport` (auth headers via `buildAuthHeaders`).
@@ -35,14 +35,15 @@ A statically-registered tool (`tools: { extractLogs }`) streams as a `tool-extra
 ## Message metadata (`DaybookMessageMetadata`)
 `tool?: 'extractLogs' | 'catchUp'`, `extractedLogs?`, `saveState?: 'saved' | 'discarded'`, `catchUpItems?`. (No `timestamp` — removed as unused.)
 
-## catchUp (notification → chat bridge)
-- Client-injected synthetic assistant message (`injectCatchUp`) with `tool: 'catchUp'` + bullet-list text (kept for AI follow-up context; hidden in the UI).
-- Module-level emitter in `useCatchUpSummary.ts`: `onCatchUpView` / `triggerCatchUpView` / `markCatchUpViewed`. `NotificationIsland` catchup item click → `triggerCatchUpView` → panel injects + HomeView switches to the AI tab.
+## catchUp (manual only)
+- The chat's floating "Catch up" button calls `fetchCatchUpItems()` (`useCatchUpSummary.ts`) and `injectCatchUp` adds a client-injected assistant message with `tool: 'catchUp'` + bullet-list text (kept for AI follow-up context; hidden in the UI).
+- There is no automatic catch-up notification any more (removed): nothing runs at startup or on tab focus. Results are cached in localStorage keyed by a stamp of logs + open note items.
 
 ## AI backend (`api/chat.ts`)
 - `streamText({ model: requireAiModel(aiConfig), tools: { extractLogs }, ... })`; `extractLogs` uses `inputSchema: extractLogsInputSchema`.
-- AI config is **per-user (BYOK)**: `getSettings(machineId)` from `api/_lib/kv.ts` → `isAiEnabled(aiConfig)` / `requireAiModel(aiConfig)` from `api/_lib/ai.ts`. Each user enters their own Gemini key in Settings → AI Assistant. There is deliberately **no `GEMINI_API_KEY` env var** — this repo is public and its deployment is reachable by anyone, so a deployment-wide key would let strangers spend the owner's quota.
-- Auth via Web Crypto ECDSA (`verifyRequest`).
+- Model selection lives in `api/_lib/ai.ts` (`resolveAi(aiConfig)`): default is the **Vercel AI Gateway** (`AI_GATEWAY_MODEL` or `google/gemini-2.5-flash`, always with `disallowPromptTraining` + `zeroDataRetention` routing options); a user who switches on "Use my own key" in Settings (`aiConfig.enabled` + `apiKey`) runs on their own Gemini key instead. Setup and env vars: `docs/vercel-ai-setup-checklist.md`.
+- `api/chat.ts` / `api/standup.ts` spread `resolveAi(...)` into `streamText` / `generateText` and map failures with `aiErrorMessage` (quota used up, rate limit, no provider meets privacy options).
+- Auth: Neon Auth bearer token (`requireUser`).
 - **Backend changes require a Vercel redeploy** to take effect.
 
 ## Design spec

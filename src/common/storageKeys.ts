@@ -11,7 +11,6 @@ export const storageKeys = {
   },
   catchUp: {
     summaries: 'catchupSummaries',
-    dismissedDate: 'catchUpDismissedDate',
   },
   notifications: {
     greetingFirstSeenAt: 'notificationGreetingFirstSeenAt',

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import { useAiChat } from '@/composables/useAiChat';
-import { fetchCatchUpItems, onCatchUpView } from '@/composables/useCatchUpSummary';
+import { fetchCatchUpItems } from '@/composables/useCatchUpSummary';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
@@ -34,10 +33,6 @@ const {
   markDiscarded,
   injectCatchUp,
 } = useAiChat();
-
-const router = useRouter();
-
-const isConfigError = computed(() => error.value?.includes('not configured') ?? false);
 
 const inputText = ref('');
 const attachedFile = ref<File | null>(null);
@@ -151,12 +146,6 @@ const handleCatchUp = async () => {
   }
 };
 
-onMounted(() => {
-  const off = onCatchUpView((items) => {
-    injectCatchUp(items);
-  });
-  onUnmounted(off);
-});
 </script>
 
 <template>
@@ -214,24 +203,15 @@ onMounted(() => {
           </VAvatar>
           <VCard color="error" variant="tonal" elevation="0" rounded="lg rounded-ts-sm" style="max-width: 88%">
             <VCardText class="pa-3 d-flex align-center ga-2">
-              <!-- Config error: render "Settings" as a clickable link, no dismiss button -->
-              <template v-if="isConfigError">
-                <span class="text-body-2 mb-0">
-                  AI Assistant is not configured. Add your Gemini API key in
-                  <a class="error-link" @click.prevent="router.push('/setting')">Settings</a>.
-                </span>
-              </template>
-              <template v-else>
-                <span class="text-body-2 mb-0">{{ error }}</span>
-                <VBtn
-                  icon="mdi-close"
-                  size="x-small"
-                  variant="text"
-                  color="error"
-                  class="flex-shrink-0"
-                  @click="clearError"
-                />
-              </template>
+              <span class="text-body-2 mb-0">{{ error }}</span>
+              <VBtn
+                icon="mdi-close"
+                size="x-small"
+                variant="text"
+                color="error"
+                class="flex-shrink-0"
+                @click="clearError"
+              />
             </VCardText>
           </VCard>
         </div>
@@ -391,11 +371,4 @@ onMounted(() => {
   background-color: rgba(var(--v-theme-primary), 0.08);
 }
 
-.error-link {
-  color: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  text-underline-offset: 2px;
-  text-decoration: underline;
-}
 </style>

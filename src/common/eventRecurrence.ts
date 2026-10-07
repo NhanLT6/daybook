@@ -59,6 +59,24 @@ export const nthWeekdayOfMonth = (date: string): number => Math.ceil(dayjs(date)
 export const isLastWeekdayOfMonth = (date: string): boolean =>
   dayjs(date).add(7, 'day').month() !== dayjs(date).month();
 
+/** Days between a date and the last day of its month: 0 on the last day, 1 on the day before it. */
+export const daysFromMonthEnd = (date: string): number => dayjs(date).endOf('month').date() - dayjs(date).date();
+
+/** True when the date sits nearer the end of its month than the start — the dates "from month end" suits. */
+export const isNearMonthEnd = (date: string): boolean => daysFromMonthEnd(date) < dayjs(date).date() - 1;
+
+const ordinalSuffix = (n: number): string => {
+  const lastTwo = n % 100;
+  if (lastTwo >= 11 && lastTwo <= 13) return 'th';
+  return ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+};
+
+/** "last day", "2nd to last day", "3rd to last day"… for a date's distance from month end. */
+export const describeDayFromEnd = (date: string): string => {
+  const n = daysFromMonthEnd(date) + 1;
+  return n === 1 ? 'last day' : `${n}${ordinalSuffix(n)} to last day`;
+};
+
 function toRRule(date: string, rule: RepeatRule): RRule {
   const start = dayjs(date);
   const options: Partial<Options> = {
@@ -81,6 +99,9 @@ function toRRule(date: string, rule: RepeatRule): RRule {
         options.byweekday = [RRULE_WEEKDAYS[start.day()].nth(nthWeekdayOfMonth(date))];
       } else if (rule.monthlyBy === 'lastWeekday') {
         options.byweekday = [RRULE_WEEKDAYS[start.day()].nth(-1)];
+      } else if (rule.monthlyBy === 'dayFromEnd') {
+        // Negative month days count back from the end (-1 = last day), so the date follows month length
+        options.bymonthday = [-(daysFromMonthEnd(date) + 1)];
       } else {
         // Months without this day (e.g. the 31st) are skipped, per RFC 5545
         options.bymonthday = [start.date()];
@@ -208,8 +229,9 @@ export function describeRepeat(days: string | string[], rule: RepeatRule): strin
     const weekday = WEEKDAY_NAMES[start.day()];
     if (rule.monthlyBy === 'nthWeekday') text += ` on the ${ORDINALS[nthWeekdayOfMonth(picked[0]) - 1]} ${weekday}`;
     else if (rule.monthlyBy === 'lastWeekday') text += ` on the last ${weekday}`;
+    else if (rule.monthlyBy === 'dayFromEnd') text += ` on the ${describeDayFromEnd(picked[0])}`;
     else if (picked.length > 1) text += ` on days ${joinList(picked.map((d) => String(dayjs(d).date())))}`;
-    else text += ` on day ${start.date()}`;
+    else text += start.date() === 1 ? ' on the first day' : ` on day ${start.date()}`;
   } else if (rule.freq === 'year') {
     text += ` on ${joinList(picked.map((d) => dayjs(d).format('MMM D')))}`;
   }
@@ -264,6 +286,7 @@ export function repeatPresets(event: EventShape, weekendDays?: number[]): Repeat
       ? [{ freq: 'month', interval: 1, monthlyBy: 'lastWeekday' } as RepeatRule]
       : []),
     { freq: 'month', interval: 1, monthlyBy: 'dayOfMonth' },
+    ...(single && isNearMonthEnd(date) ? [{ freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' } as RepeatRule] : []),
     { freq: 'year', interval: 1 },
   ];
   return [

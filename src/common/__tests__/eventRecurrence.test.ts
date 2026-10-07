@@ -5,6 +5,8 @@ import type { AppEvent, RepeatRule } from '@/interfaces/Event';
 import {
   atOccurrence,
   backToBackRule,
+  daysFromMonthEnd,
+  describeDayFromEnd,
   describeRepeat,
   getNextOccurrence,
   getOccurrences,
@@ -83,6 +85,28 @@ describe('getOccurrences', () => {
 
     const last = event({ date: '2026-10-30', repeat: { freq: 'month', interval: 1, monthlyBy: 'lastWeekday' } });
     expect(getOccurrences(last, '2026-10-01', '2026-12-31')).toEqual(['2026-10-30', '2026-11-27', '2026-12-25']);
+  });
+
+  it('repeats monthly on the same distance from month end', () => {
+    // Last day: follows month length, including a leap-year February
+    const last = event({ date: '2027-12-31', repeat: { freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' } });
+    expect(getOccurrences(last, '2028-01-01', '2028-04-30')).toEqual([
+      '2028-01-31',
+      '2028-02-29',
+      '2028-03-31',
+      '2028-04-30',
+    ]);
+
+    // 3rd to last day (Oct 29)
+    const third = event({ date: '2026-10-29', repeat: { freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' } });
+    expect(getOccurrences(third, '2026-10-01', '2027-03-31')).toEqual([
+      '2026-10-29',
+      '2026-11-28',
+      '2026-12-29',
+      '2027-01-29',
+      '2027-02-26',
+      '2027-03-29',
+    ]);
   });
 
   it('skips months without the day for day-of-month rules', () => {
@@ -167,6 +191,36 @@ describe('describeRepeat', () => {
     expect(describeRepeat('2026-10-06', { freq: 'day', interval: 1, end: { until: '2026-12-31' } })).toBe(
       'Every day, until Dec 31, 2026',
     );
+  });
+});
+
+describe('month-end helpers', () => {
+  it('measures the distance from month end', () => {
+    expect(daysFromMonthEnd('2026-10-31')).toBe(0);
+    expect(daysFromMonthEnd('2026-10-29')).toBe(2);
+    expect(daysFromMonthEnd('2028-02-01')).toBe(28);
+  });
+
+  it('names the day counting back from month end', () => {
+    expect(describeDayFromEnd('2026-10-31')).toBe('last day');
+    expect(describeDayFromEnd('2026-10-30')).toBe('2nd to last day');
+    expect(describeDayFromEnd('2026-10-29')).toBe('3rd to last day');
+    expect(describeDayFromEnd('2026-10-21')).toBe('11th to last day');
+  });
+
+  it('describes first-day and last-day rules', () => {
+    expect(describeRepeat('2026-10-01', { freq: 'month', interval: 1 })).toBe('Every month on the first day');
+    expect(describeRepeat('2026-10-31', { freq: 'month', interval: 1, monthlyBy: 'dayFromEnd' })).toBe(
+      'Every month on the last day',
+    );
+  });
+
+  it('offers from-month-end only for dates nearer the end than the start', () => {
+    const offered = (date: string) => repeatPresets({ date }).some((p) => p.value.monthlyBy === 'dayFromEnd');
+    expect(offered('2026-10-31')).toBe(true);
+    expect(offered('2026-10-20')).toBe(true);
+    expect(offered('2026-10-05')).toBe(false);
+    expect(offered('2026-10-01')).toBe(false);
   });
 });
 

@@ -8,7 +8,7 @@ export type RepeatFreq = 'day' | 'week' | 'month' | 'year';
 export interface RepeatRule {
   freq: RepeatFreq;
   interval: number; // Every N units (>= 1)
-  monthlyBy?: 'dayOfMonth' | 'nthWeekday' | 'lastWeekday'; // Monthly only. Undefined = dayOfMonth
+  monthlyBy?: 'dayOfMonth' | 'nthWeekday' | 'lastWeekday' | 'dayFromEnd'; // Monthly only. Undefined = dayOfMonth. dayFromEnd keeps the start date's distance from month end (0 = last day)
   end?: { until: string } | { count: number }; // Undefined = never ends. until: YYYY-MM-DD, inclusive
   skip?: string[]; // Occurrence start dates (YYYY-MM-DD) left out of the series
 }

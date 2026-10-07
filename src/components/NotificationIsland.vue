@@ -3,9 +3,6 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import type { NotificationAction, NotificationItem, NotificationKind } from '@/stores/notificationCenter';
 
-import type { CatchUpRenderItem } from '@/composables/useCatchUpSummary';
-import { markCatchUpViewed, triggerCatchUpView } from '@/composables/useCatchUpSummary';
-
 import { storeToRefs } from 'pinia';
 import { useTheme } from 'vuetify';
 
@@ -186,8 +183,6 @@ function iconFor(kind?: NotificationKind): string {
       return 'mdi-alert-octagon-outline';
     case 'activity':
       return 'mdi-progress-clock';
-    case 'catchup':
-      return 'mdi-lightning-bolt';
     case 'info':
       return 'mdi-information-outline';
     default:
@@ -201,7 +196,7 @@ function compactText(item: NotificationItem | null): string {
 }
 
 function canQuickDismiss(item: NotificationItem): boolean {
-  return item.kind !== 'catchup' && item.kind !== 'confirm';
+  return item.kind !== 'confirm';
 }
 
 function actionColor(action: NotificationAction): string | undefined {
@@ -212,14 +207,6 @@ function actionColor(action: NotificationAction): string | undefined {
 
 function actionVariant(action: NotificationAction): 'text' | 'tonal' {
   return action.tone === 'default' || !action.tone ? 'text' : 'tonal';
-}
-
-function onCatchUpItemClick(item: NotificationItem) {
-  const items = (item.payload?.items as CatchUpRenderItem[] | undefined) ?? [];
-  if (!items.length) return;
-  triggerCatchUpView(items);
-  notificationCenter.dismiss(item.id);
-  markCatchUpViewed();
 }
 
 watch(
@@ -290,9 +277,7 @@ onClickOutside(rootEl, () => {
                 v-for="item in sortedItems"
                 :key="item.id"
                 class="island-item"
-                :class="{ 'island-item--clickable': item.kind === 'catchup' }"
                 :data-kind="item.kind"
-                @click="item.kind === 'catchup' ? onCatchUpItemClick(item) : undefined"
               >
                 <div class="island-item-head">
                   <span class="island-item-icon">
@@ -316,7 +301,7 @@ onClickOutside(rootEl, () => {
                   />
                 </div>
 
-                <p v-if="item.description && item.kind !== 'catchup'" class="island-description">{{ item.description }}</p>
+                <p v-if="item.description" class="island-description">{{ item.description }}</p>
 
                 <div v-if="item.actions?.length" class="island-actions" @click.stop>
                   <VBtn
@@ -587,16 +572,6 @@ onClickOutside(rootEl, () => {
   border-radius: 7px;
   padding: 8px 0;
   background: transparent;
-}
-
-.island-item--clickable {
-  cursor: pointer;
-  border-radius: 7px;
-  transition: background 0.12s ease;
-}
-
-.island-item--clickable:hover {
-  background: rgba(var(--v-theme-on-surface), 0.04);
 }
 
 .island-item-head {
