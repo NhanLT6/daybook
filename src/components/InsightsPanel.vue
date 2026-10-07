@@ -5,13 +5,14 @@ import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
 
+import { useNow } from '@vueuse/core';
+
 import dayjs from 'dayjs';
 
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { computeTaskBreakdown, type TaskBreakdownItem } from '@/composables/useTaskBreakdown';
-import { useTimeLogs } from '@/composables/useTimeLogs';
-import { useSettingsStore } from '@/stores/settings';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { sumBy, uniqBy } from 'lodash';
 
 const props = defineProps<{
@@ -25,9 +26,9 @@ const props = defineProps<{
 
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
 
-const settingsStore = useSettingsStore();
 const { getProjectColor, getTaskColors } = useProjectColors();
-const { inRange } = useTimeLogs();
+const workCalendar = useWorkCalendar();
+const now = useNow({ interval: 60_000 });
 
 // Alpha-hex suffixes appended to a project colour for the selected-row tints
 const SELECTED_TINT = '40'; // ~25% — selected project title
@@ -72,68 +73,42 @@ const currentMonthKey = computed(() => {
     .format(yearAndMonthFormat);
 });
 
-// Week-over-week delta
-const weekStartDate = computed(() => {
-  const today = dayjs();
-  const diff = (today.day() - settingsStore.firstDayOfWeek + 7) % 7;
-  return today.subtract(diff, 'day').startOf('day');
+// ── Overview: how complete the month's logging is ───────────────────────────────
+
+// Workdays of the month: not a weekend day (Settings) and not a holiday event
+const workdays = computed(() => {
+  const month = dayjs(currentMonthKey.value, yearAndMonthFormat);
+  const { weekendDays, holidays } = workCalendar.value;
+  return Array.from({ length: month.daysInMonth() }, (_, i) => month.date(i + 1))
+    .filter((day) => !weekendDays.includes(day.day()) && !holidays.has(day.format(isoDateFormat)))
+    .map((day) => day.format(isoDateFormat));
 });
 
-const thisWeekMinutes = computed(() => {
-  const weekStart = weekStartDate.value;
-  const today = dayjs().endOf('day');
-  return sumBy(
-    props.timeLogs.filter((log) => {
-      const d = dayjs(log.date, isoDateFormat);
-      return d.isValid() && !d.isBefore(weekStart) && !d.isAfter(today);
-    }),
-    'duration',
-  );
+// Days with logged time — plan entries have no duration and don't count
+const loggedDates = computed(
+  () => new Set(props.timeLogs.filter((l) => (l.duration ?? 0) > 0).map((l) => l.date)),
+);
+
+const daysLogged = computed(() => loggedDates.value.size);
+const daysProgress = computed(() =>
+  workdays.value.length > 0 ? Math.min(100, (daysLogged.value / workdays.value.length) * 100) : 0,
+);
+
+// Workdays before today with nothing logged — the gaps to fill before syncing the month to Xero.
+// Today is left out: it isn't missing while it's still being worked.
+const today = computed(() => dayjs(now.value).format(isoDateFormat));
+const pastWorkdays = computed(() => workdays.value.filter((day) => day < today.value));
+const missingDays = computed(() => pastWorkdays.value.filter((day) => !loggedDates.value.has(day)));
+
+const MISSING_SHOWN = 4;
+const missingLabel = computed(() => {
+  if (missingDays.value.length === 0) return 'None';
+  const shown = missingDays.value.slice(0, MISSING_SHOWN).map((day) => dayjs(day, isoDateFormat).format('MMM D'));
+  const more = missingDays.value.length - shown.length;
+  return `${shown.join(', ')}${more > 0 ? ` +${more} more` : ''}`;
 });
 
-const lastWeekMinutes = computed(() => {
-  const lastWeekStart = weekStartDate.value.subtract(7, 'day');
-  const lastWeekEnd = weekStartDate.value.subtract(1, 'day').endOf('day');
-  // Range query spans the month boundary automatically since logs are sourced from the repo, not a per-month cache
-  return sumBy(inRange(lastWeekStart.format(isoDateFormat), lastWeekEnd.format(isoDateFormat)), 'duration');
-});
-
-const delta = computed(() => thisWeekMinutes.value - lastWeekMinutes.value);
-
-const deltaLabel = computed(() => {
-  if (lastWeekMinutes.value === 0) return null;
-  return `${minutesToHourWithMinutes(Math.abs(delta.value))} vs last week`;
-});
-
-const deltaIcon = computed(() => {
-  if (delta.value > 0) return 'mdi-chevron-up';
-  if (delta.value < 0) return 'mdi-chevron-down';
-  return null;
-});
-
-const deltaIconColor = computed(() => {
-  if (delta.value > 0) return 'success';
-  if (delta.value < 0) return 'error';
-  return '';
-});
-
-// ── Days logged ───────────────────────────────────────────────────────────────
-
-const daysLogged = computed(() => uniqBy(props.timeLogs, 'date').length);
-
-const workdaysInMonth = computed(() => {
-  const monthDate = dayjs(currentMonthKey.value, yearAndMonthFormat);
-  const daysInMonth = monthDate.daysInMonth();
-  const weekendDays = settingsStore.weekendDays;
-  let count = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = monthDate.date(d).day(); // 0=Sunday, 6=Saturday
-    if (!weekendDays.includes(dow)) count++;
-  }
-  return count;
-});
-
-const daysProgress = computed(() => (workdaysInMonth.value > 0 ? (daysLogged.value / workdaysInMonth.value) * 100 : 0));
+const avgPerDay = computed(() => (daysLogged.value > 0 ? Math.round(totalMinutes.value / daysLogged.value) : 0));
 
 // ── Project breakdown ─────────────────────────────────────────────────────────
 
@@ -219,24 +194,38 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 
     <!-- Scrollable body -->
     <div class="overflow-y-auto flex-grow-1 px-2 pb-2 d-flex flex-column ga-3">
-      <!-- Total hours -->
-      <VCard>
-        <div class="pa-4">
-          <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(totalMinutes) }}</div>
-          <div v-if="deltaLabel" class="d-flex align-center ga-1 text-caption text-medium-emphasis mt-1">
-            <VIcon v-if="deltaIcon" :color="deltaIconColor" :icon="deltaIcon" size="14" />
-            {{ deltaLabel }}
-          </div>
-        </div>
-      </VCard>
-
-      <!-- Days logged -->
+      <!-- Overview: month total, then how complete the month's logging is -->
       <div>
-        <div class="text-overline text-medium-emphasis ms-2">Days logged</div>
+        <div class="text-overline text-medium-emphasis ms-2">Overview</div>
         <VCard>
           <div class="pa-4">
-            <div class="text-body-2 mb-2">{{ daysLogged }} / {{ workdaysInMonth }} workdays</div>
-            <VProgressLinear :model-value="daysProgress" bg-color="rgba(var(--v-theme-on-surface), 0.08)" rounded />
+            <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(totalMinutes) }}</div>
+            <div class="text-caption text-medium-emphasis mt-1">Total logged</div>
+            <VDivider class="my-3" />
+
+            <!-- Days logged + progress against the month's workdays -->
+            <div class="d-flex justify-space-between text-caption">
+              <span class="text-medium-emphasis">Days logged</span>
+              <span>{{ daysLogged }} / {{ workdays.length }} workdays</span>
+            </div>
+            <VProgressLinear
+              :model-value="daysProgress"
+              bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+              class="mt-1 mb-2"
+              rounded
+            />
+
+            <!-- Past workdays with nothing logged (hidden for a month that hasn't started) -->
+            <div v-if="pastWorkdays.length" class="d-flex justify-space-between ga-4 text-caption mt-1">
+              <span class="text-medium-emphasis text-no-wrap">Not logged</span>
+              <span class="text-end" :class="missingDays.length ? 'text-warning' : 'text-success'">
+                {{ missingLabel }}
+              </span>
+            </div>
+            <div class="d-flex justify-space-between text-caption mt-1">
+              <span class="text-medium-emphasis">Avg per day</span>
+              <span>{{ minutesToHourWithMinutes(avgPerDay) }}</span>
+            </div>
           </div>
         </VCard>
       </div>
