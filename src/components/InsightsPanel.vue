@@ -193,9 +193,11 @@ const weekComparison = computed<Comparison | null>(() => {
   );
 });
 
-// "+4h 30m" / "−2h" / "same" — neutral: more hours isn't better or worse by itself
-const formatDelta = (minutes: number) =>
-  minutes === 0 ? 'same' : `${minutes > 0 ? '+' : '−'}${minutesToHourWithMinutes(Math.abs(minutes))}`;
+// "+4h 30m vs last week" / "same as last week" — neutral: more hours isn't better or worse by itself
+const formatDelta = (minutes: number, period: string) =>
+  minutes === 0
+    ? `same as ${period}`
+    : `${minutes > 0 ? '+' : '−'}${minutesToHourWithMinutes(Math.abs(minutes))} vs ${period}`;
 
 const comparisonRows = computed(() => {
   const rows: { label: string; value: string; delta: string; vs: string }[] = [];
@@ -205,24 +207,27 @@ const comparisonRows = computed(() => {
     rows.push({
       label: 'This week',
       value: minutesToHourWithMinutes(week.minutes),
-      delta: formatDelta(week.delta),
+      delta: formatDelta(week.delta, 'last week'),
       vs: week.previousLabel,
     });
   }
   if (month) {
+    // A past month is compared with the month before it by name ("vs Aug")
+    const viewed = dayjs(currentMonthKey.value, yearAndMonthFormat);
+    const previousMonth = viewed.isSame(now.value, 'month') ? 'last month' : viewed.subtract(1, 'month').format('MMM');
     rows.push({
       // A past month is compared in full, so it goes by its name
       label: dayjs(currentMonthKey.value, yearAndMonthFormat).isSame(now.value, 'month')
         ? 'This month'
         : dayjs(currentMonthKey.value, yearAndMonthFormat).format('MMMM'),
       value: minutesToHourWithMinutes(month.minutes),
-      delta: formatDelta(month.delta),
+      delta: formatDelta(month.delta, previousMonth),
       vs: month.previousLabel,
     });
     rows.push({
       label: 'Avg per day',
       value: minutesToHourWithMinutes(month.avgPerDay),
-      delta: formatDelta(month.avgDelta),
+      delta: formatDelta(month.avgDelta, previousMonth),
       vs: month.previousLabel,
     });
   }
@@ -360,18 +365,18 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
               </div>
             </div>
 
-            <!-- So far vs the same point of last week / last month, one line each; the compared dates are in the
-                 delta's tooltip -->
-            <div v-for="row in comparisonRows" :key="row.label" class="d-flex justify-space-between ga-4">
-              <span class="text-medium-emphasis">{{ row.label }}</span>
-              <span class="text-no-wrap">
-                {{ row.value }}
+            <!-- So far vs the same point of last week / last month; the compared dates are in the delta's tooltip -->
+            <div v-for="row in comparisonRows" :key="row.label" class="d-flex justify-space-between align-start ga-4">
+              <span class="text-medium-emphasis text-no-wrap">{{ row.label }}</span>
+              <!-- Value, with the change vs the previous period underneath -->
+              <div class="d-flex flex-column align-end text-no-wrap">
+                <span>{{ row.value }}</span>
                 <VTooltip :text="`vs ${row.vs}`" location="top">
                   <template #activator="{ props: tooltipProps }">
-                    <span v-bind="tooltipProps" class="text-medium-emphasis ms-1">{{ row.delta }}</span>
+                    <span v-bind="tooltipProps" class="text-caption text-medium-emphasis">{{ row.delta }}</span>
                   </template>
                 </VTooltip>
-              </span>
+              </div>
             </div>
           </div>
         </VCard>

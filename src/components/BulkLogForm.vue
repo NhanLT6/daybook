@@ -391,7 +391,7 @@ watch(
 
       <!-- Quick picks: one non-wrapping row that scrolls sideways, so it never grows past one line -->
       <div v-if="showQuickPicks" class="quick-picks d-flex align-center ga-2">
-        <VIcon icon="mdi-history" size="small" class="text-medium-emphasis" />
+        <VIcon icon="mdi-lightning-bolt" size="small" class="text-medium-emphasis" />
         <div class="quick-picks-scroll d-flex ga-2">
           <VChip
             v-for="pick in recentProjectTasks"
@@ -539,11 +539,11 @@ watch(
           +{{ hour }}h
         </VBtn>
 
-        <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips) -->
+        <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips).
+             Filled, square-cornered button so it reads as an action, not another pill chip or a status label. -->
         <VBtn
           v-if="remainingMinutes"
-          class="rounded-xl font-weight-medium"
-          variant="tonal"
+          variant="flat"
           color="primary"
           density="comfortable"
           prepend-icon="mdi-timer-sand"

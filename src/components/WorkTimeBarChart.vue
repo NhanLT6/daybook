@@ -31,6 +31,8 @@ const chartColors = computed(() => ({
   gridColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
   tickColor: isDark.value ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
   legendColor: isDark.value ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)',
+  // Target line is informative only, so it sits just above the grid lines in strength
+  targetLineColor: isDark.value ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)',
   // Border between stacked segments — matches the card surface so it reads as a thin gap,
   // separating similar pastel fills without changing the palette
   segmentBorder: theme.global.current.value.colors.surface,
@@ -275,14 +277,14 @@ const chartOptions = computed(() => ({
                 type: 'line' as const,
                 yMin: targetLineHours.value,
                 yMax: targetLineHours.value,
-                borderColor: chartColors.value.tickColor,
+                borderColor: chartColors.value.targetLineColor,
                 borderWidth: 1,
                 borderDash: [6, 4],
                 label: {
                   display: true,
                   content: minutesToHourWithMinutes(targetLineHours.value * 60),
                   position: 'start' as const,
-                  color: chartColors.value.tickColor,
+                  color: chartColors.value.targetLineColor,
                   backgroundColor: 'transparent',
                   font: { size: 10 },
                   padding: 2,
