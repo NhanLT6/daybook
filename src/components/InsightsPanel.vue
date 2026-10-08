@@ -141,8 +141,8 @@ const shortDate = (date: string) => dayjs(date, isoDateFormat).format('MMM D');
 interface Comparison {
   minutes: number;
   avgPerDay: number;
-  delta: number; // minutes vs the previous period
-  avgDelta: number;
+  previousMinutes: number;
+  previousAvgPerDay: number | null; // null when nothing was logged in the previous period
   previousLabel: string; // "Sep 1 – 7"
 }
 
@@ -154,8 +154,8 @@ const compare = (from: string, to: string, prevFrom: string, prevTo: string): Co
   return {
     minutes: current.minutes,
     avgPerDay: avg(current),
-    delta: current.minutes - previous.minutes,
-    avgDelta: previous.days && current.days ? avg(current) - avg(previous) : 0,
+    previousMinutes: previous.minutes,
+    previousAvgPerDay: previous.days ? avg(previous) : null,
     previousLabel:
       prevFrom === prevTo
         ? shortDate(prevFrom)
@@ -193,41 +193,37 @@ const weekComparison = computed<Comparison | null>(() => {
   );
 });
 
-// "+4h 30m vs last week" / "same as last week" — neutral: more hours isn't better or worse by itself
-const formatDelta = (minutes: number, period: string) =>
-  minutes === 0
-    ? `same as ${period}`
-    : `${minutes > 0 ? '+' : '−'}${minutesToHourWithMinutes(Math.abs(minutes))} vs ${period}`;
-
+// One row per metric: this period and the previous one (to the same point), side by side
 const comparisonRows = computed(() => {
-  const rows: { label: string; value: string; delta: string; vs: string }[] = [];
+  const rows: { label: string; value: string; previousLabel: string; previousValue: string; vs: string }[] = [];
   const week = weekComparison.value;
   const month = monthComparison.value;
   if (week) {
     rows.push({
       label: 'This week',
       value: minutesToHourWithMinutes(week.minutes),
-      delta: formatDelta(week.delta, 'last week'),
+      previousLabel: 'Last week',
+      previousValue: minutesToHourWithMinutes(week.previousMinutes),
       vs: week.previousLabel,
     });
   }
   if (month) {
-    // A past month is compared with the month before it by name ("vs Aug")
+    // A past month is compared in full, so both months go by their names
     const viewed = dayjs(currentMonthKey.value, yearAndMonthFormat);
-    const previousMonth = viewed.isSame(now.value, 'month') ? 'last month' : viewed.subtract(1, 'month').format('MMM');
+    const isCurrent = viewed.isSame(now.value, 'month');
+    const previousMonth = isCurrent ? 'Last month' : viewed.subtract(1, 'month').format('MMMM');
     rows.push({
-      // A past month is compared in full, so it goes by its name
-      label: dayjs(currentMonthKey.value, yearAndMonthFormat).isSame(now.value, 'month')
-        ? 'This month'
-        : dayjs(currentMonthKey.value, yearAndMonthFormat).format('MMMM'),
+      label: isCurrent ? 'This month' : viewed.format('MMMM'),
       value: minutesToHourWithMinutes(month.minutes),
-      delta: formatDelta(month.delta, previousMonth),
+      previousLabel: previousMonth,
+      previousValue: minutesToHourWithMinutes(month.previousMinutes),
       vs: month.previousLabel,
     });
     rows.push({
       label: 'Avg per day',
       value: minutesToHourWithMinutes(month.avgPerDay),
-      delta: formatDelta(month.avgDelta, previousMonth),
+      previousLabel: previousMonth,
+      previousValue: month.previousAvgPerDay === null ? '—' : minutesToHourWithMinutes(month.previousAvgPerDay),
       vs: month.previousLabel,
     });
   }
@@ -366,17 +362,21 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
             </div>
 
             <!-- So far vs the same point of last week / last month; the compared dates are in the delta's tooltip -->
-            <div v-for="row in comparisonRows" :key="row.label" class="d-flex justify-space-between align-start ga-4">
-              <span class="text-medium-emphasis text-no-wrap">{{ row.label }}</span>
-              <!-- Value, with the change vs the previous period underneath -->
-              <div class="d-flex flex-column align-end text-no-wrap">
+            <!-- Two columns per row (this period | previous period, greyed); on a narrow panel the previous one
+                 wraps under the current one -->
+            <div v-for="row in comparisonRows" :key="row.label" class="comparison-row d-flex flex-wrap">
+              <div class="comparison-cell d-flex justify-space-between ga-2">
+                <span class="text-medium-emphasis">{{ row.label }}</span>
                 <span>{{ row.value }}</span>
-                <VTooltip :text="`vs ${row.vs}`" location="top">
-                  <template #activator="{ props: tooltipProps }">
-                    <span v-bind="tooltipProps" class="text-caption text-medium-emphasis">{{ row.delta }}</span>
-                  </template>
-                </VTooltip>
               </div>
+              <VTooltip :text="row.vs" location="top">
+                <template #activator="{ props: tooltipProps }">
+                  <div v-bind="tooltipProps" class="comparison-cell d-flex justify-space-between ga-2 text-medium-emphasis">
+                    <span>{{ row.previousLabel }}</span>
+                    <span>{{ row.previousValue }}</span>
+                  </div>
+                </template>
+              </VTooltip>
             </div>
           </div>
         </VCard>
@@ -518,3 +518,19 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
     </div>
   </VCard>
 </template>
+
+<style scoped>
+/* Each cell keeps its label and value on one line; when the panel can't fit two cells side by side, the
+   previous-period cell wraps under the current one */
+.comparison-row {
+  column-gap: 16px;
+  row-gap: 2px;
+}
+
+/* Equal share of the row, but never narrower than the text: a cell that can't fit wraps instead of clipping */
+.comparison-cell {
+  flex: 1 1 0;
+  min-width: max-content;
+  white-space: nowrap;
+}
+</style>

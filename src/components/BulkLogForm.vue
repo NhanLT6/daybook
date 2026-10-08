@@ -539,12 +539,11 @@ watch(
           +{{ hour }}h
         </VBtn>
 
-        <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips).
-             Filled, square-cornered button so it reads as an action, not another pill chip or a status label. -->
+        <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips) -->
         <VBtn
           v-if="remainingMinutes"
+          class="rounded-xl elevation-1 font-weight-regular"
           variant="flat"
-          color="primary"
           density="comfortable"
           prepend-icon="mdi-timer-sand"
           @click="onRemainingClick"
