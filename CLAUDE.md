@@ -52,7 +52,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Dark Theme**: Toggle in app toolbar, persisted to localStorage
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
 - **Sticky Notes**: Card-based rich-text notes tab with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch), pasted images (Blobs in a separate `daybook-images` IndexedDB, corner-drag resize, click to zoom); Chat reads notes via the client-side `searchNotes` tool and Catch-up includes open note items (see `docs/features/notes.md`)
-- **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates, incl. a holiday-aware "last work day of the month"; the Events page pairs a calendar with the list, selection linked both ways (see `docs/features/events.md`)
+- **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates, incl. a holiday-aware "last work day of the month"; the Events page pairs a calendar (with a picked-day/today card under it) with the list, selection linked both ways (see `docs/features/events.md`)
 
 ## Feature Documentation
 Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.

@@ -269,6 +269,40 @@ export function getNextOccurrence(
 }
 
 /**
+ * The occurrence that covers `day` (its start date), or null. Unlike `getOccurrences(day, day)`, which matches
+ * any occurrence whose span reaches the day, a multiple-day event only counts on its picked days, not the gaps
+ * between them.
+ */
+export function occurrenceOn(
+  event: AppEvent,
+  day: string,
+  calendar: WorkCalendar = DEFAULT_WORK_CALENDAR,
+): string | null {
+  return (
+    getOccurrences(event, day, day, calendar).find((occurrence) => {
+      const shown = atOccurrence(event, occurrence);
+      return shown.endDate && shown.endDate !== shown.date
+        ? toDay(shown.date) <= day && day <= toDay(shown.endDate)
+        : eventDays(shown).includes(day);
+    }) ?? null
+  );
+}
+
+/** The first day on or after `from` the event actually happens on (a picked day or a day of a range); null once over. */
+export function nextEventDay(
+  event: AppEvent,
+  from: string,
+  calendar: WorkCalendar = DEFAULT_WORK_CALENDAR,
+): string | null {
+  const occurrence = getNextOccurrence(event, from, calendar);
+  if (!occurrence) return null;
+  const shown = atOccurrence(event, occurrence);
+  // A range that is already running continues on `from` itself
+  if (shown.endDate && shown.endDate !== shown.date) return toDay(shown.date) > from ? toDay(shown.date) : from;
+  return eventDays(shown).find((d) => d >= from) ?? null;
+}
+
+/**
  * Copy of the event moved to a given occurrence, so date formatters/renderers work unchanged.
  * Ranges keep their length. Multiple-day events keep their spacing: monthly/yearly series keep each
  * day's day-of-month (the 5th and 20th stay the 5th and 20th), shorter ones shift by whole days.

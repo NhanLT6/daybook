@@ -22,7 +22,9 @@ test('events header stays readable and filters work on mobile', async ({ page })
   });
 
   await page.goto('/events');
-  await expect(page.locator('main').getByText('National Day')).toBeVisible({ timeout: 20000 });
+  // Scoped to the list: the day card under the calendar also names the next event
+  const list = page.locator('.event-list');
+  await expect(list.getByText('National Day')).toBeVisible({ timeout: 20000 });
 
   // Title is actually laid out, not crushed to nothing
   const box = await page.locator('.event-toolbar__title').boundingBox();
@@ -45,6 +47,6 @@ test('events header stays readable and filters work on mobile', async ({ page })
   // And they still filter
   const controls = page.locator('.event-toolbar__controls');
   await controls.getByRole('button', { name: 'Mine', exact: true }).click();
-  await expect(page.locator('main')).toContainText('Team offsite');
-  await expect(page.locator('main')).not.toContainText('National Day');
+  await expect(list).toContainText('Team offsite');
+  await expect(list).not.toContainText('National Day');
 });

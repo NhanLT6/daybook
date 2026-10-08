@@ -377,7 +377,9 @@ watch(
 <template>
   <VCard class="pa-2 ma-2 overflow-visible">
     <form ref="formEl" class="d-flex flex-column ga-2" autocomplete="off">
-      <VInput class="calendar-date-field" :error-messages="errors.selectedDates">
+      <!-- hide-details="auto": the message line only takes space when there's an error, so the calendar sits the
+           same distance from the next field as the other fields do -->
+      <VInput class="calendar-date-field" :error-messages="errors.selectedDates" hide-details="auto">
         <CalendarOverview
           v-model:selected-dates="selectedDates"
           :single-date-mode="!!editingLog"
@@ -389,24 +391,26 @@ watch(
         </template>
       </VInput>
 
-      <!-- Quick picks: one non-wrapping row that scrolls sideways, so it never grows past one line -->
+      <!-- Quick picks: one row that never grows past one line. VSlideGroup adds prev/next arrows when it overflows
+           on desktop and swipes on touch, so the hidden chips are reachable without shift + wheel. -->
       <div v-if="showQuickPicks" class="quick-picks d-flex align-center ga-2">
         <VIcon icon="mdi-lightning-bolt" size="small" class="text-medium-emphasis" />
-        <div class="quick-picks-scroll d-flex ga-2">
-          <VChip
+        <VSlideGroup class="quick-picks-slide">
+          <VBtn
             v-for="pick in recentProjectTasks"
             :key="`${pick.project} › ${pick.task}`"
             v-tooltip="{ text: `${pick.project} › ${pick.task}`, openDelay: 400 }"
-            size="small"
-            variant="tonal"
+            class="quick-chip rounded-xl font-weight-regular text-none"
+            variant="flat"
+            density="comfortable"
             @click="onQuickPick(pick)"
           >
             <template #prepend>
-              <VAvatar :color="projectColors.getProjectColor(pick.project)" size="10" start />
+              <VAvatar :color="projectColors.getProjectColor(pick.project)" size="10" />
             </template>
-            {{ pick.task }}
-          </VChip>
-        </div>
+            <span class="quick-pick-label">{{ pick.task }}</span>
+          </VBtn>
+        </VSlideGroup>
       </div>
 
       <VCombobox
@@ -519,21 +523,21 @@ watch(
         <VIcon icon="mdi-lightning-bolt" size="small" class="text-medium-emphasis time-chips-icon" />
         <div class="d-flex flex-wrap ga-2">
           <VBtn
-            class="rounded-xl elevation-1 font-weight-regular"
+            class="quick-chip rounded-xl font-weight-regular"
             variant="flat"
             density="comfortable"
             @click="onHourClick(0.25)"
             >+15m</VBtn
           >
           <VBtn
-            class="rounded-xl elevation-1 font-weight-regular"
+            class="quick-chip rounded-xl font-weight-regular"
             variant="flat"
             density="comfortable"
             @click="onHourClick(0.5)"
             >+30m</VBtn
           >
           <VBtn
-            class="rounded-xl elevation-1 font-weight-regular"
+            class="quick-chip rounded-xl font-weight-regular"
             variant="flat"
             density="comfortable"
             v-for="hour in hours"
@@ -546,7 +550,7 @@ watch(
           <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips) -->
           <VBtn
             v-if="remainingMinutes"
-            class="rounded-xl elevation-1 font-weight-regular"
+            class="quick-chip rounded-xl font-weight-regular"
             variant="flat"
             density="comfortable"
             prepend-icon="mdi-timer-sand"
@@ -583,28 +587,37 @@ watch(
   margin-top: 6px;
 }
 
-.quick-picks-scroll {
+/* Quick-action chips (time chips and quick picks): a lighter shadow than elevation-1, enough to read as
+   buttons without the heavy outline that clashed with the project colour dots */
+.quick-chip {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    0 0 1px rgba(0, 0, 0, 0.12) !important;
+}
+
+.quick-picks-slide {
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  /* Room for the chips' focus ring, which overflow would otherwise clip */
-  padding: 2px;
+  flex: 1 1 auto;
 }
 
-.quick-picks-scroll::-webkit-scrollbar {
-  display: none;
+/* Room for the chips' shadow and focus ring, which the slide group's overflow would otherwise clip */
+.quick-picks-slide :deep(.v-slide-group__content) {
+  gap: 8px;
+  padding: 3px 2px;
 }
 
-.quick-picks-scroll > * {
-  flex-shrink: 0;
+/* Slimmer arrows than the default 52px so they don't eat the row */
+.quick-picks-slide :deep(.v-slide-group__prev),
+.quick-picks-slide :deep(.v-slide-group__next) {
+  min-width: 28px;
+  flex: 0 0 28px;
 }
 
 /* Long task names truncate; the tooltip carries the full Project › Task */
-.quick-picks-scroll :deep(.v-chip) {
-  max-width: 180px;
-}
-
-.quick-picks-scroll :deep(.v-chip__content) {
+.quick-pick-label {
+  /* Task names read as text, not button caps: drop VBtn's wide letter-spacing */
+  letter-spacing: normal;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

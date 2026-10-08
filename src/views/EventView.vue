@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 
 import CalendarOverview from '@/components/CalendarOverview.vue';
+import EventDayCard from '@/components/EventDayCard.vue';
 import EventList from '@/components/EventList.vue';
 
 import dayjs from 'dayjs';
@@ -19,8 +20,14 @@ const selectedEventId = ref<string | null>(null);
 const selectedDay = computed(() => (selectedDates.value[0] ? dayjs(selectedDates.value[0]).format('YYYY-MM-DD') : null));
 const highlightEvent = computed(() => events.value.find((e) => e.id === selectedEventId.value) ?? null);
 
+// The day card shows the day last picked on the calendar, or today. Kept apart from selectedDates: selecting
+// an event clears the calendar's day, but the card should stay on the day the user is looking at.
+const pickedDay = ref<string | null>(null);
+const cardDay = computed(() => pickedDay.value ?? dayjs().format('YYYY-MM-DD'));
+
 const onSelectDates = (dates: Date[]) => {
   selectedDates.value = dates;
+  pickedDay.value = dates[0] ? dayjs(dates[0]).format('YYYY-MM-DD') : null;
   if (dates.length) selectedEventId.value = null;
 };
 
@@ -33,16 +40,21 @@ const onSelectEvent = (id: string) => {
 
 <template>
   <div class="page-fill event-page">
-    <!-- Calendar column: fixed width, opens on the month (remembered apart from Home's week/month) -->
-    <CalendarOverview
-      class="glass-acrylic event-calendar"
-      single-date-mode
-      :selected-dates="selectedDates"
-      :view-storage-key="storageKeys.settings.eventCalendarView"
-      default-view="monthly"
-      :highlight-event="highlightEvent"
-      @update:selected-dates="onSelectDates"
-    />
+    <!-- Calendar column: fixed width, opens on the month (remembered apart from Home's week/month), with the
+         picked day's (or today's) events underneath -->
+    <div class="event-side">
+      <CalendarOverview
+        class="glass-acrylic"
+        single-date-mode
+        :selected-dates="selectedDates"
+        :view-storage-key="storageKeys.settings.eventCalendarView"
+        default-view="monthly"
+        :highlight-event="highlightEvent"
+        @update:selected-dates="onSelectDates"
+      />
+
+      <EventDayCard :day="cardDay" :selected-event-id="selectedEventId" @select-event="onSelectEvent" />
+    </div>
 
     <!-- Event list takes the remaining space -->
     <EventList
@@ -60,10 +72,12 @@ const onSelectEvent = (id: string) => {
   gap: 12px;
 }
 
-/* Calendar keeps its natural height instead of the page's full-height panel rule */
-.event-page > .event-calendar {
+/* Calendar + day card keep their natural height instead of the page's full-height panel rule */
+.event-side {
   flex: 0 0 340px;
-  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   align-self: flex-start;
 }
 
@@ -79,7 +93,7 @@ const onSelectEvent = (id: string) => {
     overflow-y: auto;
   }
 
-  .event-page > .event-calendar {
+  .event-side {
     flex-basis: auto;
     align-self: stretch;
   }

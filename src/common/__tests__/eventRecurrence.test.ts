@@ -9,8 +9,10 @@ import {
   getNextOccurrence,
   getOccurrences,
   isSameRule,
+  nextEventDay,
   normalizeRule,
   nthWorkdayOfMonth,
+  occurrenceOn,
   repeatPresets,
   validateRepeat,
 } from '@/common/eventRecurrence';
@@ -402,5 +404,48 @@ describe('backToBackRule', () => {
   it('is null for anything but a range', () => {
     expect(backToBackRule({ date: '2026-10-05' })).toBeNull();
     expect(backToBackRule({ date: '2026-10-05', dates: ['2026-10-05', '2026-10-09'] })).toBeNull();
+  });
+});
+
+describe('occurrenceOn', () => {
+  it('finds a weekly occurrence on its day only', () => {
+    const weekly = event({ repeat: { freq: 'week', interval: 1 } });
+    expect(occurrenceOn(weekly, '2026-10-13')).toBe('2026-10-13');
+    expect(occurrenceOn(weekly, '2026-10-14')).toBeNull();
+  });
+
+  it('covers every day of a range, returning its start', () => {
+    const sprint = event({ endDate: '2026-10-09' });
+    expect(occurrenceOn(sprint, '2026-10-08')).toBe('2026-10-06');
+    expect(occurrenceOn(sprint, '2026-10-10')).toBeNull();
+  });
+
+  it('skips the gaps between the picked days of a multiple-day event', () => {
+    const picked = event({ dates: ['2026-10-06', '2026-10-20'] });
+    expect(occurrenceOn(picked, '2026-10-20')).toBe('2026-10-06');
+    expect(occurrenceOn(picked, '2026-10-12')).toBeNull();
+  });
+
+  it('respects skipped dates', () => {
+    const weekly = event({ repeat: { freq: 'week', interval: 1, skip: ['2026-10-13'] } });
+    expect(occurrenceOn(weekly, '2026-10-13')).toBeNull();
+  });
+});
+
+describe('nextEventDay', () => {
+  it('returns the next occurrence of a series', () => {
+    expect(nextEventDay(event({ repeat: biweekly }), '2026-10-07')).toBe('2026-10-20');
+  });
+
+  it('returns from itself while a range is running', () => {
+    expect(nextEventDay(event({ endDate: '2026-10-09' }), '2026-10-08')).toBe('2026-10-08');
+  });
+
+  it('returns the next picked day, not the start, inside a multiple-day event', () => {
+    expect(nextEventDay(event({ dates: ['2026-10-06', '2026-10-20'] }), '2026-10-12')).toBe('2026-10-20');
+  });
+
+  it('is null once the event is over', () => {
+    expect(nextEventDay(event(), '2026-10-07')).toBeNull();
   });
 });

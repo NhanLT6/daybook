@@ -45,4 +45,5 @@ One row above Project with the 5 most recently logged Project + Task pairs (`rec
 
 - Only real logs with a task, whose project still exists. Project-only logs are covered by the Project dropdown's "Recent" group.
 - Shown in create mode while Project is empty, so it disappears once the form is being filled. Hidden in edit mode and after a clone.
-- The row never wraps: it scrolls sideways, and long task names truncate (the tooltip shows `Project › Task`). It adds at most one line to the form.
+- The row never wraps. It's a `VSlideGroup`: prev/next arrows on desktop when it overflows, swipe on touch. Long task names truncate (the tooltip shows `Project › Task`). It adds at most one line to the form.
+- Quick picks and the time chips share the `quick-chip` style: white pill, lighter shadow than `elevation-1`.

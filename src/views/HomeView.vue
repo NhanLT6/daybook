@@ -7,6 +7,7 @@ import InsightsPanel from '@/components/InsightsPanel.vue';
 import LogList from '@/components/LogList.vue';
 import MobileWeekChart from '@/components/MobileWeekChart.vue';
 import NotesPanel from '@/components/NotesPanel.vue';
+import TodayEvents from '@/components/TodayEvents.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
@@ -305,6 +306,8 @@ const onAiUndoLogs = async () => {
       <VTabsWindow v-model="tab">
         <!-- Form tab: scrollable so sticky form-actions works -->
         <VTabsWindowItem value="form" class="overflow-y-auto">
+          <!-- Today's events, if any: a quiet reminder before logging -->
+          <TodayEvents class="mx-4 mt-1" />
           <BulkLogForm
             v-model:selected-dates="selectedDates"
             :editing-log="editingLog"
