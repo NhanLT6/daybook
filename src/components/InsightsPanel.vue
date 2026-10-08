@@ -367,13 +367,13 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
             <!-- Two columns per row (this period | previous period, greyed); on a narrow panel the previous one
                  wraps under the current one -->
             <div v-for="row in comparisonRows" :key="row.label" class="comparison-row d-flex flex-wrap">
-              <div class="comparison-cell d-flex justify-space-between ga-2">
+              <div class="comparison-cell d-flex ga-2">
                 <span class="text-medium-emphasis">{{ row.label }}</span>
                 <span>{{ row.value }}</span>
               </div>
               <VTooltip :text="row.vs" location="top">
                 <template #activator="{ props: tooltipProps }">
-                  <div v-bind="tooltipProps" class="comparison-cell d-flex justify-space-between ga-2 text-medium-emphasis">
+                  <div v-bind="tooltipProps" class="comparison-cell d-flex ga-2 text-medium-emphasis">
                     <span>{{ row.previousLabel }}</span>
                     <span>{{ row.previousValue }}</span>
                   </div>
@@ -522,8 +522,8 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 </template>
 
 <style scoped>
-/* Each cell keeps its label and value on one line; when the panel can't fit two cells side by side, the
-   previous-period cell wraps under the current one */
+/* Each cell is "label value", left-aligned, on one line; when the panel can't fit two cells side by side,
+   the previous-period cell wraps under the current one */
 .comparison-row {
   column-gap: 16px;
   row-gap: 2px;

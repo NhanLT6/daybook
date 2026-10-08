@@ -175,6 +175,8 @@ the rule is untouched.
   day) doesn't jump the card back to today. Each item shows its time or "All day", plus the full span for a
   multi-day range. Clicking an item selects the event, the same as clicking its row. An empty day shows
   "Nothing on" and the next event day (`nextEventDay`), "in N days" for today or "N days later" for a picked day.
+- **Today line on Home** (`TodayEvents`, top of the Form tab): today's events as small text chips with their dot
+  colour and start time. Hidden when nothing is on. Kept quiet on purpose: a glance, not a notification.
 - **Which day an event is on**: use `occurrenceOn(event, day)`, not `getOccurrences(event, day, day)`. The
   latter matches any occurrence whose span reaches the day, so a Multiple-mode event (the 5th and the 20th)
   would also count on the 12th. The day card and the list's picked-day tint both use `occurrenceOn`.
