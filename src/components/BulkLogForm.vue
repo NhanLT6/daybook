@@ -513,43 +513,48 @@ watch(
         persistent-hint
       />
 
-      <div class="d-flex flex-wrap ga-2 mb-4">
-        <VBtn
-          class="rounded-xl elevation-1 font-weight-regular"
-          variant="flat"
-          density="comfortable"
-          @click="onHourClick(0.25)"
-          >+15m</VBtn
-        >
-        <VBtn
-          class="rounded-xl elevation-1 font-weight-regular"
-          variant="flat"
-          density="comfortable"
-          @click="onHourClick(0.5)"
-          >+30m</VBtn
-        >
-        <VBtn
-          class="rounded-xl elevation-1 font-weight-regular"
-          variant="flat"
-          density="comfortable"
-          v-for="hour in hours"
-          :key="hour"
-          @click="onHourClick(hour)"
-        >
-          +{{ hour }}h
-        </VBtn>
+      <!-- Time chips; the bolt marks them as quick actions, like the quick-pick row above Project. The bolt sits in
+           its own column so wrapped chip rows line up under the first one. -->
+      <div class="d-flex align-start ga-2 mb-4">
+        <VIcon icon="mdi-lightning-bolt" size="small" class="text-medium-emphasis time-chips-icon" />
+        <div class="d-flex flex-wrap ga-2">
+          <VBtn
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            @click="onHourClick(0.25)"
+            >+15m</VBtn
+          >
+          <VBtn
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            @click="onHourClick(0.5)"
+            >+30m</VBtn
+          >
+          <VBtn
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            v-for="hour in hours"
+            :key="hour"
+            @click="onHourClick(hour)"
+          >
+            +{{ hour }}h
+          </VBtn>
 
-        <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips) -->
-        <VBtn
-          v-if="remainingMinutes"
-          class="rounded-xl elevation-1 font-weight-regular"
-          variant="flat"
-          density="comfortable"
-          prepend-icon="mdi-timer-sand"
-          @click="onRemainingClick"
-        >
-          Remaining {{ minutesToHourWithMinutes(remainingMinutes) }}
-        </VBtn>
+          <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips) -->
+          <VBtn
+            v-if="remainingMinutes"
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            prepend-icon="mdi-timer-sand"
+            @click="onRemainingClick"
+          >
+            Remaining {{ minutesToHourWithMinutes(remainingMinutes) }}
+          </VBtn>
+        </div>
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
@@ -571,6 +576,11 @@ watch(
   position: sticky;
   bottom: 4px;
   padding-top: 8px;
+}
+
+/* Centre the bolt on the first chip row (comfortable chip ≈ 32px, small icon 20px) */
+.time-chips-icon {
+  margin-top: 6px;
 }
 
 .quick-picks-scroll {

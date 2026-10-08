@@ -204,7 +204,7 @@ const comparisonRows = computed(() => {
       value: minutesToHourWithMinutes(week.minutes),
       previousLabel: 'Last week',
       previousValue: minutesToHourWithMinutes(week.previousMinutes),
-      vs: week.previousLabel,
+      vs: `${week.previousLabel}: the same days last week`,
     });
   }
   if (month) {
@@ -212,19 +212,21 @@ const comparisonRows = computed(() => {
     const viewed = dayjs(currentMonthKey.value, yearAndMonthFormat);
     const isCurrent = viewed.isSame(now.value, 'month');
     const previousMonth = isCurrent ? 'Last month' : viewed.subtract(1, 'month').format('MMMM');
+    // Months are compared day for day: last month up to today's date, or a past month against the same days before it
+    const monthVs = `${month.previousLabel}: ${isCurrent ? "last month up to today's date" : `the same days of ${previousMonth}`}`;
     rows.push({
       label: isCurrent ? 'This month' : viewed.format('MMMM'),
       value: minutesToHourWithMinutes(month.minutes),
       previousLabel: previousMonth,
       previousValue: minutesToHourWithMinutes(month.previousMinutes),
-      vs: month.previousLabel,
+      vs: monthVs,
     });
     rows.push({
       label: 'Avg per day',
       value: minutesToHourWithMinutes(month.avgPerDay),
       previousLabel: previousMonth,
       previousValue: month.previousAvgPerDay === null ? '—' : minutesToHourWithMinutes(month.previousAvgPerDay),
-      vs: month.previousLabel,
+      vs: `${monthVs}, per logged day`,
     });
   }
   return rows;
