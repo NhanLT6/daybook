@@ -587,12 +587,13 @@ watch(
   margin-top: 6px;
 }
 
-/* Quick-action chips (time chips and quick picks): a lighter shadow than elevation-1, enough to read as
-   buttons without the heavy outline that clashed with the project colour dots */
+/* Quick-action chips (time chips and quick picks): elevation-1's shape at about two-thirds of its strength,
+   enough to read as buttons without the heavy outline that clashed with the project colour dots */
 .quick-chip {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.1),
-    0 0 1px rgba(0, 0, 0, 0.12) !important;
+    0 2px 1px -1px rgba(0, 0, 0, 0.14),
+    0 1px 1px 0 rgba(0, 0, 0, 0.1),
+    0 1px 3px 0 rgba(0, 0, 0, 0.09) !important;
 }
 
 .quick-picks-slide {
