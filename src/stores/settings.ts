@@ -89,6 +89,11 @@ export const useSettingsStore = defineStore('settings', () => {
   // Weekend days configuration (dayjs day values: 0=Sunday, 1=Monday, etc.)
   const weekendDays = useStorage('weekendDays', [5, 6, 0]); // Default Fri, Sat, Sun
 
+  // Daily target: the hours a workday should add up to (Remaining chip, chart, day colours, AI "rest of
+  // the day"). Kept as an on/off flag plus the hours so turning it off ("no limit") keeps the last value.
+  const dailyTargetEnabled = useStorage('dailyTargetEnabled', true);
+  const dailyTargetHours = useStorage('dailyTargetHours', 8);
+
   const useDefaultTasks = useStorage('useDefaultTasks', true);
 
   const useCategories = useStorage('useCategories', false);
@@ -160,6 +165,8 @@ export const useSettingsStore = defineStore('settings', () => {
     dateDisplayFormat,
     firstDayOfWeek,
     weekendDays,
+    dailyTargetEnabled,
+    dailyTargetHours,
     useDefaultTasks,
     useCategories,
     rememberLastSelectedDate,

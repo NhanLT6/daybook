@@ -28,6 +28,14 @@ describe('formatEffort', () => {
   it('formats 18h as 2d 2h', () => {
     expect(formatEffort(18 * 60)).toBe('2d 2h');
   });
+
+  it('counts days in the daily target length (7.5h: 18h -> 2d 3h)', () => {
+    expect(formatEffort(18 * 60, 7.5 * 60)).toBe('2d 3h');
+  });
+
+  it('shows plain hours with no daily target', () => {
+    expect(formatEffort(18 * 60, null)).toBe('18h');
+  });
 });
 
 describe('accumulateMinutesByProject', () => {

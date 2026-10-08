@@ -14,7 +14,7 @@ import { authHeaders } from './useAuth';
 
 dayjs.extend(customParseFormat);
 
-const HOURS_PER_DAY = 8; // for the "Xd Yh" effort metric
+const DEFAULT_MINUTES_PER_DAY = 8 * 60; // for the "Xd Yh" effort metric; the user's daily target overrides it
 const LONG_RUNNING_THRESHOLD_MINUTES = 15 * 60; // 15h accumulated effort
 const LOOKBACK_WORKING_DAYS = 15; // rolling window for accumulation (~3 weeks)
 
@@ -38,10 +38,13 @@ export function deriveItemId(project: string): string {
   return hashString(project);
 }
 
-export function formatEffort(minutes: number): string {
+/** "Xd Yh" with a day as long as the daily target; plain hours when there's no target (no limit). */
+export function formatEffort(minutes: number, minutesPerDay: number | null = DEFAULT_MINUTES_PER_DAY): string {
   const totalHours = Math.round(minutes / 60);
-  const days = Math.floor(totalHours / HOURS_PER_DAY);
-  const hours = totalHours % HOURS_PER_DAY;
+  if (!minutesPerDay) return `${totalHours}h`;
+  const hoursPerDay = minutesPerDay / 60;
+  const days = Math.floor(totalHours / hoursPerDay);
+  const hours = Math.round(totalHours - days * hoursPerDay);
   const parts: string[] = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
@@ -107,13 +110,17 @@ export function accumulateMinutesByProject(logs: TimeLog[]): Map<string, number>
   return totals;
 }
 
-export function applyLines(items: CatchUpItem[], lines: { id: string; text: string }[]): CatchUpRenderItem[] {
+export function applyLines(
+  items: CatchUpItem[],
+  lines: { id: string; text: string }[],
+  minutesPerDay: number | null = DEFAULT_MINUTES_PER_DAY,
+): CatchUpRenderItem[] {
   const textById = new Map(lines.map((l) => [l.id, l.text]));
   return items.map((item) => ({
     project: item.project,
     text: textById.get(item.id) ?? item.project,
     ongoing: item.ongoing,
-    effortLabel: item.ongoing ? formatEffort(item.accumulatedMinutes) : undefined,
+    effortLabel: item.ongoing ? formatEffort(item.accumulatedMinutes, minutesPerDay) : undefined,
   }));
 }
 
@@ -229,7 +236,12 @@ function buildPlanRequestItems(plans: TimeLog[]): RequestPlan[] {
   }));
 }
 
-async function callStandupApi(all: TimeLog[], noteItems: string[], today: string): Promise<CatchUpRenderItem[] | null> {
+async function callStandupApi(
+  all: TimeLog[],
+  noteItems: string[],
+  today: string,
+  minutesPerDay: number | null,
+): Promise<CatchUpRenderItem[] | null> {
   const todayDayjs = dayjs(today).startOf('day');
 
   // Separate did logs (actual work) from plan entries
@@ -267,7 +279,7 @@ async function callStandupApi(all: TimeLog[], noteItems: string[], today: string
     noteLines?: string[];
   }>('/api/standup', { items: requestItems, plans: planItems, notes: noteItems, today }, { headers });
 
-  const didRendered = applyLines(items, response.data.lines ?? []);
+  const didRendered = applyLines(items, response.data.lines ?? [], minutesPerDay);
   const todoRendered: CatchUpRenderItem[] = (response.data.todoLines ?? []).map((l) => ({
     project: planIdToProject.get(l.id) ?? l.id,
     text: l.text,
@@ -291,10 +303,13 @@ async function callStandupApi(all: TimeLog[], noteItems: string[], today: string
   return rendered.length ? rendered : null;
 }
 
-export async function fetchCatchUpItems(): Promise<CatchUpRenderItem[] | null> {
+/** `minutesPerDay` is the user's daily target (null = no limit), the day length of the "Xd Yh" effort labels. */
+export async function fetchCatchUpItems(
+  minutesPerDay: number | null = DEFAULT_MINUTES_PER_DAY,
+): Promise<CatchUpRenderItem[] | null> {
   const all = await allLogs();
   const noteItems = await openNoteItemsFromDb();
   const cached = getCachedSummary(summaryKey(all, noteItems));
   if (cached) return cached;
-  return callStandupApi(all, noteItems, dayjs().format('YYYY-MM-DD'));
+  return callStandupApi(all, noteItems, dayjs().format('YYYY-MM-DD'), minutesPerDay);
 }

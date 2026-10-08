@@ -2,7 +2,9 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import { useCategories } from '@/composables/useCategories';
+import { useDailyTarget } from '@/composables/useDailyTarget';
 import { useProjectColors } from '@/composables/useProjectColors';
+import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
 
 import CalendarOverview from '@/components/CalendarOverview.vue';
@@ -65,6 +67,7 @@ const {
   allTasks,
   myProjects,
   sortedProjectItems,
+  recentProjectTasks,
   pinProject,
   unpinProject,
   isPinned,
@@ -260,6 +263,44 @@ const onHourClick = (hour: number) => {
   setFieldValue('duration', currentDuration + hour * 60);
 };
 
+// Remaining chip: what's left of the daily target on the one selected date. Shown only for a single workday that
+// already has logged time below the target — it's for topping a day up, not for bulk-logging empty days.
+const { logs } = useTimeLogs();
+const { targetMinutesOn } = useDailyTarget();
+const remainingMinutes = computed((): number | null => {
+  const dates = selectedDatesField.value.value ?? [];
+  if (dates.length !== 1) return null;
+
+  const date = dayjs(dates[0]).format(isoDateFormat);
+  const target = targetMinutesOn(date);
+  if (!target) return null; // no limit, weekend or holiday
+
+  // The log being edited is replaced on save, so its old duration doesn't count
+  const logged = logs.value
+    .filter((l) => l.date === date && l.id !== editingLog?.id)
+    .reduce((sum, l) => sum + (l.duration ?? 0), 0);
+  if (logged === 0) return null;
+
+  const remaining = target - logged;
+  return remaining > 0 ? remaining : null;
+});
+
+// Unlike the +time chips, Remaining replaces the duration: it is the whole amount that tops the day up
+const onRemainingClick = () => {
+  if (remainingMinutes.value) setFieldValue('duration', remainingMinutes.value);
+};
+
+// Quick picks: recent Project + Task pairs, one click fills both. Only offered while starting a fresh log
+// (create mode, Project still empty), so the row disappears as soon as the form is being filled.
+const showQuickPicks = computed(
+  () => !isEditMode.value && !projectField.value.value && recentProjectTasks.value.length > 0,
+);
+
+const onQuickPick = (pick: { project: string; task: string }) => {
+  setFieldValue('project', pick.project);
+  setFieldValue('task', pick.task);
+};
+
 // Label reflects what Save will actually do: no dates selected → plain "Save";
 // otherwise "Save"/"Plan" (duration set vs empty) + the count. One duration field
 // for the whole batch, so every date shares the same log/plan type — no mixed case.
@@ -347,6 +388,26 @@ watch(
           <span class="px-4">{{ errors.selectedDates }}</span>
         </template>
       </VInput>
+
+      <!-- Quick picks: one non-wrapping row that scrolls sideways, so it never grows past one line -->
+      <div v-if="showQuickPicks" class="quick-picks d-flex align-center ga-2">
+        <VIcon icon="mdi-lightning-bolt" size="small" class="text-medium-emphasis" />
+        <div class="quick-picks-scroll d-flex ga-2">
+          <VChip
+            v-for="pick in recentProjectTasks"
+            :key="`${pick.project} › ${pick.task}`"
+            v-tooltip="{ text: `${pick.project} › ${pick.task}`, openDelay: 400 }"
+            size="small"
+            variant="tonal"
+            @click="onQuickPick(pick)"
+          >
+            <template #prepend>
+              <VAvatar :color="projectColors.getProjectColor(pick.project)" size="10" start />
+            </template>
+            {{ pick.task }}
+          </VChip>
+        </div>
+      </div>
 
       <VCombobox
         ref="projectComboboxEl"
@@ -452,31 +513,48 @@ watch(
         persistent-hint
       />
 
-      <div class="d-flex flex-wrap ga-2 mb-4">
-        <VBtn
-          class="rounded-xl elevation-1 font-weight-regular"
-          variant="flat"
-          density="comfortable"
-          @click="onHourClick(0.25)"
-          >+15m</VBtn
-        >
-        <VBtn
-          class="rounded-xl elevation-1 font-weight-regular"
-          variant="flat"
-          density="comfortable"
-          @click="onHourClick(0.5)"
-          >+30m</VBtn
-        >
-        <VBtn
-          class="rounded-xl elevation-1 font-weight-regular"
-          variant="flat"
-          density="comfortable"
-          v-for="hour in hours"
-          :key="hour"
-          @click="onHourClick(hour)"
-        >
-          +{{ hour }}h
-        </VBtn>
+      <!-- Time chips; the bolt marks them as quick actions, like the quick-pick row above Project. The bolt sits in
+           its own column so wrapped chip rows line up under the first one. -->
+      <div class="d-flex align-start ga-2 mb-4">
+        <VIcon icon="mdi-lightning-bolt" size="small" class="text-medium-emphasis time-chips-icon" />
+        <div class="d-flex flex-wrap ga-2">
+          <VBtn
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            @click="onHourClick(0.25)"
+            >+15m</VBtn
+          >
+          <VBtn
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            @click="onHourClick(0.5)"
+            >+30m</VBtn
+          >
+          <VBtn
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            v-for="hour in hours"
+            :key="hour"
+            @click="onHourClick(hour)"
+          >
+            +{{ hour }}h
+          </VBtn>
+
+          <!-- Tops the selected day up to the daily target (replaces the duration, unlike the + chips) -->
+          <VBtn
+            v-if="remainingMinutes"
+            class="rounded-xl elevation-1 font-weight-regular"
+            variant="flat"
+            density="comfortable"
+            prepend-icon="mdi-timer-sand"
+            @click="onRemainingClick"
+          >
+            Remaining {{ minutesToHourWithMinutes(remainingMinutes) }}
+          </VBtn>
+        </div>
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
@@ -498,6 +576,38 @@ watch(
   position: sticky;
   bottom: 4px;
   padding-top: 8px;
+}
+
+/* Centre the bolt on the first chip row (comfortable chip ≈ 32px, small icon 20px) */
+.time-chips-icon {
+  margin-top: 6px;
+}
+
+.quick-picks-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Room for the chips' focus ring, which overflow would otherwise clip */
+  padding: 2px;
+}
+
+.quick-picks-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-picks-scroll > * {
+  flex-shrink: 0;
+}
+
+/* Long task names truncate; the tooltip carries the full Project › Task */
+.quick-picks-scroll :deep(.v-chip) {
+  max-width: 180px;
+}
+
+.quick-picks-scroll :deep(.v-chip__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .calendar-date-field :deep(.v-input__control),

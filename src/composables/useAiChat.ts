@@ -12,8 +12,10 @@ import { DefaultChatTransport, getToolName, isToolUIPart, lastAssistantMessageIs
 
 import { searchNotes } from '@/common/searchNotes';
 import { searchNotesInputSchema } from '@/interfaces/aiTools';
+import { useSettingsStore } from '@/stores/settings';
 
 import { authHeaders } from './useAuth';
+import { dailyTargetMinutes } from './useDailyTarget';
 import { useNotes } from './useNotes';
 
 // ── Image helper ──────────────────────────────────────────────────────────
@@ -49,6 +51,7 @@ export function extractLogsFromMessage(message: Pick<DaybookUIMessage, 'parts'>)
 // ── Composable ────────────────────────────────────────────────────────────
 
 export function useAiChat() {
+  const settingsStore = useSettingsStore();
   const error = ref<string | null>(null);
   const latestLogsMessageId = ref<string | null>(null);
   const savedLogsMessageId = ref<string | null>(null);
@@ -147,6 +150,8 @@ export function useAiChat() {
       projects: projects.map((p) => p.title),
       tasks: tasks.map((t) => ({ project: t.project, title: t.title })),
       currentDate: new Date().toISOString().split('T')[0],
+      // The user's workday length for "rest of the day" phrasing; null = no daily target
+      workdayMinutes: dailyTargetMinutes(settingsStore.dailyTargetEnabled, settingsStore.dailyTargetHours),
     };
 
     await chat.sendMessage({

@@ -18,7 +18,7 @@
 - **Vue Ecosystem**: vue, vue-router, pinia
 - **UI/UX**: vuetify, @vueuse/core, v-calendar, vue-sonner, @formkit/drag-and-drop (notes drag, mouse + touch)
 - **Notes editor**: @tiptap (core pinned to starter-kit's exact version, starter-kit, extension-list, extension-image, extension-file-handler)
-- **Charts**: chart.js, chartjs-plugin-datalabels
+- **Charts**: chart.js, chartjs-plugin-datalabels, chartjs-plugin-annotation (target line)
 - **Data Processing**: papaparse, file-saver, dayjs, lodash, rrule
 - **Forms**: vee-validate, yup
 - **HTTP**: axios
@@ -42,7 +42,8 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 ```
 
 ## Key Features
-- **Time Logging**: Individual and bulk time entry
+- **Time Logging**: Individual and bulk time entry; log form has recent Project+Task quick picks and a Remaining chip (see `docs/features/daily-target.md`)
+- **Daily Target**: Configurable workday hours (or no limit) — single source `useDailyTarget()`, never hardcode 8h (see `docs/features/daily-target.md`)
 - **Xero Integration**: Automated work logging via Playwright
 - **Jira Integration**: Ticket sync with daily auto-cache (Vercel API → jiraApi.ts → useJiraApi.ts)
 - **Calendar View**: Visual time tracking overview
@@ -58,6 +59,7 @@ Detailed docs for non-trivial features live in `docs/features/`. Read the releva
 - `docs/features/categories.md` — Category grouping for projects, VCombobox grouping pattern, BulkLogForm category rules
 - `docs/features/log-list-filters.md` — LogList filter bar (project/task/date/search), Insights↔chart project sync, panel-expansion coordination
 - `docs/features/notes.md` — Note data model + IndexedDB versioning, images (storage, compression, zoom, sweep), HTML sanitization rules, native drag & drop (reorder/trash) design, undo mechanism
+- `docs/features/daily-target.md` — Daily target setting + `useDailyTarget()` consumers, Remaining chip rules, quick picks
 - `docs/features/events.md` — Event/RepeatRule data model (no migration), `eventRecurrence.ts` date logic, work-day rules (`WorkCalendar`), repeat form rules, Events page calendar selection, skip dates, timezone/UTC-midnight and day-of-month gotchas
 
 ## Important Notes

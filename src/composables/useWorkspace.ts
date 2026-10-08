@@ -103,6 +103,24 @@ export function useWorkspace() {
       .map(([title]) => title);
   });
 
+  // Most recently logged Project + Task pairs (real logs with a task, latest work date first) for the log form's
+  // quick picks. Project-only logs are left out: the Project dropdown's "Recent" group already covers them.
+  const QUICK_PICK_LIMIT = 5;
+  const recentProjectTasks = computed((): Array<{ project: string; task: string }> => {
+    const titles = new Set(myProjects.value.map((p) => p.title));
+    const lastUsed = new Map<string, { project: string; task: string; date: string }>();
+    for (const log of logs.value) {
+      if (log.type !== 'log' || !log.task || !titles.has(log.project)) continue;
+      const key = JSON.stringify([log.project, log.task]);
+      const prev = lastUsed.get(key);
+      if (!prev || log.date > prev.date) lastUsed.set(key, { project: log.project, task: log.task, date: log.date });
+    }
+    return [...lastUsed.values()]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, QUICK_PICK_LIMIT)
+      .map(({ project, task }) => ({ project, task }));
+  });
+
   // For grouped VCombobox — flat array with injected subheader objects.
   // Order: "Pinned", then "Recent" (each item carries its category as subtitle for context when categories
   // are on), then the rest — category groups when categories are enabled, otherwise one "All projects" group.
@@ -202,6 +220,7 @@ export function useWorkspace() {
     myProjects,
     sortedProjectTitles,
     sortedProjectItems,
+    recentProjectTasks,
     pinProject,
     unpinProject,
     isPinned,

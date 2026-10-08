@@ -14,6 +14,7 @@ interface ChatApiRequest {
   projects: string[];
   tasks: Array<{ project: string; title: string }>;
   currentDate: string;
+  workdayMinutes?: number | null; // The user's daily target; null = no target. Absent from older clients → 480
 }
 
 const extractLogsTool = tool({
@@ -29,10 +30,24 @@ const searchNotesTool = tool({
   inputSchema: searchNotesInputSchema,
 });
 
+// Remainder rules depend on the user's daily target; with none set there's no "rest of the day" to compute
+function workdayRules(workdayMinutes: number | null): string {
+  if (!workdayMinutes) {
+    return `- The user has no standard workday length set, unless they state one in the message.
+- Duration remainder phrasing ("the rest", "remaining time", "rest of the day", "what's left") can only be resolved when the message states the workday length. Otherwise don't guess: ask the user how long their day was.`;
+  }
+  const rest = workdayMinutes - 15 - 60;
+  return `- The user's standard workday is ${workdayMinutes} minutes unless they state otherwise in the message.
+- Duration remainder phrasing ("the rest", "remaining time", "rest of the day", "what's left") means: workday total minus the sum of every other duration already stated in the same message. When this phrasing is present, compute the remainder and set it as that entry's duration — do not fall back to a plan entry in this case.
+  - Example: "15min daily, T-123 1hour, rest for T-456" → daily=15, T-123=60, T-456=${workdayMinutes}-15-60=${rest}.
+  - If the remainder would be zero or negative, say so in your text reply instead of calling extractLogs with a bad value.`;
+}
+
 function buildSystemPrompt(
   projects: string[],
   tasks: Array<{ project: string; title: string }>,
   currentDate: string,
+  workdayMinutes: number | null,
 ): string {
   const projectList = projects.length ? projects.join(', ') : 'none configured';
   const taskList = tasks.length ? tasks.map((t) => `  - ${t.project}: ${t.title}`).join('\n') : '  none configured';
@@ -51,10 +66,7 @@ When the user describes work they did (via text or screenshot), call the extract
 - Task is optional. Only set it when the user's message actually mentions a task; leave it unset otherwise. Do not default it to the project name.
 - Resolve relative dates ("yesterday", "this morning", "last Friday") using today's date.
 - Duration must be in minutes (integer).
-- The user's standard workday is 8 hours (480 minutes) unless they state otherwise in the message.
-- Duration remainder phrasing ("the rest", "remaining time", "rest of the day", "what's left") means: workday total minus the sum of every other duration already stated in the same message. When this phrasing is present, compute the remainder and set it as that entry's duration — do not fall back to a plan entry in this case.
-  - Example: "15min daily, T-123 1hour, rest for T-456" → daily=15, T-123=60, T-456=480-15-60=405.
-  - If the remainder would be zero or negative, say so in your text reply instead of calling extractLogs with a bad value.
+${workdayRules(workdayMinutes)}
 - Omit duration (plan entry, no time logged yet) when the user is describing future/not-yet-done work — e.g. "plan to work on T-999", "will pick up T-999", "todo: T-999" — with no remainder phrasing.
 - If a task is mentioned with no duration, no remainder phrasing, and no plan-intent wording either, don't guess — ask the user to clarify how much time (or whether it's a plan entry).
 - description is optional — use it for meaningful detail only.
@@ -95,7 +107,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = streamText({
       ...resolveAi(aiConfig),
       maxOutputTokens: MAX_OUTPUT_TOKENS,
-      system: buildSystemPrompt(body.projects, body.tasks, body.currentDate),
+      system: buildSystemPrompt(
+        body.projects,
+        body.tasks,
+        body.currentDate,
+        body.workdayMinutes === undefined ? 480 : body.workdayMinutes,
+      ),
       messages: await convertToModelMessages(body.messages),
       tools: { extractLogs: extractLogsTool, searchNotes: searchNotesTool },
     });

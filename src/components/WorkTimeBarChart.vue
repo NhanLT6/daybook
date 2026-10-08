@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, toRefs, watch } from 'vue';
 
+import { useDailyTarget } from '@/composables/useDailyTarget';
 import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
@@ -16,7 +17,10 @@ import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
 import type { TooltipItem } from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation';
 import { chain } from 'lodash';
+
+Chart.register(annotationPlugin);
 
 // Theme integration
 const theme = useTheme();
@@ -27,6 +31,8 @@ const chartColors = computed(() => ({
   gridColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
   tickColor: isDark.value ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
   legendColor: isDark.value ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)',
+  // Target line is informative only, so it sits just above the grid lines in strength
+  targetLineColor: isDark.value ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)',
   // Border between stacked segments — matches the card surface so it reads as a thin gap,
   // separating similar pastel fills without changing the palette
   segmentBorder: theme.global.current.value.colors.surface,
@@ -54,6 +60,7 @@ let chartInstance: Chart | null = null;
 // Composables
 const projectColors = useProjectColors();
 const settingsStore = useSettingsStore();
+const { targetMinutes, targetMinutesOn } = useDailyTarget();
 
 // Reactive computed properties for chart data
 const selectedMonth = computed(() => dayjs().month((currentMonth?.value ?? dayjs().month() + 1) - 1));
@@ -105,7 +112,6 @@ const chartData = computed(() => {
     // Precompute once per recompute (avoids dayjs.format in inner loops)
     const dayKeys = daysInMonth.value.map((d) => d.format(isoDateFormat));
     const weekendDay = daysInMonth.value.map((d) => settingsStore.weekendDays.includes(d.day()));
-    const isWeekendLog = (log: TimeLog) => settingsStore.weekendDays.includes(dayjs(log.date, isoDateFormat).day());
 
     // Per-day logged hours (summed then rounded once) for a set of logs, indexed by day-of-month
     const dailyHours = (logs: TimeLog[]) =>
@@ -164,14 +170,17 @@ const chartData = computed(() => {
       })
       .value();
 
-    // Remaining fills each weekday up to 8h; weekend days show only logged work
-    const loggedPerDay = dailyHours(timeLogs.value.filter((log) => !isWeekendLog(log)));
+    // No daily target ("no limit") → nothing to fill up to
+    if (targetMinutes.value === null) return { labels, datasets: loggedDataSet };
+
+    // Remaining fills each workday up to the daily target; weekends and holidays (target 0) show only logged work
+    const loggedPerDay = dailyHours(timeLogs.value);
 
     const remainingDataSet = {
       label: 'Remaining',
       backgroundColor: projectColors.remainingDataColor(),
       ...segmentBorder.value,
-      data: loggedPerDay.map((h, i) => (weekendDay[i] ? 0 : Math.max(8 - h, 0))),
+      data: loggedPerDay.map((h, i) => Math.max((targetMinutesOn(dayKeys[i]) ?? 0) / 60 - h, 0)),
     };
 
     return { labels, datasets: [...loggedDataSet, remainingDataSet] };
@@ -182,6 +191,18 @@ const chartData = computed(() => {
       datasets: [{ label: 'Error', backgroundColor: '#f44336', data: [0] }],
     };
   }
+});
+
+// Dashed target line, only in the all-projects view and only once some day goes past the target: below it the
+// Remaining bars already mark where a full day ends.
+const targetLineHours = computed((): number | null => {
+  if (props.selectedProject || targetMinutes.value === null) return null;
+  const targetHours = targetMinutes.value / 60;
+  const totals = chain(timeLogs.value)
+    .groupBy((l) => l.date)
+    .map((logs) => sumMinutesToHours(logs.map((l) => l.duration ?? 0)))
+    .value();
+  return totals.some((h) => h > targetHours) ? targetHours : null;
 });
 
 const chartOptions = computed(() => ({
@@ -198,7 +219,6 @@ const chartOptions = computed(() => ({
     y: {
       stacked: true,
       beginAtZero: true,
-      max: props.selectedProject ? undefined : 8,
       grid: {
         color: chartColors.value.gridColor,
       },
@@ -247,6 +267,31 @@ const chartOptions = computed(() => ({
           }));
         },
       },
+    },
+    annotation: {
+      annotations:
+        targetLineHours.value === null
+          ? {}
+          : {
+              target: {
+                type: 'line' as const,
+                yMin: targetLineHours.value,
+                yMax: targetLineHours.value,
+                borderColor: chartColors.value.targetLineColor,
+                borderWidth: 1,
+                borderDash: [6, 4],
+                label: {
+                  display: true,
+                  content: minutesToHourWithMinutes(targetLineHours.value * 60),
+                  position: 'start' as const,
+                  color: chartColors.value.targetLineColor,
+                  backgroundColor: 'transparent',
+                  font: { size: 10 },
+                  padding: 2,
+                  yAdjust: -8,
+                },
+              },
+            },
     },
     tooltip: {
       enabled: true,
