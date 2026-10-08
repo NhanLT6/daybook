@@ -10,7 +10,7 @@ import { omit } from 'lodash';
 
 import holidayImg from '@/assets/summer-holidays.png';
 import { formatEventDate } from '@/common/DateHelpers';
-import { atOccurrence, describeRepeat, eventDays, getNextOccurrence, getOccurrences } from '@/common/eventRecurrence';
+import { atOccurrence, describeRepeat, eventDays, getNextOccurrence, occurrenceOn } from '@/common/eventRecurrence';
 import { useEvents } from '@/composables/useEvents';
 import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
@@ -71,7 +71,7 @@ const activeIds = computed(() => {
   if (!day) return new Set(selectedEventId ? [selectedEventId] : []);
   return new Set(
     filteredEvents.value
-      .filter((row) => getOccurrences(row.event, day, day, workCalendar.value).length > 0)
+      .filter((row) => occurrenceOn(row.event, day, workCalendar.value) !== null)
       .map((row) => row.id),
   );
 });

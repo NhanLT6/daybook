@@ -170,6 +170,14 @@ the rule is untouched.
     Clicking the row again clears it. The row's action buttons stop the click.
   - Green is the selection colour on both sides, matching the calendar's selected day; dots keep their
     holiday/event colours.
+- **Day card** (`EventDayCard`, under the calendar): the events on the last day picked on the calendar, or
+  today. `EventView` keeps that day in its own `pickedDay`, so selecting an event (which clears the calendar's
+  day) doesn't jump the card back to today. Each item shows its time or "All day", plus the full span for a
+  multi-day range. Clicking an item selects the event, the same as clicking its row. An empty day shows
+  "Nothing on" and the next event day (`nextEventDay`), "in N days" for today or "N days later" for a picked day.
+- **Which day an event is on**: use `occurrenceOn(event, day)`, not `getOccurrences(event, day, day)`. The
+  latter matches any occurrence whose span reaches the day, so a Multiple-mode event (the 5th and the 20th)
+  would also count on the 12th. The day card and the list's picked-day tint both use `occurrenceOn`.
 - **Events list**: a series is one row showing its next occurrence (`getNextOccurrence` + `atOccurrence`) plus
   the `describeRepeat` summary. "Upcoming" also uses the next occurrence, so a running series appears once.
 - **Calendar**: expands occurrences only for the visible range (`getOccurrences`) — never enumerate a series
