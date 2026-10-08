@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { useDailyTarget } from '@/composables/useDailyTarget';
 import { useProjectColors } from '@/composables/useProjectColors';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
@@ -19,6 +20,7 @@ const props = defineProps<{
 
 const settingsStore = useSettingsStore();
 const { getProjectColor } = useProjectColors();
+const { targetMinutes } = useDailyTarget();
 
 // Determine the reference date for centering the displayed week.
 // Priority: selectedDates[0] if it's within currentMonth, else today if
@@ -77,11 +79,11 @@ const dayData = computed(() =>
   }),
 );
 
-// Scale: max minutes across the week, with a floor of 480 (8h) so an
-// all-light week doesn't render at 100% height and look misleading.
+// Scale: max minutes across the week, with a floor of the daily target so an all-light week doesn't render at
+// 100% height and look misleading. With no target, 1h keeps an empty week from dividing by zero.
 const maxDuration = computed(() => {
   const max = Math.max(...dayData.value.map((d) => d.totalDuration));
-  return Math.max(max, 480);
+  return Math.max(max, targetMinutes.value ?? 60);
 });
 </script>
 

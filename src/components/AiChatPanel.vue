@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import { useAiChat } from '@/composables/useAiChat';
 import { fetchCatchUpItems } from '@/composables/useCatchUpSummary';
+import { useDailyTarget } from '@/composables/useDailyTarget';
 
 import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { Project } from '@/interfaces/Project';
@@ -133,12 +134,13 @@ const clearError = () => {
 };
 
 const isCatchUpLoading = ref(false);
+const { targetMinutes } = useDailyTarget();
 
 const handleCatchUp = async () => {
   if (isCatchUpLoading.value || isLoading.value) return;
   isCatchUpLoading.value = true;
   try {
-    const items = await fetchCatchUpItems();
+    const items = await fetchCatchUpItems(targetMinutes.value);
     if (items?.length) {
       injectCatchUp(items);
     } else {

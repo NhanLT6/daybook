@@ -1,6 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 
+import { useDailyTarget } from '@/composables/useDailyTarget';
 import { useDateDisplay } from '@/composables/useDateDisplay';
 import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
 import { NO_TASK } from '@/composables/useTaskBreakdown';
@@ -106,17 +107,15 @@ const onSearchFocusChange = (focused: boolean) => {
   if (!focused && !searchText.value.trim()) searchExpanded.value = false;
 };
 
-const getColorHint = (minutes: number) => {
-  const hours = dayjs.duration({ minutes }).asHours();
+// Day total colour against the daily target: within 30 min of it → primary, over it → error. No colour on
+// weekends/holidays (target 0) or when there's no target at all.
+const { targetMinutesOn } = useDailyTarget();
+const getColorHint = (date: string, minutes: number) => {
+  const target = targetMinutesOn(date);
+  if (!target) return '';
 
-  if (hours >= 7.5 && hours <= 8) {
-    return 'primary';
-  }
-
-  if (hours > 8) {
-    return 'error';
-  }
-
+  if (minutes > target) return 'error';
+  if (minutes >= target - 30) return 'primary';
   return '';
 };
 
@@ -470,7 +469,7 @@ const readCsv = (file?: File) => {
               </span>
             </div>
 
-            <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.durationSum)" variant="text">
+            <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.date, group.durationSum)" variant="text">
               {{ minutesToHourWithMinutes(group.durationSum) }}
             </VChip>
           </VExpansionPanelTitle>

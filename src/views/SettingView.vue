@@ -299,6 +299,32 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
                 <VListItem v-bind="props" :subtitle="item.raw.description" />
               </template>
             </VSelect>
+
+            <!-- Daily target: off means no limit; the hours are kept so switching back restores them -->
+            <div class="d-flex align-start ga-4">
+              <VSwitch
+                v-model="settingsStore.dailyTargetEnabled"
+                label="Daily target"
+                color="primary"
+                persistent-hint
+                :hint="
+                  settingsStore.dailyTargetEnabled
+                    ? 'Hours a workday should add up to. Drives the Remaining chip, chart and day colours.'
+                    : 'No limit: days are not compared against a target'
+                "
+              />
+              <VNumberInput
+                v-if="settingsStore.dailyTargetEnabled"
+                v-model="settingsStore.dailyTargetHours"
+                label="Hours"
+                :min="0.5"
+                :max="24"
+                :step="0.5"
+                :precision="1"
+                control-variant="stacked"
+                style="max-width: 140px"
+              />
+            </div>
           </VCardText>
         </VCard>
 

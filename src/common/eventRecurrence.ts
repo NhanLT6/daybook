@@ -87,7 +87,7 @@ export function normalizeRule(rule: RepeatRule, date: string): RepeatRule {
   return { ...rest, monthlyOn };
 }
 
-const isWorkday = (day: Dayjs, calendar: WorkCalendar) =>
+export const isWorkday = (day: Dayjs, calendar: WorkCalendar) =>
   !calendar.weekendDays.includes(day.day()) && !calendar.holidays.has(day.format('YYYY-MM-DD'));
 
 /** The nth (or last, -1) work day of the date's month; null when the month has fewer work days. */
