@@ -40,10 +40,10 @@ const imageStyle = computed(() => {
 }
 
 .v-theme--light .app-background-static {
-  background-color: #a0abb7;
+  background-color: #a5afbb;
 }
 
 .v-theme--dark .app-background-static {
-  background-color: #37393d;
+  background-color: #313337;
 }
 </style>
