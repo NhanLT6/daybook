@@ -3,7 +3,14 @@ import type { UIMessage } from 'ai';
 
 import { convertToModelMessages, streamText, tool } from 'ai';
 
-import { extractLogsInputSchema, searchNotesInputSchema } from '../src/interfaces/aiTools.js';
+import {
+  SERVER_CHAT_COMMANDS,
+  addEventInputSchema,
+  addNoteInputSchema,
+  extractLogsInputSchema,
+  searchNotesInputSchema,
+  type ServerChatCommand,
+} from '../src/interfaces/aiTools.js';
 import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js';
 import { AI_NOT_SET_UP_MESSAGE, MAX_OUTPUT_TOKENS, aiErrorMessage, isAiAvailable, resolveAi } from './_lib/ai.js';
 import { getSettings } from './_lib/settingsRepo.js';
@@ -15,6 +22,7 @@ interface ChatApiRequest {
   tasks: Array<{ project: string; title: string }>;
   currentDate: string;
   workdayMinutes?: number | null; // The user's daily target; null = no target. Absent from older clients → 480
+  command?: string; // Slash command on the latest message (/log, /note…); absent = let the model decide
 }
 
 const extractLogsTool = tool({
@@ -29,6 +37,46 @@ const searchNotesTool = tool({
     "Read the user's sticky notes. Call this when the answer may be in their notes: reminders, open questions, what they noted about a ticket or person.",
   inputSchema: searchNotesInputSchema,
 });
+
+// No execute for these either: notes and events live in the user's browser
+const addNoteTool = tool({
+  description: 'Save a new sticky note for the user: a reminder, a to-do, a question to bring up later.',
+  inputSchema: addNoteInputSchema,
+});
+
+const addEventTool = tool({
+  description:
+    "Add a one-off event to the user's calendar: a meeting, leave, a deadline, a release. Not for repeating events.",
+  inputSchema: addEventInputSchema,
+});
+
+const TOOLS = {
+  extractLogs: extractLogsTool,
+  searchNotes: searchNotesTool,
+  addNote: addNoteTool,
+  addEvent: addEventTool,
+};
+type ToolName = keyof typeof TOOLS;
+
+// A slash command narrows the tools to the one feature the user named, so the model can't
+// file a note as a log. It can still answer in text, which is how it asks back for missing details.
+const COMMAND_TOOLS: Record<ServerChatCommand, ToolName[]> = {
+  log: ['extractLogs'],
+  note: ['addNote'],
+  event: ['addEvent'],
+  ask: ['searchNotes'],
+};
+
+const COMMAND_RULES: Record<ServerChatCommand, string> = {
+  log: 'The latest message starts with /log: it is work to log. Call extractLogs, or ask for what is missing. Do not save it as a note or event.',
+  note: "The latest message starts with /note: save the rest of it with addNote, keeping the user's wording (fix only obvious typos). Do not log time.",
+  event:
+    'The latest message starts with /event: add it with addEvent. If the date is unclear, ask. If it repeats, say repeating events are set up on the Events page.',
+  ask: 'The latest message starts with /ask: answer it from the notes with searchNotes.',
+};
+
+const parseCommand = (value: unknown): ServerChatCommand | undefined =>
+  SERVER_CHAT_COMMANDS.find((c) => c === value);
 
 // Remainder rules depend on the user's daily target; with none set there's no "rest of the day" to compute
 function workdayRules(workdayMinutes: number | null): string {
@@ -48,9 +96,12 @@ function buildSystemPrompt(
   tasks: Array<{ project: string; title: string }>,
   currentDate: string,
   workdayMinutes: number | null,
+  command: ServerChatCommand | undefined,
 ): string {
   const projectList = projects.length ? projects.join(', ') : 'none configured';
   const taskList = tasks.length ? tasks.map((t) => `  - ${t.project}: ${t.title}`).join('\n') : '  none configured';
+
+  const commandRule = command ? `\n\n${COMMAND_RULES[command]}` : '';
 
   return `You are a time log assistant for a daily work tracking app called Daybook.
 Today's date is ${currentDate}.
@@ -80,7 +131,14 @@ The user also keeps quick sticky notes: reminders, questions for the daily meeti
 - Checklist lines start with "[ ]" (still open) or "[x]" (done). An open line or a line ending in "?" is usually an open question or to-do.
 - Quote or closely paraphrase the note you rely on, with its date. If a note is ambiguous, say what it says rather than inventing details.
 - If nothing relevant is in the notes, say so plainly.
-- Do not call extractLogs from note content unless the user asks to log it.`;
+- Do not call extractLogs from note content unless the user asks to log it.
+
+Saving notes and events:
+- Call addNote when the user wants to remember something for later (a reminder, a to-do, a question for someone). Keep their wording.
+- Call addEvent when they mention a dated thing on their calendar (a meeting, leave, a deadline). Resolve relative dates using today's date. Repeating events can't be added here: point them to the Events page.
+- Work they did is a time log, not a note. If you can't tell which one they mean, ask in one short question instead of guessing.
+- After a save, confirm in a few words. The app shows an Undo button, so don't ask "are you sure".
+- A message may start with a slash command (/log, /note, /event, /ask). It tells you which one the user means.${commandRule}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -103,6 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const body = req.body as ChatApiRequest;
+    const command = parseCommand(body.command);
 
     const result = streamText({
       ...resolveAi(aiConfig),
@@ -112,9 +171,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         body.tasks,
         body.currentDate,
         body.workdayMinutes === undefined ? 480 : body.workdayMinutes,
+        command,
       ),
       messages: await convertToModelMessages(body.messages),
-      tools: { extractLogs: extractLogsTool, searchNotes: searchNotesTool },
+      tools: TOOLS,
+      ...(command ? { activeTools: COMMAND_TOOLS[command] } : {}),
     });
 
     // Stream to Node.js ServerResponse using the AI SDK helper. Failures after the stream has started

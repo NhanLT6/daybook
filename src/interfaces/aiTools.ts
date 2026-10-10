@@ -50,3 +50,47 @@ export interface SearchNotesOutput {
 }
 
 export type SearchNotesInput = z.infer<typeof searchNotesInputSchema>;
+
+/**
+ * `addNote` runs in the browser too: it saves a new sticky note (undoable from the chat).
+ * Plain text in, the client turns it into note HTML.
+ */
+export const addNoteInputSchema = z.object({
+  text: z
+    .string()
+    .min(1)
+    .describe(
+      'The note, in the user\'s own words. One line per paragraph; start a line with "[ ] " to make it a checklist item.',
+    ),
+});
+
+export type AddNoteInput = z.infer<typeof addNoteInputSchema>;
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const hhmm = z.string().regex(/^\d{2}:\d{2}$/);
+
+/** `addEvent` saves a one-off calendar marker in the browser. Repeating events stay on the Events page. */
+export const addEventInputSchema = z.object({
+  title: z.string().min(1).describe('Short event name'),
+  date: isoDate.describe('Start date, ISO YYYY-MM-DD, resolved from relative references using today'),
+  endDate: isoDate.optional().describe('Last day, only for an event spanning several days'),
+  startTime: hhmm.optional().describe('Start time HH:mm (24h). Omit for an all-day event'),
+  endTime: hhmm.optional().describe('End time HH:mm (24h), only with startTime'),
+  description: z.string().optional().describe('Optional extra detail'),
+});
+
+export type AddEventInput = z.infer<typeof addEventInputSchema>;
+
+/** What addNote / addEvent send back: the id lets the chat undo the save. */
+export interface AddedItemOutput {
+  saved: boolean;
+  id?: string;
+  error?: string;
+}
+
+/**
+ * Slash commands: the user says up front what a message is, so the model doesn't guess.
+ * `catchup` never reaches the server (it runs the existing Catch-up summary).
+ */
+export const SERVER_CHAT_COMMANDS = ['log', 'note', 'event', 'ask'] as const;
+export type ServerChatCommand = (typeof SERVER_CHAT_COMMANDS)[number];

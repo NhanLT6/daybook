@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 
+import { type ChatCommand, parseChatCommand, suggestChatCommands } from '@/common/chatCommands';
 import { useAiChat } from '@/composables/useAiChat';
 import { fetchCatchUpItems } from '@/composables/useCatchUpSummary';
 import { useDailyTarget } from '@/composables/useDailyTarget';
@@ -56,19 +57,68 @@ watch(
   },
 );
 
+// Slash command menu: open while the user is typing the command word (`/`, `/no`)
+const commandSuggestions = computed(() => suggestChatCommands(inputText.value));
+const activeSuggestion = ref(0);
+const menuDismissed = ref(false); // Esc hides the menu until the text changes
+const showCommandMenu = computed(() => commandSuggestions.value.length > 0 && !menuDismissed.value);
+
+watch(inputText, () => {
+  activeSuggestion.value = 0;
+  menuDismissed.value = false;
+});
+
+const pickCommand = (command: ChatCommand) => {
+  // catchup needs no text, so it runs straight away
+  if (command.name === 'catchup') {
+    inputText.value = '';
+    handleCatchUp();
+    return;
+  }
+  inputText.value = `/${command.name} `;
+};
+
 const handleSend = async () => {
   const text = inputText.value.trim();
   if (!text && !attachedFile.value) return;
+
+  const { command, rest } = parseChatCommand(text);
+  if (command?.name === 'catchup') {
+    inputText.value = '';
+    await handleCatchUp();
+    return;
+  }
+  // A bare command with nothing after it isn't a message yet
+  if (command && !rest && !attachedFile.value) return;
 
   const file = attachedFile.value;
   inputText.value = '';
   attachedFile.value = null;
   attachedPreview.value = null;
 
-  await sendMessage(text, file, props.projects, props.tasks);
+  await sendMessage(text, file, props.projects, props.tasks, command?.name);
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
+  if (showCommandMenu.value) {
+    const count = commandSuggestions.value.length;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeSuggestion.value = (activeSuggestion.value + (e.key === 'ArrowDown' ? 1 : count - 1)) % count;
+      return;
+    }
+    if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+      e.preventDefault();
+      pickCommand(commandSuggestions.value[activeSuggestion.value]);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      menuDismissed.value = true;
+      return;
+    }
+  }
+
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     handleSend();
@@ -126,7 +176,8 @@ const handleDiscard = (messageId: string) => {
 const handleRetry = async (messageId: string) => {
   const msg = messages.value.find((m) => m.id === messageId);
   const text = msg?.parts.find((p): p is TextUIPart => p.type === 'text')?.text ?? '';
-  await sendMessage(text, null, props.projects, props.tasks);
+  const { command } = parseChatCommand(text);
+  await sendMessage(text, null, props.projects, props.tasks, command?.name === 'catchup' ? undefined : command?.name);
 };
 
 const clearError = () => {
@@ -176,6 +227,7 @@ const handleCatchUp = async () => {
           <VIcon icon="mdi-creation" size="36" color="primary" class="mb-3" opacity="0.5" />
           <p class="text-body-2 text-medium-emphasis mb-1">Describe your work or paste a screenshot</p>
           <p class="text-caption text-disabled">e.g. "DS-1234 for 2h this morning"</p>
+          <p class="text-caption text-disabled">Type / for /log, /note, /event…</p>
         </div>
 
         <AiChatMessage
@@ -255,6 +307,27 @@ const handleCatchUp = async () => {
 
     <!-- Input area (sticky at bottom) -->
     <div class="input-area pa-3 border-t">
+      <!-- Slash command menu, floating above the input -->
+      <VCard v-if="showCommandMenu" class="command-menu" elevation="6" rounded="lg">
+        <VList density="compact" nav class="pa-1" aria-label="Commands">
+          <VListItem
+            v-for="(command, i) in commandSuggestions"
+            :key="command.name"
+            :active="i === activeSuggestion"
+            :prepend-icon="command.icon"
+            rounded="lg"
+            @mousedown.prevent
+            @click="pickCommand(command)"
+            @mouseenter="activeSuggestion = i"
+          >
+            <VListItemTitle>
+              <span class="font-weight-medium">/{{ command.name }}</span>
+              <span class="text-medium-emphasis ml-2">{{ command.hint }}</span>
+            </VListItemTitle>
+          </VListItem>
+        </VList>
+      </VCard>
+
       <div v-if="attachedPreview" class="mb-2 position-relative" style="width: fit-content">
         <VImg :src="attachedPreview" width="80" height="60" cover rounded="lg" />
 
@@ -280,7 +353,7 @@ const handleCatchUp = async () => {
 
         <VTextarea
           v-model="inputText"
-          :placeholder="isDragOver ? 'Drop image here…' : 'Describe your work…'"
+          :placeholder="isDragOver ? 'Drop image here…' : 'Describe your work, or type /'"
           rows="1"
           auto-grow
           max-rows="4"
@@ -379,7 +452,17 @@ const handleCatchUp = async () => {
 }
 
 .input-area {
+  position: relative;
   transition: background-color 0.15s ease;
+}
+
+/* Sits just above the input, full width of the panel's input row */
+.command-menu {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100% - 4px);
+  z-index: 2;
 }
 
 .drag-over {

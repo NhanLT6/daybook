@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { AddEventInput, AddNoteInput, AddedItemOutput } from '@/interfaces/aiTools';
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { FileUIPart, TextUIPart } from 'ai';
 
 import { getToolName, isToolUIPart } from 'ai';
+
+import dayjs from 'dayjs';
+
+import { parseChatCommand } from '@/common/chatCommands';
+import { removeAddedItem } from '@/composables/useAiChat';
 
 import AiLogCard from './AiLogCard.vue';
 
@@ -39,6 +45,60 @@ const displayText = computed(() =>
 const readNotes = computed(() =>
   props.message.parts.some((p) => isToolUIPart(p) && getToolName(p) === 'searchNotes'),
 );
+
+// User messages: a leading /command shows as a chip, the rest as the message text
+const userCommand = computed(() => (props.message.role === 'user' ? parseChatCommand(displayText.value) : undefined));
+const userText = computed(() => (userCommand.value?.command ? userCommand.value.rest : displayText.value));
+
+// Notes and events the model saved in this reply, each with its own Undo
+interface AddedItem {
+  key: string;
+  tool: 'addNote' | 'addEvent';
+  id: string;
+  icon: string;
+  label: string;
+}
+
+const eventLabel = (e: AddEventInput) => {
+  const fmt = (d: string) => dayjs(d).format('ddd D MMM');
+  const days = e.endDate ? `${fmt(e.date)} – ${fmt(e.endDate)}` : fmt(e.date);
+  const time = e.startTime ? ` ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : '';
+  return `${e.title} · ${days}${time}`;
+};
+
+const addedItems = computed<AddedItem[]>(() =>
+  props.message.parts.flatMap((p) => {
+    if (!isToolUIPart(p) || p.state !== 'output-available') return [];
+    const name = getToolName(p);
+    if (name !== 'addNote' && name !== 'addEvent') return [];
+    const output = p.output as AddedItemOutput;
+    if (!output.saved || !output.id) return [];
+    return [
+      name === 'addNote'
+        ? {
+            key: p.toolCallId,
+            tool: name,
+            id: output.id,
+            icon: 'mdi-note-check-outline',
+            label: (p.input as AddNoteInput).text.split('\n')[0],
+          }
+        : {
+            key: p.toolCallId,
+            tool: name,
+            id: output.id,
+            icon: 'mdi-calendar-check',
+            label: eventLabel(p.input as AddEventInput),
+          },
+    ];
+  }),
+);
+
+const undoneKeys = ref(new Set<string>());
+
+const undoAdded = async (item: AddedItem) => {
+  await removeAddedItem(item.tool, item.id);
+  undoneKeys.value = new Set(undoneKeys.value).add(item.key);
+};
 
 const tool = computed(() => props.message.metadata?.tool);
 const extractedLogs = computed(() => props.message.metadata?.extractedLogs);
@@ -91,12 +151,23 @@ const copyMessage = () => {
               max-height="160"
               cover
             />
+            <!-- Slash command chip, e.g. /note -->
+            <VChip
+              v-if="userCommand?.command"
+              size="x-small"
+              variant="flat"
+              color="primary"
+              :prepend-icon="userCommand.command.icon"
+              class="mb-1 command-chip"
+            >
+              /{{ userCommand.command.name }}
+            </VChip>
             <p
-              v-if="displayText"
+              v-if="userText"
               class="text-body-2 mb-0 message-text"
               style="white-space: pre-wrap; word-break: break-word"
             >
-              {{ displayText }}
+              {{ userText }}
             </p>
           </VCardText>
         </VCard>
@@ -202,6 +273,18 @@ const copyMessage = () => {
           </ul>
         </template>
 
+        <!-- addNote / addEvent results: what was saved, each undoable -->
+        <div v-if="addedItems.length" class="d-flex flex-column ga-1 mt-2">
+          <div v-for="item in addedItems" :key="item.key" class="added-item d-flex align-center ga-2">
+            <VIcon :icon="item.icon" size="16" :color="undoneKeys.has(item.key) ? undefined : 'primary'" />
+            <span class="text-body-2 flex-grow-1 text-truncate" :class="{ 'is-undone': undoneKeys.has(item.key) }">
+              {{ item.label }}
+            </span>
+            <span v-if="undoneKeys.has(item.key)" class="text-caption text-medium-emphasis">Removed</span>
+            <VBtn v-else size="x-small" variant="text" color="primary" @click="undoAdded(item)">Undo</VBtn>
+          </div>
+        </div>
+
         <!-- extractLogs tool result + action area -->
         <template v-if="tool === 'extractLogs' && extractedLogs?.length">
           <div class="d-flex flex-column ga-2 mt-3">
@@ -240,6 +323,19 @@ const copyMessage = () => {
 <style scoped>
 .message-card {
   word-break: break-word;
+}
+
+.command-chip {
+  font-weight: 600;
+}
+
+.added-item {
+  min-width: 0;
+}
+
+.added-item .is-undone {
+  text-decoration: line-through;
+  opacity: 0.6;
 }
 
 .catchup-list {

@@ -2,7 +2,7 @@ import { computed, ref } from 'vue';
 
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
-import type { ExtractLogsInput } from '@/interfaces/aiTools';
+import type { AddedItemOutput, ExtractLogsInput, ServerChatCommand } from '@/interfaces/aiTools';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { FileUIPart } from 'ai';
@@ -10,12 +10,16 @@ import type { FileUIPart } from 'ai';
 import { Chat } from '@ai-sdk/vue';
 import { DefaultChatTransport, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 
+import { plainTextToNoteHtml } from '@/common/plainTextToNoteHtml';
+import { sanitizeNoteHtml } from '@/common/sanitizeNoteHtml';
 import { searchNotes } from '@/common/searchNotes';
-import { searchNotesInputSchema } from '@/interfaces/aiTools';
+import { addEventInputSchema, addNoteInputSchema, searchNotesInputSchema } from '@/interfaces/aiTools';
+import { nanoid } from 'nanoid';
 import { useSettingsStore } from '@/stores/settings';
 
 import { authHeaders } from './useAuth';
 import { dailyTargetMinutes } from './useDailyTarget';
+import { useEvents } from './useEvents';
 import { useNotes } from './useNotes';
 
 // ── Image helper ──────────────────────────────────────────────────────────
@@ -48,6 +52,54 @@ export function extractLogsFromMessage(message: Pick<DaybookUIMessage, 'parts'>)
   return input?.logs ?? [];
 }
 
+// ── Client-side tools ───────────────────────────────────────────────────────
+
+// Notes and events only exist in this browser's IndexedDB, so the tools that read or
+// write them run here and send their result back to the model.
+const CLIENT_TOOLS = ['searchNotes', 'addNote', 'addEvent'] as const;
+type ClientTool = (typeof CLIENT_TOOLS)[number];
+const isClientTool = (name: string): name is ClientTool => (CLIENT_TOOLS as readonly string[]).includes(name);
+
+async function runClientTool(name: ClientTool, input: unknown) {
+  if (name === 'searchNotes') {
+    const { notes, ready } = useNotes();
+    await ready;
+    return searchNotes(notes.value, searchNotesInputSchema.parse(input));
+  }
+
+  if (name === 'addNote') {
+    const { text } = addNoteInputSchema.parse(input);
+    const { saveNote, nextTopOrder, ready } = useNotes();
+    await ready;
+    const now = Date.now();
+    const id = nanoid();
+    await saveNote({
+      id,
+      content: sanitizeNoteHtml(plainTextToNoteHtml(text)),
+      order: nextTopOrder(),
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { saved: true, id } satisfies AddedItemOutput;
+  }
+
+  const event = addEventInputSchema.parse(input);
+  // Reject what the Events form would reject, rather than storing an event the calendar can't draw
+  if (event.endDate && event.endDate < event.date) return { saved: false, error: 'endDate is before date' };
+  if (event.endTime && !event.startTime) return { saved: false, error: 'endTime needs a startTime' };
+  const { addEvent, ready } = useEvents();
+  await ready;
+  const id = nanoid();
+  await addEvent({ ...event, endDate: event.endDate === event.date ? undefined : event.endDate, id, type: 'custom' });
+  return { saved: true, id } satisfies AddedItemOutput;
+}
+
+/** Undo an addNote / addEvent save from the chat. */
+export async function removeAddedItem(tool: 'addNote' | 'addEvent', id: string) {
+  if (tool === 'addNote') await useNotes().removeNote(id);
+  else await useEvents().removeEvent(id);
+}
+
 // ── Composable ────────────────────────────────────────────────────────────
 
 export function useAiChat() {
@@ -68,29 +120,26 @@ export function useAiChat() {
       headers: async () => (await authHeaders()) ?? {},
       body: () => requestBody,
     }),
-    // searchNotes runs here because notes only exist in this browser's IndexedDB
     onToolCall: async ({ toolCall }) => {
-      if (toolCall.dynamic || toolCall.toolName !== 'searchNotes') return;
-      const { notes, ready } = useNotes();
+      if (toolCall.dynamic || !isClientTool(toolCall.toolName)) return;
+      const tool = toolCall.toolName;
       try {
-        await ready;
+        const output = await runClientTool(tool, toolCall.input);
         // Not awaited: awaiting addToolOutput inside onToolCall can deadlock the chat job queue
-        void chat.addToolOutput({
-          tool: 'searchNotes',
-          toolCallId: toolCall.toolCallId,
-          output: searchNotes(notes.value, searchNotesInputSchema.parse(toolCall.input)),
-        });
+        void chat.addToolOutput({ tool, toolCallId: toolCall.toolCallId, output } as Parameters<
+          typeof chat.addToolOutput
+        >[0]);
       } catch {
         void chat.addToolOutput({
-          tool: 'searchNotes',
+          tool,
           toolCallId: toolCall.toolCallId,
           state: 'output-error',
-          errorText: 'Could not read notes',
+          errorText: tool === 'searchNotes' ? 'Could not read notes' : 'Could not save',
         });
       }
     },
-    // Send the searchNotes result back so the model can answer. extractLogs never gets an
-    // output, so a turn that extracted logs does not resubmit.
+    // Send client tool results back so the model can answer or confirm. extractLogs never
+    // gets an output, so a turn that extracted logs does not resubmit.
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onFinish: ({ messages: finished }) => {
       const last = finished[finished.length - 1];
@@ -128,7 +177,15 @@ export function useAiChat() {
   // True while request is in-flight or tokens are arriving
   const isLoading = computed(() => chat.status === 'submitted' || chat.status === 'streaming');
 
-  const sendMessage = async (text: string, attachedFile: File | null, projects: Project[], tasks: Task[]) => {
+  // `command`: the slash command the text starts with, if any. The text keeps its `/note` prefix
+  // so the conversation history still shows what each message was.
+  const sendMessage = async (
+    text: string,
+    attachedFile: File | null,
+    projects: Project[],
+    tasks: Task[],
+    command?: ServerChatCommand,
+  ) => {
     if (!text.trim() && !attachedFile) return;
 
     error.value = null;
@@ -152,6 +209,7 @@ export function useAiChat() {
       currentDate: new Date().toISOString().split('T')[0],
       // The user's workday length for "rest of the day" phrasing; null = no daily target
       workdayMinutes: dailyTargetMinutes(settingsStore.dailyTargetEnabled, settingsStore.dailyTargetHours),
+      ...(command ? { command } : {}),
     };
 
     await chat.sendMessage({

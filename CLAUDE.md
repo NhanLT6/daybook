@@ -60,6 +60,7 @@ Detailed docs for non-trivial features live in `docs/features/`. Read the releva
 - `docs/features/log-list-filters.md` — LogList filter bar (project/task/date/search), Insights↔chart project sync, panel-expansion coordination
 - `docs/features/notes.md` — Note data model + IndexedDB versioning, images (storage, compression, zoom, sweep), HTML sanitization rules, native drag & drop (reorder/trash) design, undo mechanism
 - `docs/features/daily-target.md` — Daily target setting + `useDailyTarget()` consumers, Remaining chip rules, quick picks
+- `docs/features/chat.md` — Chat tools (extractLogs, searchNotes, addNote, addEvent; which run in the browser), slash commands and how they narrow the model's tools
 - `docs/features/events.md` — Event/RepeatRule data model (no migration), `eventRecurrence.ts` date logic, work-day rules (`WorkCalendar`), repeat form rules, Events page calendar selection, skip dates, timezone/UTC-midnight and day-of-month gotchas
 
 ## Important Notes

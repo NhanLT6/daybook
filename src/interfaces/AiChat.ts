@@ -1,4 +1,12 @@
-import type { ExtractLogsInput, ExtractedLog, SearchNotesInput, SearchNotesOutput } from './aiTools';
+import type {
+  AddEventInput,
+  AddNoteInput,
+  AddedItemOutput,
+  ExtractLogsInput,
+  ExtractedLog,
+  SearchNotesInput,
+  SearchNotesOutput,
+} from './aiTools';
 import type { CatchUpRenderItem } from './CatchUp';
 import type { UIDataTypes, UIMessage } from 'ai';
 
@@ -20,6 +28,8 @@ export interface DaybookMessageMetadata {
 export type DaybookUITools = {
   extractLogs: { input: ExtractLogsInput; output: never };
   searchNotes: { input: SearchNotesInput; output: SearchNotesOutput };
+  addNote: { input: AddNoteInput; output: AddedItemOutput };
+  addEvent: { input: AddEventInput; output: AddedItemOutput };
 };
 
 // Typed UIMessage used throughout this app

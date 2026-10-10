@@ -60,7 +60,7 @@ test('Chat answers from notes via the searchNotes tool', async ({ page }) => {
   await addNote(page, 'ask BA abt login redirect?');
 
   await page.locator('.v-tab', { hasText: 'Chat' }).click();
-  const input = page.getByPlaceholder('Describe your work…');
+  const input = page.getByPlaceholder('Describe your work');
   await input.fill('what did I note about the auth bug?');
   await input.press('Enter');
 
