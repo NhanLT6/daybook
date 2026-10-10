@@ -1271,7 +1271,7 @@ const lipHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   min-height: 40px;
 }
 .composer-spark {
-  color: rgb(var(--v-theme-primary));
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
   margin: 0 4px 11px 0;
 }
 .composer-chip {
