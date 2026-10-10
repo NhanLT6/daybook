@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat Frame Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/*
+  Handoff mock for Daybook. Lifted from monetai_flutter:
+  - docs/superpowers/mockups/2026-10-05-capture-bar-split.html (bar, layers, springs, pop)
+  - docs/superpowers/mockups/2026-10-06-voice-in-features.html (form chat card, lines, dots, turns pill)
+  Every class is prefixed `tsc-` and every rule is scoped under `.tsc-root`, so it can sit inside a
+  Vuetify app without touching global styles. Only `body.tsc-standalone` styles the demo page.
+
+  The glass: both source mocks draw it with a WebGL2 shader, not CSS. Here it is a CSS
+  translation of the shader's numbers (see README section 2). The gooey neck between pill and
+  circle (Giọt) is NOT reproduced: CSS cannot union two shapes under one backdrop-filter.
+*/
+body.tsc-standalone { margin: 0; background: #F1F3F2; padding: 24px 16px 48px }
+body.tsc-standalone.tsc-dark { background: #15181D }
+
+.tsc-root {
+  /* Demo page tokens (mock :root, capture-bar-split.html:6-24) */
+  --tsc-bg: #F1F3F2; --tsc-panel: #FFFFFF; --tsc-ink: #141D26; --tsc-muted: #5E6973; --tsc-faint: #8E98A1; --tsc-line: #DCE2E0;
+  --tsc-brand: #1FA567;
+  --tsc-body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tsc-num: "Space Grotesk", ui-monospace, monospace;
+
+  /* App tokens (APP.light, voice-in-features.html:218; Flutter values in README) */
+  --tsc-text: #141D26; --tsc-app-muted: #5E6973; --tsc-app-faint: #8E98A1; --tsc-rule: rgba(20,29,38,.12);
+  --tsc-quiet: rgba(20,29,38,.06); --tsc-mine: rgba(20,29,38,.07);
+  --tsc-send: #E0F2EA; --tsc-send-ink: #167448; --tsc-halo: rgba(255,255,255,.75);
+  --tsc-card: #FFFFFF; --tsc-coach-bg: #F1EEFE; --tsc-coach-ink: #4B3A9E;
+  --tsc-page-rgb: 247,247,247;
+
+  /* Glass, light: veil .24 of surface, light from bottom right (shader terms, README 2) */
+  --tsc-glass-blur: 3.5px;
+  --tsc-veil: rgba(255,255,255,.24);
+  --tsc-rim:
+    inset -1.5px -1.5px 1px -.5px rgba(255,255,255,.95),
+    inset 1px 1px 0 0 rgba(20,28,38,.12),
+    inset 0 0 0 1px rgba(255,255,255,.22);
+  --tsc-shadow: 0 1px 2px rgba(0,0,0,.06), 0 10px 24px rgba(0,0,0,.05);
+
+  font: 15px/1.55 var(--tsc-body); color: var(--tsc-ink);
+}
+.tsc-root[data-theme="dark"] {
+  --tsc-bg: #15181D; --tsc-panel: #1E2228; --tsc-ink: #E8ECEF; --tsc-muted: #A3ADB6; --tsc-faint: #78828C; --tsc-line: #2E343C;
+  --tsc-brand: #4CC38A;
+  --tsc-text: #E8ECEF; --tsc-app-muted: #A3ADB6; --tsc-app-faint: #78828C; --tsc-rule: rgba(232,236,239,.14);
+  --tsc-quiet: rgba(232,236,239,.08); --tsc-mine: rgba(232,236,239,.10);
+  --tsc-send: #24453D; --tsc-send-ink: #1FA567; --tsc-halo: rgba(20,22,26,.7);
+  --tsc-card: #262A31; --tsc-coach-bg: #2A2640; --tsc-coach-ink: #C9BFFF;
+  --tsc-page-rgb: 30,34,41;
+
+  /* Glass, dark: veil .42 of surface #262A31, light from top left */
+  --tsc-veil: rgba(38,42,49,.42);
+  --tsc-rim:
+    inset 1.5px 1.5px 1px -.5px rgba(255,255,255,.45),
+    inset -1px -1px 0 0 rgba(0,0,0,.08),
+    inset 0 0 0 1px rgba(255,255,255,.06);
+  --tsc-shadow: 0 6px 22px rgba(0,0,0,.08);
+  color-scheme: dark;
+}
+.tsc-root *, .tsc-root *::before, .tsc-root *::after { box-sizing: border-box }
+
+/* Layout: phone left, controls right; stacks on narrow screens */
+.tsc-wrap { max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: 393px minmax(0, 1fr); gap: 32px; align-items: start }
+@media (max-width: 860px) { .tsc-wrap { grid-template-columns: minmax(0, 1fr) } .tsc-stage { display: flex; justify-content: center } }
+.tsc-root h1 { font-size: 24px; line-height: 1.25; margin: 0 0 6px; font-weight: 700 }
+.tsc-lede { color: var(--tsc-muted); margin: 0 0 18px; font-size: 14px }
+.tsc-card { background: var(--tsc-panel); border: 1px solid var(--tsc-line); border-radius: 16px; padding: 18px; margin-bottom: 18px }
+.tsc-group { display: grid; gap: 8px; margin-bottom: 16px }
+.tsc-group:last-child { margin-bottom: 0 }
+.tsc-label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--tsc-faint); font-weight: 600 }
+.tsc-seg { display: flex; flex-wrap: wrap; gap: 6px }
+.tsc-seg button { font: 500 14px/1 var(--tsc-body); color: var(--tsc-ink); background: transparent; border: 1px solid var(--tsc-line); border-radius: 999px; padding: 9px 13px; cursor: pointer }
+.tsc-seg button[aria-pressed="true"] { border-color: var(--tsc-ink); box-shadow: inset 0 0 0 1px var(--tsc-ink) }
+.tsc-seg button:focus-visible { outline: 2px solid var(--tsc-brand); outline-offset: 2px }
+.tsc-note { font-size: 13px; color: var(--tsc-muted); margin: 0 }
+.tsc-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px currentColor; color: var(--tsc-muted); margin-bottom: 8px }
+.tsc-badge.tsc-real { color: var(--tsc-brand) }
+.tsc-badge.tsc-near { color: #B07A1A }
+
+/* The phone (mock .phone) */
+.tsc-phone { position: relative; width: 393px; max-width: 100%; height: 852px; border-radius: 44px; overflow: hidden;
+  box-shadow: 0 0 0 10px #0D1014, 0 30px 60px -20px rgba(0,0,0,.35); user-select: none; background: rgb(var(--tsc-page-rgb)); color: var(--tsc-text) }
+
+/* Illustrative page behind the glass (not from the mocks: they used screenshots) */
+.tsc-pagebg { position: absolute; inset: 0; padding: 64px 16px 0; overflow: hidden }
+.tsc-pagebg h2 { font-size: 22px; font-weight: 700; margin: 0 0 14px }
+.tsc-coach { border-radius: 20px; padding: 14px 16px; background: var(--tsc-coach-bg); color: var(--tsc-coach-ink); font-size: 14px; margin-bottom: 14px }
+.tsc-rows { background: var(--tsc-card); border-radius: 20px; padding: 4px 16px }
+.tsc-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--tsc-rule); font-size: 15px }
+.tsc-row:last-child { border-bottom: 0 }
+.tsc-row small { display: block; color: var(--tsc-app-faint); font-size: 12px }
+.tsc-row b { font: 600 15px var(--tsc-num) }
+.tsc-row b.tsc-in { color: var(--tsc-brand) }
+
+/* Edge fade: the page fades to its own colour, 82%, over the 60px above the bar (agent_surface.dart:61-64) */
+.tsc-fade { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none;
+  background: linear-gradient(to bottom,
+    rgba(var(--tsc-page-rgb), 0) 0,
+    rgba(var(--tsc-page-rgb), .128) 15px,
+    rgba(var(--tsc-page-rgb), .41) 30px,
+    rgba(var(--tsc-page-rgb), .692) 45px,
+    rgba(var(--tsc-page-rgb), .82) 60px,
+    rgba(var(--tsc-page-rgb), .82) 100%) }
+
+/* Glass shapes: CSS translation of shaders/droplet_glass.frag */
+.tsc-glass { position: absolute; pointer-events: none;
+  -webkit-backdrop-filter: blur(var(--tsc-glass-blur)); backdrop-filter: blur(var(--tsc-glass-blur));
+  background: var(--tsc-veil); box-shadow: var(--tsc-rim), var(--tsc-shadow) }
+
+/* Rows that trade places (mock .layer, .layer.off): blur 7px, scale .92, fade, 280ms ease */
+.tsc-layer { position: absolute; display: flex; align-items: center; pointer-events: none; transition: filter .28s, transform .28s, opacity .28s;
+  text-shadow: 0 0 6px var(--tsc-halo), 0 0 2px var(--tsc-halo) }
+.tsc-layer.tsc-off { filter: blur(7px); transform: scale(.92); opacity: 0 }
+.tsc-layer.tsc-off * { pointer-events: none !important }
+.tsc-hit { pointer-events: auto; cursor: pointer; display: grid; place-items: center; width: 48px; height: 48px; flex: none; border: 0; background: none; padding: 0; color: inherit; border-radius: 24px; font: inherit }
+.tsc-hit:focus-visible { outline: 2px solid var(--tsc-brand); outline-offset: -4px }
+.tsc-hit svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round }
+.tsc-disc { width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center }
+.tsc-rule { width: 1px; height: 24px; margin: 0 4px; flex: none; background: var(--tsc-rule) }
+.tsc-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 100%; color: var(--tsc-app-faint) }
+.tsc-field > span { overflow: hidden; text-overflow: ellipsis }
+.tsc-tap { pointer-events: auto; cursor: text }
+.tsc-draft { margin: 0 6px 13.5px; align-self: flex-end; flex: 1; min-width: 0; border: 0; background: none; font: 15px/21px var(--tsc-body); color: var(--tsc-text); outline: none; padding: 0; resize: none; pointer-events: auto; overflow-y: auto; scrollbar-width: none; caret-color: #1FA567; height: 21px }
+.tsc-draft::-webkit-scrollbar { display: none }
+.tsc-draft::placeholder { color: var(--tsc-app-faint) }
+.tsc-spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: tsc-spin .8s linear infinite; flex: none }
+@keyframes tsc-spin { to { transform: rotate(360deg) } }
+@keyframes tsc-pop { 0% { transform: scale(.55) } 55% { transform: scale(1.18) } 80% { transform: scale(.94) } 100% { transform: scale(1) } }
+.tsc-pop svg { animation: tsc-pop .42s cubic-bezier(.3,.7,.4,1) }
+.tsc-toast { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); background: rgba(20,29,38,.88); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 999px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .2s }
+.tsc-toast.tsc-on { opacity: 1 }
+
+/* Form chat card (voice-in-features.html:59-69) */
+#tscConv { overflow: hidden; border-radius: 30px; align-items: flex-start; text-shadow: none }
+.tsc-stack { position: absolute; left: 8px; width: 295px; display: flex; flex-direction: column; gap: 6px }
+.tsc-line { max-width: 86%; padding: 8px 12px; border-radius: 18px; font-size: 14px; line-height: 20px; text-wrap: pretty; animation: tsc-line-in .28s cubic-bezier(.2,.8,.2,1) }
+.tsc-line.tsc-ai { align-self: flex-start; background: var(--tsc-coach-bg); color: var(--tsc-coach-ink) }
+.tsc-line.tsc-me { align-self: flex-end; background: var(--tsc-mine); color: var(--tsc-text) }
+.tsc-line.tsc-hint { align-self: flex-start; padding: 2px 12px; font-size: 13px; line-height: 18px; color: var(--tsc-app-faint) }
+@keyframes tsc-line-in { from { opacity: 0; transform: translateY(6px) } }
+.tsc-dots { display: inline-flex; gap: 4px; padding: 6px 2px }
+.tsc-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .35; animation: tsc-dot 1s infinite }
+.tsc-dots i:nth-child(2) { animation-delay: .15s } .tsc-dots i:nth-child(3) { animation-delay: .3s }
+@keyframes tsc-dot { 30% { opacity: 1 } }
+
+/* Turns pill over the mic column (voice-in-features.html:53-54, 403-424) */
+.tsc-turns { position: absolute; font-size: 12px; line-height: 16px; white-space: nowrap; pointer-events: none; transition: opacity .2s;
+  padding: 3px 10px; border-radius: 999px; color: var(--tsc-app-faint); background: var(--tsc-card);
+  box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 4px 12px -4px rgba(0,0,0,.12) }
+
+@media (prefers-reduced-motion: reduce) {
+  .tsc-layer { transition: none } .tsc-spin, .tsc-line, .tsc-dots i { animation: none } .tsc-pop svg { animation: none }
+}
+</style>
+</head>
+<body class="tsc-standalone">
+<div class="tsc-root" id="tscRoot" data-theme="light">
+  <div class="tsc-wrap">
+    <div class="tsc-stage">
+      <div class="tsc-phone" id="tscPhone">
+        <div class="tsc-pagebg" aria-hidden="true">
+          <h2>Tháng 10</h2>
+          <div class="tsc-coach">Tuần này bạn chi cho ăn uống ít hơn tuần trước 12%.</div>
+          <div class="tsc-rows">
+            <div class="tsc-row"><span>Cà phê<small>Hôm nay, 08:12</small></span><b>45.000 ₫</b></div>
+            <div class="tsc-row"><span>Grab về nhà<small>Hôm nay, 19:40</small></span><b>60.000 ₫</b></div>
+            <div class="tsc-row"><span>Ăn trưa<small>Hôm qua, 12:05</small></span><b>55.000 ₫</b></div>
+            <div class="tsc-row"><span>Lương tháng 10<small>01/10</small></span><b class="tsc-in">+24.500.000 ₫</b></div>
+            <div class="tsc-row"><span>Netflix<small>05/10</small></span><b>260.000 ₫</b></div>
+            <div class="tsc-row"><span>Siêu thị<small>04/10</small></span><b>612.000 ₫</b></div>
+            <div class="tsc-row"><span>Điện<small>03/10</small></span><b>845.000 ₫</b></div>
+            <div class="tsc-row"><span>Tiền nhà<small>01/10</small></span><b>6.500.000 ₫</b></div>
+            <div class="tsc-row"><span>Gửi tiết kiệm VCB<small>30/09</small></span><b>100.000.000 ₫</b></div>
+            <div class="tsc-row"><span>Bún chả<small>29/09</small></span><b>50.000 ₫</b></div>
+            <div class="tsc-row"><span>Xăng<small>28/09</small></span><b>80.000 ₫</b></div>
+          </div>
+        </div>
+        <div class="tsc-fade" id="tscFade"></div>
+        <div class="tsc-glass" id="tscGlassP"></div>
+        <div class="tsc-glass" id="tscGlassM"></div>
+        <div id="tscUi"></div>
+        <div class="tsc-turns" id="tscTurns" aria-live="polite"></div>
+        <div class="tsc-toast" id="tscToast"></div>
+      </div>
+    </div>
+
+    <div>
+      <h1>Khung chat kính</h1>
+      <p class="tsc-lede">Dựng lại từ hai mock của monetai: thanh tách đôi (capture-bar-split) và thẻ trò chuyện trên biểu mẫu (voice-in-features). Kính ở đây là bản dịch CSS từ shader WebGL của mock, xem README mục 2.</p>
+      <div class="tsc-card">
+        <div class="tsc-group">
+          <span class="tsc-label">Trạng thái</span>
+          <div class="tsc-seg" id="tscStates"></div>
+        </div>
+        <div class="tsc-group">
+          <span class="tsc-label">Giao diện</span>
+          <div class="tsc-seg" id="tscTheme"></div>
+        </div>
+        <div class="tsc-group">
+          <span class="tsc-badge" id="tscBadge"></span>
+          <p class="tsc-note" id="tscNote"></p>
+        </div>
+      </div>
+      <div class="tsc-card">
+        <p class="tsc-note"><b>Thử:</b> chạm ô chữ để gõ, Enter để gửi, Shift+Enter xuống dòng. Trên thẻ trò chuyện, gõ rồi Enter: hiện ba chấm 1,3 giây rồi AI trả lời (như mock). Lăn chuột trên điện thoại khi đang ở thẻ: cuộn xuống thu thẻ, cuộn lên mở lại.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+// Geometry from the mocks: 393 x 852 phone, bar baseline 20px from the bottom.
+const W = 393, H = 852, L = 16, R = 377;
+const MC = 347, MR = 30, P_END = MC - MR - 10;
+const SMALL = 22; // 44px small circle: Flutter keeps 44 over the mock's 40 (spec 2026-10-05 §2)
+const LINE = 21;
+const BOTTOM = 832;
+
+const ICON = {
+  photo: '<path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M3 16l5-5c.93-.89 2.07-.89 3 0l5 5"/><path d="M14 14l1-1c.93-.89 2.07-.89 3 0l3 3"/>',
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  mic: '<path d="M9 5a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0z"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  x: '<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+  kb: '<path d="M2 8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M6 10v.01"/><path d="M10 10v.01"/><path d="M14 10v.01"/><path d="M18 10v.01"/><path d="M6 14v.01"/><path d="M18 14v.01"/><path d="M10 14h4"/>',
+  up: '<path d="M12 5v14"/><path d="M18 11l-6-6"/><path d="M6 11l6-6"/>',
+};
+const svg = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
+
+// Copy from the mocks (voice-in-features.html:229-237, 675-687).
+const SAID = {
+  said: "gửi 100 triệu Vietcombank 6 tháng",
+  ask: "Đã điền ngân hàng, số tiền, kỳ hạn. Bạn nhập thêm lãi suất nhé?",
+  byHand: "Đã nhận lãi suất 4,7% bạn nhập trên biểu mẫu.",
+  complete: "Đã nhận đủ thông tin, bạn kiểm tra lại rồi bấm ✓ để lưu.",
+  same: "Thông tin không đổi, bạn bấm ✓ để lưu nhé.",
+  reply: "Trả lời, hoặc bấm mic",
+};
+
+const STATES = [
+  ["rest", "1. Nghỉ (gần nhất với ẩn)"],
+  ["typing", "2. Đang gõ"],
+  ["expanded", "3. Mở, có tin nhắn"],
+  ["waiting", "4. Chờ AI trả lời"],
+  ["collapsed", "Thu gọn"],
+  ["waitingBar", "Chờ AI, ngoài form"],
+];
+const NOTES = {
+  rest: ["near", "Gần nhất, không phải bản gốc", "Mock không có trạng thái \"ẩn, chỉ lộ một cạnh\". Gần nhất là thanh nghỉ: pill kính cao 60px và vòng mic 60px, cách đáy 20px. Thứ tự trong pill theo Flutter hiện tại (ô chữ, ảnh, +), mock cũ đặt ảnh, form, vạch, rồi ô chữ."],
+  typing: ["real", "Có trong mock", "Đang gõ: ✕, bản nháp, Gửi (khi có chữ) trong pill; vòng nhỏ bên phải là mic. Bản nháp cao tối đa 3 dòng, pill lớn lên phía trên. Mock không có hover; trạng thái này là \"typing\"."],
+  expanded: ["real", "Có trong mock", "Thẻ trò chuyện trên biểu mẫu: dòng AI tím bên trái, dòng của bạn nền xám bên phải, dòng gợi ý không có nền. Mic nằm trong thẻ, góc dưới phải. Pill \"Còn n lượt\" ngay trên mic."],
+  waiting: ["real", "Có trong mock", "Chờ AI: dòng AI là ba chấm nhấp nháy, hàng soạn để trống, mic mờ và không bấm được. Mock ẩn pill lượt khi chờ; Flutter vẫn hiện và thay ba chấm bằng chữ \"Đang điền biểu mẫu…\"."],
+  collapsed: ["near", "Có trong mock, gần với \"chỉ lộ một cạnh\"", "Cuộn form xuống thì thẻ thu lại, chỉ còn dòng AI mới nhất và hàng soạn; pill lượt ẩn. Cuộn lên hoặc có dòng AI mới thì mở lại."],
+  waitingBar: ["real", "Có trong mock", "Chờ AI lần gửi đầu, khi chưa có thẻ: hàng trạng thái trong pill có vòng quay và \"Đang điền biểu mẫu…\" (Flutter: \"Đang đọc…\" ở Home). Mic mờ."],
+};
+
+const $ = (id) => document.getElementById(id);
+const root = $("tscRoot");
+let state = "rest", theme = "light";
+let inConv = false, collapsed = false, conv = [], draft = "", lines = 1, turnsLeft = 6, stepTimer = null;
+
+// Springs: underdamped, ratio about 0.4 (mock stepSprings, voice-in-features.html:303-316).
+const ORDER = ["P", "M"];
+const KEYS = ["cx", "cy", "hw", "hh", "r"];
+const blobs = {};
+const pill = (left, right, height) => ({ cx: (left + right) / 2, cy: BOTTOM - height / 2, hw: (right - left) / 2, hh: height / 2, r: 30 });
+const circle = (cx, radius) => ({ cx, cy: BOTTOM - 30, hw: radius, hh: radius, r: radius });
+const composerHeight = () => 60 + (lines - 1) * LINE;
+
+function convHeight() {
+  const stack = $("tscStack");
+  const full = stack.offsetHeight;
+  if (!full) return composerHeight();
+
+  const aiLines = stack.querySelectorAll(".tsc-ai");
+  const latest = aiLines[aiLines.length - 1];
+  const shown = collapsed && latest ? full - latest.offsetTop : full;
+  return composerHeight() + shown + 8;
+}
+function layout() {
+  if (inConv) return { P: pill(L, R, convHeight()) };
+  if (state === "typing") return { P: pill(L, R - 2 * SMALL - 10, composerHeight()), M: circle(R - SMALL, SMALL) };
+  return { P: pill(L, P_END, 60), M: circle(MC, MR) };
+}
+function setTargets(lay) {
+  for (const id of ORDER) {
+    const target = lay[id];
+    let blob = blobs[id];
+    if (target && !blob) {
+      const from = id === "P" ? { ...target, cx: MC - 40, hw: 6, hh: 6, r: 6 } : { ...target, hw: 0, hh: 0, r: 0 };
+      blob = blobs[id] = { alive: true, cur: from, vel: {}, tgt: { ...target } };
+      KEYS.forEach((key) => (blob.vel[key] = 0));
+    } else if (target) {
+      blob.tgt = { ...target }; blob.alive = true;
+    } else if (blob) {
+      blob.tgt = { ...blob.cur, cy: BOTTOM - 30, hw: 0, hh: 0, r: 0 };
+      blob.alive = false;
+    }
+  }
+}
+function stepSprings(dt) {
+  const stiffness = 195, damping = 11.2;
+  for (const id of ORDER) {
+    const blob = blobs[id]; if (!blob) continue;
+    for (const key of KEYS) {
+      blob.vel[key] += ((blob.tgt[key] - blob.cur[key]) * stiffness - blob.vel[key] * damping) * dt;
+      blob.cur[key] += blob.vel[key] * dt;
+    }
+    blob.cur.r = Math.max(0, Math.min(blob.cur.r, blob.cur.hw, blob.cur.hh));
+    if (!blob.alive && blob.cur.hw < 1.2) delete blobs[id];
+  }
+}
+function snap() { for (const id of ORDER) if (blobs[id]) { blobs[id].cur = { ...blobs[id].tgt }; KEYS.forEach((key) => (blobs[id].vel[key] = 0)) } }
+
+// UI layers (mock structure: one layer per row face, swapped with .tsc-off).
+$("tscUi").innerHTML = `
+  <div class="tsc-layer" id="tscConv"><div class="tsc-stack" id="tscStack" aria-live="polite"></div></div>
+  <div class="tsc-layer" id="tscRest"></div>
+  <div class="tsc-layer" id="tscReply"></div>
+  <div class="tsc-layer" id="tscComposer">
+    <button class="tsc-hit" data-act="cancel" id="tscX" aria-label="Huỷ"><span class="tsc-disc" style="background:var(--tsc-quiet);color:var(--tsc-app-muted)">${svg("x")}</span></button>
+    <textarea class="tsc-draft" id="tscTa" rows="1" aria-label="Bản nháp, nói hoặc gõ"></textarea>
+    <button class="tsc-hit" data-act="send" id="tscSend" aria-label="Gửi"><span class="tsc-disc" style="background:var(--tsc-send);color:var(--tsc-send-ink)">${svg("up")}</span></button>
+  </div>
+  <div class="tsc-layer" id="tscStatus"></div>
+  <div class="tsc-layer" id="tscM"></div>`;
+const ta = $("tscTa");
+
+function paintConv() {
+  $("tscStack").innerHTML = conv.map((item) => {
+    const body = item.thinking ? '<span class="tsc-dots" aria-label="Đang điền biểu mẫu"><i></i><i></i><i></i></span>' : item.text;
+    return `<div class="tsc-line tsc-${item.who}">${body}</div>`;
+  }).join("");
+  $("tscStack").style.bottom = composerHeight() + "px";
+}
+
+function paintLayers() {
+  const typing = state === "typing";
+  const waiting = state === "waiting" || state === "waitingBar";
+  $("tscRest").innerHTML = `<span class="tsc-field tsc-tap" data-act="type"><span>Nhập hoặc nói</span></span>`
+    + `<button class="tsc-hit" data-act="photo" aria-label="Chụp hoặc chọn ảnh" style="color:var(--tsc-app-muted)">${svg("photo")}</button>`
+    + `<button class="tsc-hit" data-act="form" aria-label="Tự điền form" style="color:var(--tsc-text)">${svg("plus")}</button><span style="width:4px"></span>`;
+  $("tscReply").innerHTML = `<span class="tsc-field tsc-tap" data-act="type" style="padding-left:20px;padding-right:60px"><span>${SAID.reply}</span></span>`;
+  $("tscStatus").innerHTML = state === "waiting"
+    ? `<span class="tsc-field"></span>`
+    : `<span class="tsc-field"><span class="tsc-spin"></span><span>Đang điền biểu mẫu…</span></span>`;
+
+  const glyph = waiting
+    ? `<span class="tsc-hit" style="color:var(--tsc-app-faint);pointer-events:none">${svg("mic")}</span>`
+    : `<button class="tsc-hit" data-act="mic" aria-label="Nói" style="color:var(--tsc-text)">${svg("mic")}</button>`;
+  $("tscM").innerHTML = glyph;
+  // Inside the card the mic is a quiet disc, like ✕, not a second droplet.
+  if (inConv) {
+    const disc = $("tscM").querySelector(".tsc-hit");
+    disc.innerHTML = `<span class="tsc-disc" style="background:var(--tsc-quiet)">${disc.innerHTML}</span>`;
+  }
+
+  const show = (id, on) => $(id).classList.toggle("tsc-off", !on);
+  show("tscConv", inConv);
+  show("tscRest", state === "rest" && !inConv);
+  show("tscReply", inConv && (state === "expanded" || state === "collapsed"));
+  show("tscComposer", typing);
+  show("tscStatus", waiting);
+  show("tscM", true);
+  $("tscSend").style.display = draft.trim() ? "" : "none";
+  ta.placeholder = inConv ? SAID.reply : "cà phê 45k, grab 60k";
+
+  const turns = $("tscTurns");
+  turns.textContent = `Còn ${turnsLeft} lượt hôm nay`;
+  turns.style.opacity = inConv && !collapsed && !waiting ? 1 : 0;
+}
+
+function place(id, blob, bottomRow) {
+  const el = $(id); if (!blob) return;
+  const box = blob.cur;
+  const height = 2 * box.hh, rowHeight = bottomRow ? Math.min(height, 60) : height;
+  Object.assign(el.style, { left: (box.cx - box.hw) + "px", top: (box.cy + box.hh - rowHeight) + "px", width: Math.max(0, 2 * box.hw) + "px", height: rowHeight + "px" });
+}
+function placeGlass(id, blob) {
+  const el = $(id);
+  if (!blob) { el.style.display = "none"; return }
+  const box = blob.cur;
+  Object.assign(el.style, { display: "", left: (box.cx - box.hw) + "px", top: (box.cy - box.hh) + "px", width: Math.max(0, 2 * box.hw) + "px", height: Math.max(0, 2 * box.hh) + "px", borderRadius: Math.max(0, Math.min(box.r, box.hw, box.hh)) + "px" });
+}
+function placeLayers() {
+  placeGlass("tscGlassP", blobs.P);
+  placeGlass("tscGlassM", blobs.M);
+  for (const id of ["tscConv", "tscComposer"]) place(id, blobs.P, false);
+  for (const id of ["tscRest", "tscReply", "tscStatus"]) place(id, blobs.P, true);
+  if (inConv && blobs.P) {
+    const box = blobs.P.cur;
+    Object.assign($("tscM").style, { left: (box.cx + box.hw - 54) + "px", top: (box.cy + box.hh - 54) + "px", width: "48px", height: "48px", justifyContent: "center" });
+    Object.assign($("tscTurns").style, { right: (W - (box.cx + box.hw) + 4) + "px", top: (box.cy - box.hh - 28) + "px" });
+  } else if (blobs.M) {
+    place("tscM", blobs.M, false);
+    $("tscM").style.justifyContent = "center";
+  }
+  Object.assign($("tscComposer").style, { padding: `0 ${inConv ? 54 : 6}px 6px 6px`, alignItems: "flex-end" });
+
+  // The fade follows the bar's top edge: 60px of ramp above it.
+  const tops = ORDER.filter((id) => blobs[id]).map((id) => blobs[id].cur.cy - blobs[id].cur.hh);
+  const barTop = tops.length ? Math.min(...tops) : BOTTOM - 60;
+  $("tscFade").style.height = (H - barTop + 60) + "px";
+}
+
+function measure() {
+  ta.style.height = "21px";
+  const next = Math.max(1, Math.min(3, Math.round(ta.scrollHeight / LINE)));
+  ta.style.height = next * LINE + "px";
+  ta.scrollTop = ta.scrollHeight;
+  if (next !== lines) { lines = next; $("tscStack").style.bottom = composerHeight() + "px"; setTargets(layout()) }
+}
+
+// Each switcher state is built the way a user reaches it in the mock.
+function scene(next) {
+  clearTimeout(stepTimer);
+  const wasConv = inConv;
+  collapsed = false;
+  if (next === "rest" || next === "waitingBar") { inConv = false; conv = []; draft = "" }
+  if (next === "typing") { if (!inConv) draft = "ăn trưa 45k" }
+  if (next === "expanded" || next === "collapsed") {
+    inConv = true;
+    conv = [{ who: "me", text: SAID.said }, { who: "ai", text: SAID.ask }, { who: "hint", text: SAID.byHand }, { who: "ai", text: SAID.complete }];
+    collapsed = next === "collapsed";
+    draft = "";
+  }
+  if (next === "waiting") {
+    inConv = true;
+    conv = [{ who: "me", text: SAID.said }, { who: "ai", text: SAID.ask }, { who: "me", text: "4,7" }, { who: "ai", thinking: true }];
+    draft = "";
+  }
+  if (!wasConv && inConv) { /* the pill grows into the card in place */ }
+  setState(next);
+}
+function setState(next) {
+  const was = state;
+  state = next;
+  ta.value = draft; lines = 1;
+  paintConv();
+  paintLayers();
+  measure();
+  setTargets(layout());
+  if (was !== next && (next === "typing" || was === "typing")) bounce();
+  if (next === "typing") setTimeout(() => { ta.focus({ preventScroll: true }); ta.setSelectionRange(ta.value.length, ta.value.length) }, 60);
+  renderSeg();
+  history.replaceState(null, "", `?state=${state}&theme=${theme}`);
+}
+function bounce() {
+  const mic = blobs.M, bar = blobs.P;
+  if (mic) { mic.cur.hw = mic.cur.hh = mic.cur.r = mic.tgt.hw * .72; mic.vel.hw = mic.vel.hh = mic.vel.r = 160 }
+  if (bar) { bar.vel.hh += 70; bar.vel.cy -= 35 }
+  const icon = $("tscM");
+  icon.classList.remove("tsc-pop"); void icon.offsetWidth; icon.classList.add("tsc-pop");
+}
+
+// Sending on the card: the user's line, then dots, then the AI line after 1.3s (mock send/resolve).
+function send() {
+  const said = draft.trim();
+  if (!said) return;
+  if (!inConv) { toast("Đã gửi"); draft = ""; return setState("rest") }
+  turnsLeft = Math.max(0, turnsLeft - 1);
+  conv.push({ who: "me", text: said }, { who: "ai", thinking: true });
+  draft = "";
+  setState("waiting");
+  stepTimer = setTimeout(() => {
+    conv.pop();
+    conv.push({ who: "ai", text: SAID.same });
+    setState("expanded");
+  }, 1300);
+}
+
+let toastTimer;
+function toast(message) { const el = $("tscToast"); el.textContent = message; el.classList.add("tsc-on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("tsc-on"), 1800) }
+
+function act(name) {
+  if (name === "type") return setState("typing");
+  if (name === "cancel") { draft = ""; return setState(inConv ? "expanded" : "rest") }
+  if (name === "send") return send();
+  if (name === "mic") return toast("Mock này không ghi âm: xem bản gốc");
+  if (name === "photo") return toast("Chụp hoặc chọn ảnh");
+  if (name === "form") return toast("Mở form im lặng, không qua AI");
+}
+$("tscPhone").addEventListener("click", (event) => {
+  const target = event.target.closest("[data-act]");
+  if (target) { event.preventDefault(); act(target.dataset.act) }
+});
+ta.addEventListener("input", () => { draft = ta.value; measure(); $("tscSend").style.display = draft.trim() ? "" : "none" });
+ta.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send() } });
+
+// Scroll on the card: down folds it to the latest AI line, up opens it (voice-in-features.html:593-623).
+$("tscPhone").addEventListener("wheel", (event) => {
+  if (!inConv || state === "waiting" || state === "typing") return;
+  event.preventDefault();
+  const fold = event.deltaY > .5 ? true : event.deltaY < -.5 ? false : collapsed;
+  if (fold !== collapsed) { collapsed = fold; state = fold ? "collapsed" : "expanded"; paintLayers(); setTargets(layout()); renderSeg() }
+}, { passive: false });
+
+// Controls
+function renderSeg() {
+  $("tscStates").innerHTML = STATES.map(([value, label]) => `<button type="button" data-v="${value}" aria-pressed="${value === state}">${label}</button>`).join("");
+  $("tscTheme").innerHTML = [["light", "Sáng"], ["dark", "Tối"]].map(([value, label]) => `<button type="button" data-v="${value}" aria-pressed="${value === theme}">${label}</button>`).join("");
+  const [kind, badge, note] = NOTES[state];
+  $("tscBadge").textContent = badge;
+  $("tscBadge").className = "tsc-badge " + (kind === "real" ? "tsc-real" : "tsc-near");
+  $("tscNote").textContent = note;
+}
+$("tscStates").addEventListener("click", (event) => { const button = event.target.closest("button"); if (button) scene(button.dataset.v) });
+$("tscTheme").addEventListener("click", (event) => { const button = event.target.closest("button"); if (button) setTheme(button.dataset.v) });
+function setTheme(next) {
+  theme = next;
+  root.dataset.theme = next;
+  document.body.classList.toggle("tsc-dark", next === "dark");
+  renderSeg();
+  history.replaceState(null, "", `?state=${state}&theme=${theme}`);
+}
+
+// Loop: springs step in real time with two sub-steps, as the mock.
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(1 / 20, (now - last) / 1000); last = now;
+  stepSprings(dt / 2); stepSprings(dt / 2);
+  if (reduced) snap();
+  placeLayers();
+  requestAnimationFrame(frame);
+}
+
+const params = new URLSearchParams(location.search);
+setTheme(params.get("theme") === "dark" ? "dark" : "light");
+scene(NOTES[params.get("state")] ? params.get("state") : "rest");
+// The first state appears settled; later changes animate.
+requestAnimationFrame(() => { setTargets(layout()); snap(); placeLayers(); requestAnimationFrame(frame) });
+})();
+</script>
+</body>
+</html>

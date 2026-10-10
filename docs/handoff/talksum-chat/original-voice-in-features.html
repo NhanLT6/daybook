@@ -1,0 +1,874 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice in Features</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* A working phone on the left (real sheet captures behind the approved glass bar), notes beside it. */
+:root {
+  --bg: #F1F3F2; --panel: #FFFFFF; --ink: #141D26; --muted: #5E6973; --faint: #8E98A1; --line: #DCE2E0;
+  --brand: #1FA567; --brand-soft: #E6F3EB; --warn: #8A6114;
+  --body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --num: "Space Grotesk", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15181D; --panel: #1E2228; --ink: #E8ECEF; --muted: #A3ADB6; --faint: #78828C;
+  --line: #2E343C; --brand: #4CC38A; --brand-soft: #20302A; --warn: #E0B25C; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15181D; --panel: #1E2228; --ink: #E8ECEF; --muted: #A3ADB6; --faint: #78828C;
+  --line: #2E343C; --brand: #4CC38A; --brand-soft: #20302A; --warn: #E0B25C; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); padding-inline: 16px; padding-block: 24px 48px; margin: 0 }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 393px minmax(0, 1fr); gap: 32px; align-items: start }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr) } }
+h1 { font-size: 26px; line-height: 1.25; margin: 0 0 6px; text-wrap: balance; font-weight: 700 }
+h2 { font-size: 17px; margin: 0 0 10px; font-weight: 600 }
+.lede { color: var(--muted); margin: 0 0 22px; max-width: 62ch }
+.stage { position: sticky; top: 16px }
+@media (max-width: 860px) { .stage { position: static; display: flex; justify-content: center } }
+
+/* The phone */
+.phone { position: relative; width: 393px; max-width: 100%; height: 852px; border-radius: 44px; overflow: hidden;
+  box-shadow: 0 0 0 10px #0D1014, 0 30px 60px -20px rgba(0,0,0,.35); user-select: none; background: #F6F7F7 }
+.phone canvas { position: absolute; inset: 0; width: 100%; height: 100% }
+.layer { position: absolute; display: flex; align-items: center; pointer-events: none; transition: filter .28s, transform .28s, opacity .28s }
+.layer.off { filter: blur(7px); transform: scale(.92); opacity: 0; pointer-events: none !important }
+.layer.off * { pointer-events: none !important }
+.hit { pointer-events: auto; cursor: pointer; display: grid; place-items: center; width: 48px; height: 48px; flex: none; border: 0; background: none; padding: 0; color: inherit; border-radius: 24px }
+.hit:focus-visible { outline: 2px solid var(--brand); outline-offset: -4px }
+.hit svg, .ico svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round }
+.disc { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center }
+#plusCover { position: absolute; left: 329px; top: 84px; width: 48px; height: 48px; border-radius: 24px; pointer-events: none }
+.rule { width: 1px; height: 24px; margin: 0 4px; flex: none }
+.field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 100% }
+.field > span { overflow: hidden; text-overflow: ellipsis }
+.tap { pointer-events: auto; cursor: text }
+textarea.draft { margin: 0 6px 13.5px; align-self: flex-end; flex: 1; min-width: 0; border: 0; background: none; font: 15px/21px var(--body); color: inherit; outline: none; padding: 0; resize: none; pointer-events: auto; overflow-y: auto; scrollbar-width: none }
+textarea.draft::-webkit-scrollbar { display: none }
+textarea.draft[readonly] { cursor: pointer; caret-color: transparent }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; flex: none }
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes pop { 0% { transform: scale(.55) } 55% { transform: scale(1.18) } 80% { transform: scale(.94) } 100% { transform: scale(1) } }
+.pop svg { animation: pop .42s cubic-bezier(.3,.7,.4,1) }
+#freeHint { position: absolute; font-size: 12px; line-height: 16px; white-space: nowrap; pointer-events: none; transition: opacity .2s }
+#freeHint.pill { padding: 3px 10px; border-radius: 999px }
+.toast { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); background: rgba(20,29,38,.88); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 999px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .2s }
+.toast.on { opacity: 1 }
+
+/* Proposed new pieces drawn over the real captures */
+#lyConv { overflow: hidden; border-radius: 30px; align-items: flex-start }
+.stack { position: absolute; left: 8px; width: 295px; display: flex; flex-direction: column; gap: 6px }
+.line { max-width: 86%; padding: 8px 12px; border-radius: 18px; font-size: 14px; line-height: 20px; text-wrap: pretty; text-shadow: none; animation: lineIn .28s cubic-bezier(.2,.8,.2,1) }
+.line.ai { align-self: flex-start }
+.line.me { align-self: flex-end }
+.line.hint { align-self: flex-start; padding: 2px 12px; font-size: 13px; line-height: 18px }
+@keyframes lineIn { from { opacity: 0; transform: translateY(6px) } }
+.dots { display: inline-flex; gap: 4px; padding: 6px 2px }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .35; animation: dot 1s infinite }
+.dots i:nth-child(2) { animation-delay: .15s } .dots i:nth-child(3) { animation-delay: .3s }
+@keyframes dot { 30% { opacity: 1 } }
+.formHit { position: absolute; top: 84px; width: 48px; height: 48px; border-radius: 24px; border: 0; padding: 0; background: none; pointer-events: auto; cursor: pointer; display: none }
+.formHit:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px }
+.ask { position: absolute; left: 16px; right: 16px; bottom: 104px; border-radius: 16px; padding: 14px; font-size: 14px; line-height: 1.45; opacity: 0; transform: translateY(8px); transition: opacity .22s, transform .22s; pointer-events: none }
+.ask.on { opacity: 1; transform: none; pointer-events: auto }
+.ask .row { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end }
+.ask button { font: 500 14px/1 var(--body); border-radius: 999px; padding: 10px 14px; border: 0; cursor: pointer }
+.badge { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 3px 8px; border-radius: 999px; background: rgba(124,92,255,.14); color: #6A4FE0; pointer-events: none; white-space: nowrap }
+.nogl { position: absolute; inset: auto 16px 120px; padding: 12px; background: #fff; border-radius: 12px; font-size: 13px }
+
+/* Controls */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 18px }
+.group { display: grid; gap: 8px; margin-bottom: 16px }
+.group:last-child { margin-bottom: 0 }
+.label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); font-weight: 600 }
+.seg { display: flex; flex-wrap: wrap; gap: 6px }
+.seg button { font: 500 14px/1 var(--body); color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 9px 13px; cursor: pointer }
+.seg button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink) }
+.seg button:disabled { opacity: .35; cursor: default }
+.seg button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px }
+.hint { font-size: 13px; color: var(--muted); margin: 0 }
+table { border-collapse: collapse; width: 100%; font-size: 14px }
+th, td { text-align: left; vertical-align: top; padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line) }
+th { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); font-weight: 600 }
+.scroll { overflow-x: auto }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); white-space: nowrap }
+.tag.ask { position: static; opacity: 1; transform: none; background: transparent; color: var(--warn); box-shadow: inset 0 0 0 1px currentColor; padding: 2px 8px; border-radius: 999px; font-size: 12px }
+code { font-family: var(--num); font-size: 13px }
+ol.hint { padding-left: 18px; margin: 8px 0 0 }
+@media (prefers-reduced-motion: reduce) { .layer, .ask { transition: none } .spin, .line, .dots i { animation: none } }
+</style>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="phone" id="phone">
+      <canvas id="gl"></canvas>
+      <div id="plusCover"></div>
+      <button class="formHit" id="backHit" style="left:16px" data-act="back" aria-label="Quay lại"></button>
+      <button class="formHit" id="saveHit" style="left:329px" data-act="save" aria-label="Lưu"></button>
+      <div id="ui"></div>
+      <div class="ask" id="ask"></div>
+      <div class="toast" id="toast"></div>
+      <div id="freeHint" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div>
+    <h1>Nói ngay trong tính năng</h1>
+    <p class="lede">Nút voice trong Sổ tiết kiệm, Định kỳ, Sổ nợ và Chuyến đi. Nền là sheet thật chụp từ app, thanh là bản kính đã chốt ở Home. Bấm mic để nghe câu mẫu, im 1,6 giây là tự gửi, form thêm mới mở ra đã điền sẵn và thanh thành cuộc trò chuyện với form.</p>
+
+    <div class="card">
+      <div class="group">
+        <span class="label">Tính năng</span>
+        <div class="seg" id="feature"></div>
+      </div>
+      <div class="group">
+        <span class="label">Đặt nút ở đâu</span>
+        <div class="seg" id="place"></div>
+      </div>
+      <div class="group">
+        <span class="label">Trạng thái</span>
+        <div class="seg" id="states"></div>
+      </div>
+      <div class="group">
+        <span class="label">Cuộn form</span>
+        <div class="seg" id="scroll"></div>
+        <p class="hint">Trên form, lăn chuột hoặc kéo form lên xuống để cuộn.</p>
+      </div>
+      <div class="group">
+        <span class="label">Giao diện app</span>
+        <div class="seg" id="theme"></div>
+      </div>
+      <p class="hint" id="placeHint"></p>
+    </div>
+
+    <div class="card">
+      <h2>Luồng đề xuất</h2>
+      <ol class="hint">
+        <li><b>Vào:</b> mở tính năng từ Home như hiện nay. Đáy sheet có thanh tách đôi giống Home: pill là ô "Nhập hoặc nói" với câu mẫu của đúng tính năng đó, vòng tròn là mic. Nút + trên đầu sheet dời xuống cuối pill, cạnh mic: một chỗ để nhập, nút form vẫn là đường im lặng mở form trống.</li>
+        <li><b>Home cũng vậy:</b> Home dời + vào cuối pill, cạnh mic, cùng một ngữ pháp với thanh ở đây. Home không có trong mock này.</li>
+        <li><b>Nói hoặc gõ:</b> y hệt Home, cùng bản nháp, cùng ✕ và Gửi, im 1,6 giây tự gửi.</li>
+        <li><b>Hiểu câu:</b> AI chỉ được trả về loại bản ghi của tính năng đang mở, nên câu "100 triệu" trong Sổ tiết kiệm luôn là tiền gửi, không bị đoán thành khoản chi.</li>
+        <li><b>Trò chuyện với form:</b> form thêm mới mở ra đã điền sẵn, và pill lớn lên thành cuộc trò chuyện ngay trên form. Dòng của AI màu tím, nằm bên trái; dòng của bạn nền xám nhạt, nằm bên phải; không có đuôi, không có thẻ ghi chú riêng. Hàng soạn (✕, bản nháp, Gửi, vòng mic nhỏ) vẫn ở đáy như lúc nói.</li>
+        <li><b>Thiếu thông tin:</b> AI hỏi đúng ô còn trống: "Đã điền ngân hàng, số tiền, kỳ hạn. Bạn nhập thêm lãi suất nhé?". Trả lời bằng giọng hay gõ đều được, kể cả chỉ "4,7": mỗi lượt gửi kèm form đang có và câu vừa hỏi, nên con số rơi đúng vào ô lãi suất.</li>
+        <li><b>Đủ rồi thì lưu:</b> khi mọi ô đã có, app nói "Đã nhận đủ thông tin, bạn kiểm tra lại rồi bấm ✓ để lưu." Lưu vẫn là dấu ✓ trên đầu form. Không có nút OK hay Huỷ, không tự lưu.</li>
+        <li><b>Lượt AI:</b> mỗi câu gửi đi, kể cả câu trả lời trên form, trừ 1 lượt trong lượt chung hằng ngày của app. Một pill nhỏ ngay trên mic ghi số lượt còn lại hôm nay, ẩn khi cuộn form.</li>
+        <li><b>Cuộn:</b> kéo form lên để đọc các ô bên dưới thì cuộc trò chuyện thu lại, chỉ còn thanh và dòng AI mới nhất. Kéo xuống lại thì mở ra. Có dòng AI mới cũng tự mở ra.</li>
+        <li><b>Câu lạc đề:</b> nói "ăn trưa 45k" trong Sổ tiết kiệm thì hỏi lại: ghi thành khoản chi, hay huỷ.</li>
+        <li><b>Sau khi lưu:</b> về lại danh sách, bản ghi mới ở đúng chỗ, thanh trở về trạng thái nghỉ để nói tiếp.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Chỗ hở tìm thấy khi dựng mock</h2>
+      <ol class="hint">
+        <li><b>Chuyến đi không có nút thêm khoản.</b> Muốn ghi một khoản chung phải ra Home. Form gõ tay đã có phần chia tiền khi đang trong chuyến đi có thành viên, nên chỉ thiếu lối vào từ trong sheet chuyến đi.</li>
+        <li><b>Sổ nợ đã có hai nút Đi mượn, Cho mượn ở đáy.</b> Mock đặt thanh ngay trên hai nút đó. Đáy sheet hơi nặng; có thể bỏ hai nút và để + trên đầu mở form chọn chiều.</li>
+        <li><b>Thanh ở Home cũng phải hiểu các câu này.</b> Nói "gửi 100 triệu VCB 6 tháng" ở Home hôm nay sẽ thành khoản chi. Cần bộ định tuyến ý định (đã ghi trong ROADMAP) để Home mở đúng form.</li>
+        <li><b>Câu lạc đề.</b> Thanh trong tính năng chỉ trả về loại của tính năng đó, nên cần một câu hỏi lại khi người dùng nói thứ khác.</li>
+        <li><b>Mỗi lần nói tốn một lượt AI</b> như ở Home, nên hết lượt và mất mạng dùng chung luật: mic gạch, nút + vẫn mở form trống. Câu trả lời trên form cũng là một lượt, nên một sổ có thể tốn hai, ba lượt.</li>
+        <li><b>Sửa tay khi AI đang hỏi.</b> Người dùng gõ thẳng lãi suất vào ô thì câu hỏi đã cũ. Khi ô mất focus, app tự kiểm ô trống, không gọi AI, không trừ lượt. App ghi một dòng gợi ý không có bubble ("Đã nhận lãi suất 4,7% bạn nhập trên form.") rồi báo đã đủ. Sửa lại một ô đã có giá trị thì không thêm dòng nào.</li>
+        <li><b>Câu lạc đề vẫn là thẻ có nút.</b> Nó đổi loại bản ghi, nên chưa đưa vào cuộc trò chuyện. Nếu chuyển thì cần cách chọn không dùng nút.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Câu mẫu và kết quả</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Tính năng</th><th>Câu nói</th><th>Form điền gì</th></tr></thead>
+        <tbody>
+          <tr><td>Sổ tiết kiệm</td><td>gửi 100 triệu Vietcombank 6 tháng lãi 4,7%</td><td>Ngân hàng, số tiền, ngày gửi hôm nay, kỳ hạn, lãi suất. Tính sẵn ngày đáo hạn và tiền lãi</td></tr>
+          <tr><td>Định kỳ</td><td>Netflix 260 nghìn ngày 5 hàng tháng</td><td>Tên, số tiền, nhóm Đăng ký, hàng tháng, lần tới ngày 5</td></tr>
+          <tr><td>Sổ nợ</td><td>cho Nam mượn 2 triệu</td><td>Người, chiều (họ nợ mình), số tiền</td></tr>
+          <tr><td>Chuyến đi</td><td>Nam trả 3 triệu 2 tiền homestay cho cả nhóm</td><td>Nội dung, số tiền, người trả Nam, chia cho cả nhóm</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>Chữ mới</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>English</th><th>Tiếng Việt</th></tr></thead>
+        <tbody id="copy"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const W = 393, H = 852, L = 16, R = 377;
+const MC = 347, MR = 30, P_END = MC - MR - 10;
+const LINE = 21;
+// The form header (‹, title, ✓) stays put while the body scrolls under it.
+const HEAD = 138;
+
+const ICON = {
+  form: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  mic: '<path d="M9 5a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0z"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  micOff: '<path d="M3 3l18 18"/><path d="M9 5a3 3 0 0 1 6 0v5a3 3 0 0 1-.13.87m-2 2A3 3 0 0 1 9 10V9"/><path d="M5 10a7 7 0 0 0 10.85 5.85m2-2A7 7 0 0 0 19 10"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  x: '<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+  kb: '<path d="M2 8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M6 10v.01"/><path d="M10 10v.01"/><path d="M14 10v.01"/><path d="M18 10v.01"/><path d="M6 14v.01"/><path d="M18 14v.01"/><path d="M10 14h4"/>',
+  up: '<path d="M12 5v14"/><path d="M18 11l-6-6"/><path d="M6 11l6-6"/>',
+  play: '<path d="M7 4v16l13-8z"/>',
+  wifiOff: '<path d="M12 18h.01"/><path d="M9.17 15.17a4 4 0 0 1 5.66 0"/><path d="M6.34 12.34a8 8 0 0 1 3.87-2.14m4.16.16a8 8 0 0 1 3.29 2"/><path d="M3.52 9.52a12 12 0 0 1 3.54-2.46m3.1-.92a12 12 0 0 1 10.33 3.37"/><path d="M3 3l18 18"/>',
+};
+const svg = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
+
+// App tokens, from lib/design/palette.dart. `mine` is the quiet fill of the user's own lines.
+const APP = {
+  light: { text: "#141D26", muted: "#5E6973", faint: "#8E98A1", line: "rgba(20,29,38,.12)", warnInk: "#8A6114", warnBg: [0.969, 0.941, 0.882], quiet: "rgba(20,29,38,.06)", mine: "rgba(20,29,38,.07)", send: "#E0F2EA", sendInk: "#167448", halo: "rgba(255,255,255,.75)", card: "#FFFFFF", coachBg: "#F1EEFE", coachInk: "#4B3A9E", page: [.969, .969, .969] },
+  dark:  { text: "#E8ECEF", muted: "#A3ADB6", faint: "#78828C", line: "rgba(232,236,239,.14)", warnInk: "#E0B25C", warnBg: [0.231, 0.200, 0.145], quiet: "rgba(232,236,239,.08)", mine: "rgba(232,236,239,.10)", send: "#24453D", sendInk: "#1FA567", halo: "rgba(20,22,26,.7)", card: "#262A31", coachBg: "#2A2640", coachInk: "#C9BFFF", page: [.118, .133, .161] },
+};
+
+// What each feature hears, and which real capture shows the result. `end` is where the form's last row ends.
+const FEATURES = {
+  savings: { name: "Sổ tiết kiệm", hint: "gửi 100tr VCB 6 tháng", words: ["gửi", "100", "triệu", "Vietcombank", "6", "tháng", "lãi", "4,7%"], missingWords: ["gửi", "100", "triệu", "Vietcombank", "6", "tháng"], ask: "Đã điền ngân hàng, số tiền, kỳ hạn. Bạn nhập thêm lãi suất nhé?", answer: ["4,7"], offTopic: "ăn trưa 45k", end: 772 },
+  commitments: { name: "Định kỳ", hint: "Netflix 260k ngày 5", words: ["Netflix", "260", "nghìn", "ngày", "5", "hàng", "tháng"], answer: ["nhóm", "Đăng", "ký"], offTopic: "ăn trưa 45k", end: 734 },
+  debts: { name: "Sổ nợ", hint: "cho Nam mượn 2tr", words: ["cho", "Nam", "mượn", "2", "triệu"], answer: ["hôm", "nay"], offTopic: "ăn trưa 45k", end: 552 },
+  trip: { name: "Chuyến đi", hint: "Nam trả 3tr2 homestay", words: ["Nam", "trả", "3", "triệu", "2", "tiền", "homestay", "cho", "cả", "nhóm"], answer: ["chia", "đều"], offTopic: "gửi tiết kiệm 50 triệu", end: 537 },
+};
+const SAID = {
+  complete: "Đã nhận đủ thông tin, bạn kiểm tra lại rồi bấm ✓ để lưu.",
+  filled: "Đã nhận đủ thông tin, bạn kiểm tra lại rồi bấm ✓ để lưu.",
+  same: "Thông tin không đổi, bạn bấm ✓ để lưu nhé.",
+  // Said by the app, not the AI, so it is a plain hint line, not a bubble.
+  byHand: "Đã nhận lãi suất 4,7% bạn nhập trên form.",
+  reply: "Trả lời, hoặc bấm mic",
+  change: "Nhập hoặc nói yêu cầu của bạn",
+};
+const EXT = "jpg";
+const shotUrl = (name) => `voice/${name}${opt.theme === "dark" ? "-dark" : ""}.${EXT}`;
+
+const opt = { feature: "savings", place: "root", state: "rest", theme: "light", counter: "mic" };
+
+// Every sentence sent, answers on the form included, spends one of the day's app-wide turns.
+const DAILY_LEFT = 7;
+let freeLeft = DAILY_LEFT, autoManual = false;
+let draft = "", spokenIndex = 0, wordTimer = null, silenceTimer = null, sample = [];
+
+// The conversation with the form: on the form, the pill holds these lines above the composer.
+let inConv = false, collapsed = false, conv = [], formName = "", waiting = "filled", lastSaid = "", autoAnswer = false;
+let scrollY = 0, scrollTarget = 0, formX = W;
+
+// Blobs
+const ORDER = ["P", "M"];
+const KEYS = ["cx", "cy", "hw", "hh", "r"];
+// Sổ nợ's list ends in a footer (Đi mượn, Cho mượn), so its bar sits just above it; its form has none.
+const bottom = () => opt.place === "root" && opt.feature === "debts" && !inConv ? 772 : 832;
+function pill(left, right, height) { const base = bottom(); return { cx: (left + right) / 2, cy: base - height / 2, hw: (right - left) / 2, hh: height / 2, r: 30 } }
+function circle(cx, radius) { const base = bottom(); return { cx, cy: base - 30, hw: radius, hh: radius, r: radius } }
+
+let lines = 1;
+const LIVE = ["listening", "speaking", "typing"];
+const BLOCKED = ["understanding", "ceiling", "offline"];
+const composerHeight = () => 60 + (lines - 1) * LINE;
+
+/** The pill's height on the form: composer row plus the lines, or only from the latest AI line when collapsed. */
+function convHeight() {
+  const stack = $("stack");
+  const full = stack.offsetHeight;
+  if (!full) return composerHeight();
+
+  const aiLines = stack.querySelectorAll(".ai");
+  const latest = aiLines[aiLines.length - 1];
+  const shown = collapsed && latest ? full - latest.offsetTop : full;
+  return composerHeight() + shown + 8;
+}
+function layout(state) {
+  // On the form the mic lives inside the card, so the pill takes the full width.
+  if (inConv) return { P: pill(L, R, convHeight()) };
+  if (LIVE.includes(state)) return { P: pill(L, R - 50, composerHeight()), M: circle(R - 20, 20) };
+  if (opt.place === "form" && state === "rest") return { M: circle(MC, MR) };
+  return { P: pill(L, P_END, 60), M: circle(MC, MR) };
+}
+const blobs = {};
+function setTargets(lay) {
+  for (const id of ORDER) {
+    const target = lay[id];
+    let blob = blobs[id];
+    if (target && !blob) {
+      const from = id === "P" ? { ...target, cx: MC - 40, hw: 6, hh: 6, r: 6 } : { ...target, hw: 0, hh: 0, r: 0 };
+      blob = blobs[id] = { goo: 1, alive: true, cur: from, vel: {}, tgt: { ...target } };
+      KEYS.forEach((key) => (blob.vel[key] = 0));
+    } else if (target) {
+      const moved = Math.abs(blob.tgt.hw - target.hw) + Math.abs(blob.tgt.cx - target.cx) > 8;
+      blob.tgt = { ...target }; blob.alive = true;
+      if (moved) blob.goo = Math.max(blob.goo, .7);
+    } else if (blob) {
+      blob.tgt = { ...blob.cur, cy: bottom() - 30, hw: 0, hh: 0, r: 0 };
+      if (id === "P") blob.tgt.cx = MC;
+      blob.alive = false; blob.goo = 1;
+    }
+  }
+}
+function stepSprings(dt) {
+  // Underdamped (ratio about 0.4), so a droplet overshoots and settles like water.
+  const stiffness = 195, damping = 11.2;
+  for (const id of ORDER) {
+    const blob = blobs[id]; if (!blob) continue;
+    for (const key of KEYS) {
+      blob.vel[key] += ((blob.tgt[key] - blob.cur[key]) * stiffness - blob.vel[key] * damping) * dt;
+      blob.cur[key] += blob.vel[key] * dt;
+    }
+    blob.cur.r = Math.max(0, Math.min(blob.cur.r, blob.cur.hw, blob.cur.hh));
+    blob.goo = Math.max(0, blob.goo - dt * 1.1);
+    if (!blob.alive && blob.cur.hw < 1.2) delete blobs[id];
+  }
+}
+
+// UI layers
+const $ = (id) => document.getElementById(id);
+$("ui").innerHTML = `
+  <div class="layer" id="lyConv"><div class="stack" id="stack" aria-live="polite"></div></div>
+  <div class="layer" id="lyRest"></div>
+  <div class="layer" id="lyReply"></div>
+  <div class="layer" id="lyComposer">
+    <button class="hit" data-act="cancel" id="inX" aria-label="Huỷ"><span class="disc">${svg("x")}</span></button>
+    <textarea class="draft" id="ta" rows="1" aria-label="Bản nháp, nói hoặc gõ"></textarea>
+    <button class="hit" data-act="send" id="inSend" aria-label="Gửi"><span class="disc">${svg("up")}</span></button>
+  </div>
+  <div class="layer" id="lyStatus"></div>
+  <div class="layer" id="lyM"></div>`;
+const ta = $("ta");
+const tokens = () => APP[opt.theme];
+const feature = () => FEATURES[opt.feature];
+
+/** AI lines on the left in coach violet, the user's own on the right in a quiet fill. No tails. */
+function paintConv() {
+  const theme = tokens();
+  $("stack").innerHTML = conv.map((item) => {
+    const style = item.who === "ai" ? `background:${theme.coachBg};color:${theme.coachInk}`
+      : item.who === "hint" ? `color:${theme.faint}` : `background:${theme.mine};color:${theme.text}`;
+    const body = item.thinking ? '<span class="dots" aria-label="Đang điền form"><i></i><i></i><i></i></span>' : item.text;
+    return `<div class="line ${item.who}" style="${style}">${body}</div>`;
+  }).join("");
+  $("stack").style.bottom = composerHeight() + "px";
+}
+
+function paintLayers() {
+  const theme = tokens(), state = opt.state, current = feature();
+  const micOff = `<span class="hit" role="img" aria-label="Không nói được lúc này" style="color:${theme.faint};pointer-events:none">${svg("micOff")}</span>`;
+  const rule = `<span class="rule" style="background:${theme.line}"></span>`;
+  const statusHtml = {
+    // On the form the AI line's dots already say it is working, so the row stays quiet.
+    understanding: conv.some((item) => item.thinking)
+      ? `<span class="field"></span>`
+      : `<span class="field" style="color:${theme.faint}"><span class="spin"></span><span>Đang điền form…</span></span>`,
+    ceiling: `<span style="width:4px"></span>${micOff}${rule}<span class="field tap" data-act="ad" style="color:${theme.warnInk};font-weight:500"><span style="display:grid">${svg("play")}</span><span>Hết lượt hôm nay</span></span>`,
+    offline: `<span style="width:4px"></span>${micOff}${rule}<span class="field" style="color:${theme.faint}">${svg("wifiOff")}<span>Cần kết nối mạng</span></span>`,
+  }[state];
+  // The header + moved down here, at the right beside the mic: one place to add.
+  $("lyRest").innerHTML = `<span class="field tap" data-act="type" style="color:${theme.faint}"><span>Nhập hoặc nói: ${current.hint}</span></span><button class="hit" data-act="form" aria-label="Thêm bằng form" style="color:${theme.text}">${svg("form")}</button><span style="width:4px"></span>`;
+  $("lyReply").innerHTML = `<span class="field tap" data-act="type" style="color:${theme.faint};padding-left:20px;padding-right:60px"><span>${waiting === "missing" ? SAID.reply : SAID.change}</span></span>`;
+  if (statusHtml) $("lyStatus").innerHTML = statusHtml;
+  $("lyStatus").querySelectorAll("svg").forEach((el) => Object.assign(el.style, { width: "20px", height: "20px", fill: "none", stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" }));
+
+  const live = state === "listening" || state === "speaking";
+  const blocked = state === "ceiling" || state === "offline";
+  $("lyM").innerHTML = blocked
+    ? `<button class="hit" data-act="form" aria-label="Thêm bằng form" style="color:${theme.text}">${svg("form")}</button>`
+    : state === "understanding"
+      ? `<span class="hit" style="color:${theme.faint};pointer-events:none">${svg("mic")}</span>`
+      : live
+        ? `<button class="hit" data-act="type" aria-label="Chuyển sang gõ" style="color:${theme.text}">${svg("kb")}</button>`
+        : `<button class="hit" data-act="mic" aria-label="Nói" style="color:${theme.text}">${svg("mic")}</button>`;
+  // Inside the card the switch is a quiet disc, like ✕, not a second droplet.
+  if (inConv) {
+    const disc = $("lyM").querySelector(".hit");
+    if (disc) disc.innerHTML = `<span class="disc" style="background:${theme.quiet}">${disc.innerHTML}</span>`;
+  }
+  $("inX").style.color = theme.muted;
+  $("inX").querySelector(".disc").style.background = theme.quiet;
+  ta.style.color = theme.text;
+  $("inSend").querySelector(".disc").style.cssText = `background:${theme.send};color:${theme.sendInk}`;
+  for (const id of ["lyRest", "lyReply", "lyComposer", "lyStatus", "lyM"]) $(id).style.textShadow = `0 0 6px ${theme.halo}, 0 0 2px ${theme.halo}`;
+
+  const show = (id, on) => $(id).classList.toggle("off", !on);
+  show("lyConv", inConv);
+  show("lyRest", (state === "rest" || state === "offTopic") && opt.place === "root" && !inConv);
+  show("lyReply", inConv && (state === "missing" || state === "filled"));
+  show("lyComposer", LIVE.includes(state));
+  show("lyStatus", BLOCKED.includes(state));
+  show("lyM", inConv || !!layout(state).M);
+  $("inSend").style.display = draft.trim() ? "" : "none";
+  ta.readOnly = live;
+  ta.placeholder = live ? "Đang nghe…" : inConv ? SAID.reply : current.hint;
+  paintFreeHint();
+  for (const id of ["backHit", "saveHit"]) $(id).style.display = inConv ? "block" : "none";
+  paintOverlays();
+}
+
+function freeText() {
+  return freeLeft ? `Còn ${freeLeft} lượt hôm nay` : "Hết lượt hôm nay";
+}
+function paintFreeHint() {
+  const theme = tokens(), hint = $("freeHint");
+  hint.textContent = freeText();
+  hint.className = opt.counter === "mic" ? "pill" : "";
+  hint.style.color = theme.faint;
+  hint.style.background = opt.counter === "mic" ? theme.card : "none";
+  hint.style.boxShadow = opt.counter === "mic" ? "0 1px 2px rgba(0,0,0,.08), 0 4px 12px -4px rgba(0,0,0,.12)" : "none";
+  hint.style.opacity = inConv && !collapsed && !BLOCKED.includes(opt.state) ? 1 : 0;
+}
+function placeFreeHint() {
+  const hint = $("freeHint"), bar = blobs.P; if (!bar || !inConv) return;
+  // Only while the card is open; scrolling the form collapses the card and hides it.
+  hint.style.opacity = !collapsed && !BLOCKED.includes(opt.state) ? 1 : 0;
+  const box = bar.cur;
+  if (opt.counter === "mic") {
+    // Just above the card's top edge, over the mic column.
+    Object.assign(hint.style, { left: "auto", right: (W - (box.cx + box.hw) + 4) + "px", top: (box.cy - box.hh - 28) + "px", transform: "none" });
+  } else {
+    // Centred in the gap between the card and the screen's bottom edge; the card does not move.
+    const cardBottom = box.cy + box.hh;
+    Object.assign(hint.style, { left: "50%", right: "auto", top: (cardBottom + (H - cardBottom) / 2 - 8) + "px", transform: "translateX(-50%)" });
+  }
+}
+
+function paintOverlays() {
+  const theme = tokens(), current = feature();
+  loadTexture("root", bgName());
+  if (formName) loadTexture("form", formName);
+  // The captures still show the header +; paint it out, since it now lives in the bar.
+  $("plusCover").style.cssText = `background:rgb(${theme.page.map((value) => value * 255).join(",")});display:${opt.place === "root" && formX > 340 ? "" : "none"}`;
+
+  const ask = $("ask");
+  const target = opt.feature === "trip" ? "sổ tiết kiệm" : "khoản chi";
+  ask.style.cssText = `bottom:${H - bottom() + 72}px;background:${theme.card};color:${theme.text};box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 28px -8px rgba(0,0,0,.22)`;
+  ask.innerHTML = `“${current.offTopic}” không phải ${current.name.toLowerCase()}. Ghi thành ${target}?
+    <div class="row"><button data-act="cancel" style="background:${theme.quiet};color:${theme.text}">Huỷ</button><button data-act="reroute" style="background:${theme.send};color:${theme.sendInk}">Ghi thành ${target}</button></div>`;
+  ask.classList.toggle("on", opt.state === "offTopic");
+}
+
+function place(id, blob, bottomRow) {
+  const el = $(id); if (!blob) return;
+  const box = blob.cur;
+  const height = 2 * box.hh, rowHeight = bottomRow ? Math.min(height, 60) : height;
+  el.style.left = (box.cx - box.hw) + "px"; el.style.top = (box.cy + box.hh - rowHeight) + "px";
+  el.style.width = Math.max(0, 2 * box.hw) + "px"; el.style.height = rowHeight + "px";
+  if (id === "lyM") el.style.justifyContent = "center";
+}
+function placeLayers() {
+  for (const id of ["lyConv", "lyComposer"]) place(id, blobs.P, false);
+  for (const id of ["lyRest", "lyReply", "lyStatus"]) place(id, blobs.P, true);
+  placeFreeHint();
+  if (inConv && blobs.P) {
+    // Bottom right of the card, on the composer row.
+    const box = blobs.P.cur;
+    Object.assign($("lyM").style, { left: (box.cx + box.hw - 54) + "px", top: (box.cy + box.hh - 54) + "px", width: "48px", height: "48px", justifyContent: "center" });
+  } else {
+    place("lyM", blobs.M, false);
+  }
+  Object.assign($("lyComposer").style, { padding: `0 ${inConv ? 54 : 6}px 6px 6px`, alignItems: "flex-end" });
+}
+function measure() {
+  ta.style.height = "21px";
+  const next = Math.max(1, Math.min(3, Math.round(ta.scrollHeight / LINE)));
+  ta.style.height = next * LINE + "px";
+  ta.scrollTop = ta.scrollHeight;
+  if (next !== lines) { lines = next; $("stack").style.bottom = composerHeight() + "px"; setTargets(layout(opt.state)) }
+}
+
+// State
+let stepTimer = null;
+function setState(next) {
+  const was = opt.state;
+  opt.state = next;
+  clearTimeout(stepTimer);
+  if (next !== "listening" && next !== "speaking") stopWords();
+  if (!LIVE.includes(next)) { draft = ""; ta.value = ""; lines = 1 }
+  if (["rest", "offTopic", "offline", "ceiling"].includes(next)) leaveForm();
+  if (next === "listening" && was !== "speaking") startListening();
+  if (next === "understanding") stepTimer = setTimeout(() => resolve(pending), 1300);
+
+  paintConv();
+  setTargets(layout(next));
+  if ((was === "typing" && next === "listening") || (["listening", "speaking"].includes(was) && next === "typing")) bounce();
+  paintLayers();
+  measure();
+  if (next === "typing" && was !== "typing") setTimeout(() => { ta.focus({ preventScroll: true }); ta.setSelectionRange(ta.value.length, ta.value.length) }, 60);
+  renderSeg("states"); renderSeg("scroll");
+}
+function leaveForm() {
+  inConv = false; conv = []; collapsed = false; autoAnswer = false; autoManual = false;
+  scrollY = scrollTarget = 0;
+}
+function bounce() {
+  const mic = blobs.M, bar = blobs.P;
+  if (mic) { mic.cur.hw = mic.cur.hh = mic.cur.r = mic.tgt.hw * .72; mic.vel.hw = mic.vel.hh = mic.vel.r = 160; mic.goo = Math.max(mic.goo, .5) }
+  if (bar) { bar.vel.hh += 70; bar.vel.cy -= 35; bar.goo = Math.max(bar.goo, .4) }
+  const icon = $("lyM");
+  icon.classList.remove("pop"); void icon.offsetWidth; icon.classList.add("pop");
+}
+
+// What the next send resolves to: the filled form, the missing-field form, an answer on the form, or the off-topic question.
+let pending = "filled";
+function startListening(words = feature().words, outcome = "filled") {
+  sample = words; pending = outcome;
+  if (draft.length && !draft.endsWith(" ")) draft += " ";
+  spokenIndex = 0;
+  ta.value = draft;
+  stopWords();
+  wordTimer = setTimeout(nextWord, 900);
+}
+function nextWord() {
+  if (opt.state !== "listening" && opt.state !== "speaking") return;
+  if (opt.state === "listening") { opt.state = "speaking"; paintLayers(); renderSeg("states") }
+  draft += (spokenIndex ? " " : "") + sample[spokenIndex++];
+  ta.value = draft; measure();
+  if (spokenIndex < sample.length) wordTimer = setTimeout(nextWord, 330 + Math.random() * 260);
+  else { opt.state = "listening"; paintLayers(); renderSeg("states"); silenceTimer = setTimeout(send, 1600) }
+}
+function stopWords() { clearTimeout(wordTimer); clearTimeout(silenceTimer) }
+
+/** Each turn on the form sends the form as it stands plus the question just asked, so "4,7" lands in Lãi suất. */
+function send() {
+  lastSaid = draft.trim();
+  freeLeft = Math.max(0, freeLeft - 1);
+  if (inConv) {
+    pending = "answer";
+    conv.push({ who: "me", text: lastSaid }, { who: "ai", thinking: true });
+    collapsed = false;
+  }
+  setState("understanding");
+}
+function resolve(outcome) {
+  const current = feature();
+  if (outcome === "offTopic") return setState("offTopic");
+
+  if (outcome === "answer") {
+    conv.pop();
+    const answered = waiting === "missing";
+    if (answered) formName = "savings-filled";
+    conv.push({ who: "ai", text: answered ? SAID.complete : SAID.same });
+    return reachForm("filled");
+  }
+
+  formName = outcome === "missing" ? "savings-missing" : `${opt.feature}-filled`;
+  conv = [{ who: "me", text: lastSaid }, { who: "ai", text: outcome === "missing" ? current.ask : SAID.filled }];
+  inConv = true; collapsed = false; scrollY = scrollTarget = 0;
+  reachForm(outcome);
+}
+/** The user typed the rate into the form: the app checks the fields itself, no AI call, no turn spent. */
+function fillByHand() {
+  formName = "savings-filled";
+  conv.push({ who: "hint", text: SAID.byHand }, { who: "ai", text: SAID.complete });
+  reachForm("filled");
+}
+function reachForm(state) {
+  waiting = state;
+  setState(state);
+  if (autoManual && state === "missing") stepTimer = setTimeout(() => { autoManual = false; fillByHand() }, 1400);
+  if (autoAnswer && state === "missing") stepTimer = setTimeout(() => { autoAnswer = false; speak(feature().answer, "answer") }, 1400);
+}
+
+const toastEl = $("toast");
+let toastTimer;
+function toast(message) { toastEl.textContent = message; toastEl.classList.add("on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove("on"), 1800) }
+
+// Plays a scripted run: the mic, the words, then the outcome.
+function speak(words, outcome) {
+  setState("listening");
+  startListening(words, outcome);
+}
+function act(name) {
+  if (name === "mic") return inConv ? speak(feature().answer, "answer") : speak(feature().words, "filled");
+  if (name === "cancel") return setState(inConv ? waiting : "rest");
+  if (name === "type") { stopWords(); return setState("typing") }
+  if (name === "send") return send();
+  if (name === "form") return toast("Mở form trống, không qua AI");
+  if (name === "ad") return toast("Xem quảng cáo để có thêm lượt");
+  if (name === "reroute") { toast("Mở form khoản chi đã điền"); return setState("rest") }
+  if (name === "save") { toast(waiting === "missing" ? "Còn thiếu lãi suất" : "Đã lưu"); if (waiting !== "missing") setState("rest"); return }
+  if (name === "back") { toast("Chưa lưu gì"); return setState("rest") }
+}
+$("phone").addEventListener("click", (event) => {
+  if (dragMoved) return;
+  if (event.target === ta && ta.readOnly) { act("type"); return }
+  const target = event.target.closest("[data-act]");
+  if (target) { event.preventDefault(); act(target.dataset.act) }
+});
+ta.addEventListener("input", () => { draft = ta.value; pending = "filled"; measure(); paintLayers() });
+ta.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (draft.trim()) send() } });
+
+// Scrolling the form: reading further down collapses the lines to the latest AI one, scrolling back expands them.
+const maxScroll = () => {
+  const expandedTop = bottom() - (composerHeight() + $("stack").offsetHeight + 8);
+  return Math.max(0, feature().end + 16 - expandedTop);
+};
+function scrollTo(next, animate) {
+  next = Math.max(0, Math.min(maxScroll(), next));
+  const delta = next - scrollTarget;
+  scrollTarget = next;
+  if (!animate) scrollY = next;
+  const fold = next < 2 ? false : delta > .5 ? true : delta < -.5 ? false : collapsed;
+  if (fold !== collapsed) { collapsed = fold; setTargets(layout(opt.state)); renderSeg("scroll") }
+}
+$("phone").addEventListener("wheel", (event) => {
+  if (!inConv) return;
+  event.preventDefault();
+  scrollTo(scrollTarget + event.deltaY, true);
+}, { passive: false });
+let dragFrom = null, dragMoved = false;
+$("phone").addEventListener("pointerdown", (event) => {
+  dragMoved = false;
+  if (!inConv || event.target.closest("[data-act], textarea, #lyConv")) return;
+  dragFrom = { y: event.clientY, scroll: scrollTarget };
+});
+addEventListener("pointermove", (event) => {
+  if (!dragFrom) return;
+  const moved = dragFrom.y - event.clientY;
+  if (Math.abs(moved) > 4) dragMoved = true;
+  scrollTo(dragFrom.scroll + moved, false);
+});
+addEventListener("pointerup", () => { dragFrom = null; setTimeout(() => (dragMoved = false), 0) });
+
+// Controls
+const SEGS = {
+  feature: Object.entries(FEATURES).map(([key, item]) => [key, item.name]),
+  place: [["root", "Thanh dưới sheet (đề xuất)"], ["form", "Mic trong form"]],
+  states: [["rest", "Nghỉ"], ["listening", "Nói"], ["typing", "Gõ"], ["understanding", "Đang điền"], ["missing", "AI hỏi thêm"], ["manual", "Tự nhập tay"], ["filled", "Đủ, chờ ✓"], ["offTopic", "Câu lạc đề"], ["offline", "Mất mạng"], ["ceiling", "Hết lượt"]],
+  scroll: [["top", "Đầu form"], ["down", "Cuộn xuống"]],
+  theme: [["light", "Sáng"], ["dark", "Tối"]],
+};
+const PLACE_HINT = {
+  root: "Thanh nằm ở màn đầu của tính năng, cùng ngữ pháp với Home. Nói xong mới mở form, trên form thanh thành cuộc trò chuyện với form.",
+  form: "Phương án khác: không có thanh ở màn đầu. Bấm + mở form trống, góc dưới form có một vòng mic để điền ngay tại chỗ. Ít chạm hơn một bước khi đã ở form, nhưng phải mở form trước rồi mới nói được.",
+};
+function renderSeg(key) {
+  const current = key === "states" ? (opt.state === "speaking" ? "listening" : opt.state) : String(opt[key]);
+  $(key).innerHTML = SEGS[key].map(([value, label]) => {
+    const off = (key === "states" && ((["missing", "manual"].includes(value) && opt.feature !== "savings") || (opt.place === "form" && ["offTopic", "typing"].includes(value))))
+      || (key === "scroll" && !inConv);
+    const pressed = key === "scroll" ? (value === "down") === collapsed && inConv : value === current;
+    return `<button type="button" data-v="${value}" aria-pressed="${pressed}"${off ? " disabled" : ""}>${label}</button>`;
+  }).join("");
+  if (key === "place") $("placeHint").textContent = PLACE_HINT[opt.place];
+}
+function jump(state) {
+  // Scripted jumps play the real path, so each state is reached the way a user would reach it.
+  leaveForm();
+  if (state === "missing") return speak(feature().missingWords, "missing");
+  if (state === "offTopic") return speak(feature().offTopic.split(" "), "offTopic");
+  if (state === "manual") { autoManual = true; return speak(feature().missingWords, "missing") }
+  if (state === "filled" && opt.feature === "savings") { autoAnswer = true; return speak(feature().missingWords, "missing") }
+  if (state === "filled") return speak(feature().words, "filled");
+  pending = "filled";
+  setState(state);
+}
+for (const key of Object.keys(SEGS)) {
+  renderSeg(key);
+  $(key).addEventListener("click", (event) => {
+    const button = event.target.closest("button"); if (!button || button.disabled) return;
+    if (key === "states") return jump(button.dataset.v);
+    if (key === "scroll") { scrollTo(button.dataset.v === "down" ? maxScroll() : 0, true); return renderSeg("scroll") }
+    opt[key] = button.dataset.v;
+    if (key === "theme") {
+      document.documentElement.dataset.theme = opt.theme;
+      paintConv(); paintLayers();
+      return renderSeg(key);
+    }
+    renderSeg(key); renderSeg("states");
+    setState("rest");
+  });
+}
+
+const COPY = [
+  ["{n} turns left today", "Còn {n} lượt hôm nay"],
+  ["Type or say: {example}", "Nhập hoặc nói: {ví dụ}"],
+  ["Filling the form…", "Đang điền form…"],
+  ["Filled in the bank, amount and term. Could you add the interest rate?", "Đã điền ngân hàng, số tiền, kỳ hạn. Bạn nhập thêm lãi suất nhé?"],
+  ["Got everything. Please check it, then tap ✓ to save.", "Đã nhận đủ thông tin, bạn kiểm tra lại rồi bấm ✓ để lưu."],
+  ["Got the 4.7% rate you entered on the form.", "Đã nhận lãi suất 4,7% bạn nhập trên form."],
+  ["Nothing changed. Tap ✓ to save.", "Thông tin không đổi, bạn bấm ✓ để lưu nhé."],
+  ["Answer, or tap the mic", "Trả lời, hoặc bấm mic"],
+  ["Type or say what you need", "Nhập hoặc nói yêu cầu của bạn"],
+  ["\"{sentence}\" isn't a {feature}. Log it as an expense?", "“{câu}” không phải {tính năng}. Ghi thành khoản chi?"],
+  ["Log as an expense", "Ghi thành khoản chi"],
+];
+$("copy").innerHTML = COPY.map(([english, vietnamese]) => `<tr><td>${english}</td><td>${vietnamese}</td></tr>`).join("");
+
+// Shader: the approved glass bar, light and droplet, over the sheet captures (the form slides in and scrolls here too)
+const canvas = $("gl");
+const gl = canvas.getContext("webgl2", { antialias: false });
+const VERT = `#version 300 es
+in vec2 a; void main(){ gl_Position = vec4(a,0.,1.); }`;
+const FRAG = `#version 300 es
+precision highp float;
+uniform sampler2D uBg, uForm; uniform vec2 uRes; uniform float uDpr, uDark, uPhase, uWob, uFade, uBottom, uBarTop, uFormX, uScroll, uHead;
+uniform vec3 uPage;
+uniform vec4 uB[2]; uniform vec4 uK[2]; uniform vec4 uT[2];
+out vec4 o;
+
+float box(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q,0.)) + min(max(q.x,q.y),0.) - r; }
+float smin(float a, float b, float k){ if(k<=0.01) return min(a,b); float h = max(k-abs(a-b),0.)/k; return min(a,b) - h*h*k*.25; }
+float scene(vec2 p){
+  float d = 1e5;
+  for(int i=0;i<2;i++){
+    vec4 b = uB[i]; if(b.z < .6) continue;
+    float di = box(p - b.xy, b.zw, uK[i].x);
+    // While listening the pill's top edge ripples with the voice, like a water surface.
+    if (i == 0 && uWob > .001) {
+      float top = smoothstep(b.y, b.y - b.w, p.y);
+      float wave = sin(p.x * .075 - uPhase * 12.5) * .6 + sin(p.x * .16 + uPhase * 7.) * .4;
+      di -= uWob * wave * top * 2.6;
+    }
+    d = (d > 9e4) ? di : smin(d, di, uK[i].y);
+  }
+  return d;
+}
+vec4 tintAt(vec2 p){
+  vec4 tint = vec4(0.); float ws = 0.;
+  for(int i=0;i<2;i++){
+    vec4 b = uB[i]; if(b.z < .6) continue;
+    float w = 1. - smoothstep(-10., 16., box(p - b.xy, b.zw, uK[i].x));
+    tint += uT[i] * w; ws += w;
+  }
+  return ws > 0. ? tint / ws : tint;
+}
+vec3 formAt(vec2 p){
+  vec2 q = vec2(p.x - uFormX, p.y < uHead ? p.y : p.y + uScroll);
+  if (q.y > 851.) return uPage;
+  return texture(uForm, clamp(q / vec2(393., 852.), 0., 1.)).rgb;
+}
+vec3 bg(vec2 p){
+  vec3 c = p.x >= uFormX ? formAt(p) : texture(uBg, clamp(p / vec2(393., 852.), 0., 1.)).rgb;
+  // The sheet fades toward its own colour over the 60px above the bar, as on Home.
+  return mix(c, uPage, uFade * .82 * smoothstep(uBarTop - 61., uBarTop, p.y) * (1. - step(uBottom + 6., p.y)));
+}
+vec3 blurBg(vec2 p, float rad){
+  vec3 acc = vec3(0.);
+  for(int i=0;i<32;i++){
+    float fi = float(i) + .5;
+    float a = fi * 2.39996;
+    acc += bg(p + vec2(cos(a), sin(a)) * sqrt(fi / 32.) * rad);
+  }
+  return acc / 32.;
+}
+
+void main(){
+  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uDpr;
+  float d = scene(p);
+  bool dark = uDark > .5;
+  float shade = .05 * (1. - smoothstep(-6., 22., scene(p - vec2(0., 6.))));
+  vec3 outside = bg(p) * (1. - shade * (dark ? 1.6 : 1.));
+  if (d > 1.5) { o = vec4(outside, 1.); return; }
+
+  float e = .75;
+  vec2 n = normalize(vec2(scene(p + vec2(e,0.)) - scene(p - vec2(e,0.)), scene(p + vec2(0.,e)) - scene(p - vec2(0.,e))) + 1e-5);
+  vec3 surf = dark ? vec3(.149,.165,.192) : vec3(1.);
+  vec3 col = mix(blurBg(p, 7.), surf, dark ? .42 : .24);
+  // The approved rim (docs/design/glass-light-and-dye.md): Fresnel, specular, exit glow, faint ink.
+  vec2 key = dark ? normalize(vec2(-.62, -.78)) : normalize(vec2(.62, .78));
+  float facing = dot(n, key);
+  float slope = clamp(1. + d / 3.5, 0., 1.);
+  vec3 normal = vec3(n * slope, sqrt(max(1. - slope * slope, 0.)));
+  col = mix(col, vec3(1.), pow(1. - normal.z, 3.) * mix(.22, 1., smoothstep(-.5, 1., facing)) * (dark ? .6 : 1.));
+  vec3 toLight = normalize(vec3(key * .9, .45));
+  col += pow(max(dot(normal, normalize(toLight + vec3(0., 0., 1.))), 0.), 60.) * (dark ? .45 : .7);
+  float exitBand = smoothstep(-9., -3., d) * (1. - smoothstep(-2.5, -.8, d));
+  col += exitBand * smoothstep(.1, 1., -facing) * (dark ? .02 : .06);
+  float hair = 1. - smoothstep(0., 1.1, abs(d + .55));
+  col = mix(col, dark ? vec3(0.) : vec3(.08, .11, .15), hair * smoothstep(.1, 1., -facing) * (dark ? .08 : .12));
+  vec4 tint = tintAt(p);
+  col = mix(col, tint.rgb, clamp(tint.a, 0., 1.));
+
+  o = vec4(mix(outside, col, smoothstep(.75, -.75, d)), 1.);
+}`;
+
+function compile(type, source) { const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader); if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader)); return shader }
+
+let U = {};
+const textures = {}, textureUrls = {};
+const dpr = Math.min(2, window.devicePixelRatio || 1);
+if (!gl) {
+  $("phone").insertAdjacentHTML("beforeend", '<div class="nogl">Trình duyệt này không có WebGL2, nên không vẽ được kính và giọt nước.</div>');
+} else {
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT)); gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG)); gl.linkProgram(prog);
+  gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  for (const name of ["uBg", "uForm", "uRes", "uDpr", "uDark", "uPhase", "uWob", "uFade", "uBottom", "uBarTop", "uFormX", "uScroll", "uHead", "uPage", "uB", "uK", "uT"]) U[name] = gl.getUniformLocation(prog, name);
+  textures.root = gl.createTexture();
+  textures.form = gl.createTexture();
+  canvas.width = W * dpr; canvas.height = H * dpr;
+}
+// The page behind the bar: the feature's root sheet, or its empty form in the alternative. The form on top is its own texture.
+function bgName() {
+  return opt.place === "root" ? `${opt.feature}-root` : `${opt.feature}-empty`;
+}
+function loadTexture(slot, name) {
+  const url = shotUrl(name);
+  if (!gl || textureUrls[slot] === url) return;
+  textureUrls[slot] = url;
+  const img = new Image();
+  img.onload = () => {
+    if (textureUrls[slot] !== url) return;
+    gl.activeTexture(slot === "root" ? gl.TEXTURE0 : gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, textures[slot]);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  };
+  img.src = url;
+}
+
+// Loop
+setTargets(layout("rest"));
+for (const id of ORDER) if (blobs[id]) { blobs[id].cur = { ...blobs[id].tgt }; blobs[id].goo = 0 }
+paintLayers();
+
+let last = performance.now(), phase = 0, amp = 0, wob = 0;
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function speechLevel() {
+  if (opt.state !== "speaking") return 0;
+  const seconds = performance.now() / 1000;
+  const syllable = .5 + .5 * Math.sin(seconds * 12.3 + Math.sin(seconds * 2.7) * 2);
+  return .35 + .65 * syllable * (.6 + .4 * Math.sin(seconds * 1.9));
+}
+function frame(now) {
+  const dt = Math.min(1 / 20, (now - last) / 1000); last = now;
+  stepSprings(dt / 2); stepSprings(dt / 2);
+  if (reduced) for (const id of ORDER) if (blobs[id]) blobs[id].cur = { ...blobs[id].tgt };
+  placeLayers();
+  // The form slides in like SheetNav.push; in the alternative the form is the page, so it just appears.
+  const formTarget = inConv ? 0 : W;
+  formX = opt.place === "form" || reduced ? formTarget : formX + (formTarget - formX) * (1 - Math.exp(-dt * 13));
+  if (Math.abs(formX - formTarget) < .5) formX = formTarget;
+  scrollY += (scrollTarget - scrollY) * (reduced ? 1 : 1 - Math.exp(-dt * 12));
+  $("plusCover").style.display = opt.place === "root" && formX > 340 ? "" : "none";
+  amp += (speechLevel() - amp) * (1 - Math.exp(-dt * 8));
+  phase += dt * (reduced ? 0 : (.10 + .55 * amp + (opt.state === "listening" ? .08 : 0)));
+  const live = opt.state === "listening" || opt.state === "speaking";
+  wob += ((live ? .25 + amp : 0) - wob) * (1 - Math.exp(-dt * 6));
+
+  if (gl) {
+    const B = new Float32Array(8), K = new Float32Array(8), T = new Float32Array(8), theme = tokens();
+    ORDER.forEach((id, index) => {
+      const blob = blobs[id]; if (!blob) return;
+      const box = blob.cur;
+      B.set([box.cx, box.cy, Math.max(0, box.hw), Math.max(0, box.hh)], index * 4);
+      K.set([Math.min(box.r, box.hw, box.hh), 4 + 52 * blob.goo, 0, 0], index * 4);
+      if (id === "P" && opt.state === "ceiling") T.set([...theme.warnBg, .88], index * 4);
+    });
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.uniform1i(U.uBg, 0); gl.uniform2f(U.uRes, canvas.width, canvas.height); gl.uniform1f(U.uDpr, dpr);
+    gl.uniform1f(U.uDark, opt.theme === "dark" ? 1 : 0);
+    gl.uniform1f(U.uPhase, phase); gl.uniform1f(U.uWob, wob);
+    gl.uniform1f(U.uFade, opt.place === "root" ? 1 : 0);
+    gl.uniform1f(U.uBottom, bottom());
+    const tops = ORDER.filter((id) => blobs[id]).map((id) => blobs[id].cur.cy - blobs[id].cur.hh);
+    gl.uniform1f(U.uBarTop, tops.length ? Math.min(...tops) : bottom() - 60);
+    gl.uniform1f(U.uFormX, formX); gl.uniform1f(U.uScroll, scrollY); gl.uniform1f(U.uHead, HEAD);
+    gl.uniform1i(U.uForm, 1);
+    gl.uniform3fv(U.uPage, theme.page);
+    gl.uniform4fv(U.uB, B); gl.uniform4fv(U.uK, K); gl.uniform4fv(U.uT, T);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
