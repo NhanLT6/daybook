@@ -329,8 +329,11 @@ const runCatchUp = async () => {
 
 const send = async () => {
   if (!canSend.value) return;
-  const cmd = command.value;
-  const text = inputText.value.trim();
+  // A pasted "/note foo" counts the same as a picked chip
+  const parsed = command.value ? undefined : parseChatCommand(inputText.value.trim());
+  const cmd = command.value ?? parsed?.command ?? null;
+  const text = parsed?.command ? parsed.rest : inputText.value.trim();
+  if (cmd && cmd.name !== 'catchup' && !text && !attachedFile.value) return; // a bare command isn't a message yet
   const file = attachedFile.value;
 
   inputText.value = '';

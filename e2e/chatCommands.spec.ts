@@ -37,8 +37,11 @@ type ChatRequest = { command?: string; messages: Array<{ parts: Array<Record<str
 
 async function openChat(page: Page) {
   await page.goto('/');
-  await page.locator('.v-tab', { hasText: 'Chat' }).click({ timeout: 20000 });
-  return page.getByPlaceholder('Describe your work');
+  await expect(page.getByRole('link', { name: 'Notes' })).toBeVisible({ timeout: 20000 });
+  await page.keyboard.press('Control+k');
+  const input = page.getByLabel('Message');
+  await expect(input).toBeVisible();
+  return input;
 }
 
 test('/note saves a sticky note through the addNote tool, and Undo removes it', async ({ page }) => {
@@ -53,11 +56,12 @@ test('/note saves a sticky note through the addNote tool, and Undo removes it', 
 
   const input = await openChat(page);
 
-  // Typing / opens the menu; picking a command fills it in
+  // Typing / opens the menu; picking a command turns it into a chip and clears the textarea
   await input.fill('/no');
   await expect(page.getByLabel('Commands')).toBeVisible();
   await input.press('Enter');
-  await expect(input).toHaveValue('/note ');
+  await expect(page.locator('.chat-composer .command-chip')).toContainText('/note');
+  await expect(input).toHaveValue('');
 
   await input.pressSequentially('ask BA about login');
   await input.press('Enter');
@@ -71,15 +75,17 @@ test('/note saves a sticky note through the addNote tool, and Undo removes it', 
   const toolPart = requests[1].messages.at(-1)?.parts.find((p) => p.type === 'tool-addNote');
   expect(toolPart?.state).toBe('output-available');
 
-  await page.locator('.v-tab', { hasText: 'Notes' }).click();
+  await page.getByRole('link', { name: 'Notes' }).click();
   await expect(page.locator('.note-card', { hasText: 'ask BA about login' })).toBeVisible();
   await expect(page.locator('.note-card', { hasText: 'check logs' }).locator('input[type="checkbox"]')).toHaveCount(1);
 
-  await page.locator('.v-tab', { hasText: 'Chat' }).click();
+  // Chat state lives in memory across client-side navigation; re-open the bar
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.keyboard.press('Control+k');
   await row.getByRole('button', { name: 'Undo' }).click();
   await expect(row).toContainText('Removed');
 
-  await page.locator('.v-tab', { hasText: 'Notes' }).click();
+  await page.getByRole('link', { name: 'Notes' }).click();
   await expect(page.locator('.note-card', { hasText: 'ask BA about login' })).toHaveCount(0);
 });
 
@@ -96,7 +102,10 @@ test('/event adds a calendar event through the addEvent tool', async ({ page }) 
   });
 
   const input = await openChat(page);
-  await input.fill('/event sprint review next friday 2-3pm');
+  // Typing the word plus a space turns it into a chip (a pasted/filled "/event text" would not)
+  await input.pressSequentially('/event ');
+  await expect(page.locator('.chat-composer .command-chip')).toContainText('/event');
+  await input.pressSequentially('sprint review next friday 2-3pm');
   await input.press('Enter');
 
   await expect(page.getByText('Added to your calendar.')).toBeVisible();

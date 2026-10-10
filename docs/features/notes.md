@@ -2,12 +2,12 @@
 
 ## Overview
 
-A lightweight, Windows-Sticky-Notes-style scratchpad next to the Chat tab: day-to-day work memory for
+A lightweight, Windows-Sticky-Notes-style scratchpad on its own page (`/notes`, header nav link "Notes", `src/views/NotesView.vue` wrapping `NotesPanel`) rather than a Home tab: day-to-day work memory for
 things like reminders about the ticket in progress, questions to raise in daily standup, or whether a
 workaround is still needed. Notes render as flat cards in a grid (not a list) under a toolbar (note count
 left, search + `+` right); pinned notes sort first in the same grid. With no notes, the toolbar is hidden and
-an empty-state card fills the tab like the Chat panel, with a "New note" button (the note editor grows out of
-it). Clicking a card expands it to fill the whole Notes tab for
+an empty-state card fills the page, with a "New note" button (the note editor grows out of
+it). Clicking a card expands it to fill the whole Notes page for
 editing; clicking a checklist checkbox on a card ticks it in place.
 
 ## Data Model
@@ -40,7 +40,7 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 |---|---|
 | `src/components/NotesPanel.vue` | Owns persistence (autosave/empty-discard), pinned-first order, search, drag & drop, trash, tick-from-card, and undo. The only place notes are read from/written to the store. |
 | `src/components/NoteCard.vue` | UI only — one card: color, sanitized preview (`previewHtml` must already be sanitized), pin icon, drag-state classes. Ripple is off (the card grows into the editor; a ripple on top reads as noise). The preview box ends 30px above the card bottom, above the date caption, and fades over its last 36px, so long notes never run under the date. |
-| `src/components/NoteEditor.vue` | UI only — the Tiptap instance, toolbar, and pin/color controls (emit `togglePin` / `color`), no note persistence (it does store pasted image blobs, see Images). `content` prop is **initial value only**: never watched back into the editor (would reset cursor/selection), so the parent keys the component by note id to force remount when switching notes. Loaded lazily (`defineAsyncComponent`): Tiptap (~120 kB gzip) is kept out of the Home chunk and fetched when NotesPanel mounts, i.e. the first time the Notes tab opens, so the first note still opens instantly. |
+| `src/components/NoteEditor.vue` | UI only — the Tiptap instance, toolbar, and pin/color controls (emit `togglePin` / `color`), no note persistence (it does store pasted image blobs, see Images). `content` prop is **initial value only**: never watched back into the editor (would reset cursor/selection), so the parent keys the component by note id to force remount when switching notes. Loaded lazily (`defineAsyncComponent`): Tiptap (~120 kB gzip) is kept out of the main chunk and fetched when NotesPanel mounts, i.e. the first time the Notes page opens, so the first note still opens instantly. |
 | `src/components/NoteImageViewer.vue` | Click-to-zoom VDialog for an editor image (Esc / outside click / click the image to close), grows out of the clicked image via `target`. |
 | `src/common/noteImageExtension.ts` | Tiptap `Image` extended to store `data-image-id` instead of `src`, with a resizable node view that loads the blob URL. |
 | `src/composables/useNoteImages.ts` | Add an image (compress + store), id → object URL cache shared by cards and editor, orphan sweep. |
@@ -59,8 +59,7 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
   removed silently (no undo).
 - `delete` cancels the pending save and runs the delete-with-undo flow (see Undo below) using the editor's
   latest content, so Undo restores what was on screen. An empty note is just discarded.
-- `onBeforeUnmount` flushes the debounce for route changes mid-edit (HomeView unmounts). Tab switches don't
-  unmount — `VTabsWindowItem` keeps rendered tab content mounted.
+- `onBeforeUnmount` flushes the debounce for route changes mid-edit (NotesView unmounts when navigating away).
 
 ## Search
 
@@ -253,8 +252,8 @@ than changing that store behavior, the notes code dismisses its own toast with `
 
 ## Gotchas
 
-- `HomeView.vue`'s mobile layout rule forces `height: auto !important` on every panel `.v-card`. Note cards
-  can't rely on a fixed `height`, so `.note-card` uses `min-height`/`max-height` instead to stay a
+- Note cards don't rely on a fixed `height` (Home's old mobile rule forced `height: auto !important` on
+  panel cards; it went with the Notes tab), so `.note-card` uses `min-height`/`max-height` instead to stay a
   consistent size on mobile too.
 - `NoteCard` must not transition `transform`: the touch drag clone is a copy of the card moved by an inline
   transform on every pointer move, and a transition makes it trail the finger.

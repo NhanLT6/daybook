@@ -17,7 +17,7 @@ const fulfillStream = (route: Route, chunks: object[]) =>
   });
 
 async function addNote(page: Page, text: string) {
-  await page.locator('.v-tab', { hasText: 'Notes' }).click();
+  await page.getByRole('link', { name: 'Notes' }).click();
   await page.locator('[aria-label="New note"]').first().click();
   await expect(page.locator('.notes-editor-overlay .ProseMirror')).toBeFocused();
   await page.keyboard.type(text);
@@ -56,11 +56,12 @@ test('Chat answers from notes via the searchNotes tool', async ({ page }) => {
   });
 
   await page.goto('/');
-  await expect(page.locator('.v-tab', { hasText: 'Notes' })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('link', { name: 'Notes' })).toBeVisible({ timeout: 20000 });
   await addNote(page, 'ask BA abt login redirect?');
 
-  await page.locator('.v-tab', { hasText: 'Chat' }).click();
-  const input = page.getByPlaceholder('Describe your work');
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.keyboard.press('Control+k');
+  const input = page.getByLabel('Message');
   await input.fill('what did I note about the auth bug?');
   await input.press('Enter');
 

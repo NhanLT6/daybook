@@ -6,10 +6,12 @@ import { expect, type Page, test } from '@playwright/test';
  * drag & drop (reorder + trash), search, pin + color, ticking checklist items from the card.
  */
 
-async function openNotesTab(page: Page) {
-  const notesTab = page.locator('.v-tab', { hasText: 'Notes' });
-  await expect(notesTab).toBeVisible({ timeout: 20000 });
-  await notesTab.click();
+async function openNotesPage(page: Page) {
+  // Notes is its own page, reached from the header nav
+  const notesLink = page.getByRole('link', { name: 'Notes' });
+  await expect(notesLink).toBeVisible({ timeout: 20000 });
+  await notesLink.click();
+  await expect(page).toHaveURL(/\/notes$/);
   await expect(page.locator('[aria-label="New note"]')).toBeVisible();
 }
 
@@ -27,7 +29,7 @@ async function xssFlag(page: Page): Promise<number | undefined> {
 
 test('creates a note and it persists across reload', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await openNewNoteEditor(page);
   await page.keyboard.type('Ask Bob about T-123');
@@ -37,13 +39,13 @@ test('creates a note and it persists across reload', async ({ page }) => {
   await expect(preview).toContainText('Ask Bob about T-123');
 
   await page.reload();
-  await openNotesTab(page);
+  await openNotesPage(page);
   await expect(page.locator('.note-card .note-preview')).toContainText('Ask Bob about T-123');
 });
 
 test('discards an empty note when navigating back', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await openNewNoteEditor(page);
   await page.locator('[aria-label="Back to notes"]').click();
@@ -54,7 +56,7 @@ test('discards an empty note when navigating back', async ({ page }) => {
 
 test('creates a checklist note with a checkbox in the preview', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await openNewNoteEditor(page);
   await page.locator('[aria-label="Checklist"]').click();
@@ -68,7 +70,7 @@ test('creates a checklist note with a checkbox in the preview', async ({ page })
 
 test('deletes a note and undo restores it', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await openNewNoteEditor(page);
   await page.keyboard.type('Delete me please');
@@ -94,7 +96,7 @@ test('sanitizes malicious html written directly into the notes store', async ({ 
     '<img src=x onerror="window.__xss=1"><a href="javascript:window.__xss=2">jslink</a><script>window.__xss=3</script>';
 
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await page.evaluate(
     (note) =>
@@ -116,7 +118,7 @@ test('sanitizes malicious html written directly into the notes store', async ({ 
   );
 
   await page.reload();
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   const preview = page.locator('.note-card .note-preview');
   await expect(preview).toContainText('jslink');
@@ -132,7 +134,7 @@ test('sanitizes malicious html written directly into the notes store', async ({ 
 
 test('reorders notes by dragging and the new order survives a reload', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await openNewNoteEditor(page);
   await page.keyboard.type('Alpha');
@@ -154,7 +156,7 @@ test('reorders notes by dragging and the new order survives a reload', async ({ 
   await expect(cards.nth(1).locator('.note-preview')).toContainText('Beta');
 
   await page.reload();
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   const reloadedCards = page.locator('.note-card');
   await expect(reloadedCards).toHaveCount(2);
@@ -164,7 +166,7 @@ test('reorders notes by dragging and the new order survives a reload', async ({ 
 
 test('drags a note onto the trash and undo restores it', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await openNewNoteEditor(page);
   await page.keyboard.type('Drag me to the trash');
@@ -204,7 +206,7 @@ test('drags a note onto the trash and undo restores it', async ({ page }) => {
 
 test('search filters notes by visible text and clearing restores all', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   for (const text of ['Ask Bob about T-123', 'Standup: login bug workaround']) {
     await openNewNoteEditor(page);
@@ -232,7 +234,7 @@ test('search filters notes by visible text and clearing restores all', async ({ 
 
 test('pins and colors a note; both survive a reload', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   for (const text of ['Plain note', 'Pin me']) {
     await openNewNoteEditor(page);
@@ -253,7 +255,7 @@ test('pins and colors a note; both survive a reload', async ({ page }) => {
   await expect(first).toHaveClass(/bg-note-yellow/);
 
   await page.reload();
-  await openNotesTab(page);
+  await openNotesPage(page);
   const reloadedFirst = page.locator('.note-card').first();
   await expect(reloadedFirst).toContainText('Plain note');
   await expect(reloadedFirst).toHaveClass(/bg-note-yellow/);
@@ -261,7 +263,7 @@ test('pins and colors a note; both survive a reload', async ({ page }) => {
 
 test('ticks a checklist item straight from the card without opening the editor', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
 
   await openNewNoteEditor(page);
   await page.locator('[aria-label="Checklist"]').click();
@@ -281,13 +283,13 @@ test('ticks a checklist item straight from the card without opening the editor',
   await expect(item).toHaveAttribute('data-checked', 'true');
 
   await page.reload();
-  await openNotesTab(page);
+  await openNotesPage(page);
   await expect(page.locator('.note-card li[data-type="taskItem"]')).toHaveAttribute('data-checked', 'true');
 });
 
 test('pasted image is stored outside the note, previews on the card, and zooms on click', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
   const editor = await openNewNoteEditor(page);
   await page.keyboard.type('Screenshot of the bug');
 
@@ -368,13 +370,13 @@ test('pasted image is stored outside the note, previews on the card, and zooms o
 
   // Survives a reload (blob comes back from the image store)
   await page.reload();
-  await openNotesTab(page);
+  await openNotesPage(page);
   await expect(page.locator('.note-card .note-preview img')).toHaveAttribute('src', /^blob:/);
 });
 
 test('resizes a pasted image by dragging its corner handle; the size is saved', async ({ page }) => {
   await page.goto('/');
-  await openNotesTab(page);
+  await openNotesPage(page);
   const editor = await openNewNoteEditor(page);
 
   await editor.evaluate(async (el) => {
@@ -417,7 +419,7 @@ test('resizes a pasted image by dragging its corner handle; the size is saved', 
 
   // Survives a reload at the new size
   await page.reload();
-  await openNotesTab(page);
+  await openNotesPage(page);
   await page.locator('.note-card').click();
   const reopened = page.locator('.notes-editor-overlay img[data-image-id]');
   await expect(reopened).toHaveAttribute('src', /^blob:/);
