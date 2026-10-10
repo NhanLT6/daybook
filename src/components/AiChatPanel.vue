@@ -314,14 +314,16 @@ const handleCatchUp = async () => {
             v-for="(command, i) in commandSuggestions"
             :key="command.name"
             :active="i === activeSuggestion"
-            :prepend-icon="command.icon"
             rounded="lg"
             @mousedown.prevent
             @click="pickCommand(command)"
             @mouseenter="activeSuggestion = i"
           >
+            <template #prepend>
+              <VIcon :icon="command.icon" :color="command.color" />
+            </template>
             <VListItemTitle>
-              <span class="font-weight-medium">/{{ command.name }}</span>
+              <span class="font-weight-medium" :class="`text-${command.color}`">/{{ command.name }}</span>
               <span class="text-medium-emphasis ml-2">{{ command.hint }}</span>
             </VListItemTitle>
           </VListItem>

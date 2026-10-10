@@ -5,16 +5,17 @@ export type ChatCommandName = ServerChatCommand | 'catchup';
 export interface ChatCommand {
   name: ChatCommandName;
   icon: string;
+  color: string; // theme color (main.ts `cmd-*`), so each feature reads apart at a glance
   hint: string; // shown in the / menu
 }
 
 // Order = order in the / menu: the logging command first, since that is what Chat is mostly for
 export const CHAT_COMMANDS: ChatCommand[] = [
-  { name: 'log', icon: 'mdi-clock-plus-outline', hint: 'Log time' },
-  { name: 'note', icon: 'mdi-note-plus-outline', hint: 'Save a sticky note' },
-  { name: 'event', icon: 'mdi-calendar-plus', hint: 'Add a calendar event' },
-  { name: 'ask', icon: 'mdi-note-search-outline', hint: 'Ask about your notes' },
-  { name: 'catchup', icon: 'mdi-history', hint: 'Catch up on recent work' },
+  { name: 'log', icon: 'mdi-clock-plus-outline', color: 'cmd-log', hint: 'Log time' },
+  { name: 'note', icon: 'mdi-note-plus-outline', color: 'cmd-note', hint: 'Save a sticky note' },
+  { name: 'event', icon: 'mdi-calendar-plus', color: 'cmd-event', hint: 'Add a calendar event' },
+  { name: 'ask', icon: 'mdi-note-search-outline', color: 'cmd-ask', hint: 'Ask about your notes' },
+  { name: 'catchup', icon: 'mdi-history', color: 'cmd-catchup', hint: 'Catch up on recent work' },
 ];
 
 /** `/note buy milk` → `{ command: 'note', rest: 'buy milk' }`. Unknown or no command → `command` undefined. */

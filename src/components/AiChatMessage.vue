@@ -56,6 +56,7 @@ interface AddedItem {
   tool: 'addNote' | 'addEvent';
   id: string;
   icon: string;
+  color: string;
   label: string;
 }
 
@@ -80,6 +81,7 @@ const addedItems = computed<AddedItem[]>(() =>
             tool: name,
             id: output.id,
             icon: 'mdi-note-check-outline',
+            color: 'cmd-note',
             label: (p.input as AddNoteInput).text.split('\n')[0],
           }
         : {
@@ -87,6 +89,7 @@ const addedItems = computed<AddedItem[]>(() =>
             tool: name,
             id: output.id,
             icon: 'mdi-calendar-check',
+            color: 'cmd-event',
             label: eventLabel(p.input as AddEventInput),
           },
     ];
@@ -152,16 +155,14 @@ const copyMessage = () => {
               cover
             />
             <!-- Slash command chip, e.g. /note -->
-            <VChip
+            <span
               v-if="userCommand?.command"
-              size="x-small"
-              variant="flat"
-              color="primary"
-              :prepend-icon="userCommand.command.icon"
-              class="mb-1 command-chip"
+              class="command-chip mb-1"
+              :style="{ '--chip-color': `var(--v-theme-${userCommand.command.color})` }"
             >
+              <VIcon :icon="userCommand.command.icon" size="14" />
               /{{ userCommand.command.name }}
-            </VChip>
+            </span>
             <p
               v-if="userText"
               class="text-body-2 mb-0 message-text"
@@ -276,7 +277,7 @@ const copyMessage = () => {
         <!-- addNote / addEvent results: what was saved, each undoable -->
         <div v-if="addedItems.length" class="d-flex flex-column ga-1 mt-2">
           <div v-for="item in addedItems" :key="item.key" class="added-item d-flex align-center ga-2">
-            <VIcon :icon="item.icon" size="16" :color="undoneKeys.has(item.key) ? undefined : 'primary'" />
+            <VIcon :icon="item.icon" size="16" :color="undoneKeys.has(item.key) ? undefined : item.color" />
             <span class="text-body-2 flex-grow-1 text-truncate" :class="{ 'is-undone': undoneKeys.has(item.key) }">
               {{ item.label }}
             </span>
@@ -325,8 +326,20 @@ const copyMessage = () => {
   word-break: break-word;
 }
 
+/* Tonal chip in the command's own hue. Own markup (not VChip) so the icon sits on the text's
+   centre line: VChip's x-small prepend icon rides high */
 .command-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border-radius: 11px;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1;
+  color: rgb(var(--chip-color));
+  background: rgba(var(--chip-color), 0.14);
 }
 
 .added-item {
