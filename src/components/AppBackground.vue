@@ -33,13 +33,14 @@ const imageStyle = computed(() => {
 }
 
 /* Default backdrop: flat, mid-tone so glass panels still read against it.
-   Light stays a soft slate (not white), dark a lifted charcoal (not black). */
+   Glass panels are semi-opaque white/black over this, so a lighter light
+   backdrop makes panels glare; dark stays a lifted charcoal, not black. */
 .app-background-static {
   transition: background-color 0.4s ease;
 }
 
 .v-theme--light .app-background-static {
-  background-color: #c3cbd3;
+  background-color: #aab4bf;
 }
 
 .v-theme--dark .app-background-static {
