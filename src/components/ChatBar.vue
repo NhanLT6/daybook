@@ -18,6 +18,9 @@ import { useDisplay } from 'vuetify';
 import dayjs from 'dayjs';
 
 import { parseChatCommand } from '@/common/chatCommands';
+import { useStorage } from '@vueuse/core';
+
+import { storageKeys } from '@/common/storageKeys';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
@@ -68,6 +71,11 @@ const inputEl = ref<HTMLTextAreaElement | null>(null);
 const fileInputEl = ref<HTMLInputElement | null>(null);
 
 const state = ref<BarState>('hidden');
+// ── Shortcut tip ──────────────────────────────────────────
+
+// The shortcut tip shows until the bar has been opened with / or Ctrl+K once
+const knowsShortcut = useStorage(storageKeys.chat.shortcutLearned, false);
+
 const isTouch = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
 const restState = (): BarState => (isTouch ? 'bar' : 'hidden'); // touch has no hover, so the bar stays
 
@@ -498,6 +506,7 @@ const isEditable = (el: Element | null) =>
 // Open from hover, shortcut or tap. Focus, unless the user is mid-typing in another field
 const reveal = ({ focus = true } = {}) => {
   hoverSuppressed = false;
+  clearTimeout(hoverLeaveTimer); // a pending hover-out must not hide a bar just opened by key or click
   if (state.value === 'hidden' || leaving.value) setState(messages.value.length ? 'open' : 'bar');
   const active = document.activeElement as HTMLInputElement | null;
   const busyElsewhere = isEditable(active) && active !== inputEl.value && !!active?.value;
@@ -550,12 +559,14 @@ const onDocumentKeydown = (e: KeyboardEvent) => {
   const inChat = !!chatEl.value?.contains(document.activeElement);
   if (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
+    knowsShortcut.value = true;
     reveal();
     return;
   }
   // A / outside any field opens the bar; a second / inside it opens the command menu
   if (e.key === '/' && !inChat && !isEditable(document.activeElement)) {
     e.preventDefault();
+    knowsShortcut.value = true;
     reveal();
     return;
   }
@@ -691,8 +702,8 @@ const lipHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
           @dragleave="isDragOver = false"
           @drop.prevent="onDrop"
         >
-          <div v-if="!messages.length && !error && !isCatchUpLoading" class="chat-msg is-ai">
-            Tell me what you worked on, or type / for a command.
+          <div v-if="!messages.length && !error && !isCatchUpLoading && !isTouch" class="chat-msg is-ai">
+            Open this anytime with <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd>.
           </div>
 
           <AiChatMessage
@@ -756,6 +767,12 @@ const lipHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
             </div>
           </template>
         </div>
+      </div>
+
+      <!-- Above the composer, until learned: how to open the bar -->
+      <div v-if="!knowsShortcut && !isTouch && state === 'bar'" class="chat-tip">
+        <VIcon icon="mdi-keyboard-outline" size="16" />
+        <span>Tip: press <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> to open this anytime</span>
       </div>
 
       <!-- Composer -->
@@ -955,6 +972,15 @@ const lipHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   background: rgba(var(--chip-color), 0.14);
 }
 
+.chat-bar kbd {
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--chat-line);
+  background: var(--chat-tile);
+  font: 500 11px/1.4 inherit;
+  font-family: inherit;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chat-msg {
     animation: none;
@@ -969,8 +995,8 @@ const lipHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   z-index: 1005;
   left: 50%;
   bottom: 0;
-  width: min(560px, 100vw);
-  height: 28px;
+  width: min(640px, 100vw); /* the bar's own width when open: no wider, so passing the mouse along the edge doesn't trigger it */
+  height: 40px;
   transform: translateX(-50%);
 }
 
@@ -1253,6 +1279,16 @@ const lipHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }
 
+/* Shortcut tip: a quiet line above the composer */
+.chat-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px 0;
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  text-shadow: 0 0 6px var(--chat-halo);
+}
 /* ── Composer ── */
 .chat-composer {
   position: relative;

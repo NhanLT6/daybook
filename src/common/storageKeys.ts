@@ -13,6 +13,7 @@ export const storageKeys = {
   },
   chat: {
     history: 'chatHistory',
+    shortcutLearned: 'chatShortcutLearned',
   },
   catchUp: {
     summaries: 'catchupSummaries',
