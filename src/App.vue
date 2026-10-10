@@ -111,7 +111,7 @@ onUnmounted(() => {
 
 const route = useRoute();
 
-const { isOpen: insightsDrawerOpen, isInline: insightsInline } = useInsightsDrawer();
+const { isShown: insightsShown, toggle: toggleInsights } = useInsightsDrawer();
 
 const { smAndDown } = useDisplay();
 
@@ -163,13 +163,15 @@ const navItems = [
           <div v-if="!smAndDown" class="dock-icons">
             <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
 
-            <!-- Insights drawer toggle — Home only, when the inline panel is hidden -->
+            <!-- Insights toggle — Home only: hides the column on wide screens, opens the drawer on narrow ones -->
             <VIconBtn
-              v-if="route.path === '/' && !insightsInline"
-              icon="mdi-chart-box-outline"
+              v-if="route.path === '/'"
+              :icon="insightsShown ? 'mdi-chart-box' : 'mdi-chart-box-outline'"
               size="small"
               variant="text"
-              @click="insightsDrawerOpen = !insightsDrawerOpen"
+              :aria-label="insightsShown ? 'Hide Insights' : 'Show Insights'"
+              :title="insightsShown ? 'Hide Insights' : 'Show Insights'"
+              @click="toggleInsights"
             />
           </div>
 
@@ -203,11 +205,11 @@ const navItems = [
               <!-- Insights, theme and account live here on small screens so the dock has room for the notification pill -->
               <VDivider class="my-1" />
               <VListItem
-                v-if="route.path === '/' && !insightsInline"
+                v-if="route.path === '/'"
                 rounded="lg"
                 prepend-icon="mdi-chart-box-outline"
                 title="Insights"
-                @click="insightsDrawerOpen = !insightsDrawerOpen"
+                @click="toggleInsights"
               />
               <VListItem
                 rounded="lg"

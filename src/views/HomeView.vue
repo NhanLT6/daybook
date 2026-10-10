@@ -103,7 +103,7 @@ watch(todayDateStr, () => {
 const tab = ref<'form' | 'ai' | 'notes'>('form');
 const theme = useTheme();
 const { smAndDown } = useDisplay();
-const { isOpen: insightsDrawerOpen, isInline: insightsInline } = useInsightsDrawer();
+const { isOpen: insightsDrawerOpen, isInline: insightsInline, showInline: insightsShowInline } = useInsightsDrawer();
 const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-darken-4' : 'green-lighten-2'));
 
 // Logs for the calendar's current month (ISO 'YYYY-MM'). Assumes current year —
@@ -368,9 +368,9 @@ const onAiUndoLogs = async () => {
       />
     </div>
 
-    <!-- Right panel: Insights — inline only on wide viewports (>= INSIGHTS_INLINE_MIN) -->
+    <!-- Right panel: Insights — inline only on wide viewports (>= INSIGHTS_INLINE_MIN), hideable from the header -->
     <InsightsPanel
-      v-if="insightsInline"
+      v-if="insightsShowInline"
       class="insights-panel"
       :time-logs="timeLogs"
       :current-month="currentMonth"

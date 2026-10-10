@@ -5,6 +5,7 @@ export const storageKeys = {
     calendarView: 'calendarView',
     eventCalendarView: 'eventCalendarView',
     projectColorMaps: 'projectColorMaps',
+    insightsVisible: 'insightsVisible',
   },
   jira: {
     config: 'jiraConfig',
