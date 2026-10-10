@@ -13,6 +13,8 @@ import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { TimeLog } from '@/interfaces/TimeLog';
 import type { TextUIPart } from 'ai';
 
+import { useDisplay } from 'vuetify';
+
 import dayjs from 'dayjs';
 
 import { parseChatCommand } from '@/common/chatCommands';
@@ -54,6 +56,7 @@ const { addProjects, addTasks, allProjects: projects, allTasks: tasks } = useWor
 const notificationCenter = useNotificationCenterStore();
 const router = useRouter();
 const { targetMinutes } = useDailyTarget();
+const { xs } = useDisplay();
 
 const chatEl = ref<HTMLElement | null>(null);
 const bodyEl = ref<HTMLElement | null>(null);
@@ -167,7 +170,8 @@ const canSend = computed(
 );
 const placeholder = computed(() => {
   if (isDragOver.value) return 'Drop image here…';
-  return command.value ? `${command.value.hint}…` : 'What did you work on? / for commands';
+  if (command.value) return `${command.value.hint}…`;
+  return xs.value ? 'What did you work on?' : 'What did you work on? / for commands'; // the long one clips on phones
 });
 
 const focusInput = () => inputEl.value?.focus({ preventScroll: true });
