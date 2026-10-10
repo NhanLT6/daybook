@@ -267,6 +267,22 @@ export function useAiChat() {
     });
   };
 
+  // Restore a conversation from history. Its last unsaved log preview stays saveable;
+  // older previews and an earlier save's Undo window are over.
+  const loadMessages = (restored: DaybookUIMessage[]) => {
+    chat.messages = restored;
+    const map = new Map<string, DaybookMessageMetadata>();
+    for (const m of restored) {
+      if (m.metadata?.tool === 'catchUp') map.set(m.id, m.metadata);
+      else if (m.metadata?.saveState) map.set(m.id, { saveState: m.metadata.saveState });
+    }
+    metadataMap.value = map;
+    const lastLogs = [...restored].reverse().find((m) => extractLogsFromMessage(m).length);
+    latestLogsMessageId.value = lastLogs && !lastLogs.metadata?.saveState ? lastLogs.id : null;
+    savedLogsMessageId.value = null;
+    error.value = null;
+  };
+
   const clearMessages = () => {
     chat.messages = [];
     metadataMap.value = new Map();
@@ -286,6 +302,7 @@ export function useAiChat() {
     markUndone,
     markDiscarded,
     injectCatchUp,
+    loadMessages,
     clearMessages,
   };
 }

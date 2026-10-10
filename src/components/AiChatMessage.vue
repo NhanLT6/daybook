@@ -126,220 +126,181 @@ const copyMessage = () => {
 </script>
 
 <template>
-  <div :class="['d-flex ga-2', message.role === 'user' ? 'justify-end' : 'justify-start']">
-    <!-- AI avatar -->
-    <VAvatar v-if="message.role === 'assistant'" size="28" color="primary" class="mt-1 flex-shrink-0">
-      <VIcon icon="mdi-creation" size="16" />
-    </VAvatar>
+  <!-- User message: tonal bubble on the right, copy / retry on hover -->
+  <div v-if="message.role === 'user'" class="user-row">
+    <div class="chat-msg is-me">
+      <img v-if="filePart?.url" :src="filePart.url" alt="Attached image" class="message-image" />
+      <!-- Slash command chip, e.g. /note -->
+      <span
+        v-if="userCommand?.command"
+        class="command-chip me-1"
+        :style="{ '--chip-color': `var(--v-theme-${userCommand.command.color})` }"
+      >
+        <VIcon :icon="userCommand.command.icon" size="14" />/{{ userCommand.command.name }}
+      </span>
+      <span v-if="userText" class="message-text">{{ userText }}</span>
+    </div>
 
-    <!-- User message with hover actions -->
-    <VHover v-if="message.role === 'user'" v-slot="{ isHovering, props: hoverProps }">
-      <div v-bind="hoverProps" class="d-flex flex-column align-end">
-        <VCard
-          color="primary"
-          variant="tonal"
-          :elevation="0"
-          rounded="lg rounded-te-sm"
-          class="message-card"
-          :style="{ maxWidth: '88%', minWidth: '3rem' }"
-        >
-          <VCardText class="pa-3">
-            <VImg
-              v-if="filePart"
-              :src="filePart.url"
-              rounded="lg"
-              class="mb-2 position-relative"
-              style="z-index: 1"
-              width="200"
-              max-height="160"
-              cover
-            />
-            <!-- Slash command chip, e.g. /note -->
-            <span
-              v-if="userCommand?.command"
-              class="command-chip mb-1"
-              :style="{ '--chip-color': `var(--v-theme-${userCommand.command.color})` }"
-            >
-              <VIcon :icon="userCommand.command.icon" size="14" />
-              /{{ userCommand.command.name }}
-            </span>
-            <p
-              v-if="userText"
-              class="text-body-2 mb-0 message-text"
-              style="white-space: pre-wrap; word-break: break-word"
-            >
-              {{ userText }}
-            </p>
-          </VCardText>
-        </VCard>
+    <div class="message-actions" :class="{ 'is-pinned': canRetry }">
+      <VIconBtn icon="mdi-content-copy" size="x-small" variant="text" v-tooltip="'Copy'" @click="copyMessage" />
+      <VIconBtn
+        v-if="canRetry"
+        icon="mdi-refresh"
+        icon-color="error"
+        size="x-small"
+        variant="text"
+        v-tooltip="'Retry'"
+        @click="emit('retry')"
+      />
+    </div>
+  </div>
 
-        <!-- Hover action row — visibility avoids d-flex !important overriding display:none, and keeps space to prevent content shift -->
-        <div :style="{ visibility: isHovering ? 'visible' : 'hidden' }" class="d-flex justify-end ga-1 mt-n4 me-2">
-          <VIconBtn
-            icon="mdi-content-copy"
-            size="small"
-            variant="elevated"
-            density="comfortable"
-            v-tooltip="'Copy'"
-            @click="copyMessage"
-          />
+  <!-- AI message: white bubble on the left -->
+  <div v-else class="chat-msg is-ai ai-message">
+    <!-- searchNotes marker -->
+    <div v-if="readNotes" class="d-flex align-center ga-1 mb-1 text-caption text-medium-emphasis">
+      <VIcon icon="mdi-note-text-outline" size="14" />
+      Checked your notes
+    </div>
 
-          <VIconBtn
-            v-if="canRetry"
-            icon="mdi-refresh"
-            icon-color="error"
-            size="small"
-            variant="elevated"
-            density="comfortable"
-            v-tooltip="'Retry'"
-            @click="emit('retry')"
-          />
-        </div>
-      </div>
-    </VHover>
+    <!-- Plain text (conversational or streaming) — hidden for catchUp (text is AI context only) -->
+    <p v-if="displayText && tool !== 'catchUp'" class="mb-0 message-text">{{ displayText }}</p>
 
-    <!-- AI message -->
-    <VCard
-      v-else
-      color="container"
-      variant="elevated"
-      :elevation="0"
-      rounded="lg rounded-ts-sm"
-      class="message-card"
-      :style="{ maxWidth: '88%' }"
-    >
-      <VCardText class="pa-3">
-        <!-- searchNotes marker -->
-        <div v-if="readNotes" class="d-flex align-center ga-1 mb-1 text-caption text-medium-emphasis">
-          <VIcon icon="mdi-note-text-outline" size="14" />
-          Checked your notes
-        </div>
-
-        <!-- Plain text (conversational or streaming) — hidden for catchUp (text is AI context only) -->
-        <p
-          v-if="displayText && tool !== 'catchUp'"
-          class="text-body-2 mb-0 message-text"
-          style="white-space: pre-wrap; word-break: break-word"
-        >
-          {{ displayText }}
-        </p>
-
-        <!-- catchUp tool result -->
-        <template v-if="tool === 'catchUp' && catchUpItems?.length">
-          <!-- Grouped: Did / Todo / From your notes sections, each only when it has items -->
-          <template v-if="catchUpHasGroups">
-            <template v-if="catchUpDidItems.length">
-              <p class="catchup-group-header">Did</p>
-              <ul class="catchup-list">
-                <li
-                  v-for="(entry, idx) in catchUpDidItems"
-                  :key="idx"
-                  class="catchup-item"
-                  :class="{ 'is-ongoing': entry.ongoing }"
-                >
-                  {{ entry.text
-                  }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
-                </li>
-              </ul>
-            </template>
-            <template v-if="catchUpTodoItems.length">
-              <p class="catchup-group-header mt-2">Todo</p>
-              <ul class="catchup-list">
-                <li v-for="(entry, idx) in catchUpTodoItems" :key="idx" class="catchup-item">
-                  {{ entry.text }}
-                </li>
-              </ul>
-            </template>
-            <template v-if="catchUpNoteItems.length">
-              <p class="catchup-group-header mt-2">From your notes</p>
-              <ul class="catchup-list">
-                <li v-for="(entry, idx) in catchUpNoteItems" :key="idx" class="catchup-item">
-                  {{ entry.text }}
-                </li>
-              </ul>
-            </template>
-          </template>
-
-          <!-- No groups: existing flat list -->
-          <ul v-else class="catchup-list">
+    <!-- catchUp tool result -->
+    <template v-if="tool === 'catchUp' && catchUpItems?.length">
+      <!-- Grouped: Did / Todo / From your notes sections, each only when it has items -->
+      <template v-if="catchUpHasGroups">
+        <template v-if="catchUpDidItems.length">
+          <p class="catchup-group-header">Did</p>
+          <ul class="catchup-list">
             <li
-              v-for="(entry, idx) in catchUpItems"
+              v-for="(entry, idx) in catchUpDidItems"
               :key="idx"
               class="catchup-item"
               :class="{ 'is-ongoing': entry.ongoing }"
             >
-              {{ entry.text
-              }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
+              {{ entry.text }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
             </li>
           </ul>
         </template>
-
-        <!-- addNote / addEvent results: what was saved, each undoable -->
-        <div v-if="addedItems.length" class="d-flex flex-column ga-1 mt-2">
-          <div v-for="item in addedItems" :key="item.key" class="added-item d-flex align-center ga-2">
-            <VIcon :icon="item.icon" size="16" :color="undoneKeys.has(item.key) ? undefined : item.color" />
-            <span class="text-body-2 flex-grow-1 text-truncate" :class="{ 'is-undone': undoneKeys.has(item.key) }">
-              {{ item.label }}
-            </span>
-            <span v-if="undoneKeys.has(item.key)" class="text-caption text-medium-emphasis">Removed</span>
-            <VBtn v-else size="x-small" variant="text" color="primary" @click="undoAdded(item)">Undo</VBtn>
-          </div>
-        </div>
-
-        <!-- extractLogs tool result + action area -->
-        <template v-if="tool === 'extractLogs' && extractedLogs?.length">
-          <div class="d-flex flex-column ga-2 mt-3">
-            <AiLogCard v-for="(log, i) in extractedLogs" :key="i" :log="log" />
-          </div>
-
-          <div class="d-flex ga-2 justify-end mt-3">
-            <!-- Discarded state -->
-            <template v-if="saveState === 'discarded'">
-              <VChip size="small" prepend-icon="mdi-close-circle-outline" variant="tonal">Discarded</VChip>
-            </template>
-
-            <!-- Saved state: undo available or committed -->
-            <template v-else-if="saveState === 'saved'">
-              <VBtn size="small" color="primary" variant="tonal" :disabled="!isUndoable" @click="emit('undo')">
-                Undo
-              </VBtn>
-            </template>
-
-            <!-- Pending state: save + discard -->
-            <template v-else>
-              <VBtn size="small" variant="text" color="default" :disabled="!isSaveable" @click="emit('discard')">
-                Discard
-              </VBtn>
-              <VBtn size="small" color="primary" variant="tonal" :disabled="!isSaveable" @click="handleSave">
-                Save {{ extractedLogs.length }} log{{ extractedLogs.length > 1 ? 's' : '' }}
-              </VBtn>
-            </template>
-          </div>
+        <template v-if="catchUpTodoItems.length">
+          <p class="catchup-group-header mt-2">Todo</p>
+          <ul class="catchup-list">
+            <li v-for="(entry, idx) in catchUpTodoItems" :key="idx" class="catchup-item">
+              {{ entry.text }}
+            </li>
+          </ul>
         </template>
-      </VCardText>
-    </VCard>
+        <template v-if="catchUpNoteItems.length">
+          <p class="catchup-group-header mt-2">From your notes</p>
+          <ul class="catchup-list">
+            <li v-for="(entry, idx) in catchUpNoteItems" :key="idx" class="catchup-item">
+              {{ entry.text }}
+            </li>
+          </ul>
+        </template>
+      </template>
+
+      <!-- No groups: flat list -->
+      <ul v-else class="catchup-list">
+        <li
+          v-for="(entry, idx) in catchUpItems"
+          :key="idx"
+          class="catchup-item"
+          :class="{ 'is-ongoing': entry.ongoing }"
+        >
+          {{ entry.text }}<span v-if="entry.effortLabel" class="catchup-effort"> · {{ entry.effortLabel }}</span>
+        </li>
+      </ul>
+    </template>
+
+    <!-- addNote / addEvent results: what was saved, each undoable -->
+    <div v-if="addedItems.length" class="d-flex flex-column ga-1 mt-2">
+      <div v-for="item in addedItems" :key="item.key" class="added-item d-flex align-center ga-2">
+        <VIcon :icon="item.icon" size="16" :color="undoneKeys.has(item.key) ? undefined : item.color" />
+        <span class="flex-grow-1 text-truncate" :class="{ 'is-undone': undoneKeys.has(item.key) }">
+          {{ item.label }}
+        </span>
+        <span v-if="undoneKeys.has(item.key)" class="text-caption text-medium-emphasis">Removed</span>
+        <VBtn v-else size="x-small" variant="text" color="primary" @click="undoAdded(item)">Undo</VBtn>
+      </div>
+    </div>
+
+    <!-- extractLogs tool result + action area -->
+    <template v-if="tool === 'extractLogs' && extractedLogs?.length">
+      <div class="d-flex flex-column ga-2 mt-2">
+        <AiLogCard v-for="(log, i) in extractedLogs" :key="i" :log="log" />
+      </div>
+
+      <div class="d-flex ga-2 justify-end align-center mt-2">
+        <!-- Discarded state -->
+        <span v-if="saveState === 'discarded'" class="text-caption text-medium-emphasis">Discarded</span>
+
+        <!-- Saved state: undo available or committed -->
+        <template v-else-if="saveState === 'saved'">
+          <span v-if="!isUndoable" class="text-caption text-medium-emphasis">Saved</span>
+          <VBtn v-else size="small" rounded="pill" color="primary" variant="tonal" @click="emit('undo')">Undo</VBtn>
+        </template>
+
+        <!-- Pending state: save + discard -->
+        <template v-else>
+          <VBtn size="small" rounded="pill" variant="text" :disabled="!isSaveable" @click="emit('discard')">
+            Discard
+          </VBtn>
+          <VBtn size="small" rounded="pill" color="primary" variant="tonal" :disabled="!isSaveable" @click="handleSave">
+            Save {{ extractedLogs.length }} log{{ extractedLogs.length > 1 ? 's' : '' }}
+          </VBtn>
+        </template>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.message-card {
-  word-break: break-word;
+.user-row {
+  align-self: flex-end;
+  max-width: 86%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
-/* Tonal chip in the command's own hue. Own markup (not VChip) so the icon sits on the text's
-   centre line: VChip's x-small prepend icon rides high */
-.command-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px 0 6px;
-  border-radius: 11px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  color: rgb(var(--chip-color));
-  background: rgba(var(--chip-color), 0.14);
+.user-row .chat-msg {
+  max-width: 100%;
+}
+
+.message-text {
+  white-space: pre-wrap;
+}
+
+.message-image {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+
+/* Copy / retry: on hover, or always while a retry is offered */
+.message-actions {
+  display: flex;
+  gap: 2px;
+  height: 0;
+  overflow: visible;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.user-row:hover .message-actions,
+.message-actions.is-pinned {
+  height: auto;
+  opacity: 1;
+}
+
+.ai-message {
+  width: fit-content;
 }
 
 .added-item {

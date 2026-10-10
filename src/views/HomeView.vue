@@ -1,19 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
-import AiChatPanel from '@/components/AiChatPanel.vue';
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import InsightsPanel from '@/components/InsightsPanel.vue';
 import LogList from '@/components/LogList.vue';
 import MobileWeekChart from '@/components/MobileWeekChart.vue';
-import NotesPanel from '@/components/NotesPanel.vue';
 import TodayEvents from '@/components/TodayEvents.vue';
 import WorkTimeBarChart from '@/components/WorkTimeBarChart.vue';
 
-import type { ExtractedLog } from '@/interfaces/AiChat';
 import type { TimeLog } from '@/interfaces/TimeLog';
 
-import { useDisplay, useTheme } from 'vuetify';
+import { useDisplay } from 'vuetify';
 
 import { useNow } from '@vueuse/core';
 
@@ -33,7 +30,7 @@ import { uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
 
 const { logs, forMonth, save, remove: removeLog, addMany: addLogs } = useTimeLogs();
-const { addProjects, addTasks, allProjects: projects, allTasks: tasks } = useWorkspace();
+const { addProjects, addTasks } = useWorkspace();
 
 const now = useNow({ interval: 60_000 });
 const todayDateStr = computed(() => dayjs(now.value).format('YYYY-MM-DD'));
@@ -100,11 +97,8 @@ watch(todayDateStr, () => {
   }
 });
 
-const tab = ref<'form' | 'ai' | 'notes'>('form');
-const theme = useTheme();
 const { smAndDown } = useDisplay();
 const { isOpen: insightsDrawerOpen, isInline: insightsInline, showInline: insightsShowInline } = useInsightsDrawer();
-const tabSliderColor = computed(() => (theme.global.current.value.dark ? 'green-darken-4' : 'green-lighten-2'));
 
 // Logs for the calendar's current month (ISO 'YYYY-MM'). Assumes current year —
 // matches prior behavior; cross-year navigation would need a year threaded alongside.
@@ -184,13 +178,11 @@ const onCloneLog = (log: TimeLog) => {
     description: log.description,
     nonce: ++cloneNonce,
   };
-  tab.value = 'form'; // reveal the form if the Chat tab is active
 };
 
 // Insights "Not logged" chips: act like a calendar click (replace while editing, else toggle), then
 // bring the form into view — closing the drawer when Insights is shown in it
 const revealForm = () => {
-  tab.value = 'form';
   if (!insightsInline.value) insightsDrawerOpen.value = false;
 };
 
@@ -245,95 +237,25 @@ const importCsv = async (file?: File) => {
 
   notificationCenter.success('Logs imported');
 };
-
-// Track IDs of the last AI-saved batch for undo support (unified store, no month bucket)
-const lastAiSavedLogs = ref<string[]>([]);
-
-// Handle logs saved from the AI chat panel. AI already returns ISO YYYY-MM-DD, so store directly.
-const onAiSaveLogs = async (extractedLogs: ExtractedLog[]) => {
-  const savedIds: string[] = [];
-  const toSave = extractedLogs.map((log) => {
-    const id = nanoid();
-    savedIds.push(id);
-    return {
-      id,
-      date: log.date, // already ISO YYYY-MM-DD
-      project: log.project,
-      task: log.task,
-      duration: log.duration,
-      type: log.duration ? 'log' : 'plan',
-      description: log.description,
-    } as TimeLog & { id: string };
-  });
-
-  await addLogs(toSave);
-  lastAiSavedLogs.value = savedIds;
-
-  // Merge any new projects and tasks into the stored lists (same as importCsv)
-  await addProjects(uniqBy(extractedLogs.map((log) => ({ title: log.project })), 'title'));
-  await addTasks(
-    uniqBy(
-      extractedLogs.filter((log) => log.task).map((log) => ({ project: log.project, title: log.task! })),
-      (t) => `${t.project}-${t.title}`,
-    ),
-  );
-
-  notificationCenter.success(`${extractedLogs.length} log${extractedLogs.length > 1 ? 's' : ''} saved`);
-};
-
-const onAiUndoLogs = async () => {
-  for (const id of lastAiSavedLogs.value) await removeLog(id);
-  lastAiSavedLogs.value = [];
-
-  notificationCenter.info('Logs removed');
-};
 </script>
 
 <template>
   <!-- Three-column layout: form | chart+logs | insights (lg+) -->
   <div class="home-layout">
-    <!-- Left panel: Form + AI Assistant tabs -->
-    <VCard
-      class="glass-acrylic form-panel d-flex flex-column overflow-hidden"
-      :class="{ 'form-panel--chat': tab !== 'form' }"
-    >
-      <VTabs v-model="tab" density="compact" class="ma-2" align-tabs="center" :slider-color="tabSliderColor">
-        <VTab value="form" prepend-icon="mdi-format-list-bulleted">Form</VTab>
-        <VTab value="ai" prepend-icon="mdi-creation">Chat</VTab>
-        <VTab value="notes" prepend-icon="mdi-note-text-outline">Notes</VTab>
-      </VTabs>
-
-      <VTabsWindow v-model="tab">
-        <!-- Form tab: scrollable so sticky form-actions works -->
-        <VTabsWindowItem value="form" class="overflow-y-auto">
-          <!-- Today's events, if any: a quiet reminder before logging -->
-          <TodayEvents class="mx-4 mt-1" />
-          <BulkLogForm
-            v-model:selected-dates="selectedDates"
-            :editing-log="editingLog"
-            :clone-seed="cloneSeed"
-            @submit="saveBulkLogs"
-            @cancel="onBulkCancel"
-            @month-changed="onMonthChanged"
-          />
-        </VTabsWindowItem>
-
-        <!-- AI Assistant tab -->
-        <VTabsWindowItem value="ai">
-          <AiChatPanel
-            class="mobile-chat"
-            :projects="projects"
-            :tasks="tasks"
-            @save-logs="onAiSaveLogs"
-            @undo-logs="onAiUndoLogs"
-          />
-        </VTabsWindowItem>
-
-        <!-- Notes tab -->
-        <VTabsWindowItem value="notes">
-          <NotesPanel />
-        </VTabsWindowItem>
-      </VTabsWindow>
+    <!-- Left panel: log form, scrollable so its sticky actions work -->
+    <VCard class="glass-acrylic form-panel d-flex flex-column overflow-hidden">
+      <div class="form-scroll overflow-y-auto">
+        <!-- Today's events, if any: a quiet reminder before logging -->
+        <TodayEvents class="mx-4 mt-3" />
+        <BulkLogForm
+          v-model:selected-dates="selectedDates"
+          :editing-log="editingLog"
+          :clone-seed="cloneSeed"
+          @submit="saveBulkLogs"
+          @cancel="onBulkCancel"
+          @month-changed="onMonthChanged"
+        />
+      </div>
     </VCard>
 
     <!-- Middle column: chart stacked above log list -->
@@ -458,31 +380,9 @@ const onAiUndoLogs = async () => {
   min-height: 0;
 }
 
-/* VTabsWindow flex chain.
-   Vuetify's VWindow sets height:inherit on .v-window__container. Because VTabsWindow
-   only has a flex-allocated height (no explicit CSS height property), inherit resolves
-   to auto — collapsing the container and preventing overflow-y-auto from scrolling.
-   This chain fixes that without touching Vuetify internals globally. */
-.form-panel :deep(.v-tabs) {
-  flex-grow: 0 !important;
-  flex-shrink: 0 !important;
-}
-.form-panel :deep(.v-tabs-window) {
-  flex: 1;
-  display: flex !important;
-  flex-direction: column;
-  min-height: 0;
-}
-.form-panel :deep(.v-tabs-window .v-window__container) {
-  height: auto !important;
+.form-scroll {
   flex: 1;
   min-height: 0;
-}
-.form-panel :deep(.v-tabs-window .v-window-item) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 /* Mobile: switch to page-scroll stacked layout */
@@ -495,7 +395,6 @@ const onAiUndoLogs = async () => {
   .form-panel {
     flex: none;
     overflow: visible !important;
-    min-height: 80vh;
   }
 
   .content-column {
@@ -509,33 +408,9 @@ const onAiUndoLogs = async () => {
     height: 70vh;
   }
 
-  /* Clear all overflow contexts so sticky form buttons work against page scroll */
-  .form-panel :deep(.v-card),
-  .form-panel :deep(.v-tabs-window),
-  .form-panel :deep(.v-tabs-window .v-window__container),
-  .form-panel :deep(.v-tabs-window .v-window-item) {
+  /* Clear the overflow contexts so sticky form buttons work against page scroll */
+  .form-panel .form-scroll {
     overflow: visible !important;
-    height: auto !important;
-    flex: none !important;
-  }
-
-  /* Chat tab: the fixed-height chat app needs a bounded panel to fill (with its
-     own internal message scroll). The page-scroll model above suits the tall
-     Form but collapses the chat to content height. Restore the flex chain and
-     give the panel a definite height only while the Chat tab is active. */
-  .form-panel.form-panel--chat {
-    min-height: 0;
-    height: 80vh;
-  }
-  .form-panel.form-panel--chat :deep(.v-tabs-window),
-  .form-panel.form-panel--chat :deep(.v-tabs-window .v-window__container),
-  .form-panel.form-panel--chat :deep(.v-tabs-window .v-window-item),
-  .form-panel.form-panel--chat :deep(.v-card.mobile-chat),
-  .form-panel.form-panel--chat :deep(.notes-panel) {
-    flex: 1 !important;
-    height: auto !important;
-    min-height: 0;
-    overflow: hidden !important;
   }
 }
 </style>

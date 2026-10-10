@@ -11,6 +11,9 @@ export const storageKeys = {
     config: 'jiraConfig',
     lastSyncDate: 'jiraLastSyncDate',
   },
+  chat: {
+    history: 'chatHistory',
+  },
   catchUp: {
     summaries: 'catchupSummaries',
   },

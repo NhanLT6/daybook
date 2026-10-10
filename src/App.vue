@@ -11,6 +11,7 @@ import { useServerSettings } from '@/composables/useServerSettings';
 
 import AppBackground from '@/components/AppBackground.vue';
 import AuthMenu from '@/components/AuthMenu.vue';
+import ChatBar from '@/components/ChatBar.vue';
 import NotificationIsland from '@/components/NotificationIsland.vue';
 
 import { useDisplay, useTheme } from 'vuetify';
@@ -138,6 +139,7 @@ watch(
 
 const navItems = [
   { text: 'Home', to: '/' },
+  { text: 'Notes', to: '/notes' },
   { text: 'Tasks', to: '/task' },
   { text: 'Events', to: '/events' },
   { text: 'Settings', to: '/setting' },
@@ -246,8 +248,13 @@ const navItems = [
 
     <VMain style="overflow-y: auto">
       <RouterView />
+      <!-- Touch screens keep the chat bar resting at the bottom: leave room so it covers no content -->
+      <div class="chat-bar-spacer" />
       <AppBackground />
     </VMain>
+
+    <!-- Glass chat bar, docked bottom centre on every page -->
+    <ChatBar />
   </VApp>
 </template>
 
@@ -273,6 +280,16 @@ const navItems = [
      back to `auto` (CSS spec), so VMain would keep its scrollbar. */
   .v-main {
     overflow: visible !important;
+  }
+}
+
+.chat-bar-spacer {
+  display: none;
+}
+@media (hover: none) {
+  .chat-bar-spacer {
+    display: block;
+    height: 88px;
   }
 }
 
