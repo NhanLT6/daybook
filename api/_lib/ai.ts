@@ -79,27 +79,52 @@ interface GatewayLikeError {
   statusCode?: number;
   type?: string;
   message?: string;
+  cause?: unknown;
+  lastError?: unknown;
 }
 
 /**
- * Message for a failed AI call. The gateway signals an exhausted credit (402), a burst past its
- * free-tier rate limit (429) and "no provider meets the privacy options" (400) in ways the user can act
- * on, so those get plain wording; anything else stays generic rather than echoing provider internals.
+ * Status, type and messages from the whole error chain: the AI SDK wraps the gateway error (a
+ * RetryError keeps it as `lastError`, other wrappers as `cause`), so the first status/type found wins
+ * and every message is kept for matching.
+ */
+function readGatewayError(err: unknown): { statusCode?: number; type?: string; message: string } {
+  const found: { statusCode?: number; type?: string; message: string } = { message: '' };
+  let current = err as GatewayLikeError | undefined;
+  for (let depth = 0; current && typeof current === 'object' && depth < 4; depth++) {
+    found.statusCode ??= current.statusCode;
+    found.type ??= current.type;
+    if (current.message) found.message += ` ${current.message}`;
+    current = (current.lastError ?? current.cause) as GatewayLikeError | undefined;
+  }
+  return found;
+}
+
+/**
+ * Message for a failed AI call. The gateway signals a reached budget or exhausted credit (402,
+ * `quota_for_entity_exceeded`), a burst past its rate limit (429) and "no provider meets the privacy
+ * options" (400) in ways the user can act on, so those get plain wording; anything else stays generic
+ * rather than echoing provider internals. The AI SDK maps types it doesn't know (like the quota one)
+ * to an internal error, so the status code and message are what identify a budget hit.
  */
 export function aiErrorMessage(err: unknown, config: AiConfig): string {
-  const { statusCode, type } = (err ?? {}) as GatewayLikeError;
-  const hint = usesOwnKey(config) ? 'Check your API key in Settings.' : 'You can add your own Gemini key in Settings.';
+  const { statusCode, type, message } = readGatewayError(err);
 
-  if (!usesOwnKey(config)) {
-    if (statusCode === 402 || type === 'insufficient_funds') {
-      return `The shared AI quota for this month is used up. ${hint}`;
-    }
-    if (statusCode === 429 || type === 'rate_limit_exceeded') {
-      return 'The shared AI is busy right now. Try again in a minute, or add your own Gemini key in Settings.';
-    }
-    if (type === 'no_providers_available') {
-      return 'No AI provider met the privacy requirements (no training, zero data retention). Ask the owner to review AI_GATEWAY_ZDR / AI_GATEWAY_MODEL.';
-    }
+  if (usesOwnKey(config)) return 'AI request failed. Check your API key in Settings.';
+
+  const quotaHit =
+    statusCode === 402 ||
+    type === 'insufficient_funds' ||
+    type === 'quota_for_entity_exceeded' ||
+    /budget exceeded|quota limit exceeded/i.test(message);
+  if (quotaHit) {
+    return 'The shared AI quota for this month is used up. You can add your own Gemini key in Settings.';
   }
-  return `AI request failed. ${hint}`;
+  if (statusCode === 429 || type === 'rate_limit_exceeded') {
+    return 'The shared AI is busy right now. Try again in a minute, or add your own Gemini key in Settings.';
+  }
+  if (type === 'no_providers_available') {
+    return 'No AI provider met the privacy requirements (no training, zero data retention). Ask the owner to review AI_GATEWAY_ZDR / AI_GATEWAY_MODEL.';
+  }
+  return "The shared AI couldn't answer right now. Try again in a moment.";
 }

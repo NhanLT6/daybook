@@ -75,6 +75,22 @@ describe('aiErrorMessage', () => {
     expect(aiErrorMessage({ statusCode: 402 }, shared)).toContain('own Gemini key');
   });
 
+  it('spots a budget hit wrapped by the AI SDK', () => {
+    vi.stubEnv('AI_GATEWAY_ENABLED', 'true');
+    // Unknown gateway types become an internal error that keeps the 402; a RetryError wraps it as lastError
+    expect(aiErrorMessage({ lastError: { statusCode: 402, type: 'internal_server_error' } }, shared)).toContain(
+      'quota',
+    );
+    expect(aiErrorMessage({ cause: { message: 'Project budget exceeded. Current spend: $5.00' } }, shared)).toContain(
+      'quota',
+    );
+  });
+
+  it("doesn't blame an API key for other shared failures", () => {
+    vi.stubEnv('AI_GATEWAY_ENABLED', 'true');
+    expect(aiErrorMessage({ statusCode: 500 }, shared)).not.toMatch(/key/i);
+  });
+
   it('keeps own-key failures generic', () => {
     expect(aiErrorMessage({ statusCode: 402 }, ownWithKey)).toBe('AI request failed. Check your API key in Settings.');
   });
