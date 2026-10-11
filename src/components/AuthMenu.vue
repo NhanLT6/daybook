@@ -60,8 +60,9 @@ const submit = async () => {
     <VMenu v-if="isAuthenticated && !hideTrigger" location="bottom end" :offset="8">
       <template #activator="{ props }">
         <!-- comfortable density: an icon button is otherwise 12px taller than its size (40px, not 28px), which
-             would stretch the whole dock the moment the avatar appears -->
-        <VBtn icon variant="text" size="small" density="comfortable" v-bind="props" aria-label="Account">
+             would stretch the whole dock the moment the avatar appears. me-2 insets it from the dock's right
+             edge as far as the brand text sits from the left -->
+        <VBtn icon variant="text" size="small" density="comfortable" class="me-2" v-bind="props" aria-label="Account">
           <VAvatar size="26" color="primary" variant="tonal">
             <VImg v-if="user?.image" :src="user.image" alt="" />
             <span v-else class="text-caption">{{ initials }}</span>
