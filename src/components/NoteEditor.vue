@@ -251,7 +251,6 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 
 .note-swatch {

@@ -520,7 +520,6 @@ const readCsv = (file?: File) => {
 .scroll-content {
   flex: 1;
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 
 /* Toolbar search: magnify button expands into a field */
