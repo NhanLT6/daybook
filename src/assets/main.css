@@ -160,6 +160,13 @@
   scrollbar-color: rgba(var(--v-theme-on-surface), 0.2) transparent;
 }
 
+/* Scroll panels reserve the scrollbar's width up front, so content doesn't
+   jump sideways when the scrollbar appears or disappears. Not on `*`: the
+   gutter is also reserved on overflow:hidden boxes (VCard etc). */
+.overflow-y-auto {
+  scrollbar-gutter: stable;
+}
+
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;

@@ -398,6 +398,7 @@ const deleteEvent = (event: AppEvent) => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* Rows select their event on the calendar */

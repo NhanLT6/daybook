@@ -532,6 +532,7 @@ onClickOutside(rootEl, () => {
   max-height: min(560px, calc(100vh - 86px));
   padding: 14px 16px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .island-panel-header {

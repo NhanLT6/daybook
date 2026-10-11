@@ -776,6 +776,7 @@ onBeforeUnmount(() => {
   position: relative; /* leave-absolute positions the fading empty state against this */
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 12px 12px 12px;
 }
 

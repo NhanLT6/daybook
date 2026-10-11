@@ -91,6 +91,7 @@ const onSelectEvent = (id: string) => {
   .event-page {
     flex-direction: column;
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .event-side {
