@@ -126,7 +126,7 @@ const copyMessage = () => {
 </script>
 
 <template>
-  <!-- User message: tonal bubble on the right, copy / retry on hover -->
+  <!-- User message: tonal bubble on the right, copy / retry beside it on hover -->
   <div v-if="message.role === 'user'" class="user-row">
     <div class="chat-msg is-me">
       <img v-if="filePart?.url" :src="filePart.url" alt="Attached image" class="message-image" />
@@ -261,12 +261,13 @@ const copyMessage = () => {
   align-self: flex-end;
   max-width: 86%;
   display: flex;
-  flex-direction: column;
+  flex-direction: row-reverse;
   align-items: flex-end;
+  gap: 2px;
 }
 
 .user-row .chat-msg {
-  max-width: 100%;
+  min-width: 0;
 }
 
 .message-text {
@@ -283,19 +284,19 @@ const copyMessage = () => {
   margin-bottom: 6px;
 }
 
-/* Copy / retry: on hover, or always while a retry is offered */
+/* Copy / retry: on hover, or always while a retry is offered. They sit beside the
+   bubble and only fade, so hovering never changes the thread's height (which
+   toggled the scrollbar and made the content jump). */
 .message-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 2px;
-  height: 0;
-  overflow: visible;
   opacity: 0;
   transition: opacity 0.15s;
 }
 
 .user-row:hover .message-actions,
 .message-actions.is-pinned {
-  height: auto;
   opacity: 1;
 }
 
