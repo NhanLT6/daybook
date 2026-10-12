@@ -64,6 +64,14 @@ Detailed docs for non-trivial features live in `docs/features/`. Read the releva
 - `docs/features/chat.md` — Chat tools (extractLogs, searchNotes, addNote, addEvent; which run in the browser), slash commands and how they narrow the model's tools
 - `docs/features/events.md` — Event/RepeatRule data model (no migration), `eventRecurrence.ts` date logic, work-day rules (`WorkCalendar`), repeat form rules, Events page calendar selection, skip dates, timezone/UTC-midnight and day-of-month gotchas
 
+## Branches, Deploys & Test Resources
+Every pushed branch gets a Vercel preview build, and the Neon integration creates a Neon branch plus branch-scoped env vars for each preview (the free tier runs out fast).
+- **One dev branch**: put all in-progress Claude work on a single `claude/dev` branch (reset from `master` when starting new work); don't push a new branch per fix
+- **No previews for Claude branches**: `vercel.json` turns off deploys for `claude/*`; keep it that way
+- **Push sparingly**: batch fixes, push only when there is something to review or merge
+- **Test resources**: any Neon branch, DB connection or env key made for testing is prefixed `claude-test-`, kept minimal, and removed when done
+- **Never touch prod** data, env vars or deployments; ask Nhan before deleting any Vercel/Neon resource or remote branch
+
 ## Important Notes
 - **Type Safety**: Full TypeScript coverage required
 - **Windows Focus**: PowerShell scripts preferred for automation
