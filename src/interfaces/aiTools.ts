@@ -30,6 +30,15 @@ export type ExtractedLog = z.infer<typeof extractedLogSchema>;
 export type ExtractLogsInput = z.infer<typeof extractLogsInputSchema>;
 
 /**
+ * extractLogs has no executor: the user reviews the logs on a card instead. Before the next request the
+ * client fills in this output (what the user did with the card), because the model API rejects a
+ * history holding a tool call with no result.
+ */
+export interface ExtractLogsOutput {
+  status: 'saved' | 'discarded' | 'not saved yet';
+}
+
+/**
  * `searchNotes` runs in the browser (notes live in IndexedDB, the server can't read them).
  * The query only ranks notes; the model reads the messy text itself, so matching stays loose.
  */

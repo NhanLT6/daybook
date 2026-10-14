@@ -14,6 +14,7 @@ import {
 import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js';
 import { AI_NOT_SET_UP_MESSAGE, MAX_OUTPUT_TOKENS, aiErrorMessage, isAiAvailable, resolveAi } from './_lib/ai.js';
 import { getSettings } from './_lib/settingsRepo.js';
+import { dateContext } from './_lib/dateContext.js';
 import { DEFAULT_AI_CONFIG, type AiConfig } from '../src/interfaces/ServerSettings.js';
 
 interface ChatApiRequest {
@@ -104,7 +105,7 @@ function buildSystemPrompt(
   const commandRule = command ? `\n\n${COMMAND_RULES[command]}` : '';
 
   return `You are a time log assistant for a daily work tracking app called Daybook.
-Today's date is ${currentDate}.
+${dateContext(currentDate)}
 
 The user's known projects are: ${projectList}
 
@@ -115,12 +116,13 @@ When the user describes work they did (via text or screenshot), call the extract
 - Match project names to the known list where possible. If not found, use what the user said.
 - Match task names to the known list for that project where possible. If not found, use what the user said.
 - Task is optional. Only set it when the user's message actually mentions a task; leave it unset otherwise. Do not default it to the project name.
-- Resolve relative dates ("yesterday", "this morning", "last Friday") using today's date.
+- Resolve relative dates ("yesterday", "this morning", "last Friday", "monday this week") from the dates listed above.
 - Duration must be in minutes (integer).
 ${workdayRules(workdayMinutes)}
 - Omit duration (plan entry, no time logged yet) when the user is describing future/not-yet-done work — e.g. "plan to work on T-999", "will pick up T-999", "todo: T-999" — with no remainder phrasing.
 - If a task is mentioned with no duration, no remainder phrasing, and no plan-intent wording either, don't guess — ask the user to clarify how much time (or whether it's a plan entry).
 - description is optional — use it for meaningful detail only.
+- If the user corrects logs you extracted earlier (wrong date, duration, task), call extractLogs again with the full corrected list. Earlier extractLogs results say whether the user saved or discarded those logs; if they were already saved, mention that the old entries need deleting from the log list.
 - Do NOT include a JSON block in your text response. Use the extractLogs tool instead.
 
 If you cannot find any time log data in the message, reply conversationally and ask for clarification. Do NOT call extractLogs in that case.

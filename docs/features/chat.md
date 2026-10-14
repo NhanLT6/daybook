@@ -21,12 +21,18 @@ All schemas live in `src/interfaces/aiTools.ts`, shared by client and server.
 
 | Tool | Runs | Result in the UI |
 |---|---|---|
-| `extractLogs` | model only, no output | Log cards with Save / Discard, then Undo until the next message |
+| `extractLogs` | model only; output filled in per request (below) | Log cards with Save / Discard, then Undo until the next message |
 | `searchNotes` | browser (notes are in IndexedDB) | "Checked your notes" marker |
 | `addNote` | browser: plain text → note HTML (`plainTextToNoteHtml`, then `sanitizeNoteHtml`) | Saved row with Undo |
 | `addEvent` | browser: one-off custom event; repeats are refused and sent to the Events page | Saved row with Undo |
 
-Browser tools have no `execute` on the server. The client answers them in `onToolCall` with `addToolOutput` (never awaited there, it can deadlock the job queue), and `sendAutomaticallyWhen` sends the result back so the model can confirm. A turn that only extracted logs never resubmits, because `extractLogs` gets no output.
+Browser tools have no `execute` on the server. The client answers them in `onToolCall` with `addToolOutput` (never awaited there, it can deadlock the job queue), and `sendAutomaticallyWhen` sends the result back so the model can confirm. A turn that only extracted logs never resubmits, because `extractLogs` gets no output in the chat (the card reads its `input-available` part).
+
+The model API rejects a history holding a tool call with no result (`AI_MissingToolResultsError`), so the transport's `prepareSendMessagesRequest` sends a copy where each pending `extractLogs` call is answered with what the user did with its card (`saved`, `discarded`, `not saved yet`; `withExtractLogsResults`). That is also how a correction like "the date is wrong" reaches the model with context.
+
+## Dates
+
+The client sends the local date (`dayjs`, not `toISOString()`, which is UTC). The server's `dateContext()` (`api/_lib/dateContext.ts`) spells out today's weekday and the dates of this week and last week, Monday-first, because models get the weekday of a bare date wrong ("monday this week" became next Monday).
 
 Notes and events save straight away (Undo instead of a confirm step); logs keep the confirm card.
 

@@ -2,12 +2,13 @@ import { computed, ref } from 'vue';
 
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
-import type { AddedItemOutput, ExtractLogsInput, ServerChatCommand } from '@/interfaces/aiTools';
+import type { AddedItemOutput, ExtractLogsInput, ExtractLogsOutput, ServerChatCommand } from '@/interfaces/aiTools';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
 import type { FileUIPart } from 'ai';
 
 import { Chat } from '@ai-sdk/vue';
+import dayjs from 'dayjs';
 import { DefaultChatTransport, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 
 import { plainTextToNoteHtml } from '@/common/plainTextToNoteHtml';
@@ -50,6 +51,29 @@ export function extractLogsFromMessage(message: Pick<DaybookUIMessage, 'parts'>)
   );
   const input = part && 'input' in part ? (part.input as ExtractLogsInput | undefined) : undefined;
   return input?.logs ?? [];
+}
+
+/**
+ * Copy of the history for the next request, with every pending extractLogs call answered by what the
+ * user did with its card. extractLogs never gets an output in the chat itself (the card reads the
+ * `input-available` part), but the model API rejects a tool call with no result
+ * (AI_MissingToolResultsError), so any message after a log extraction failed without this.
+ */
+export function withExtractLogsResults(
+  messages: DaybookUIMessage[],
+  saveStateOf: (messageId: string) => DaybookMessageMetadata['saveState'],
+): DaybookUIMessage[] {
+  return messages.map((m) => {
+    if (m.role !== 'assistant' || !m.parts.some((p) => p.type === 'tool-extractLogs' && p.state === 'input-available'))
+      return m;
+    const output: ExtractLogsOutput = { status: saveStateOf(m.id) ?? 'not saved yet' };
+    return {
+      ...m,
+      parts: m.parts.map((p) =>
+        p.type === 'tool-extractLogs' && p.state === 'input-available' ? { ...p, state: 'output-available', output } : p,
+      ),
+    } as DaybookUIMessage;
+  });
 }
 
 // ── Client-side tools ───────────────────────────────────────────────────────
@@ -119,6 +143,15 @@ export function useAiChat() {
     transport: new DefaultChatTransport<DaybookUIMessage>({
       headers: async () => (await authHeaders()) ?? {},
       body: () => requestBody,
+      prepareSendMessagesRequest: ({ id, messages, body, trigger, messageId }) => ({
+        body: {
+          ...body,
+          id,
+          messages: withExtractLogsResults(messages, (mid) => metadataMap.value.get(mid)?.saveState),
+          trigger,
+          messageId,
+        },
+      }),
     }),
     onToolCall: async ({ toolCall }) => {
       if (toolCall.dynamic || !isClientTool(toolCall.toolName)) return;
@@ -206,7 +239,8 @@ export function useAiChat() {
     requestBody = {
       projects: projects.map((p) => p.title),
       tasks: tasks.map((t) => ({ project: t.project, title: t.title })),
-      currentDate: new Date().toISOString().split('T')[0],
+      // Local date: toISOString() is UTC, which is still yesterday for early mornings east of UTC
+      currentDate: dayjs().format('YYYY-MM-DD'),
       // The user's workday length for "rest of the day" phrasing; null = no daily target
       workdayMinutes: dailyTargetMinutes(settingsStore.dailyTargetEnabled, settingsStore.dailyTargetHours),
       ...(command ? { command } : {}),

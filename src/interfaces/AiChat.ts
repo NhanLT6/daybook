@@ -3,6 +3,7 @@ import type {
   AddNoteInput,
   AddedItemOutput,
   ExtractLogsInput,
+  ExtractLogsOutput,
   ExtractedLog,
   SearchNotesInput,
   SearchNotesOutput,
@@ -26,7 +27,7 @@ export interface DaybookMessageMetadata {
 // `part.input` is typed instead of `unknown`. Must be a `type`
 // (not `interface`) to satisfy the SDK's `UITools = Record<string, UITool>`.
 export type DaybookUITools = {
-  extractLogs: { input: ExtractLogsInput; output: never };
+  extractLogs: { input: ExtractLogsInput; output: ExtractLogsOutput };
   searchNotes: { input: SearchNotesInput; output: SearchNotesOutput };
   addNote: { input: AddNoteInput; output: AddedItemOutput };
   addEvent: { input: AddEventInput; output: AddedItemOutput };
