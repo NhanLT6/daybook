@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, provide, ref } from 'vue';
+
+import { LIST_SCROLLED_KEY } from '@/components/listPanelKeys';
 
 import { useScroll } from '@vueuse/core';
 
@@ -19,8 +21,12 @@ const search = defineModel<string>('search', { default: '' });
 const body = ref<HTMLElement | null>(null);
 defineExpose({ body });
 
-// Lets sticky column titles take a solid fill only once rows scroll under them
+// Lets sticky column titles (GroupedTable) take a fill only once rows scroll under them
 const { y: scrollTop } = useScroll(body);
+provide(
+  LIST_SCROLLED_KEY,
+  computed(() => scrollTop.value > 0),
+);
 </script>
 
 <template>
@@ -58,7 +64,7 @@ const { y: scrollTop } = useScroll(body);
     </div>
 
     <!-- Body: owns the scroll so the toolbar stays put -->
-    <div ref="body" class="list-panel__body" :class="{ 'list-panel__body--scrolled': scrollTop > 0 }">
+    <div ref="body" class="list-panel__body">
       <slot />
     </div>
   </section>

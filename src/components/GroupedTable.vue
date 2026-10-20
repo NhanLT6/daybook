@@ -1,7 +1,9 @@
 <script setup lang="ts" generic="G extends TableGroup<any>">
-import { computed, useSlots } from 'vue';
+import { computed, inject, ref, useSlots } from 'vue';
 
 import { useDisplay } from 'vuetify';
+
+import { LIST_SCROLLED_KEY } from '@/components/listPanelKeys';
 
 // The one table the list pages share. Column titles sit on the glass; the rows sit in solid
 // (tier-1) cards: consecutive groups with the same `block` share a card, and blocks are spaced
@@ -106,13 +108,16 @@ const blocks = computed(() => {
 
 const colWidth = (col: TableColumn) => (typeof col.width === 'number' ? `${col.width}px` : col.width);
 
+// ListPanel says when its body has scrolled, so the pinned head can take a fill
+const listScrolled = inject(LIST_SCROLLED_KEY, ref(false));
+
 const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : undefined);
 </script>
 
 <template>
   <div class="gt">
     <!-- Column titles on the glass, pinned under the toolbar while the body scrolls -->
-    <div class="gt-head">
+    <div class="gt-head" :class="{ 'gt-head--frosted': listScrolled }">
       <table class="gt-table">
         <colgroup>
           <col v-for="col in columns" :key="col.key" :style="{ width: colWidth(col) }" />
@@ -224,14 +229,25 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
   padding: 0 8px;
 }
 
-:global(.list-panel__body--scrolled) .gt-head {
-  background: rgb(var(--v-theme-surface));
+/* Once rows scroll under it, the head turns into a strip of the same frosted glass as the card
+   (ListPanel provides the scroll state) */
+.gt-head--frosted {
+  backdrop-filter: blur(var(--glass-blur, 25.6px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
   box-shadow: 0 1px 0 rgba(var(--v-theme-on-surface), 0.09);
 }
 
+.v-theme--light .gt-head--frosted {
+  background: rgba(255, 255, 255, var(--glass-opacity-light, 0.83));
+}
+
+.v-theme--dark .gt-head--frosted {
+  background: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77));
+}
+
 .gt-head th {
-  height: 32px;
-  padding: 0 12px;
+  height: 40px;
+  padding: 0 16px;
   text-align: start;
   font-size: 0.75rem;
   font-weight: 500;
@@ -247,7 +263,7 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
 
 .gt-block-label {
   margin: 4px 0 -6px;
-  padding: 0 4px 0 12px;
+  padding: 0 4px 0 16px;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -262,8 +278,8 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
 
 /* Group row: the hairline above it is what separates groups within a card */
 .gt-group-row td {
-  height: 44px;
-  padding: 6px 12px;
+  height: 52px;
+  padding: 8px 16px;
   font-size: 0.8125rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
   border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
@@ -297,8 +313,8 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
 
 /* Rows: plain, a soft tint on hover */
 .gt-row td {
-  height: 40px;
-  padding: 4px 12px;
+  height: 52px;
+  padding: 8px 16px;
   vertical-align: middle;
   overflow-wrap: anywhere;
 }
@@ -313,7 +329,7 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
 }
 
 .gt-empty-row td {
-  padding: 0 12px 10px;
+  padding: 0 16px 14px;
   font-size: 0.8125rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
