@@ -16,11 +16,13 @@ import { NO_TASK, useTaskBreakdown } from '@/composables/useTaskBreakdown';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
-import type { TooltipItem } from 'chart.js';
+import type { Plugin, TooltipItem } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { chain } from 'lodash';
 
 Chart.register(annotationPlugin);
+
+const REMAINING = 'Remaining';
 
 // Theme integration
 const theme = useTheme();
@@ -36,6 +38,7 @@ const chartColors = computed(() => ({
   // Border between stacked segments — matches the card surface so it reads as a thin gap,
   // separating similar pastel fills without changing the palette
   segmentBorder: theme.global.current.value.colors.surface,
+  offDayOutline: theme.global.current.value.colors.warning,
 }));
 
 // Shared per-dataset border config: a hairline gap between stacked segments
@@ -60,7 +63,7 @@ let chartInstance: Chart | null = null;
 // Composables
 const projectColors = useProjectColors();
 const settingsStore = useSettingsStore();
-const { targetMinutes, targetMinutesOn } = useDailyTarget();
+const { targetMinutes, isOffDay } = useDailyTarget();
 
 // Reactive computed properties for chart data
 const selectedMonth = computed(() => dayjs().month((currentMonth?.value ?? dayjs().month() + 1) - 1));
@@ -111,18 +114,14 @@ const chartData = computed(() => {
   try {
     // Precompute once per recompute (avoids dayjs.format in inner loops)
     const dayKeys = daysInMonth.value.map((d) => d.format(isoDateFormat));
-    const weekendDay = daysInMonth.value.map((d) => settingsStore.weekendDays.includes(d.day()));
 
     // Per-day logged hours (summed then rounded once) for a set of logs, indexed by day-of-month
     const dailyHours = (logs: TimeLog[]) =>
       dayKeys.map((key) => sumMinutesToHours(logs.filter((l) => l.date === key).map((l) => l.duration ?? 0)));
 
     const labels = daysInMonth.value.map((d) => d.format('DD'));
-    // Weekend cells wear the danger colour in every view; weekday cells keep their own colour
-    const weekendColor = projectColors.weekendDataColor();
 
-    // Selected project → stack by task (or a single series for simple projects).
-    // Weekday cells use the task shade; weekend cells share the danger colour flag.
+    // Selected project → stack by task (or a single series for simple projects)
     if (props.selectedProject) {
       const projectLogs = timeLogs.value.filter((log) => log.project === props.selectedProject);
 
@@ -148,7 +147,7 @@ const chartData = computed(() => {
 
       const datasets = series.map((s) => ({
         label: s.label,
-        backgroundColor: weekendDay.map((w) => (w ? weekendColor : s.color)),
+        backgroundColor: s.color,
         ...segmentBorder.value,
         data: dailyHours(s.logs),
       }));
@@ -156,14 +155,14 @@ const chartData = computed(() => {
       return { labels, datasets };
     }
 
-    // All-projects view: per-project bars keep their own label; weekend cells wear the danger flag.
+    // All-projects view: one series per project
     const loggedDataSet = chain(timeLogs.value)
       .groupBy((l) => l.project)
       .map((logsByProject, projectName) => {
         const projectColor = projectColors.getProjectColor(projectName);
         return {
           label: projectName,
-          backgroundColor: weekendDay.map((w) => (w ? weekendColor : projectColor)),
+          backgroundColor: projectColor,
           ...segmentBorder.value,
           data: dailyHours(logsByProject),
         };
@@ -173,14 +172,14 @@ const chartData = computed(() => {
     // No daily target ("no limit") → nothing to fill up to
     if (targetMinutes.value === null) return { labels, datasets: loggedDataSet };
 
-    // Remaining fills each workday up to the daily target; weekends and holidays (target 0) show only logged work
+    // Remaining fills every day up to the daily target, weekends and holidays too (they get an outline instead)
     const loggedPerDay = dailyHours(timeLogs.value);
 
     const remainingDataSet = {
-      label: 'Remaining',
+      label: REMAINING,
       backgroundColor: projectColors.remainingDataColor(),
       ...segmentBorder.value,
-      data: loggedPerDay.map((h, i) => Math.max((targetMinutesOn(dayKeys[i]) ?? 0) / 60 - h, 0)),
+      data: loggedPerDay.map((h) => Math.max(targetMinutes.value! / 60 - h, 0)),
     };
 
     return { labels, datasets: [...loggedDataSet, remainingDataSet] };
@@ -192,6 +191,41 @@ const chartData = computed(() => {
     };
   }
 });
+
+// Weekend / holiday columns (indexes into the month) — logging on them is flagged, not hidden
+const offDayIndexes = computed(() =>
+  daysInMonth.value.flatMap((d, i) => (isOffDay(d.format(isoDateFormat)) ? [i] : [])),
+);
+
+// Amber outline around a whole weekend/holiday column that has logged time: a soft "worked on a day off" flag
+// in place of recolouring the bars, so side work (studying on a Saturday) keeps its project colours.
+const offDayOutline: Plugin<'bar'> = {
+  id: 'offDayOutline',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    ctx.save();
+    ctx.strokeStyle = chartColors.value.offDayOutline;
+    ctx.lineWidth = 2;
+    for (const i of offDayIndexes.value) {
+      const visible = chart.data.datasets
+        .map((ds, d) => ({ ds, d }))
+        .filter(({ ds, d }) => chart.isDatasetVisible(d) && Number(ds.data[i]) > 0);
+      if (!visible.some(({ ds }) => ds.label !== REMAINING)) continue;
+
+      // Final (post-animation) geometry of each stacked segment in the column
+      const bars = visible.map(({ d }) =>
+        chart.getDatasetMeta(d).data[i].getProps(['x', 'y', 'base', 'width'], true),
+      ) as { x: number; y: number; base: number; width: number }[];
+      const top = Math.min(...bars.map((b) => b.y));
+      const bottom = Math.max(...bars.map((b) => b.base));
+      const { x, width } = bars[0];
+      ctx.beginPath();
+      ctx.roundRect(x - width / 2 - 1, top - 1, width + 2, bottom - top + 2, 3);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+};
 
 // Dashed target line, only in the all-projects view and only once some day goes past the target: below it the
 // Remaining bars already mark where a full day ends.
@@ -243,21 +277,10 @@ const chartOptions = computed(() => ({
         usePointStyle: true,
         generateLabels: (chart: Chart) => {
           const datasets = chart.data.datasets || [];
-          // Per-point colour arrays mix weekday + weekend cells; show the dominant
-          // (weekday) colour in the swatch, not whatever day 0 happens to land on.
-          const swatchColor = (bg: unknown): string | undefined => {
-            if (!Array.isArray(bg)) return bg as string | undefined;
-            const counts = new Map<string, number>();
-            for (const c of bg) if (typeof c === 'string') counts.set(c, (counts.get(c) ?? 0) + 1);
-            let best = bg[0] as string;
-            let max = -1;
-            for (const [c, n] of counts) if (n > max) [max, best] = [n, c];
-            return best;
-          };
           return datasets.map((dataset, index) => ({
             text:
               dataset.label && dataset.label.length > 20 ? `${dataset.label.substring(0, 20)}...` : dataset.label || '',
-            fillStyle: swatchColor(dataset.backgroundColor),
+            fillStyle: dataset.backgroundColor as string,
             strokeStyle: Array.isArray(dataset.borderColor) ? dataset.borderColor[0] : dataset.borderColor,
             lineWidth: typeof dataset.borderWidth === 'number' ? dataset.borderWidth : 0,
             hidden: !chart.isDatasetVisible(index),
@@ -318,6 +341,7 @@ const initializeChart = () => {
       type: 'bar',
       data: chartData.value,
       options: chartOptions.value,
+      plugins: [offDayOutline],
     });
   } catch (error) {
     console.error('Chart initialization failed:', error);
@@ -347,7 +371,8 @@ watch(
 );
 
 // Watch for theme changes and update chart colors (no animation)
-watch(isDark, () => {
+// Theme and off days are read at draw time (colours, outline plugin), not from chartData
+watch([isDark, offDayIndexes], () => {
   updateChart('none');
 });
 

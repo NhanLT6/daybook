@@ -107,14 +107,15 @@ const onSearchFocusChange = (focused: boolean) => {
   if (!focused && !searchText.value.trim()) searchExpanded.value = false;
 };
 
-// Day total colour against the daily target: within 30 min of it → primary, over it → error. No colour on
-// weekends/holidays (target 0) or when there's no target at all.
-const { targetMinutesOn } = useDailyTarget();
+// Day total colour against the daily target: over it → error, logged on a weekend/holiday → warning, within
+// 30 min of it → primary. No colour when there's no target at all.
+const { targetMinutes, isOffDay } = useDailyTarget();
 const getColorHint = (date: string, minutes: number) => {
-  const target = targetMinutesOn(date);
+  const target = targetMinutes.value;
   if (!target) return '';
 
   if (minutes > target) return 'error';
+  if (isOffDay(date)) return 'warning';
   if (minutes >= target - 30) return 'primary';
   return '';
 };

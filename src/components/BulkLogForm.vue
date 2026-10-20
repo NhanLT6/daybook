@@ -263,17 +263,17 @@ const onHourClick = (hour: number) => {
   setFieldValue('duration', currentDuration + hour * 60);
 };
 
-// Remaining chip: what's left of the daily target on the one selected date. Shown only for a single workday that
-// already has logged time below the target — it's for topping a day up, not for bulk-logging empty days.
+// Remaining chip: what's left of the daily target on the one selected date (weekends and holidays included). Shown
+// only for a single day that already has logged time below the target — it's for topping a day up, not for bulk-logging empty days.
 const { logs } = useTimeLogs();
-const { targetMinutesOn } = useDailyTarget();
+const { targetMinutes } = useDailyTarget();
 const remainingMinutes = computed((): number | null => {
   const dates = selectedDatesField.value.value ?? [];
   if (dates.length !== 1) return null;
 
   const date = dayjs(dates[0]).format(isoDateFormat);
-  const target = targetMinutesOn(date);
-  if (!target) return null; // no limit, weekend or holiday
+  const target = targetMinutes.value;
+  if (!target) return null; // no limit
 
   // The log being edited is replaced on save, so its old duration doesn't count
   const logged = logs.value

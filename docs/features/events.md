@@ -48,7 +48,7 @@ Interfaces: `src/interfaces/Event.ts`
 | `src/common/eventRecurrence.ts` | All date logic. Components never touch `rrule` or do their own recurrence math. |
 | `src/common/__tests__/eventRecurrence.test.ts` | Unit tests for every function below. |
 | `src/composables/useEvents.ts` | Thin wrapper over `useCollection<AppEvent>('events')` (add/remove/replaceAll). |
-| `src/composables/useWorkCalendar.ts` | `WorkCalendar` from Settings weekend days + every day covered by a holiday event. Also used by Insights for workday counts. |
+| `src/composables/useWorkCalendar.ts` | `WorkCalendar` from Settings weekend days + every day covered by a holiday event, except observances (`dayOff: false`, from the Calendarific type). Also used by Insights for workday counts. |
 | `src/views/EventView.vue` | Events page: calendar column + list; owns the day / event selection. |
 | `src/components/EventForm.vue` | Add/edit form: Single/Multiple/Range date picker, Repeat field, skipped-date chips. |
 | `src/components/EventList.vue` | Events list: one row per series, "Skip next date" action, highlights rows for the calendar selection. |

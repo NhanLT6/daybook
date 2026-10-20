@@ -15,6 +15,7 @@ export const dailyTargetMinutes = (enabled: boolean, hours: number | null | unde
 /**
  * The single source for "how long should a day be". Every place that compares logged time against a full day
  * (Remaining chip, month chart, LogList day colours, Catch-up effort, AI "rest of the day") reads it from here.
+ * The target is the same on every day; `isOffDay` only drives the off-day warning.
  */
 export function useDailyTarget() {
   const settingsStore = useSettingsStore();
@@ -25,11 +26,11 @@ export function useDailyTarget() {
     dailyTargetMinutes(settingsStore.dailyTargetEnabled, settingsStore.dailyTargetHours),
   );
 
-  /** Target for a given date (YYYY-MM-DD): 0 on weekends and holidays, null when there's no target at all. */
-  const targetMinutesOn = (date: string): number | null => {
-    if (targetMinutes.value === null) return null;
-    return isWorkday(dayjs(date, isoDateFormat), workCalendar.value) ? targetMinutes.value : 0;
-  };
+  /**
+   * Weekends and holidays keep the full target: people log side work on them (study, a Saturday task), so an off
+   * day is a warning (amber outline / colour), never a guess that nothing should be logged.
+   */
+  const isOffDay = (date: string): boolean => !isWorkday(dayjs(date, isoDateFormat), workCalendar.value);
 
-  return { targetMinutes, targetMinutesOn };
+  return { targetMinutes, isOffDay };
 }

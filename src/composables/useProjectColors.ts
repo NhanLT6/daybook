@@ -151,13 +151,10 @@ export const useProjectColors = () => {
   // Theme-aware utility colors
   // Remaining: neutral grey placeholder (Vuetify grey-darken-3 / grey-lighten-3)
   const remainingDataColor = () => (isDark() ? '#424242' : '#EEEEEE');
-  // Weekend: muted red base for the weekend-work flag (not an error — just flagged)
-  const weekendDataColor = () => (isDark() ? '#4A2C2C' : '#FFCDD2');
 
   return {
     chartPalette,
     remainingDataColor,
-    weekendDataColor,
     getProjectColor,
     getTaskColors,
     setProjectColor,
