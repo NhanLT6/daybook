@@ -130,6 +130,30 @@ const projectGroups = computed<ProjectGroup[]>(() => {
   return groups;
 });
 
+// ─── Search ───────────────────────────────────────────────────
+// A project whose title matches keeps all its tasks; otherwise only the matching
+// tasks stay, and projects/groups left empty drop out.
+const searchText = ref('');
+const searchQuery = computed(() => (searchText.value ?? '').trim().toLowerCase());
+
+const visibleGroups = computed<ProjectGroup[]>(() => {
+  const q = searchQuery.value;
+  if (!q) return projectGroups.value;
+
+  return projectGroups.value
+    .map((group) => ({
+      ...group,
+      projects: group.projects
+        .map((p) =>
+          p.title.toLowerCase().includes(q)
+            ? p
+            : { ...p, tasks: p.tasks.filter((t) => t.title.toLowerCase().includes(q)) },
+        )
+        .filter((p) => p.title.toLowerCase().includes(q) || p.tasks.length > 0),
+    }))
+    .filter((group) => group.projects.length > 0);
+});
+
 // ─── Form ─────────────────────────────────────────────────────
 
 const validationSchema = computed(() =>
@@ -380,196 +404,190 @@ const showTaskField = computed(
 
     <!-- Main content: big card fills the space, inner container keeps content narrow -->
     <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
-      <!-- Header — same constrained container as the body so the actions align with the content edges -->
-      <VCardTitle class="flex-shrink-0 pa-0">
-        <VContainer class="page-inner py-0">
-          <VToolbar class="bg-transparent">
-            <VToolbarTitle>Projects & Tasks</VToolbarTitle>
+      <!-- Toolbar, styled like the Logs toolbar: title + count, search, actions -->
+      <div class="task-toolbar flex-shrink-0">
+        <div class="page-inner task-toolbar__inner">
+          <h3 class="task-toolbar__title">Projects & Tasks</h3>
+          <span class="task-toolbar__count">{{ allProjects.length }}</span>
 
-              <VSpacer />
+          <!-- Search: matches project and task names -->
+          <div class="task-search">
+            <VTextField
+              v-model="searchText"
+              placeholder="Search tasks"
+              prepend-inner-icon="mdi-magnify"
+              variant="solo"
+              flat
+              density="compact"
+              hide-details
+              single-line
+              clearable
+              class="task-search__field"
+              @click:clear="searchText = ''"
+            />
+          </div>
 
-              <div class="d-flex ga-2">
-                <!-- New Category button (categories mode only) -->
-                <VTooltip v-if="settingsStore.useCategories">
-                  <template #activator="{ props }">
-                    <VBtn
-                      variant="text"
-                      prepend-icon="mdi-shape-plus-outline"
-                      size="small"
-                      @click="openAddCategory"
-                      v-bind="props"
-                    >
-                      <span class="d-none d-sm-inline">New Category</span>
-                    </VBtn>
-                  </template>
-                  Add a new category
-                </VTooltip>
+          <VSpacer />
 
-                <!-- New Project button -->
-                <VTooltip>
-                  <template #activator="{ props }">
-                    <VBtn
-                      color="primary"
-                      variant="tonal"
-                      prepend-icon="mdi-plus"
-                      @click="createNewProject()"
-                      v-bind="props"
-                    >
-                      <span class="d-none d-sm-inline">New Project</span>
-                    </VBtn>
-                  </template>
-                  Create a new project
-                </VTooltip>
-              </div>
-            </VToolbar>
-          </VContainer>
-      </VCardTitle>
+          <!-- New Category (categories mode only) -->
+          <VBtn
+            v-if="settingsStore.useCategories"
+            class="text-none"
+            variant="text"
+            rounded="lg"
+            height="32"
+            prepend-icon="mdi-shape-plus-outline"
+            v-tooltip="'Add a new category'"
+            @click="openAddCategory"
+          >
+            <span class="d-none d-sm-inline">New Category</span>
+          </VBtn>
+
+          <!-- New Project -->
+          <VBtn
+            class="task-toolbar__new text-none"
+            color="primary"
+            variant="tonal"
+            rounded="lg"
+            height="32"
+            prepend-icon="mdi-plus"
+            v-tooltip="'Create a new project'"
+            @click="createNewProject()"
+          >
+            <span class="d-none d-sm-inline">New Project</span>
+          </VBtn>
+        </div>
+      </div>
 
       <!-- Scrollable body; inner container keeps projects/tasks at a comfortable width -->
       <div class="tasks-body flex-grow-1 overflow-y-auto">
-        <VContainer class="page-inner">
+        <VContainer class="page-inner pt-2">
           <!-- Projects grouped by category -->
-          <template v-if="allProjects.length > 0">
-            <div v-for="group in projectGroups" :key="group.categoryId ?? 'uncategorized'" class="mb-6">
+          <template v-if="visibleGroups.length > 0">
+            <section
+              v-for="group in visibleGroups"
+              :key="group.categoryId ?? 'uncategorized'"
+              class="project-group"
+              :class="{ 'project-group--categorized': settingsStore.useCategories }"
+            >
               <!-- Category section header (only when categories enabled) -->
-              <div v-if="settingsStore.useCategories" class="d-flex align-center px-4 py-2 bg-container rounded-0">
-                <span class="text-subtitle-2 font-weight-bold flex-grow-1">{{ group.categoryName }}</span>
+              <div v-if="settingsStore.useCategories" class="category-row">
+                <span class="category-row__name">{{ group.categoryName }}</span>
 
-                <VTooltip v-if="group.categoryId">
-                  <template #activator="{ props }">
-                    <VBtn
-                      icon="mdi-pencil-outline"
-                      variant="text"
-                      size="x-small"
-                      v-bind="props"
-                      @click="openEditCategory(sortedCategories.find((c) => c.id === group.categoryId)!)"
-                    />
-                  </template>
-                  Rename category
-                </VTooltip>
-
-                <VTooltip v-if="group.categoryId">
-                  <template #activator="{ props }">
-                    <VBtn
-                      icon="mdi-trash-can-outline"
-                      variant="text"
-                      size="x-small"
-                      v-bind="props"
-                      @click="deleteCategory(group.categoryId!)"
-                    />
-                  </template>
-                  Delete category (projects become Uncategorized)
-                </VTooltip>
+                <template v-if="group.categoryId">
+                  <VIconBtn
+                    icon="mdi-pencil-outline"
+                    aria-label="Rename category"
+                    size="28"
+                    icon-size="16"
+                    rounded="lg"
+                    variant="text"
+                    class="row-action"
+                    v-tooltip="'Rename category'"
+                    @click="openEditCategory(sortedCategories.find((c) => c.id === group.categoryId)!)"
+                  />
+                  <VIconBtn
+                    icon="mdi-trash-can-outline"
+                    aria-label="Delete category"
+                    size="28"
+                    icon-size="16"
+                    rounded="lg"
+                    variant="text"
+                    class="row-action"
+                    v-tooltip="'Delete category (projects become Uncategorized)'"
+                    @click="deleteCategory(group.categoryId!)"
+                  />
+                </template>
               </div>
 
-              <!-- Projects in this group -->
-              <div v-for="project in group.projects" :key="project.title" class="project-section mb-4">
+              <!-- Projects in this group, a hairline between each -->
+              <div v-for="project in group.projects" :key="project.title" class="project-block">
                 <!-- Project row -->
-                <div class="d-flex align-center px-4 py-2">
-                  <VAvatar
-                    :color="projectColors.getProjectColor(project.title)"
-                    size="small"
-                    class="me-3 flex-shrink-0"
+                <div class="project-row">
+                  <span
+                    class="project-dot"
+                    :style="{ backgroundColor: projectColors.getProjectColor(project.title) }"
                   />
 
-                  <span class="font-weight-medium flex-grow-1 project-title">
-                    {{ project.title }}
-                    <VChip size="x-small" variant="tonal" class="ms-2"> {{ project.tasks.length }} Task(s) </VChip>
-                  </span>
+                  <span class="project-title">{{ project.title }}</span>
+                  <span class="project-count">{{ project.tasks.length }}</span>
 
-                  <div class="d-flex flex-shrink-0 ga-1">
-                    <VTooltip>
-                      <template #activator="{ props }">
-                        <VBtn
-                          icon="mdi-pencil-outline"
-                          variant="text"
-                          size="x-small"
-                          v-bind="props"
-                          @click="editProject(project)"
-                        />
-                      </template>
-                      Edit project
-                    </VTooltip>
+                  <VSpacer />
 
-                    <VTooltip>
-                      <template #activator="{ props }">
-                        <VBtn
-                          icon="mdi-trash-can-outline"
-                          variant="text"
-                          size="x-small"
-                          v-bind="props"
-                          @click="confirmDeleteProject(project.title)"
-                        />
-                      </template>
-                      Delete project{{ project.tasks.length > 0 ? ' and all its tasks' : '' }}
-                    </VTooltip>
-
-                    <VTooltip>
-                      <template #activator="{ props }">
-                        <VBtn
-                          icon="mdi-plus"
-                          variant="text"
-                          size="x-small"
-                          v-bind="props"
-                          @click="createNewTask(project.title)"
-                        />
-                      </template>
-                      Add new task to this project
-                    </VTooltip>
+                  <div class="d-flex flex-shrink-0">
+                    <VIconBtn
+                      icon="mdi-pencil-outline"
+                      aria-label="Edit project"
+                      size="32"
+                      icon-size="18"
+                      rounded="lg"
+                      variant="text"
+                      class="row-action"
+                      v-tooltip="'Edit project'"
+                      @click="editProject(project)"
+                    />
+                    <VIconBtn
+                      icon="mdi-trash-can-outline"
+                      aria-label="Delete project"
+                      size="32"
+                      icon-size="18"
+                      rounded="lg"
+                      variant="text"
+                      class="row-action"
+                      v-tooltip="`Delete project${project.tasks.length > 0 ? ' and all its tasks' : ''}`"
+                      @click="confirmDeleteProject(project.title)"
+                    />
+                    <VIconBtn
+                      icon="mdi-plus"
+                      aria-label="Add task"
+                      size="32"
+                      icon-size="18"
+                      rounded="lg"
+                      variant="text"
+                      v-tooltip="'Add new task to this project'"
+                      @click="createNewTask(project.title)"
+                    />
                   </div>
                 </div>
 
-                <!-- Tasks under this project — wrapped in a rounded card that clips the corners -->
-                <VCard v-if="project.tasks.length" class="elevation-0 rounded-lg overflow-hidden mt-2">
-                  <VDataTable
-                    :items="project.tasks.map((task) => ({ title: task.title, project: project.title }))"
-                    :headers="[]"
-                    class="bg-container"
-                    hide-default-footer
-                    hide-default-header
+                <!-- Tasks under this project, indented to the title -->
+                <ul v-if="project.tasks.length" class="task-rows">
+                  <li
+                    v-for="task in project.tasks"
+                    :key="task.title"
+                    class="task-row"
+                    @click="editTask({ title: task.title, project: project.title })"
                   >
-                    <template #item="{ item }">
-                      <tr @click="editTask({ title: item.title, project: item.project })" class="cursor-pointer">
-                        <td class="d-flex align-center pa-3">
-                          <span class="text-truncate flex-grow-1 me-2">{{ item.title }}</span>
+                    <span class="text-truncate flex-grow-1">{{ task.title }}</span>
 
-                          <div class="d-flex flex-shrink-0">
-                            <VTooltip>
-                              <template #activator="{ props }">
-                                <VBtn
-                                  icon="mdi-pencil-outline"
-                                  variant="text"
-                                  size="x-small"
-                                  @click.stop="editTask({ title: item.title, project: item.project })"
-                                  v-bind="props"
-                                />
-                              </template>
-                              Edit task name
-                            </VTooltip>
-
-                            <VTooltip>
-                              <template #activator="{ props }">
-                                <VBtn
-                                  icon="mdi-trash-can-outline"
-                                  variant="text"
-                                  size="x-small"
-                                  @click.stop="deleteTaskDirectly(item.title, item.project)"
-                                  class="me-1"
-                                  v-bind="props"
-                                />
-                              </template>
-                              Delete this task
-                            </VTooltip>
-                          </div>
-                        </td>
-                      </tr>
-                    </template>
-                  </VDataTable>
-                </VCard>
+                    <VIconBtn
+                      icon="mdi-pencil-outline"
+                      aria-label="Edit task"
+                      size="28"
+                      icon-size="16"
+                      rounded="lg"
+                      variant="text"
+                      class="row-action"
+                      v-tooltip="'Edit task name'"
+                      @click.stop="editTask({ title: task.title, project: project.title })"
+                    />
+                    <VIconBtn
+                      icon="mdi-trash-can-outline"
+                      aria-label="Delete task"
+                      size="28"
+                      icon-size="16"
+                      rounded="lg"
+                      variant="text"
+                      class="row-action"
+                      v-tooltip="'Delete this task'"
+                      @click.stop="deleteTaskDirectly(task.title, project.title)"
+                    />
+                  </li>
+                </ul>
 
                 <!-- Empty task state -->
-                <div v-else class="text-center py-2 text-medium-emphasis bg-container rounded-lg text-caption mt-2">
-                  No tasks in this project.
+                <div v-else class="task-empty">
+                  No tasks yet.
                   <a
                     href="#"
                     class="text-decoration-none text-primary ms-1"
@@ -581,13 +599,25 @@ const showTaskField = computed(
               </div>
 
               <!-- + New Project within category (categories mode only) -->
-              <div v-if="settingsStore.useCategories" class="px-4 py-2">
-                <VBtn variant="text" prepend-icon="mdi-plus" size="small" @click="createNewProject(group.categoryId)">
+              <div v-if="settingsStore.useCategories && !searchQuery" class="py-2">
+                <VBtn
+                  class="text-none"
+                  variant="text"
+                  prepend-icon="mdi-plus"
+                  size="small"
+                  @click="createNewProject(group.categoryId)"
+                >
                   New Project in {{ group.categoryName }}
                 </VBtn>
               </div>
-            </div>
+            </section>
           </template>
+
+          <!-- No search results -->
+          <div v-else-if="allProjects.length > 0" class="text-center py-8 text-medium-emphasis">
+            <VIcon size="48" class="mb-3">mdi-magnify-close</VIcon>
+            <div>No projects or tasks match "{{ searchText }}"</div>
+          </div>
 
           <!-- Empty State -->
           <div v-else class="text-center py-8 text-medium-emphasis">
@@ -660,28 +690,174 @@ const showTaskField = computed(
 </template>
 
 <style scoped>
-.cursor-pointer {
-  cursor: pointer;
+/* ── Toolbar: mirrors LogList's toolbar (hairline below, compact tinted search) ── */
+.task-toolbar {
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.09);
+}
+
+.task-toolbar__inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 auto;
+  padding: 10px 16px;
+}
+
+.task-toolbar .v-btn {
+  letter-spacing: normal;
+}
+
+.task-toolbar__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.task-toolbar__count,
+.project-count {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
+}
+
+.task-toolbar__count {
+  margin-left: 2px;
+}
+
+.task-search {
+  flex: 1 1 280px;
+  min-width: 120px;
+  max-width: 280px;
+  margin-left: 10px;
+}
+
+/* Out-specifies .glass-acrylic .v-field's solid surface, as in LogList */
+.task-search__field :deep(.v-field) {
+  background-color: rgba(var(--v-theme-on-surface), 0.05) !important;
+  border-radius: 12px;
+  min-height: 32px;
+  font-size: 0.8125rem;
+}
+
+.task-search__field :deep(.v-field__input) {
+  min-height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.task-search__field :deep(.v-field__prepend-inner) {
+  padding-inline-start: 2px;
+}
+
+.task-search__field :deep(.v-field__prepend-inner .v-icon) {
+  font-size: 18px;
+}
+
+/* Phones: New Project shrinks to its + icon so search keeps the room */
+@media (max-width: 599px) {
+  .task-toolbar__new {
+    min-width: 32px;
+    padding-inline: 6px;
+  }
+
+  .task-toolbar__new :deep(.v-btn__prepend) {
+    margin-inline: 0;
+  }
+}
+
+/* ── Category header: small muted label, its own hairline ── */
+.project-group--categorized + .project-group--categorized {
+  margin-top: 16px;
+}
+
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px 6px 8px;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.09);
+}
+
+.category-row__name {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+/* ── Project block: hairline between projects is the grouping ── */
+.project-block {
+  padding: 6px 0 10px;
+}
+
+.project-block + .project-block {
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.09);
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 8px;
+}
+
+.project-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 4px;
 }
 
 .project-title {
-  flex: 1 1 0;
   min-width: 0;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  hyphens: auto;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
-/* Mobile optimizations */
-@media (max-width: 768px) {
-  .min-width-0 {
-    min-width: 0;
+/* ── Task rows: indented to the project title, soft hover tint ── */
+.task-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 22px;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 36px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.task-row:hover {
+  background-color: rgba(var(--v-theme-on-surface), 0.05);
+}
+
+.task-empty {
+  padding: 4px 0 2px 32px;
+  font-size: 0.8125rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+/* Secondary actions stay quiet until the row is hovered (pointer devices only) */
+@media (hover: hover) {
+  .row-action {
+    opacity: 0;
+    transition: opacity 0.15s;
   }
 
-  .v-btn--size-x-small {
-    min-width: 28px !important;
-    width: 28px !important;
-    height: 28px !important;
+  .task-row:hover .row-action,
+  .project-row:hover .row-action,
+  .category-row:hover .row-action,
+  .row-action:focus-visible {
+    opacity: 1;
   }
 }
 </style>
