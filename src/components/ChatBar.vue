@@ -23,9 +23,7 @@ import { useDisplay } from 'vuetify';
 import dayjs from 'dayjs';
 
 import { parseChatCommand } from '@/common/chatCommands';
-import { useStorage } from '@vueuse/core';
 
-import { storageKeys } from '@/common/storageKeys';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
@@ -87,11 +85,6 @@ const inputEl = ref<HTMLTextAreaElement | null>(null);
 const fileInputEl = ref<HTMLInputElement | null>(null);
 
 const state = ref<BarState>('hidden');
-// ── Shortcut tip ──────────────────────────────────────────
-
-// The shortcut tip shows until the bar has been opened with / or Ctrl+K once
-const knowsShortcut = useStorage(storageKeys.chat.shortcutLearned, false);
-
 const isTouch = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
 const restState = (): BarState => (isTouch ? 'bar' : 'hidden'); // touch has no hover, so the bar stays
 
@@ -617,7 +610,7 @@ const partsOf = (s: Shape): (Element | null)[] => {
   const el = chatEl.value;
   if (!el) return [];
   if (s === 'toast') return [el.querySelector('.chat-toast')];
-  if (s === 'bar') return [composerEl.value, el.querySelector('.chat-tip')];
+  if (s === 'bar') return [composerEl.value];
   if (s === 'open') return [bodyEl.value, composerEl.value];
   return [el.querySelector('.chat-peek')];
 };
@@ -807,14 +800,12 @@ const onDocumentKeydown = (e: KeyboardEvent) => {
   const inChat = !!chatEl.value?.contains(document.activeElement);
   if (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
-    knowsShortcut.value = true;
     reveal();
     return;
   }
   // A / outside any field opens the bar; a second / inside it opens the command menu
   if (e.key === '/' && !inChat && !isEditable(document.activeElement)) {
     e.preventDefault();
-    knowsShortcut.value = true;
     reveal();
     return;
   }
@@ -1063,12 +1054,6 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
         </div>
       </div>
 
-      <!-- Above the composer, until learned: how to open the bar -->
-      <div v-if="!knowsShortcut && !isTouch && shape === 'bar'" class="chat-tip">
-        <VIcon icon="mdi-keyboard-outline" size="16" />
-        <span>Tip: press <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> to open this anytime</span>
-      </div>
-
       <!-- Composer -->
       <div v-show="shape !== 'toast'" ref="composerEl" class="chat-composer" @dragover.prevent="isDragOver = true" @drop.prevent="onDrop">
         <!-- Slash menu, rising above the bar: commands, then projects / tasks / Jira tickets -->
@@ -1133,6 +1118,10 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
               @paste="onPaste"
               @focus="state === 'hidden' && reveal({ focus: false })"
             />
+            <!-- How to bring the chat back, inside the empty field and away from the placeholder -->
+            <span v-if="!inputText && !command && !isTouch && mdAndUp" class="composer-hint" aria-hidden="true">
+              <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> to open
+            </span>
           </div>
           <input
             ref="fileInputEl"
@@ -1394,7 +1383,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 
 /* ── The chat ── */
 .chat {
-  --w: 560px;
+  --w: 600px; /* room for the placeholder and the shortcut hint side by side */
   position: fixed;
   z-index: 1007;
   left: var(--content-x);
@@ -1773,16 +1762,6 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }
 
-/* Shortcut tip: a quiet line above the composer */
-.chat-tip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 18px 0;
-  font-size: 12px;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-  text-shadow: 0 0 6px var(--chat-halo);
-}
 /* ── Composer ── */
 .chat-composer {
   position: relative;
@@ -1828,6 +1807,17 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   color: transparent;
   text-shadow: none;
   pointer-events: none;
+}
+/* Right-aligned beside the placeholder, next to the image button */
+.composer-hint {
+  position: absolute;
+  right: 0;
+  top: 0;
+  line-height: 21px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }
 .chat-composer textarea {
   position: relative;
