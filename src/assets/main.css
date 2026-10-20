@@ -18,7 +18,7 @@
   background-color: rgba(var(--v-theme-on-surface), 0.05);
 }
 
-/* ── Full-height page shell (shared by Task/Event views) ─────────────────────
+/* ── Full-height page shell (shared by the Task/Event/Notes views) ───────────
    .page-fill fills VMain and pads it; its panel VCard fills the height so the
    card reads as the content area. .page-inner caps the readable width of the
    scrollable content inside that card. */
@@ -197,4 +197,37 @@
   --vc-accent-700: #4caf50;
   --vc-accent-800: #388e3c;
   --vc-accent-900: #2e7d32;
+}
+
+/* ── List pages (ListPanel): the tinted 32px pill used for filter buttons in a list toolbar ── */
+.list-filter-btn.v-btn {
+  height: 32px;
+  padding-inline: 10px;
+  font-size: 0.8125rem;
+  letter-spacing: normal;
+  text-transform: none;
+  background-color: rgba(var(--v-theme-on-surface), 0.05) !important;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+/* A toolbar button that drops to its icon on phones (its label is wrapped in d-none d-sm-inline) */
+@media (max-width: 599px) {
+  .list-icon-on-xs.v-btn {
+    min-width: 32px;
+    padding-inline: 6px;
+  }
+
+  .list-icon-on-xs .v-btn__prepend {
+    margin-inline: 0;
+  }
+}
+
+/* Empty / no-match state inside a list body */
+.list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }

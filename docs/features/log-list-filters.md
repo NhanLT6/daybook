@@ -6,7 +6,7 @@ The **Logs** section (`LogList.vue`) has a filter bar: **Project**, **Task**, **
 
 The **Project** filter is shared two-way with the **Insights** panel and the **bar chart** via a single `selectedProject` ref in `HomeView`. Picking a project anywhere (Insights accordion, the LogList filter, or clearing it) updates all three at once. Task / Date range / Search are LogList-local.
 
-When any filter is active, LogList auto-expands every surviving date panel so the detail is visible immediately.
+When any filter is active, LogList auto-expands every surviving day group so the detail is visible immediately.
 
 The Insights **Overview** card also lists past workdays with nothing logged ("Not logged") as chips (first 8, then a "+N more" chip that expands). Clicking a chip toggles that date in `HomeView.selectedDates` exactly like a calendar click (replaces it while editing a log), switches to the Form tab and closes the Insights drawer on small screens. Chips are neutral grey (tonal) and turn green once picked: the gaps inform without asking for attention. `CalendarOverview` moves to a newly added date that is outside the visible range.
 
@@ -42,7 +42,7 @@ HomeView.selectedProject (ref)
 3. **Date range** — `log.date` within `[from, to]` (see clamping below)
 4. **Search** — case-insensitive substring across `project` / `task` / `description`
 
-`loggedTimeByDates` groups `filteredItems` (not the raw props), so week-grouping, totals, and the empty state all follow the filter. Empty result → "No logs match filters" (vs "No data" when the month is genuinely empty).
+`loggedTimeByDates` groups `filteredItems` (not the raw props) into `GroupedTable` groups — one collapsible group per day (`<tbody id="YYYY-MM-DD">`, `expanded` = `openedPanels`), a gap before each new week, the day total under the Duration column — so week-grouping, totals, and the empty state all follow the filter. Empty result → "No logs match filters" (vs "No data" when the month is genuinely empty).
 
 ### Options
 
@@ -62,7 +62,7 @@ On desktop the chart and the logs are **one glass card** in `HomeView`: `WorkTim
 
 - **Header** (`WorkTimeBarChart`): month title + "Hours logged per day · stacked by project", today / this-week stats (current month only), then whatever the parent puts in the `actions` slot — Home puts the **Insights toggle** there (see below).
 - **Chart**: no nested inner card. Its wrapper animates `height` to 0 when `collapsed`; the canvas keeps a fixed height inside, so Chart.js never redraws squashed bars mid-animation.
-- **Toolbar** (`LogList`), framed by hairlines: **Logs** + the filtered count, the always-visible search, the project filter button and four always-visible icon buttons: Expand logs, Collapse logs, Import CSV, Export CSV (Nhan wants these at hand, not in a menu). Import clicks a hidden `<input type="file">`, reset after each pick so the same file can be imported again.
+- **Toolbar** (`LogList` → shared `ListPanel`, see CLAUDE.md "List pages"), framed by hairlines: **Logs** + the filtered count, the always-visible search, the project filter button and four always-visible icon buttons: Expand logs, Collapse logs, Import CSV, Export CSV (Nhan wants these at hand, not in a menu). Import clicks a hidden `<input type="file">`, reset after each pick so the same file can be imported again.
 - **Chart header actions** (`WorkTimeBarChart`'s `actions` slot, filled by `HomeView`): Hide/Show chart (chevron, remembered in localStorage under `homeChartCollapsed`), then the Insights toggle.
 
 ### Insights toggle
@@ -73,7 +73,7 @@ The inline column animates with `VExpandXTransition` on a `.insights-wrap` wrapp
 
 ### Search
 
-An always-visible compact field (`placeholder="Search logs"`, `.log-search__field`). Its clear `×` uses an explicit `@click:clear="searchText = ''"` — Vuetify's built-in clearable emitted `click:clear` but did not reliably write our `v-model` ref for this single-line field.
+An always-visible compact field (`placeholder="Search logs"`, ListPanel's `.list-search__field`). Its clear `×` (in `ListPanel`) uses an explicit `@click:clear="search = ''"` — Vuetify's built-in clearable emitted `click:clear` but did not reliably write our `v-model` ref for this single-line field.
 
 ### Filter popup
 

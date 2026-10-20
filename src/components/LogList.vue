@@ -6,7 +6,13 @@ import { useDateDisplay } from '@/composables/useDateDisplay';
 import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
 import { NO_TASK } from '@/composables/useTaskBreakdown';
 
+import GroupedTable from '@/components/GroupedTable.vue';
+import ListPanel from '@/components/ListPanel.vue';
+
+import type { TableColumn } from '@/components/GroupedTable.vue';
 import type { TimeLog } from '@/interfaces/TimeLog';
+
+import { useDisplay } from 'vuetify';
 
 import dayjs from 'dayjs';
 
@@ -31,7 +37,6 @@ export interface LogListProps {
 
 const { items: logItems, selectedDates, currentMonth, hasChart = false } = defineProps<LogListProps>();
 
-
 // Project focus — two-way synced with Insights + chart through HomeView
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
 
@@ -46,10 +51,11 @@ const emit = defineEmits<{
 const { formatInternalDateForDisplay } = useDateDisplay();
 const notificationCenter = useNotificationCenterStore();
 const settingsStore = useSettingsStore();
+const { smAndUp } = useDisplay();
 
-const scrollContentRef = ref<HTMLElement | null>(null);
+const panel = ref<InstanceType<typeof ListPanel> | null>(null);
 
-// Scroll to the selected date's expansion panel if it's outside viewport
+// Scroll to the selected date's group if it's outside the list's viewport
 const scrollToSelectedDate = async (date: Date) => {
   if (!date) return;
 
@@ -63,7 +69,7 @@ const scrollToSelectedDate = async (date: Date) => {
 
   const rect = element.getBoundingClientRect();
 
-  const container = scrollContentRef.value;
+  const container = panel.value?.body;
   if (!container) return;
 
   const containerRect = container.getBoundingClientRect();
@@ -103,13 +109,12 @@ const getColorHint = (date: string, minutes: number) => {
 
 // Table
 
-const headers = ref([
-  { title: 'Project', key: 'project' },
-  { title: 'Task', key: 'task' },
-  { title: 'Duration', key: 'duration' },
-  { title: 'Description', key: 'description' },
-  { title: 'Actions', key: 'actions', sortable: false },
-]);
+const columns: TableColumn[] = [
+  { key: 'project', title: 'Project' },
+  { key: 'task', title: 'Task', hideBelow: 'sm' },
+  { key: 'duration', title: 'Duration', width: 104, align: 'end' },
+  { key: 'description', title: 'Description', hideBelow: 'md' },
+];
 
 // Week start key for a date, derived from the configured firstDayOfWeek (matches WorkTimeBarChart)
 const weekStartOf = (date: string) => {
@@ -174,13 +179,14 @@ const loggedTimeByDates = computed(() => {
     .orderBy((item) => item.date)
     .value();
 
-  // Flag the first/last panel of each week so the template can space and round week groups
-  return groups.map((group, i) => {
-    const week = weekStartOf(group.date);
-    const isWeekStart = i === 0 || weekStartOf(groups[i - 1].date) !== week;
-    const isWeekEnd = i === groups.length - 1 || weekStartOf(groups[i + 1].date) !== week;
-    return { ...group, isWeekStart, isWeekEnd, gapBefore: isWeekStart && i > 0 };
-  });
+  // One table group per day, keyed (and DOM id'd) by its date; a gap opens before each new week
+  return groups.map((group, i) => ({
+    ...group,
+    key: group.date,
+    id: group.date,
+    rows: group.tasks,
+    gapBefore: i > 0 && weekStartOf(groups[i - 1].date) !== weekStartOf(group.date),
+  }));
 });
 
 // Reset dependent filters when their context changes
@@ -269,30 +275,17 @@ const onCsvPicked = (event: Event) => {
 
 <template>
   <!-- Logs section: renders no card of its own, the parent card wraps it (with the chart on desktop) -->
-  <section class="log-list d-flex flex-column">
-    <!-- Toolbar: title + count, search, project filter, chart toggle, ⋯ menu -->
-    <div class="log-toolbar" :class="{ 'log-toolbar--below-chart': hasChart }">
-      <h3 class="log-toolbar__title">Logs</h3>
-      <span class="log-toolbar__count">{{ filteredItems.length }}</span>
-
-      <!-- Search: always visible, compact -->
-      <div class="log-search">
-        <VTextField
-          v-model="searchText"
-          placeholder="Search logs"
-          prepend-inner-icon="mdi-magnify"
-          variant="solo"
-          flat
-          density="compact"
-          hide-details
-          single-line
-          clearable
-          class="log-search__field"
-          @click:clear="searchText = ''"
-        />
-      </div>
-
-      <!-- Project filter: shows the focused project; the popup also holds task + date range -->
+  <ListPanel
+    ref="panel"
+    v-model:search="searchText"
+    class="log-list"
+    title="Logs"
+    :count="filteredItems.length"
+    search-placeholder="Search logs"
+    :divided="hasChart"
+  >
+    <!-- Project filter: shows the focused project; the popup also holds task + date range -->
+    <template #filters>
       <VMenu v-model="isFilterMenuOpen" :close-on-content-click="false" location="bottom end" offset="8">
         <template #activator="{ props: menuProps }">
           <VBadge
@@ -301,13 +294,11 @@ const onCsvPicked = (event: Event) => {
             color="error"
             offset-x="4"
             offset-y="4"
-            class="log-filter"
           >
             <VBtn
-              class="log-filter__btn text-none"
+              class="list-filter-btn"
               variant="flat"
               rounded="lg"
-              height="32"
               prepend-icon="mdi-filter-variant"
               append-icon="mdi-chevron-down"
               v-bind="menuProps"
@@ -364,10 +355,10 @@ const onCsvPicked = (event: Event) => {
           </div>
         </VCard>
       </VMenu>
+    </template>
 
-      <VSpacer />
-
-      <!-- List actions, always at hand: expand/collapse every day, CSV import/export -->
+    <!-- List actions, always at hand: expand/collapse every day, CSV import/export -->
+    <template #actions>
       <VIconBtn
         icon="mdi-arrow-expand"
         aria-label="Expand logs"
@@ -409,162 +400,82 @@ const onCsvPicked = (event: Event) => {
         @click="emit('export')"
       />
       <input ref="csvInput" type="file" accept=".csv" hidden @change="onCsvPicked" />
-    </div>
+    </template>
 
-    <!-- Scrollable content area -->
-    <div ref="scrollContentRef" class="scroll-content">
-      <!-- No data -->
-      <VCard v-if="loggedTimeByDates.length === 0" class="ma-4">
-        <div class="d-flex flex-column ga-2 py-4 align-center bg-container rounded text-disabled">
-          <VIcon icon="mdi-package-variant-closed" class="text-disabled" />
-          <div class="text-subtitle-1 text-disabled">{{ hasActiveFilter ? 'No logs match filters' : 'No data' }}</div>
-        </div>
-      </VCard>
-      <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-2 pt-2 pe-2">
-        <VExpansionPanel
-          v-for="group in loggedTimeByDates"
-          :id="group.date"
-          :key="group.date"
-          :value="group.date"
-          :class="{
-            'border-b-sm': !group.isWeekEnd,
-            'week-gap': group.gapBefore,
-            'week-start': group.isWeekStart,
-            'week-end': group.isWeekEnd,
-          }"
+    <!-- Days as collapsible table groups, their logs as rows -->
+    <GroupedTable
+      v-if="loggedTimeByDates.length > 0"
+      v-model:expanded="openedPanels"
+      :columns="columns"
+      :groups="loggedTimeByDates"
+      :row-key="(log) => log.id"
+      collapsible
+    >
+      <!-- Day row: weekday + date, the day's total under Duration -->
+      <template #group="{ group }">
+        <span class="log-day__weekday">{{ dayjs(group.date, isoDateFormat).format('ddd').toUpperCase() }}</span>
+        <span class="font-weight-medium">{{ formatInternalDateForDisplay(group.date) }}</span>
+      </template>
+
+      <template #group.duration="{ group }">
+        <span
+          class="log-day__total"
+          :class="getColorHint(group.date, group.durationSum) && `text-${getColorHint(group.date, group.durationSum)}`"
         >
-          <VExpansionPanelTitle>
-            <div class="me-2 d-flex align-center ga-2">
-              <span class="text-caption text-medium-emphasis" style="min-width: 36px">
-                {{ dayjs(group.date, isoDateFormat).format('ddd').toUpperCase() }}
-              </span>
-              <span class="font-weight-bold" style="min-width: 110px">
-                {{ formatInternalDateForDisplay(group.date) }}
-              </span>
-            </div>
+          {{ minutesToHourWithMinutes(group.durationSum) }}
+        </span>
+      </template>
 
-            <VChip prepend-icon="mdi-timer-outline" :color="getColorHint(group.date, group.durationSum)" variant="text">
-              {{ minutesToHourWithMinutes(group.durationSum) }}
-            </VChip>
-          </VExpansionPanelTitle>
+      <!-- Phones drop the Task column, so the task rides under the project -->
+      <template #cell.project="{ row }">
+        <div>{{ row.project }}</div>
+        <div v-if="!smAndUp && row.task" class="text-caption text-medium-emphasis">{{ row.task }}</div>
+      </template>
 
-          <VExpansionPanelText>
-            <VCard class="elevation-0 rounded-lg">
-              <VDataTable :items="group.tasks" :headers="headers" class="bg-container" hide-default-footer>
-                <template #item.task="{ item }">
-                  <span :class="{ 'text-disabled': !item.task }">{{ item.task || '-' }}</span>
-                </template>
+      <template #cell.task="{ row }">
+        <span :class="{ 'text-disabled': !row.task }">{{ row.task || '-' }}</span>
+      </template>
 
-                <template #item.duration="{ item }">
-                  <VChip v-if="item.type === 'plan'" color="success" size="x-small" variant="tonal">Plan</VChip>
-                  <span v-else>{{ minutesToHourWithMinutes(item.duration ?? 0) }}</span>
-                </template>
+      <template #cell.duration="{ row }">
+        <VChip v-if="row.type === 'plan'" color="success" size="x-small" variant="tonal">Plan</VChip>
+        <span v-else>{{ minutesToHourWithMinutes(row.duration ?? 0) }}</span>
+      </template>
 
-                <!--suppress VueUnrecognizedSlot -->
-                <template #item.actions="{ item }">
-                  <!-- Tooltip as activator="parent" child (not the v-tooltip directive):
-                       the directive's update hook throws when these keyed rows re-patch -->
-                  <div class="d-flex">
-                    <VBtn icon variant="text" size="small" @click="onEditLog(item)">
-                      <VIcon icon="mdi-pencil-outline" />
-                      <VTooltip activator="parent" text="Edit" />
-                    </VBtn>
+      <template #cell.description="{ row }">
+        <span class="text-medium-emphasis">{{ row.description }}</span>
+      </template>
 
-                    <VBtn icon variant="text" size="small" @click="onCloneLog(item)">
-                      <VIcon icon="mdi-content-duplicate" />
-                      <VTooltip activator="parent" text="Clone" />
-                    </VBtn>
+      <!-- Tooltip as activator="parent" child (not the v-tooltip directive):
+           the directive's update hook throws when these keyed rows re-patch -->
+      <template #actions="{ row }">
+        <VBtn icon variant="text" size="28" rounded="lg" aria-label="Edit" @click="onEditLog(row)">
+          <VIcon icon="mdi-pencil-outline" size="16" />
+          <VTooltip activator="parent" text="Edit" />
+        </VBtn>
 
-                    <VBtn icon variant="text" size="small" @click="onDeleteLog(item)">
-                      <VIcon icon="mdi-trash-can-outline" />
-                      <VTooltip activator="parent" text="Delete" />
-                    </VBtn>
-                  </div>
-                </template>
-              </VDataTable>
-            </VCard>
-          </VExpansionPanelText>
-        </VExpansionPanel>
-      </VExpansionPanels>
+        <VBtn icon variant="text" size="28" rounded="lg" aria-label="Clone" @click="onCloneLog(row)">
+          <VIcon icon="mdi-content-duplicate" size="16" />
+          <VTooltip activator="parent" text="Clone" />
+        </VBtn>
+
+        <VBtn icon variant="text" size="28" rounded="lg" aria-label="Delete" @click="onDeleteLog(row)">
+          <VIcon icon="mdi-trash-can-outline" size="16" />
+          <VTooltip activator="parent" text="Delete" />
+        </VBtn>
+      </template>
+    </GroupedTable>
+
+    <!-- No data -->
+    <div v-else class="list-empty">
+      <VIcon icon="mdi-package-variant-closed" />
+      <div>{{ hasActiveFilter ? 'No logs match filters' : 'No data' }}</div>
     </div>
-  </section>
+  </ListPanel>
 </template>
 
 <style scoped>
 .log-list {
   min-height: 0;
-}
-
-.scroll-content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* Toolbar row, framed by hairlines like the mock's sheet; the top one only when a chart sits above it */
-.log-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px 8px 18px;
-  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.09);
-}
-
-.log-toolbar--below-chart {
-  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.09);
-}
-
-.log-toolbar__title {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 500;
-}
-
-.log-toolbar__count {
-  font-size: 0.8125rem;
-  margin-left: 2px;
-  font-variant-numeric: tabular-nums;
-  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
-}
-
-.log-search {
-  flex: 1 1 260px;
-  min-width: 120px;
-  max-width: 260px;
-  margin-left: 10px;
-}
-
-/* 32px tall, softly tinted fields: out-specifies .glass-acrylic .v-field's solid surface */
-.log-search__field :deep(.v-field),
-.log-filter__btn {
-  background-color: rgba(var(--v-theme-on-surface), 0.05) !important;
-}
-
-.log-search__field :deep(.v-field) {
-  border-radius: 12px;
-  min-height: 32px;
-  font-size: 0.8125rem;
-}
-
-.log-search__field :deep(.v-field__input) {
-  min-height: 32px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.log-search__field :deep(.v-field__prepend-inner) {
-  padding-inline-start: 2px;
-}
-
-.log-search__field :deep(.v-field__prepend-inner .v-icon) {
-  font-size: 18px;
-}
-
-.log-filter__btn {
-  font-size: 0.8125rem;
-  letter-spacing: normal;
-  padding-inline: 10px;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 .log-filter__label {
@@ -582,24 +493,13 @@ const onCsvPicked = (event: Event) => {
   }
 }
 
-/* Week grouping: gap between weeks + rounded corners so each week reads as its own card.
-   Scoped to the accordion context to out-specify Vuetify's
-   `.v-expansion-panels--variant-accordion > .v-expansion-panel { margin-top: 0; border-radius: 0 }`. */
-:deep(.v-expansion-panels--variant-accordion > .v-expansion-panel.week-gap) {
-  margin-top: 12px;
+.log-day__weekday {
+  min-width: 32px;
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
-/* !important mirrors Vuetify's own accordion rule that resets middle-panel radius:
-   `... > :not(:first-child):not(:last-child) { border-radius: 0 !important }` */
-:deep(.v-expansion-panels--variant-accordion > .v-expansion-panel.week-start) {
-  border-top-left-radius: 8px !important;
-  border-top-right-radius: 8px !important;
-  overflow: hidden;
-}
-
-:deep(.v-expansion-panels--variant-accordion > .v-expansion-panel.week-end) {
-  border-bottom-left-radius: 8px !important;
-  border-bottom-right-radius: 8px !important;
-  overflow: hidden;
+.log-day__total {
+  font-weight: 500;
 }
 </style>

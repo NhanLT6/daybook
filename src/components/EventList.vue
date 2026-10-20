@@ -1,19 +1,25 @@
 <script setup lang="ts">
-import { type ComponentPublicInstance, computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
+
+import { useEvents } from '@/composables/useEvents';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 
 import EventForm from '@/components/EventForm.vue';
+import GroupedTable from '@/components/GroupedTable.vue';
+import ListPanel from '@/components/ListPanel.vue';
 
+import type { TableColumn, TableGroup } from '@/components/GroupedTable.vue';
 import type { AppEvent } from '@/interfaces/Event';
 
+import { useDisplay } from 'vuetify';
+
 import dayjs from 'dayjs';
-import { omit } from 'lodash';
 
 import holidayImg from '@/assets/summer-holidays.png';
 import { formatEventDate } from '@/common/DateHelpers';
 import { atOccurrence, describeRepeat, eventDays, getNextOccurrence, occurrenceOn } from '@/common/eventRecurrence';
-import { useEvents } from '@/composables/useEvents';
-import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
+import { omit } from 'lodash';
 import { nanoid } from 'nanoid';
 
 // The page's calendar owns the selection: a picked day highlights the events on it, a clicked row
@@ -31,10 +37,19 @@ const emit = defineEmits<{
 const { events, addEvent, removeEvent } = useEvents();
 const workCalendar = useWorkCalendar();
 const notificationCenter = useNotificationCenterStore();
+const { smAndUp } = useDisplay();
 
 // ─── Filters ─────────────────────────────────────────────────
 const typeFilter = ref<'all' | 'custom' | 'holiday'>('all');
 const timeFilter = ref<'upcoming' | 'all'>('upcoming');
+const searchText = ref('');
+const isFilterMenuOpen = ref(false);
+
+// The filter button names what's shown, e.g. "Upcoming · Mine"
+const typeLabels = { all: 'All types', custom: 'Mine', holiday: 'Holidays' } as const;
+const filterLabel = computed(
+  () => `${timeFilter.value === 'upcoming' ? 'Upcoming' : 'All time'} · ${typeLabels[typeFilter.value]}`,
+);
 
 // One table row per event; `next` is its next occurrence (null once the series is over).
 // Computed once per event here so the template never recomputes it.
@@ -44,25 +59,45 @@ interface EventRow {
   next: string | null;
 }
 
-// Events filtered by type + time, sorted by next occurrence (ended events fall back to their first date)
-const filteredEvents = computed<EventRow[]>(() =>
-  events.value
-    .filter((e) => typeFilter.value === 'all' || e.type === typeFilter.value)
-    .map((event) => ({ id: event.id, event, next: getNextOccurrence(event, undefined, workCalendar.value) }))
-    // An event is past iff it has no occurrence left
-    .filter((row) => timeFilter.value === 'all' || row.next !== null)
-    .sort((a, b) => dayjs(a.next ?? a.event.date).diff(dayjs(b.next ?? b.event.date))),
-);
+// Events filtered by type + time + search, sorted by next occurrence (ended events fall back to their first date)
+const filteredEvents = computed<EventRow[]>(() => {
+  const q = (searchText.value ?? '').trim().toLowerCase();
+  return (
+    events.value
+      .filter((e) => typeFilter.value === 'all' || e.type === typeFilter.value)
+      .filter((e) => !q || e.title.toLowerCase().includes(q) || !!e.description?.toLowerCase().includes(q))
+      .map((event) => ({ id: event.id, event, next: getNextOccurrence(event, undefined, workCalendar.value) }))
+      // An event is past iff it has no occurrence left
+      .filter((row) => timeFilter.value === 'all' || row.next !== null)
+      .sort((a, b) => dayjs(a.next ?? a.event.date).diff(dayjs(b.next ?? b.event.date)))
+  );
+});
+
+// One table group per month of the next occurrence
+const monthGroups = computed<TableGroup<EventRow>[]>(() => {
+  const groups: TableGroup<EventRow>[] = [];
+  for (const row of filteredEvents.value) {
+    const key = dayjs(row.next ?? row.event.date).format('YYYY-MM');
+    const last = groups.at(-1);
+    if (last?.key === key) last.rows.push(row);
+    else groups.push({ key, rows: [row] });
+  }
+  return groups;
+});
+
+const monthLabel = (key: string) => {
+  const d = dayjs(`${key}-01`);
+  return d.isSame(dayjs(), 'year') ? d.format('MMMM') : d.format('MMMM YYYY');
+};
 
 // Empty-state copy reflects the active time filter
 const emptyMessage = computed(() => (timeFilter.value === 'upcoming' ? 'No upcoming events' : 'No events'));
 
-// Table columns — actions right-aligned via the slot (no header `align` to keep typing simple)
-const headers = [
-  { title: '', key: 'type', sortable: false, width: 56 },
-  { title: 'Event', key: 'title', sortable: false },
-  { title: 'When', key: 'when', sortable: false },
-  { title: '', key: 'actions', sortable: false, width: 136 },
+// Table columns
+const columns: TableColumn[] = [
+  { key: 'type', title: '', width: 48 },
+  { key: 'title', title: 'Event' },
+  { key: 'when', title: 'When', width: 240, hideBelow: 'sm' },
 ];
 
 // Rows highlighted for the calendar selection: the events occurring on the picked day, or the clicked event
@@ -77,22 +112,19 @@ const activeIds = computed(() => {
 });
 
 // Rows are clickable; past events dim, calendar-selected ones get the green tint
-const rowProps = ({ item }: { item: EventRow }) => ({
-  class: ['event-row', { 'text-disabled': item.next === null, 'event-row--active': activeIds.value.has(item.id) }],
-});
-
-const onRowClick = (_: Event, { item }: { item: EventRow }) => emit('selectEvent', item.id);
+const rowClass = (row: EventRow) => [
+  'event-row',
+  { 'text-disabled': row.next === null, 'event-row--active': activeIds.value.has(row.id) },
+];
 
 // Scroll the first event on a newly picked day into view
-const tableCard = ref<ComponentPublicInstance | null>(null);
+const panel = ref<InstanceType<typeof ListPanel> | null>(null);
 watch(
   () => selectedDay,
   async (day) => {
     if (!day) return;
     await nextTick();
-    (tableCard.value?.$el as HTMLElement | undefined)
-      ?.querySelector('.event-row--active')
-      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    panel.value?.body?.querySelector('.event-row--active')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   },
 );
 
@@ -156,7 +188,13 @@ const skipNextOccurrence = (event: AppEvent, next: string) => {
         closeOnComplete: true,
         onClick: () => {
           const current = events.value.find((e) => e.id === event.id);
-          if (current?.repeat) addEvent(withSkip(current, (current.repeat.skip ?? []).filter((d) => d !== next)));
+          if (current?.repeat)
+            addEvent(
+              withSkip(
+                current,
+                (current.repeat.skip ?? []).filter((d) => d !== next),
+              ),
+            );
         },
       },
     ],
@@ -190,130 +228,156 @@ const deleteEvent = (event: AppEvent) => {
 
 <template>
   <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
-    <!-- Header -->
-    <VCardTitle class="flex-shrink-0 pa-0">
-      <VContainer class="page-inner pt-3 pb-0">
-        <!-- Wrapping header: title and controls share one row when there's room and
-             stack when there isn't. VToolbar can't wrap, so on narrow screens it
-             crushed the title to zero width and clipped the filter labels. -->
-        <div class="event-toolbar">
-          <div class="text-h6 event-toolbar__title">Events</div>
+    <ListPanel
+      ref="panel"
+      v-model:search="searchText"
+      class="flex-grow-1"
+      title="Events"
+      :count="filteredEvents.length"
+      search-placeholder="Search events"
+    >
+      <!-- Time + type filters in one popup, like the Logs filter -->
+      <template #filters>
+        <VMenu v-model="isFilterMenuOpen" :close-on-content-click="false" location="bottom end" offset="8">
+          <template #activator="{ props: menuProps }">
+            <VBtn
+              class="list-filter-btn event-filter"
+              variant="flat"
+              rounded="lg"
+              prepend-icon="mdi-filter-variant"
+              append-icon="mdi-chevron-down"
+              v-bind="menuProps"
+              v-tooltip="'Filter events'"
+            >
+              <span class="event-filter__label">{{ filterLabel }}</span>
+            </VBtn>
+          </template>
 
-          <div class="event-toolbar__controls">
-            <!-- Type filter -->
+          <VCard class="pa-3 d-flex flex-column ga-3 event-filter-menu">
+            <VBtnToggle v-model="timeFilter" density="compact" variant="outlined" divided mandatory>
+              <VBtn value="upcoming" size="small">Upcoming</VBtn>
+              <VBtn value="all" size="small">All time</VBtn>
+            </VBtnToggle>
+
             <VBtnToggle v-model="typeFilter" density="compact" variant="outlined" divided mandatory>
               <VBtn value="all" size="small">All</VBtn>
               <VBtn value="custom" size="small">Mine</VBtn>
               <VBtn value="holiday" size="small">Holidays</VBtn>
             </VBtnToggle>
+          </VCard>
+        </VMenu>
+      </template>
 
-            <!-- Time filter -->
-            <VBtnToggle v-model="timeFilter" density="compact" variant="outlined" divided mandatory>
-              <VBtn value="upcoming" size="small">Upcoming</VBtn>
-              <VBtn value="all" size="small">All</VBtn>
-            </VBtnToggle>
-
-            <VTooltip>
-              <template #activator="{ props }">
-                <VBtn
-                  prepend-icon="mdi-plus"
-                  color="primary"
-                  variant="tonal"
-                  class="event-toolbar__add"
-                  @click="openAddModal"
-                  v-bind="props"
-                >
-                  New Event
-                </VBtn>
-              </template>
-              Add event
-            </VTooltip>
-          </div>
-        </div>
-      </VContainer>
-    </VCardTitle>
-
-    <!-- Body — the table owns the scroll so its header stays fixed -->
-    <div class="event-body">
-      <VContainer class="page-inner event-inner">
-        <!-- Empty state -->
-        <div
-          v-if="filteredEvents.length === 0"
-          class="d-flex flex-column ga-2 py-8 align-center bg-container rounded-lg text-disabled"
+      <template #actions>
+        <VBtn
+          color="primary"
+          variant="tonal"
+          rounded="lg"
+          height="32"
+          prepend-icon="mdi-plus"
+          class="list-icon-on-xs"
+          aria-label="New Event"
+          v-tooltip="'Add event'"
+          @click="openAddModal"
         >
-          <VIcon icon="mdi-calendar-blank-outline" />
-          <div class="text-subtitle-1">{{ emptyMessage }}</div>
-        </div>
+          <span class="d-none d-sm-inline">New Event</span>
+        </VBtn>
+      </template>
 
-        <!-- Events table -->
-        <VCard v-else ref="tableCard" class="elevation-0 rounded-lg overflow-hidden event-table-card">
-          <VDataTable
-            :items="filteredEvents"
-            :headers="headers"
-            item-value="id"
-            :items-per-page="-1"
-            :row-props="rowProps"
-            class="bg-container events-table"
-            @click:row="onRowClick"
-            fixed-header
-            hide-default-footer
-          >
-            <!-- Type avatar: holiday image vs custom icon -->
-            <template #item.type="{ item }">
-              <VAvatar size="small" variant="tonal">
-                <VImg v-if="item.event.type === 'holiday'" :src="holidayImg" alt="Holiday" />
-                <VIcon v-else icon="mdi-account-outline" class="text-disabled" />
-              </VAvatar>
-            </template>
+      <!-- Events grouped by month; rows select their event on the calendar -->
+      <GroupedTable
+        v-if="monthGroups.length > 0"
+        :columns="columns"
+        :groups="monthGroups"
+        :row-key="(row) => row.id"
+        :row-class="rowClass"
+        @row-click="(row) => emit('selectEvent', row.id)"
+      >
+        <template #group="{ group }">
+          <span class="font-weight-medium">{{ monthLabel(group.key) }}</span>
+          <span class="event-month-count">{{ group.rows.length }}</span>
+        </template>
 
-            <!-- Title + optional muted description line -->
-            <template #item.title="{ item }">
-              <div class="py-1">
-                <div>{{ item.event.title }}</div>
-                <div v-if="item.event.description" class="text-caption text-medium-emphasis">
-                  {{ item.event.description }}
-                </div>
-              </div>
-            </template>
+        <!-- Type avatar: holiday image vs custom icon -->
+        <template #cell.type="{ row }">
+          <VAvatar size="28" variant="tonal">
+            <VImg v-if="row.event.type === 'holiday'" :src="holidayImg" alt="Holiday" />
+            <VIcon v-else icon="mdi-account-outline" size="16" class="text-disabled" />
+          </VAvatar>
+        </template>
 
-            <!-- Next occurrence (or first date once the series ended) + repeat summary -->
-            <template #item.when="{ item }">
-              <div class="py-1">
-                <span class="text-no-wrap">{{
-                  formatEventDate(item.next ? atOccurrence(item.event, item.next) : item.event)
-                }}</span>
-                <div v-if="item.event.repeat" class="text-caption text-medium-emphasis text-no-wrap">
-                  <VIcon icon="mdi-repeat" size="x-small" class="mr-1" />{{
-                    describeRepeat(eventDays(item.event), item.event.repeat)
-                  }}
-                </div>
-              </div>
-            </template>
+        <!-- Title + optional muted description line -->
+        <template #cell.title="{ row }">
+          <div>{{ row.event.title }}</div>
+          <div v-if="row.event.description" class="text-caption text-medium-emphasis">
+            {{ row.event.description }}
+          </div>
+          <!-- Phones drop the When column, so the date rides under the title -->
+          <div v-if="!smAndUp" class="text-caption text-medium-emphasis">
+            {{ formatEventDate(row.next ? atOccurrence(row.event, row.next) : row.event) }}
+          </div>
+        </template>
 
-            <!-- Skip next / edit / delete — custom events only. Clicks stop here so they don't select the row -->
-            <template #item.actions="{ item }">
-              <div v-if="item.event.type === 'custom'" class="d-flex ga-1 justify-end" @click.stop>
-                <!-- Tooltip wraps the button: VIconBtn's default slot would replace its icon -->
-                <VTooltip v-if="item.event.repeat && item.next" :text="`Skip ${occurrenceLabel(item.event, item.next)}`">
-                  <template #activator="{ props }">
-                    <VIconBtn
-                      v-bind="props"
-                      icon="mdi-calendar-remove-outline"
-                      size="small"
-                      variant="text"
-                      :aria-label="`Skip ${occurrenceLabel(item.event, item.next)}`"
-                      @click="skipNextOccurrence(item.event, item.next)"
-                    />
-                  </template>
-                </VTooltip>
-                <VIconBtn icon="mdi-pencil-outline" size="small" variant="text" @click="openEditModal(item.event)" />
-                <VIconBtn icon="mdi-trash-can-outline" size="small" variant="text" @click="deleteEvent(item.event)" />
-              </div>
-            </template>
-          </VDataTable>
-        </VCard>
-      </VContainer>
-    </div>
+        <!-- Next occurrence (or first date once the series ended) + repeat summary -->
+        <template #cell.when="{ row }">
+          <span class="text-no-wrap">{{
+            formatEventDate(row.next ? atOccurrence(row.event, row.next) : row.event)
+          }}</span>
+          <div v-if="row.event.repeat" class="text-caption text-medium-emphasis">
+            <VIcon icon="mdi-repeat" size="x-small" class="mr-1" />{{
+              describeRepeat(eventDays(row.event), row.event.repeat)
+            }}
+          </div>
+        </template>
+
+        <!-- Skip next / edit / delete — custom events only -->
+        <template #actions="{ row }">
+          <template v-if="row.event.type === 'custom'">
+            <!-- Tooltip wraps the button: VIconBtn's default slot would replace its icon -->
+            <VTooltip v-if="row.event.repeat && row.next" :text="`Skip ${occurrenceLabel(row.event, row.next)}`">
+              <template #activator="{ props }">
+                <VIconBtn
+                  v-bind="props"
+                  icon="mdi-calendar-remove-outline"
+                  size="28"
+                  icon-size="16"
+                  rounded="lg"
+                  variant="text"
+                  :aria-label="`Skip ${occurrenceLabel(row.event, row.next)}`"
+                  @click="skipNextOccurrence(row.event, row.next)"
+                />
+              </template>
+            </VTooltip>
+            <VIconBtn
+              icon="mdi-pencil-outline"
+              aria-label="Edit event"
+              size="28"
+              icon-size="16"
+              rounded="lg"
+              variant="text"
+              v-tooltip="'Edit'"
+              @click="openEditModal(row.event)"
+            />
+            <VIconBtn
+              icon="mdi-trash-can-outline"
+              aria-label="Delete event"
+              size="28"
+              icon-size="16"
+              rounded="lg"
+              variant="text"
+              v-tooltip="'Delete'"
+              @click="deleteEvent(row.event)"
+            />
+          </template>
+        </template>
+      </GroupedTable>
+
+      <!-- Empty state -->
+      <div v-else class="list-empty">
+        <VIcon icon="mdi-calendar-blank-outline" />
+        <div>{{ emptyMessage }}</div>
+      </div>
+    </ListPanel>
 
     <!-- Add / Edit Modal -->
     <VDialog v-model="isModalOpen" max-width="520" persistent scrollable>
@@ -323,96 +387,29 @@ const deleteEvent = (event: AppEvent) => {
 </template>
 
 <style scoped>
-/* Header: one row while it fits, stacked once it doesn't. */
-.event-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-block: 4px;
+.event-month-count {
+  font-size: 0.8125rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }
 
-/* Grows to push the controls right, but may shrink to 0 rather than clip them. */
-.event-toolbar__title {
-  flex: 1 1 auto;
-  min-width: 0;
+.event-filter__label {
+  white-space: nowrap;
 }
 
-.event-toolbar__controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* Below sm the title takes its own line and the controls span the full width, so
-   the toggle groups render their labels instead of overflowing into scrollbars. */
+/* Phones: the funnel + chevron alone, the search field keeps the room */
 @media (max-width: 599px) {
-  .event-toolbar__title {
-    flex-basis: 100%;
+  .event-filter__label {
+    display: none;
   }
-
-  .event-toolbar__controls {
-    width: 100%;
-  }
-
-  .event-toolbar__add {
-    flex: 1 1 100%;
-  }
-}
-
-/* Body fills the card; the table (not the page) owns the scroll so its header
-   stays fixed via VDataTable's fixed-header. */
-.event-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  overflow: hidden;
-}
-
-.event-inner {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.event-table-card {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Flex chain down through VDataTable's internals so .v-table__wrapper is the
-   bounded scroll container (letting fixed-header stick) instead of growing to
-   full content height. */
-.event-table-card :deep(.v-data-table),
-.event-table-card :deep(.v-table) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.event-table-card :deep(.v-table__wrapper) {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 /* Rows select their event on the calendar */
-.events-table :deep(.event-row) {
+:deep(.event-row) {
   cursor: pointer;
 }
 
 /* Same green as the calendar's selected day */
-.events-table :deep(.event-row--active) {
-  background: rgba(var(--v-theme-primary), 0.16);
-}
-
-/* Sticky header needs an opaque fill so scrolled rows don't bleed through the
-   frosted glass card behind the semi-transparent .bg-container. */
-.events-table :deep(thead th) {
-  background: rgb(var(--v-theme-surface)) !important;
+:deep(.event-row--active) td {
+  background: rgba(var(--v-theme-primary), 0.16) !important;
 }
 </style>

@@ -54,7 +54,7 @@ const ALL_DAYS = SEED.map((s) => s.day);
 
 // Locators (scoped by the stable classes / icons the component already uses)
 const searchInput = (page: Page) => page.getByPlaceholder('Search logs');
-const searchClear = (page: Page) => page.locator('.log-search__field .v-field__clearable');
+const searchClear = (page: Page) => page.locator('.list-search__field .v-field__clearable');
 const filterButton = (page: Page) => page.locator('button:has(.mdi-filter-variant)');
 const filterBadge = (page: Page) => page.locator('.v-badge__badge');
 const filterMenu = (page: Page) => page.locator('.v-overlay__content').filter({ hasText: 'Clear all' });

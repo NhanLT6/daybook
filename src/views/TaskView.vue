@@ -4,8 +4,13 @@ import { computed, onMounted, ref } from 'vue';
 import { useCategories } from '@/composables/useCategories';
 import { useCollection } from '@/composables/useCollection';
 import { useProjectColors } from '@/composables/useProjectColors';
+import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
 
+import GroupedTable from '@/components/GroupedTable.vue';
+import ListPanel from '@/components/ListPanel.vue';
+
+import type { TableColumn, TableGroup } from '@/components/GroupedTable.vue';
 import type { Category } from '@/interfaces/Category';
 import type { Project } from '@/interfaces/Project';
 import type { Task } from '@/interfaces/Task';
@@ -13,6 +18,10 @@ import type { Task } from '@/interfaces/Task';
 import { useField, useForm } from 'vee-validate';
 import { object, string } from 'yup';
 
+import dayjs from 'dayjs';
+
+import { isoDateFormat } from '@/common/DateFormat';
+import { minutesToHourWithMinutes } from '@/common/DateHelpers';
 import { useSettingsStore } from '@/stores/settings';
 
 interface TaskFormData {
@@ -153,6 +162,71 @@ const visibleGroups = computed<ProjectGroup[]>(() => {
     }))
     .filter((group) => group.projects.length > 0);
 });
+
+// ─── Table ────────────────────────────────────────────────────
+// Hours this month and the last day logged, per task and per project, so the wide
+// table carries something useful in its columns.
+const { logs } = useTimeLogs();
+
+interface Usage {
+  monthMinutes: number;
+  lastDate: string | null;
+}
+
+const usage = computed(() => {
+  const monthPrefix = dayjs().format('YYYY-MM-');
+  const byKey = new Map<string, Usage>();
+  const bump = (key: string, date: string, minutes: number) => {
+    const u = byKey.get(key) ?? { monthMinutes: 0, lastDate: null };
+    if (date.startsWith(monthPrefix)) u.monthMinutes += minutes;
+    if (!u.lastDate || date > u.lastDate) u.lastDate = date;
+    byKey.set(key, u);
+  };
+  for (const log of logs.value) {
+    if (log.type !== 'log') continue;
+    bump(log.project, log.date, log.duration ?? 0);
+    if (log.task) bump(taskId({ title: log.task, project: log.project }), log.date, log.duration ?? 0);
+  }
+  return byKey;
+});
+
+const hoursLabel = (key: string) => {
+  const minutes = usage.value.get(key)?.monthMinutes ?? 0;
+  return minutes ? minutesToHourWithMinutes(minutes) : '—';
+};
+
+const lastLoggedLabel = (key: string) => {
+  const last = usage.value.get(key)?.lastDate;
+  if (!last) return '—';
+  const d = dayjs(last, isoDateFormat);
+  return d.isSame(dayjs(), 'year') ? d.format('MMM D') : d.format('MMM D, YYYY');
+};
+
+const columns: TableColumn[] = [
+  { key: 'title', title: 'Task' },
+  { key: 'month', title: 'This month', width: 120, align: 'end', hideBelow: 'sm' },
+  { key: 'last', title: 'Last logged', width: 140, align: 'end', hideBelow: 'sm' },
+];
+
+// One table group per project; in categories mode each category opens a section
+const tableGroups = computed<(TableGroup<Task> & { project: ProjectWithTasks; categoryId: string | null })[]>(() =>
+  visibleGroups.value.flatMap((group) =>
+    group.projects.map((project) => ({
+      key: project.title,
+      rows: project.tasks,
+      section: settingsStore.useCategories ? (group.categoryName ?? undefined) : undefined,
+      project,
+      categoryId: group.categoryId,
+    })),
+  ),
+);
+
+// Categories with no projects yet still need a place to add one
+const emptyCategories = computed(() =>
+  settingsStore.useCategories && !searchQuery.value
+    ? sortedCategories.value.filter((c) => !allProjects.value.some((p) => p.categoryId === c.id))
+    : [],
+);
 
 // ─── Form ─────────────────────────────────────────────────────
 
@@ -402,41 +476,24 @@ const showTaskField = computed(
       </VCard>
     </VDialog>
 
-    <!-- Main content: big card fills the space, inner container keeps content narrow -->
+    <!-- Main content: one glass card, the shared list shell spans its full width -->
     <VCard class="glass-acrylic d-flex flex-column overflow-hidden">
-      <!-- Toolbar, styled like the Logs toolbar: title + count, search, actions -->
-      <div class="task-toolbar flex-shrink-0">
-        <div class="page-inner task-toolbar__inner">
-          <h3 class="task-toolbar__title">Projects & Tasks</h3>
-          <span class="task-toolbar__count">{{ allProjects.length }}</span>
-
-          <!-- Search: matches project and task names -->
-          <div class="task-search">
-            <VTextField
-              v-model="searchText"
-              placeholder="Search tasks"
-              prepend-inner-icon="mdi-magnify"
-              variant="solo"
-              flat
-              density="compact"
-              hide-details
-              single-line
-              clearable
-              class="task-search__field"
-              @click:clear="searchText = ''"
-            />
-          </div>
-
-          <VSpacer />
-
+      <ListPanel
+        v-model:search="searchText"
+        class="flex-grow-1"
+        title="Projects & Tasks"
+        :count="allProjects.length"
+        search-placeholder="Search tasks"
+      >
+        <template #actions>
           <!-- New Category (categories mode only) -->
           <VBtn
             v-if="settingsStore.useCategories"
-            class="text-none"
             variant="text"
             rounded="lg"
             height="32"
             prepend-icon="mdi-shape-plus-outline"
+            class="list-icon-on-xs"
             v-tooltip="'Add a new category'"
             @click="openAddCategory"
           >
@@ -445,188 +502,180 @@ const showTaskField = computed(
 
           <!-- New Project -->
           <VBtn
-            class="task-toolbar__new text-none"
             color="primary"
             variant="tonal"
             rounded="lg"
             height="32"
             prepend-icon="mdi-plus"
+            class="list-icon-on-xs"
             v-tooltip="'Create a new project'"
             @click="createNewProject()"
           >
             <span class="d-none d-sm-inline">New Project</span>
           </VBtn>
-        </div>
-      </div>
+        </template>
 
-      <!-- Scrollable body; inner container keeps projects/tasks at a comfortable width -->
-      <div class="tasks-body flex-grow-1 overflow-y-auto">
-        <VContainer class="page-inner pt-2">
-          <!-- Projects grouped by category -->
-          <template v-if="visibleGroups.length > 0">
-            <section
-              v-for="group in visibleGroups"
-              :key="group.categoryId ?? 'uncategorized'"
-              class="project-group"
-              :class="{ 'project-group--categorized': settingsStore.useCategories }"
-            >
-              <!-- Category section header (only when categories enabled) -->
-              <div v-if="settingsStore.useCategories" class="category-row">
-                <span class="category-row__name">{{ group.categoryName }}</span>
-
-                <template v-if="group.categoryId">
-                  <VIconBtn
-                    icon="mdi-pencil-outline"
-                    aria-label="Rename category"
-                    size="28"
-                    icon-size="16"
-                    rounded="lg"
-                    variant="text"
-                    class="row-action"
-                    v-tooltip="'Rename category'"
-                    @click="openEditCategory(sortedCategories.find((c) => c.id === group.categoryId)!)"
-                  />
-                  <VIconBtn
-                    icon="mdi-trash-can-outline"
-                    aria-label="Delete category"
-                    size="28"
-                    icon-size="16"
-                    rounded="lg"
-                    variant="text"
-                    class="row-action"
-                    v-tooltip="'Delete category (projects become Uncategorized)'"
-                    @click="deleteCategory(group.categoryId!)"
-                  />
-                </template>
-              </div>
-
-              <!-- Projects in this group, a hairline between each -->
-              <div v-for="project in group.projects" :key="project.title" class="project-block">
-                <!-- Project row -->
-                <div class="project-row">
-                  <span
-                    class="project-dot"
-                    :style="{ backgroundColor: projectColors.getProjectColor(project.title) }"
-                  />
-
-                  <span class="project-title">{{ project.title }}</span>
-                  <span class="project-count">{{ project.tasks.length }}</span>
-
-                  <VSpacer />
-
-                  <div class="d-flex flex-shrink-0">
-                    <VIconBtn
-                      icon="mdi-pencil-outline"
-                      aria-label="Edit project"
-                      size="32"
-                      icon-size="18"
-                      rounded="lg"
-                      variant="text"
-                      class="row-action"
-                      v-tooltip="'Edit project'"
-                      @click="editProject(project)"
-                    />
-                    <VIconBtn
-                      icon="mdi-trash-can-outline"
-                      aria-label="Delete project"
-                      size="32"
-                      icon-size="18"
-                      rounded="lg"
-                      variant="text"
-                      class="row-action"
-                      v-tooltip="`Delete project${project.tasks.length > 0 ? ' and all its tasks' : ''}`"
-                      @click="confirmDeleteProject(project.title)"
-                    />
-                    <VIconBtn
-                      icon="mdi-plus"
-                      aria-label="Add task"
-                      size="32"
-                      icon-size="18"
-                      rounded="lg"
-                      variant="text"
-                      v-tooltip="'Add new task to this project'"
-                      @click="createNewTask(project.title)"
-                    />
-                  </div>
-                </div>
-
-                <!-- Tasks under this project, indented to the title -->
-                <ul v-if="project.tasks.length" class="task-rows">
-                  <li
-                    v-for="task in project.tasks"
-                    :key="task.title"
-                    class="task-row"
-                    @click="editTask({ title: task.title, project: project.title })"
-                  >
-                    <span class="text-truncate flex-grow-1">{{ task.title }}</span>
-
-                    <VIconBtn
-                      icon="mdi-pencil-outline"
-                      aria-label="Edit task"
-                      size="28"
-                      icon-size="16"
-                      rounded="lg"
-                      variant="text"
-                      class="row-action"
-                      v-tooltip="'Edit task name'"
-                      @click.stop="editTask({ title: task.title, project: project.title })"
-                    />
-                    <VIconBtn
-                      icon="mdi-trash-can-outline"
-                      aria-label="Delete task"
-                      size="28"
-                      icon-size="16"
-                      rounded="lg"
-                      variant="text"
-                      class="row-action"
-                      v-tooltip="'Delete this task'"
-                      @click.stop="deleteTaskDirectly(task.title, project.title)"
-                    />
-                  </li>
-                </ul>
-
-                <!-- Empty task state -->
-                <div v-else class="task-empty">
-                  No tasks yet.
-                  <a
-                    href="#"
-                    class="text-decoration-none text-primary ms-1"
-                    @click.prevent="createNewTask(project.title)"
-                  >
-                    Add one
-                  </a>
-                </div>
-              </div>
-
-              <!-- + New Project within category (categories mode only) -->
-              <div v-if="settingsStore.useCategories && !searchQuery" class="py-2">
-                <VBtn
-                  class="text-none"
+        <!-- Projects as table groups, their tasks as rows -->
+        <GroupedTable
+          v-if="tableGroups.length > 0"
+          :columns="columns"
+          :groups="tableGroups"
+          :row-key="(task) => taskId(task)"
+          @row-click="editTask"
+        >
+          <!-- Category section: name + rename / delete / add project -->
+          <template #section="{ label, group }">
+            <div class="d-flex align-center ga-1">
+              <span class="flex-grow-1">{{ label }}</span>
+              <template v-if="group.categoryId">
+                <VIconBtn
+                  icon="mdi-pencil-outline"
+                  aria-label="Rename category"
+                  size="28"
+                  icon-size="16"
+                  rounded="lg"
                   variant="text"
-                  prepend-icon="mdi-plus"
-                  size="small"
-                  @click="createNewProject(group.categoryId)"
-                >
-                  New Project in {{ group.categoryName }}
-                </VBtn>
-              </div>
-            </section>
+                  v-tooltip="'Rename category'"
+                  @click="openEditCategory(sortedCategories.find((c) => c.id === group.categoryId)!)"
+                />
+                <VIconBtn
+                  icon="mdi-trash-can-outline"
+                  aria-label="Delete category"
+                  size="28"
+                  icon-size="16"
+                  rounded="lg"
+                  variant="text"
+                  v-tooltip="'Delete category (projects become Uncategorized)'"
+                  @click="deleteCategory(group.categoryId!)"
+                />
+              </template>
+              <VIconBtn
+                icon="mdi-plus"
+                aria-label="New project in category"
+                size="28"
+                icon-size="16"
+                rounded="lg"
+                variant="text"
+                v-tooltip="`New project in ${label}`"
+                @click="createNewProject(group.categoryId)"
+              />
+            </div>
           </template>
 
-          <!-- No search results -->
-          <div v-else-if="allProjects.length > 0" class="text-center py-8 text-medium-emphasis">
-            <VIcon size="48" class="mb-3">mdi-magnify-close</VIcon>
-            <div>No projects or tasks match "{{ searchText }}"</div>
-          </div>
+          <!-- Project row: colour dot, name, task count; month total; actions -->
+          <template #group="{ group }">
+            <span
+              class="project-dot"
+              :style="{ backgroundColor: projectColors.getProjectColor(group.project.title) }"
+            />
+            <span class="project-title">{{ group.project.title }}</span>
+            <span class="project-count">{{ group.project.tasks.length }}</span>
+          </template>
 
-          <!-- Empty State -->
-          <div v-else class="text-center py-8 text-medium-emphasis">
-            <VIcon size="64" class="mb-4">mdi-folder-plus-outline</VIcon>
-            <div class="text-h6 mb-2">No projects yet</div>
-            <div>Create your first project to get started</div>
-          </div>
-        </VContainer>
-      </div>
+          <template #group.month="{ group }">{{ hoursLabel(group.project.title) }}</template>
+          <template #group.last="{ group }">{{ lastLoggedLabel(group.project.title) }}</template>
+
+          <template #group-actions="{ group }">
+            <VIconBtn
+              icon="mdi-plus"
+              aria-label="Add task"
+              size="28"
+              icon-size="16"
+              rounded="lg"
+              variant="text"
+              v-tooltip="'Add new task to this project'"
+              @click="createNewTask(group.project.title)"
+            />
+            <VIconBtn
+              icon="mdi-pencil-outline"
+              aria-label="Edit project"
+              size="28"
+              icon-size="16"
+              rounded="lg"
+              variant="text"
+              v-tooltip="'Edit project'"
+              @click="editProject(group.project)"
+            />
+            <VIconBtn
+              icon="mdi-trash-can-outline"
+              aria-label="Delete project"
+              size="28"
+              icon-size="16"
+              rounded="lg"
+              variant="text"
+              v-tooltip="`Delete project${group.project.tasks.length > 0 ? ' and all its tasks' : ''}`"
+              @click="confirmDeleteProject(group.project.title)"
+            />
+          </template>
+
+          <template #cell.title="{ row }">
+            <span class="task-title">{{ row.title }}</span>
+          </template>
+
+          <template #cell.month="{ row }">
+            <span class="text-medium-emphasis">{{ hoursLabel(taskId(row)) }}</span>
+          </template>
+
+          <template #cell.last="{ row }">
+            <span class="text-medium-emphasis">{{ lastLoggedLabel(taskId(row)) }}</span>
+          </template>
+
+          <template #actions="{ row }">
+            <VIconBtn
+              icon="mdi-pencil-outline"
+              aria-label="Edit task"
+              size="28"
+              icon-size="16"
+              rounded="lg"
+              variant="text"
+              v-tooltip="'Edit task name'"
+              @click="editTask(row)"
+            />
+            <VIconBtn
+              icon="mdi-trash-can-outline"
+              aria-label="Delete task"
+              size="28"
+              icon-size="16"
+              rounded="lg"
+              variant="text"
+              v-tooltip="'Delete this task'"
+              @click="deleteTaskDirectly(row.title, row.project)"
+            />
+          </template>
+
+          <!-- Project without tasks -->
+          <template #group-empty="{ group }">
+            <span class="task-indent">No tasks yet.</span>
+            <a
+              href="#"
+              class="text-decoration-none text-primary ms-1"
+              @click.prevent="createNewTask(group.project.title)"
+            >
+              Add one
+            </a>
+          </template>
+        </GroupedTable>
+
+        <!-- Categories that have no projects yet -->
+        <div v-for="cat in emptyCategories" :key="cat.id" class="empty-category">
+          <span class="flex-grow-1">{{ cat.name }}</span>
+          <VBtn variant="text" size="small" prepend-icon="mdi-plus" @click="createNewProject(cat.id)">
+            New Project
+          </VBtn>
+        </div>
+
+        <!-- No search results -->
+        <div v-if="tableGroups.length === 0 && allProjects.length > 0" class="list-empty">
+          <VIcon icon="mdi-magnify-close" />
+          <div>No projects or tasks match "{{ searchText }}"</div>
+        </div>
+
+        <!-- No projects at all -->
+        <div v-else-if="allProjects.length === 0" class="list-empty">
+          <VIcon icon="mdi-folder-plus-outline" />
+          <div>No projects yet. Create your first project to get started.</div>
+        </div>
+      </ListPanel>
     </VCard>
   </div>
 
@@ -690,126 +739,11 @@ const showTaskField = computed(
 </template>
 
 <style scoped>
-/* ── Toolbar: mirrors LogList's toolbar (hairline below, compact tinted search) ── */
-.task-toolbar {
-  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.09);
-}
-
-.task-toolbar__inner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 auto;
-  padding: 10px 16px;
-}
-
-.task-toolbar .v-btn {
-  letter-spacing: normal;
-}
-
-.task-toolbar__title {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.task-toolbar__count,
-.project-count {
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
-}
-
-.task-toolbar__count {
-  margin-left: 2px;
-}
-
-.task-search {
-  flex: 1 1 280px;
-  min-width: 120px;
-  max-width: 280px;
-  margin-left: 10px;
-}
-
-/* Out-specifies .glass-acrylic .v-field's solid surface, as in LogList */
-.task-search__field :deep(.v-field) {
-  background-color: rgba(var(--v-theme-on-surface), 0.05) !important;
-  border-radius: 12px;
-  min-height: 32px;
-  font-size: 0.8125rem;
-}
-
-.task-search__field :deep(.v-field__input) {
-  min-height: 32px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.task-search__field :deep(.v-field__prepend-inner) {
-  padding-inline-start: 2px;
-}
-
-.task-search__field :deep(.v-field__prepend-inner .v-icon) {
-  font-size: 18px;
-}
-
-/* Phones: New Project shrinks to its + icon so search keeps the room */
-@media (max-width: 599px) {
-  .task-toolbar__new {
-    min-width: 32px;
-    padding-inline: 6px;
-  }
-
-  .task-toolbar__new :deep(.v-btn__prepend) {
-    margin-inline: 0;
-  }
-}
-
-/* ── Category header: small muted label, its own hairline ── */
-.project-group--categorized + .project-group--categorized {
-  margin-top: 16px;
-}
-
-.category-row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 4px 6px 8px;
-  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.09);
-}
-
-.category-row__name {
-  flex: 1;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-}
-
-/* ── Project block: hairline between projects is the grouping ── */
-.project-block {
-  padding: 6px 0 10px;
-}
-
-.project-block + .project-block {
-  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.09);
-}
-
-.project-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px 4px 8px;
-}
-
 .project-dot {
   flex-shrink: 0;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  margin-right: 4px;
 }
 
 .project-title {
@@ -818,46 +752,26 @@ const showTaskField = computed(
   overflow-wrap: anywhere;
 }
 
-/* ── Task rows: indented to the project title, soft hover tint ── */
-.task-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 22px;
+.project-count {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }
 
-.task-row {
+/* Task names line up under the project name (dot 10px + 8px gap) */
+.task-title,
+.task-indent {
+  padding-inline-start: 18px;
+}
+
+.empty-category {
   display: flex;
   align-items: center;
-  gap: 2px;
-  min-height: 36px;
-  padding: 2px 4px 2px 10px;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.task-row:hover {
-  background-color: rgba(var(--v-theme-on-surface), 0.05);
-}
-
-.task-empty {
-  padding: 4px 0 2px 32px;
-  font-size: 0.8125rem;
+  padding: 18px 12px 4px 18px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-}
-
-/* Secondary actions stay quiet until the row is hovered (pointer devices only) */
-@media (hover: hover) {
-  .row-action {
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
-
-  .task-row:hover .row-action,
-  .project-row:hover .row-action,
-  .category-row:hover .row-action,
-  .row-action:focus-visible {
-    opacity: 1;
-  }
 }
 </style>

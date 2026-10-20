@@ -51,7 +51,7 @@ Interfaces: `src/interfaces/Event.ts`
 | `src/composables/useWorkCalendar.ts` | `WorkCalendar` from Settings weekend days + every day covered by a holiday event, except observances (`dayOff: false`, from the Calendarific type). Also used by Insights for workday counts. |
 | `src/views/EventView.vue` | Events page: calendar column + list; owns the day / event selection. |
 | `src/components/EventForm.vue` | Add/edit form: Single/Multiple/Range date picker, Repeat field, skipped-date chips. |
-| `src/components/EventList.vue` | Events list: one row per series, "Skip next date" action, highlights rows for the calendar selection. |
+| `src/components/EventList.vue` | Events list (`ListPanel` + `GroupedTable`, grouped by month of the next date): one row per series, search, time/type filters in one popup, "Skip next date" action, highlights rows for the calendar selection. |
 | `src/components/CalendarOverview.vue` | Calendar dots/markers; expands occurrences for the visible range only. Shared with Home's log form. |
 
 `eventRecurrence.ts` exports:

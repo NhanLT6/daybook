@@ -95,6 +95,11 @@ Every pushed branch gets a Vercel preview build, and the Neon integration create
 - **v-calendar**: Uses `is-dark` prop + custom CSS variables (`.vc-primary`) to sync with Vuetify theme
 - **Chart.js**: Uses `useTheme()` + computed colors for grid, ticks, and legend
 
+### List pages (Logs, Tasks, Events)
+- One pattern, shared code: `ListPanel.vue` (toolbar: title + count, search, `filters` slot, `actions` slot; scrolling body) wrapping `GroupedTable.vue` (sticky column titles, full-width group rows with totals under their column via `group.<key>` slots, optional section rows, hover-revealed row actions, `hideBelow` columns)
+- Lists span the card's full width (no centered `page-inner` container); wide screens get useful columns, not empty space
+- Filters go in a `.list-filter-btn` popup; toolbar buttons are 32px, `rounded="lg"`, `list-icon-on-xs` to drop to the icon on phones. Don't restyle a list locally: change the shared component
+
 ### Reactive State & Watchers
 - **Single Source of Truth**: Avoid multiple watchers competing over the same state
 - **Prefer `computed` over `watch + ref`**: Use computed properties with getter/setter for prop synchronization
