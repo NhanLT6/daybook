@@ -541,7 +541,7 @@ const onCsvPicked = (event: Event) => {
 }
 
 .log-search__field :deep(.v-field) {
-  border-radius: 9px;
+  border-radius: 12px;
   min-height: 32px;
   font-size: 0.8125rem;
 }

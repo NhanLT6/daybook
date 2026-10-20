@@ -26,7 +26,7 @@ const emit = defineEmits<{ closed: [] }>();
   max-width: 95vw;
   max-height: 90vh;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: zoom-out;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 }

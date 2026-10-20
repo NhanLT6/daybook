@@ -165,7 +165,22 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
     <!-- Desktop: floating glass nav rail on the left; there is no top bar at all -->
     <VNavigationDrawer v-if="!smAndDown" permanent rail :rail-width="80" floating class="app-rail-shell">
       <nav class="app-rail glass-acrylic" aria-label="Main">
-        <RouterLink to="/" class="rail-brand" aria-label="Daybook" title="Daybook">D</RouterLink>
+        <!-- App icon (same drawing as public/favicon.svg), inlined so it follows the app theme, not the OS -->
+        <RouterLink to="/" class="rail-brand" aria-label="Daybook" title="Daybook">
+          <svg viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle class="rail-brand__track" cx="16" cy="16" r="12.5" stroke-width="4" />
+            <circle
+              class="rail-brand__arc"
+              cx="16"
+              cy="16"
+              r="12.5"
+              stroke-width="4"
+              stroke-dasharray="58.9 78.5"
+              transform="rotate(-90 16 16)"
+            />
+            <path class="rail-brand__check" d="M10.5 16.5 14.5 20.5 21.5 12" stroke-width="3.2" />
+          </svg>
+        </RouterLink>
 
         <RouterLink
           v-for="item in railItems"
@@ -370,7 +385,7 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
   width: 100%;
   gap: 2px;
   padding: 4px;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: visible;
 }
 
@@ -414,7 +429,7 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 .app-rail {
   height: calc(100% - 24px);
   margin: 12px 0 12px 12px;
-  border-radius: 18px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -422,21 +437,39 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
   padding: 12px 0;
 }
 
-/* Brand mark: inverted rounded square, doubles as the Home link */
+/* Brand mark: the app icon, doubles as the Home link */
 .rail-brand {
   width: 40px;
   height: 40px;
   flex: 0 0 auto;
-  border-radius: 12px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   margin-bottom: 14px;
-  font-weight: 700;
-  font-size: 17px;
-  text-decoration: none;
-  background: rgb(var(--v-theme-on-surface));
-  color: rgb(var(--v-theme-surface));
   transition: opacity 0.15s;
+}
+
+.rail-brand svg {
+  width: 36px;
+  height: 36px;
+}
+
+/* Icon colours as in favicon.svg, keyed to the app theme */
+.rail-brand__track {
+  stroke: #d2e3d8;
+}
+.rail-brand__arc {
+  stroke: #4a8c6a;
+}
+.rail-brand__check {
+  stroke: #3b7556;
+}
+.v-theme--dark .rail-brand__track {
+  stroke: #2c4237;
+}
+.v-theme--dark .rail-brand__arc,
+.v-theme--dark .rail-brand__check {
+  stroke: #7fc29c;
 }
 
 .rail-brand:hover {
