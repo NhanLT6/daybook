@@ -31,8 +31,6 @@ export interface LogListProps {
 
 const { items: logItems, selectedDates, currentMonth, hasChart = false } = defineProps<LogListProps>();
 
-// Chart folded away (only meaningful with hasChart) — owned by HomeView, which remembers it
-const chartCollapsed = defineModel<boolean>('chartCollapsed', { default: false });
 
 // Project focus — two-way synced with Insights + chart through HomeView
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
@@ -368,20 +366,6 @@ const onCsvPicked = (event: Event) => {
       </VMenu>
 
       <VSpacer />
-
-      <!-- Fold the chart away to give the list its height -->
-      <VIconBtn
-        v-if="hasChart"
-        :icon="chartCollapsed ? 'mdi-arrow-expand-down' : 'mdi-arrow-collapse-up'"
-        :aria-label="chartCollapsed ? 'Show chart' : 'Collapse chart'"
-        :aria-expanded="!chartCollapsed"
-        size="32"
-        icon-size="20"
-        rounded="lg"
-        variant="text"
-        v-tooltip="chartCollapsed ? 'Show chart' : 'Collapse chart'"
-        @click="chartCollapsed = !chartCollapsed"
-      />
 
       <!-- List actions, always at hand: expand/collapse every day, CSV import/export -->
       <VIconBtn

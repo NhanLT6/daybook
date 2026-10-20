@@ -291,6 +291,18 @@ const importCsv = async (file?: File) => {
           <!-- Insights toggle: hides the column on wide screens, opens the drawer on narrow ones. The chevron
                points where the panel will go, and turns around once it is gone -->
           <template #actions>
+            <!-- Fold the chart away to give the list its height (remembered) -->
+            <VIconBtn
+              :icon="chartCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up'"
+              size="32"
+              icon-size="20"
+              rounded="lg"
+              variant="text"
+              :aria-label="chartCollapsed ? 'Show chart' : 'Hide chart'"
+              :aria-expanded="!chartCollapsed"
+              v-tooltip="chartCollapsed ? 'Show chart' : 'Hide chart'"
+              @click="chartCollapsed = !chartCollapsed"
+            />
             <VIconBtn
               icon="mdi-chevron-double-right"
               class="insights-toggle"
@@ -314,7 +326,6 @@ const importCsv = async (file?: File) => {
           :current-month="currentMonth"
           :selected-dates="selectedDates"
           :has-chart="!smAndDown"
-          v-model:chart-collapsed="chartCollapsed"
           v-model:selected-project="selectedProject"
           v-model:selected-task="selectedTask"
           v-model:date-range="dateRangeModel"

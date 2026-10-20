@@ -62,7 +62,8 @@ On desktop the chart and the logs are **one glass card** in `HomeView`: `WorkTim
 
 - **Header** (`WorkTimeBarChart`): month title + "Hours logged per day · stacked by project", today / this-week stats (current month only), then whatever the parent puts in the `actions` slot — Home puts the **Insights toggle** there (see below).
 - **Chart**: no nested inner card. Its wrapper animates `height` to 0 when `collapsed`; the canvas keeps a fixed height inside, so Chart.js never redraws squashed bars mid-animation.
-- **Toolbar** (`LogList`), framed by hairlines: **Logs** + the filtered count, the always-visible search, the project filter button, the chart toggle (only with `has-chart`; `v-model:chart-collapsed`, remembered in localStorage under `homeChartCollapsed`) and four always-visible icon buttons: Expand logs, Collapse logs, Import CSV, Export CSV (Nhan wants these at hand, not in a menu). Import clicks a hidden `<input type="file">`, reset after each pick so the same file can be imported again.
+- **Toolbar** (`LogList`), framed by hairlines: **Logs** + the filtered count, the always-visible search, the project filter button and four always-visible icon buttons: Expand logs, Collapse logs, Import CSV, Export CSV (Nhan wants these at hand, not in a menu). Import clicks a hidden `<input type="file">`, reset after each pick so the same file can be imported again.
+- **Chart header actions** (`WorkTimeBarChart`'s `actions` slot, filled by `HomeView`): Hide/Show chart (chevron, remembered in localStorage under `homeChartCollapsed`), then the Insights toggle.
 
 ### Insights toggle
 
