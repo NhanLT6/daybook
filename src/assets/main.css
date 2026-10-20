@@ -68,7 +68,7 @@
 /* Data tables — clean, borderless */
 .v-data-table {
   background-color: transparent !important;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .v-data-table > .v-table__wrapper > table {

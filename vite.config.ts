@@ -12,6 +12,7 @@ export default defineConfig({
     vue(),
     vuetify({
       autoImport: { labs: true },
+      styles: { configFile: 'src/styles/settings.scss' },
     }),
     // vueDevTools(),
   ],

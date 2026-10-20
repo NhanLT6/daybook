@@ -1,0 +1,7 @@
+// Vuetify SASS settings (wired in vite.config.ts). The app's corner radius is Vuetify's `lg`
+// token (cards, dialogs, panels, buttons via rounded="lg"); 12px matches the nav rail.
+@use 'vuetify/settings' with (
+  $rounded: (
+    'lg': 12px,
+  )
+);

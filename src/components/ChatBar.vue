@@ -1815,8 +1815,9 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   place-items: center;
   border: 0;
   border-radius: 20px;
-  background: rgba(var(--v-theme-primary), 0.16);
-  color: rgb(var(--v-theme-primary));
+  /* Ink rather than brand green: dark in light mode, white in dark mode, so green stays rare */
+  background: rgb(var(--v-theme-on-surface));
+  color: rgb(var(--v-theme-surface));
   cursor: pointer;
   transition:
     opacity 0.2s,

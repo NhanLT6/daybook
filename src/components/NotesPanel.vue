@@ -757,7 +757,7 @@ onBeforeUnmount(() => {
 
 /* Match the icon buttons' 40px height (compact density otherwise makes it shorter) */
 .notes-search__field :deep(.v-field) {
-  border-radius: 8px;
+  border-radius: 12px;
   min-height: 40px;
 }
 
