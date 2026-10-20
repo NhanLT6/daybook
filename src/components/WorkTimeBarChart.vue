@@ -28,6 +28,10 @@ const REMAINING = 'Remaining';
 const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === 'dark');
 
+// '#FB8C00' → '251, 140, 0' for rgba()
+const hexToRgb = (hex: string) =>
+  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ');
+
 // Theme-aware colors for chart
 const chartColors = computed(() => ({
   gridColor: isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
@@ -38,7 +42,8 @@ const chartColors = computed(() => ({
   // Border between stacked segments — matches the card surface so it reads as a thin gap,
   // separating similar pastel fills without changing the palette
   segmentBorder: theme.global.current.value.colors.surface,
-  offDayOutline: theme.global.current.value.colors.warning,
+  // Theme warning at reduced alpha: a gentle flag, not an alarm
+  offDayOutline: `rgba(${hexToRgb(theme.global.current.value.colors.warning)}, ${isDark.value ? 0.5 : 0.45})`,
 }));
 
 // Shared per-dataset border config: a hairline gap between stacked segments
@@ -207,7 +212,7 @@ const offDayOutline: Plugin<'bar'> = {
     const { ctx } = chart;
     ctx.save();
     ctx.strokeStyle = chartColors.value.offDayOutline;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     for (const i of offDayIndexes.value) {
       const visible = chart.data.datasets
         .map((ds, d) => ({ ds, d }))
