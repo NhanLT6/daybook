@@ -1085,16 +1085,18 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 </template>
 
 <style>
-/* Glass tokens for the bar. One veil for both themes (a neutral grey, dimmer than white so the
-   white AI bubbles and cards read on it); the rim light comes from the bottom right in light
-   and the top left in dark. Shared by AiChatMessage, which renders inside the bar. */
+/* Surface tokens for the bar. Light is solid white, no glass: the coloured rim already sets it
+   apart, and white reads on the grey background where grey glass blended in (the peek edge most
+   of all); AI bubbles take a faint tint to show on it. Dark keeps the glass. The rim light comes
+   from the bottom right in light and the top left in dark. Shared by AiChatMessage, which renders
+   inside the bar. */
 .chat-bar {
   /* Everything centres on the content area, right of the nav rail on md and up */
   --inset-l: 12px;
   --content-x: calc(50% + (var(--inset-l) - 12px) / 2);
   --content-w: calc(100vw - var(--inset-l) - 12px);
-  --chat-veil: rgba(226, 227, 229, 0.46);
-  --chat-blur: 7px;
+  --chat-veil: #ffffff;
+  --chat-blur: 0px;
   --chat-rim:
     inset -1.5px -1.5px 1px -0.5px rgba(255, 255, 255, 0.95), inset 1px 1px 0 0 rgba(20, 28, 38, 0.12),
     inset 0 0 0 1px rgba(255, 255, 255, 0.22);
@@ -1102,7 +1104,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   --chat-line: rgba(20, 28, 38, 0.12);
   --chat-tile: rgba(20, 28, 38, 0.05);
   --chat-menu: rgba(255, 255, 255, 0.94);
-  --chat-ai: #ffffff;
+  --chat-ai: rgba(20, 28, 38, 0.05);
   --chat-halo: rgba(255, 255, 255, 0.75);
   --chat-thumb: rgba(20, 28, 38, 0.22);
   --chat-thumb-hover: rgba(20, 28, 38, 0.36);
@@ -1121,6 +1123,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 
 .v-theme--dark .chat-bar {
   --chat-veil: rgba(45, 45, 45, 0.46);
+  --chat-blur: 7px;
   --chat-rim:
     inset 1.5px 1.5px 1px -0.5px rgba(255, 255, 255, 0.45), inset -1px -1px 0 0 rgba(0, 0, 0, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -1332,6 +1335,10 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 .chat-bar.is-peek .chat-rim {
   opacity: 0.7;
   transition: opacity 0.3s;
+}
+/* On white the edge needs the rim at full strength to catch the eye */
+.v-theme--light .chat-bar.is-peek .chat-rim {
+  opacity: 1;
 }
 .chat-bar.is-peek.is-lit .chat-rim {
   opacity: 1;
