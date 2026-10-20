@@ -43,7 +43,7 @@ import ChatNotice from './ChatNotice.vue';
  */
 type BarState = 'hidden' | 'bar' | 'open';
 // What is drawn: the line (hidden), the notification toast (hidden), the bar or the panel
-type Shape = 'line' | 'toast' | 'bar' | 'open';
+type Shape = 'peek' | 'toast' | 'bar' | 'open';
 
 const {
   messages,
@@ -443,21 +443,18 @@ const setState = (next: BarState) => {
   if (prev === 'hidden' || next === 'hidden') dropPassive();
 };
 
-// ── Morph: line ⇄ toast / bar ⇄ panel ─────────────────────────────────────
+// ── Morph: peek ⇄ toast / bar ⇄ panel ─────────────────────────────────────
 
 // iOS-style sheet curve: fast start, long soft settle, no overshoot
 const EASE = 'cubic-bezier(.32,.72,0,1)';
 const CLOSE_EASE = 'cubic-bezier(.5,0,.2,1)';
-const OPEN_MS = 560; // from the line
-const MORPH_MS = 420; // between toast, bar and panel
-const CLOSE_MS = 400;
-// The rim is bright while the line turns into the chat, then settles to a quiet outline
+const MORPH_MS = 420; // between peek, toast, bar and panel
+// The rim is bright while the chat rises out of the peek, then settles to a quiet outline
 const RIM_REST = 0.75;
 const HALO_REST = 0; // the glow only flashes during the morph; at rest only the rim carries colour
 
-const shape = ref<Shape>('line');
-const desiredShape = computed<Shape>(() => (state.value === 'hidden' ? (notice.value ? 'toast' : 'line') : state.value));
-const leaving = ref(false); // folding back into the line: contents fade, the rim stays lit
+const shape = ref<Shape>('peek');
+const desiredShape = computed<Shape>(() => (state.value === 'hidden' ? (notice.value ? 'toast' : 'peek') : state.value));
 
 // The light takes the notification's colour while the toast shows (and while it folds away)
 const tint = ref<string | null>(null);
@@ -465,21 +462,13 @@ const lightStyle = computed(() => {
   if (!tint.value) return {};
   const c = `rgb(var(--v-theme-${tint.value}))`;
   return {
-    '--line-grad': `linear-gradient(90deg, transparent, ${c} 25%, ${c} 75%, transparent)`,
     '--halo-grad': `linear-gradient(90deg, ${c}, ${c})`,
     '--rim-stops': `${c}, transparent 35%, ${c} 50%, transparent 85%, ${c}`,
   };
 });
 
-// The seam (the line at rest): lit while the pointer dwells on the bottom edge or right after
-// the chat folds back into it; handed off (hidden) while the chat element carries the light
-const zoneLit = ref(false);
-const seamFlash = ref(false);
-let flashTimer: ReturnType<typeof setTimeout> | undefined;
-const seamClass = computed(() => {
-  if (shape.value !== 'line') return 'is-handoff';
-  return zoneLit.value || seamFlash.value ? 'is-lit' : '';
-});
+// The peek lifts a little and its rim lights up while the pointer dwells on it
+const peekLit = ref(false);
 
 interface Geo {
   w: number;
@@ -488,10 +477,6 @@ interface Geo {
   b: number;
 }
 
-// The chat starts and ends as the lit line itself: same width, 2px tall, at the line's height
-// Content area: from the nav rail (80px + 12px margin, md and up) to a 12px right margin
-const contentWidth = () => window.innerWidth - (mdAndUp.value ? 92 : 12) - 12;
-const lineGeo = (): Geo => ({ w: Math.round(contentWidth() * 0.58), h: 2, r: 1, b: 5 });
 const measure = (el: HTMLElement): Geo => {
   const rect = el.getBoundingClientRect();
   return {
@@ -520,7 +505,6 @@ const freeze = (frozen: boolean) => {
 const stopMorph = () => {
   morphAnim?.cancel();
   morphAnim = undefined;
-  leaving.value = false;
   freeze(false);
 };
 
@@ -553,27 +537,21 @@ const partsOf = (s: Shape): (Element | null)[] => {
   if (s === 'toast') return [el.querySelector('.chat-toast')];
   if (s === 'bar') return [composerEl.value, el.querySelector('.chat-tip')];
   if (s === 'open') return [bodyEl.value, composerEl.value];
-  return [];
+  return [el.querySelector('.chat-peek')];
 };
 
 const morphTo = async (next: Shape) => {
   const el = chatEl.value;
   const prev = shape.value;
-  if (!el || (next === prev && !leaving.value)) return;
+  if (!el || next === prev) return;
   const token = ++morphToken;
   // Measure before cancelling, so an interrupted morph carries on from where it is
-  const from = prev === 'line' ? lineGeo() : measure(el);
-  const reopening = leaving.value;
+  const from = measure(el);
   stopMorph();
-  trackFrame(OPEN_MS + 60);
-
-  if (next === 'line') {
-    fold(prev, from);
-    return;
-  }
+  trackFrame(MORPH_MS + 60);
 
   if (next === 'toast') tint.value = notice.value ? noticeColor(notice.value.kind) : tint.value;
-  else tint.value = null; // the open chat wears its own light, not the last toast's
+  else if (next !== 'peek') tint.value = null; // the open chat wears its own light, not the last toast's
   const before = partsOf(prev);
   shape.value = next;
   if (reducedMotion) return;
@@ -585,47 +563,29 @@ const morphTo = async (next: Shape) => {
   }
 
   freeze(true);
+  // Rising from the peek is a slide at the same width: no clip, so the hover bridge under it
+  // stays under a pointer resting where the peek was
+  if (prev === 'peek') el.style.overflow = '';
   await nextTick();
   if (token !== morphToken) return;
   applyBodyHeight();
   const to = measure(el);
-  const fromLine = prev === 'line';
-  const duration = fromLine ? OPEN_MS : MORPH_MS;
-  morphAnim = el.animate([frame(from), frame(to)], { duration, easing: EASE });
+  const toPeek = next === 'peek';
+  morphAnim = el.animate([frame(from), frame(to)], { duration: MORPH_MS, easing: toPeek ? CLOSE_EASE : EASE });
   morphAnim.onfinish = () => {
     morphAnim = undefined;
     freeze(false);
-  };
-  if (fromLine || reopening) light(true, duration, EASE);
-  partsOf(next)
-    .filter((part) => part && !before.includes(part))
-    .forEach((part) => zoomIn(part, fromLine ? 200 : 60));
-};
-
-// Fold back down into the line: the line then flashes lit and relaxes to rest
-const fold = (prev: Shape, from: Geo) => {
-  const el = chatEl.value;
-  const done = () => {
-    morphAnim = undefined;
-    leaving.value = false;
-    freeze(false);
+    if (!toPeek) return;
+    // Back at rest: the rim and halo drop to the peek's own (CSS) levels, the toast's colour goes
     rimAnim?.cancel();
     haloAnim?.cancel();
-    shape.value = 'line';
     tint.value = null;
-    seamFlash.value = true;
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => (seamFlash.value = false), 260);
   };
-  if (!el || reducedMotion || prev === 'line') {
-    done();
-    return;
-  }
-  leaving.value = true;
-  freeze(true);
-  morphAnim = el.animate([frame(from), frame(lineGeo())], { duration: CLOSE_MS, easing: CLOSE_EASE });
-  morphAnim.onfinish = done;
-  light(false, CLOSE_MS, CLOSE_EASE);
+  // Rising out of the peek (or sinking back into it) flashes the light
+  if (prev === 'peek' || toPeek) light(!toPeek, MORPH_MS, toPeek ? CLOSE_EASE : EASE);
+  partsOf(next)
+    .filter((part) => part && !before.includes(part))
+    .forEach((part) => zoomIn(part, 60));
 };
 
 watch(desiredShape, (next) => void morphTo(next));
@@ -691,7 +651,7 @@ const onToastKeydown = (e: KeyboardEvent) => {
 const toastItem = ref<NotificationItem | null>(null);
 watch(notice, (item) => item && (toastItem.value = item), { immediate: true });
 
-const pillItem = computed(() => (state.value !== 'hidden' && shape.value !== 'line' ? notice.value : null));
+const pillItem = computed(() => (state.value !== 'hidden' && shape.value !== 'peek' ? notice.value : null));
 const notificationsLabel = computed(() => {
   const n = notifications.value.length;
   return `${n} notification${n === 1 ? '' : 's'} today`;
@@ -703,7 +663,7 @@ const isEditable = (el: Element | null) =>
 // Open from hover, shortcut or tap. Focus, unless the user is mid-typing in another field
 const reveal = ({ focus = true } = {}) => {
   hoverSuppressed = false;
-  zoneLit.value = false;
+  peekLit.value = false;
   clearTimeout(hoverLeaveTimer); // a pending hover-out must not hide a bar just opened by key or click
   if (state.value === 'hidden') setState(messages.value.length ? 'open' : 'bar');
   const active = document.activeElement as HTMLInputElement | null;
@@ -711,7 +671,7 @@ const reveal = ({ focus = true } = {}) => {
   if (focus && !busyElsewhere) focusInput();
 };
 
-// After Esc or a click outside, a pointer still resting on the bottom edge must not pop the bar
+// After Esc or a click outside, a pointer still resting on the peek must not pop the bar
 // straight back up: hover reveals again only once the pointer has left and come back
 let hoverSuppressed = false;
 
@@ -721,7 +681,7 @@ const close = () => {
   if (state.value !== 'open') inputEl.value?.blur();
 };
 
-// Hover: the line lights up at once, and opens after a dwell, so sweeping the mouse along the
+// Hover: the peek lights up at once, and rises after a dwell, so sweeping the mouse along the
 // bottom edge doesn't pop it up. Not over the toast: that opens on click
 let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 let hoverLeaveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -729,16 +689,15 @@ let hoverLeaveTimer: ReturnType<typeof setTimeout> | undefined;
 const onPointerEnter = () => {
   clearTimeout(hoverLeaveTimer);
   if (isTouch || hoverSuppressed || state.value !== 'hidden' || desiredShape.value === 'toast') return;
-  zoneLit.value = true;
+  peekLit.value = true;
   hoverTimer = setTimeout(() => reveal(), 320);
 };
 
 const onPointerLeave = (e: MouseEvent) => {
   clearTimeout(hoverTimer);
-  zoneLit.value = false;
-  // Moving between the bar and the hover zone isn't leaving
+  peekLit.value = false;
   const to = e.relatedTarget as Element | null;
-  if (!to?.closest('.chat, .chat-hotzone')) hoverSuppressed = false;
+  if (!to?.closest('.chat')) hoverSuppressed = false;
   if (isTouch) return;
   hoverLeaveTimer = setTimeout(() => {
     if (state.value === 'bar' && !hasDraft.value && !menuOpen.value) {
@@ -752,7 +711,7 @@ const onPointerLeave = (e: MouseEvent) => {
 // above the chat don't count
 const onDocumentPointerDown = (e: PointerEvent) => {
   const target = e.target as Element | null;
-  if (!target || chatEl.value?.contains(target) || target.closest('.chat-pill, .chat-hotzone, .v-overlay-container')) return;
+  if (!target || chatEl.value?.contains(target) || target.closest('.chat-pill, .v-overlay-container')) return;
   // A confirm toast is answered or dropped: clicking elsewhere dismisses it
   if (state.value === 'hidden') {
     if (shape.value === 'toast' && notice.value?.kind === 'confirm') notificationCenter.dismiss(notice.value.id);
@@ -805,7 +764,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize);
   clearTimeout(hoverTimer);
   clearTimeout(hoverLeaveTimer);
-  clearTimeout(flashTimer);
   resizeObserver?.disconnect();
   stopMorph();
 });
@@ -853,8 +811,12 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   if (e.propertyName === 'height' && !showHistory.value) threadEl.value?.scrollTo({ top: threadEl.value.scrollHeight });
 };
 
-// A draft is waiting in the hidden bar: the line stays brighter
-const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
+// The peek shows a draft left in the bar (with its command) in place of the placeholder
+const peekText = computed(() => {
+  if (!hasDraft.value) return placeholder.value;
+  const text = inputText.value.trim() || (attachedFile.value ? '(image)' : '');
+  return command.value ? `/${command.value.name} ${text}` : text;
+});
 </script>
 
 <template>
@@ -862,25 +824,14 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
     ref="rootEl"
     class="chat-bar"
     :class="{
-      'is-hidden': shape === 'line',
+      'is-peek': shape === 'peek',
+      'is-lit': peekLit,
       'is-toast': shape === 'toast',
       'is-open': shape === 'open',
       'has-rail': mdAndUp,
     }"
     :style="lightStyle"
   >
-    <!-- Hover target along the bottom edge (also the keyboard and click way in), and the line of
-         light it wakes up in the bottom gutter -->
-    <button
-      type="button"
-      class="chat-hotzone"
-      aria-label="Open chat"
-      @mouseenter="onPointerEnter"
-      @mouseleave="onPointerLeave"
-      @click="reveal()"
-    />
-    <div class="chat-seam" :class="[seamClass, { 'has-draft': lineHasDraft }]" aria-hidden="true" />
-
     <!-- Glow under the chat; a sibling, so the chat's own blur doesn't swallow it -->
     <div ref="haloEl" class="chat-halo" aria-hidden="true" />
 
@@ -888,13 +839,20 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
     <div
       ref="chatEl"
       class="chat"
-      :class="{ leaving }"
       role="dialog"
       aria-label="Chat"
       @mouseenter="onPointerEnter"
       @mouseleave="onPointerLeave"
     >
       <div ref="rimEl" class="chat-rim" aria-hidden="true" />
+
+      <!-- At rest: the composer's top edge peeks up from the bottom of the screen (the rest of it
+           sits below the edge) with the placeholder, or the draft left in it -->
+      <button v-if="shape === 'peek'" type="button" class="chat-peek" aria-label="Open chat" @click="reveal()">
+        <VIcon icon="mdi-creation-outline" size="15" />
+        <span class="chat-peek__text" :class="{ 'is-draft': hasDraft }">{{ peekText }}</span>
+        <span class="chat-peek__keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+      </button>
 
       <!-- Notification toast (chat hidden): opens the panel with the list -->
       <div
@@ -1156,19 +1114,10 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   --chat-halo: rgba(255, 255, 255, 0.75);
   --chat-thumb: rgba(20, 28, 38, 0.22);
   --chat-thumb-hover: rgba(20, 28, 38, 0.36);
-  /* The light ("pha màu"): a near-black core (white in dark) whose ends fade through blue and
-     pink; the glow under it runs the whole spectrum. Notifications swap in their own colour
-     (lightStyle). The rim's angle turns on the rim itself, so it takes stops, not a gradient */
+  /* The light ("pha màu"): a near-black core (white in dark) running through blue, pink and
+     amber on the rim; the glow under it runs the whole spectrum. Notifications swap in their own
+     colour (lightStyle). The rim's angle turns on the rim itself, so it takes stops, not a gradient */
   --light-mono: rgba(16, 18, 22, 0.8);
-  --line-grad: linear-gradient(
-    90deg,
-    transparent,
-    #6f9bff 12%,
-    var(--light-mono) 32%,
-    var(--light-mono) 68%,
-    #ff7eb6 88%,
-    transparent
-  );
   --halo-grad: linear-gradient(90deg, #6f9bff, #a98bff, #ff7eb6, #ffad66, #6fdcc0);
   --rim-stops: var(--light-mono), #6f9bff, var(--light-mono) 35%, #ff7eb6 55%, var(--light-mono) 70%, #ffad66 85%,
     var(--light-mono);
@@ -1275,8 +1224,10 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   border-radius: 4px;
   border: 1px solid var(--chat-line);
   background: var(--chat-tile);
-  font: 500 11px/1.4 inherit;
   font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1287,81 +1238,8 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
 </style>
 
 <style scoped>
-/* ── Hover zone and the line of light ── */
-.chat-hotzone {
-  position: fixed;
-  z-index: 1005;
-  left: var(--content-x);
-  bottom: 0;
-  width: min(640px, var(--content-w)); /* the bar's own width when open: no wider, so passing the mouse along the edge doesn't trigger it */
-  height: 40px;
-  padding: 0;
-  border: 0;
-  background: none;
-  outline: none;
-  transform: translateX(-50%);
-  cursor: default;
-}
-
-/* The line sits in the bottom 12px gutter, under the cards: a 2px core with a blurred glow
-   below it. Rest is short and dim; lit (hover, or right after the chat folds into it) is wide */
-.chat-seam {
-  --seam-w: 30%;
-  --seam-o: 0.45;
-  position: fixed;
-  z-index: 1004;
-  left: var(--inset-l);
-  right: 12px;
-  bottom: 0;
-  height: 12px;
-  pointer-events: none;
-}
-.chat-seam::before,
-.chat-seam::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  width: var(--seam-w);
-  opacity: var(--seam-o);
-  transform: translateX(-50%);
-  transition:
-    width 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 0.35s;
-}
-.chat-seam::before {
-  bottom: 5px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--line-grad);
-}
-.chat-seam::after {
-  bottom: -8px;
-  height: 20px;
-  background: var(--halo-grad);
-  mask-image: radial-gradient(closest-side, #000 20%, transparent);
-  filter: blur(7px);
-  opacity: calc(var(--seam-o) * 0.7);
-}
-.chat-seam.has-draft {
-  --seam-o: 0.8;
-}
-.chat-seam.is-lit,
-.chat-hotzone:focus-visible + .chat-seam:not(.is-handoff) {
-  --seam-w: 58%;
-  --seam-o: 1;
-}
-/* The chat element carries the light now: the line steps aside at once */
-.chat-seam.is-handoff {
-  --seam-w: 58%;
-  --seam-o: 0;
-}
-.chat-seam.is-handoff::before,
-.chat-seam.is-handoff::after {
-  transition: opacity 0.12s;
-}
-
 /* Rim: a 2px ring of turning light (the border box minus the padding box), bright while the
-   chat morphs out of the line and quiet after */
+   chat rises out of the peek and quiet after */
 .chat-rim {
   position: absolute;
   inset: 0;
@@ -1377,7 +1255,7 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   mask-composite: exclude;
   animation: chat-light-turn 9s linear infinite;
 }
-.chat-bar.is-hidden .chat-rim {
+.chat-bar.is-peek:not(.is-lit) .chat-rim {
   animation-play-state: paused;
 }
 @property --a {
@@ -1402,7 +1280,7 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   opacity: 0;
   pointer-events: none;
 }
-.chat-bar.is-hidden .chat-halo {
+.chat-bar.is-peek .chat-halo {
   opacity: 0;
 }
 
@@ -1428,6 +1306,14 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
     width 0.42s cubic-bezier(0.32, 0.72, 0, 1),
     border-radius 0.42s cubic-bezier(0.32, 0.72, 0, 1);
 }
+/* Hover bridge from the risen chat down to the screen edge: a pointer still where the peek was
+   (now in the gap under the bar) hasn't left, so the bar doesn't sink back under it */
+.chat::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: calc(16px + env(safe-area-inset-bottom, 0px));
+}
 .chat-bar.is-open .chat {
   --w: 640px;
   border-radius: 26px;
@@ -1437,16 +1323,70 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   border-radius: 23px;
 }
-.chat-bar.is-hidden .chat {
+/* Peek (the rest state with a mouse): the bar's own box sunk below the screen edge, so only its
+   top --peek-h shows. Its composer stays underneath, invisible, so the box keeps the bar's size
+   and rising is a plain slide. Hover lifts it a little while the dwell runs */
+.chat-bar.is-peek .chat {
+  --peek-h: 28px;
+  --bar-h: 56px;
+  height: var(--bar-h);
+  bottom: calc(var(--peek-h) - var(--bar-h));
+  overflow: hidden;
+  transition: bottom 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.chat-bar.is-peek.is-lit .chat {
+  bottom: calc(var(--peek-h) + 4px - var(--bar-h));
+}
+.chat-bar.is-peek .chat-rim {
+  opacity: 0.45;
+  transition: opacity 0.3s;
+}
+.chat-bar.is-peek.is-lit .chat-rim {
+  opacity: 1;
+}
+.chat-bar.is-peek .chat-composer {
   opacity: 0;
   pointer-events: none;
-  transition: none;
 }
 .chat > :not(.chat-rim) {
   transition: opacity 0.15s ease-out;
 }
-.chat.leaving > :not(.chat-rim) {
-  opacity: 0;
+
+.chat-peek {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  height: var(--peek-h);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 20px 0 18px;
+  border: 0;
+  background: none;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 13px;
+  cursor: text;
+  outline: none;
+  text-shadow: 0 0 6px var(--chat-halo);
+}
+.chat-peek:focus-visible {
+  background: var(--chat-tile);
+}
+.chat-peek__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-peek__text.is-draft {
+  color: rgb(var(--v-theme-on-surface));
+}
+.chat-peek__keys {
+  display: flex;
+  gap: 3px;
+  flex: none;
 }
 
 /* Toast: one line, 46px tall */
