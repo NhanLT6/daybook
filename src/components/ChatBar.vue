@@ -828,7 +828,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
     }"
     :style="lightStyle"
   >
-    <!-- Glow under the chat; a sibling, so the chat's own blur doesn't swallow it -->
+    <!-- Glow under the chat while it morphs; a sibling, so the chat's solid surface doesn't cover it -->
     <div ref="haloEl" class="chat-halo" aria-hidden="true" />
 
     <!-- The chat: toast, or conversation panel above the composer -->
@@ -1085,16 +1085,17 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 </template>
 
 <style>
-/* Glass tokens for the bar. One veil for both themes (a neutral grey, dimmer than white so the
-   white AI bubbles and cards read on it); the rim light comes from the bottom right in light
-   and the top left in dark. Shared by AiChatMessage, which renders inside the bar. */
+/* Surface tokens for the bar. Solid, no glass: the coloured rim already sets it apart, and the
+   grey glass blended into the grey background (the peek edge most of all). Light is white; dark
+   is a step lighter than the cards, since lighter reads as a higher layer there where shadows
+   barely show. AI bubbles take a faint tint to show on it. The rim light comes from the bottom
+   right in light and the top left in dark. Shared by AiChatMessage, which renders inside the bar. */
 .chat-bar {
   /* Everything centres on the content area, right of the nav rail on md and up */
   --inset-l: 12px;
   --content-x: calc(50% + (var(--inset-l) - 12px) / 2);
   --content-w: calc(100vw - var(--inset-l) - 12px);
-  --chat-veil: rgba(226, 227, 229, 0.46);
-  --chat-blur: 7px;
+  --chat-veil: #ffffff;
   --chat-rim:
     inset -1.5px -1.5px 1px -0.5px rgba(255, 255, 255, 0.95), inset 1px 1px 0 0 rgba(20, 28, 38, 0.12),
     inset 0 0 0 1px rgba(255, 255, 255, 0.22);
@@ -1102,7 +1103,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   --chat-line: rgba(20, 28, 38, 0.12);
   --chat-tile: rgba(20, 28, 38, 0.05);
   --chat-menu: rgba(255, 255, 255, 0.94);
-  --chat-ai: #ffffff;
+  --chat-ai: rgba(20, 28, 38, 0.05);
   --chat-halo: rgba(255, 255, 255, 0.75);
   --chat-thumb: rgba(20, 28, 38, 0.22);
   --chat-thumb-hover: rgba(20, 28, 38, 0.36);
@@ -1120,15 +1121,15 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 }
 
 .v-theme--dark .chat-bar {
-  --chat-veil: rgba(45, 45, 45, 0.46);
+  --chat-veil: #363636;
   --chat-rim:
     inset 1.5px 1.5px 1px -0.5px rgba(255, 255, 255, 0.45), inset -1px -1px 0 0 rgba(0, 0, 0, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   --chat-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.22), 0 24px 60px rgba(0, 0, 0, 0.24);
   --chat-line: rgba(232, 236, 239, 0.12);
   --chat-tile: rgba(255, 255, 255, 0.05);
-  --chat-menu: rgba(45, 45, 45, 0.96);
-  --chat-ai: rgba(60, 60, 60, 0.7);
+  --chat-menu: #404040;
+  --chat-ai: rgba(255, 255, 255, 0.07);
   --chat-halo: rgba(20, 22, 26, 0.7);
   --chat-thumb: rgba(255, 255, 255, 0.2);
   --chat-thumb-hover: rgba(255, 255, 255, 0.34);
@@ -1261,7 +1262,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   }
 }
 
-/* Halo: the same light, blurred, under the chat while it morphs; at rest the glass stays neutral
+/* Halo: the same light, blurred, under the chat while it morphs; at rest the surface stays neutral
    and only the rim is coloured. syncFrame keeps it on the chat's box */
 .chat-halo {
   position: fixed;
@@ -1292,8 +1293,6 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   color: rgb(var(--v-theme-on-surface));
   background: var(--chat-veil);
   box-shadow: var(--chat-rim), var(--chat-shadow);
-  backdrop-filter: blur(var(--chat-blur));
-  -webkit-backdrop-filter: blur(var(--chat-blur));
   transition:
     width 0.42s cubic-bezier(0.32, 0.72, 0, 1),
     border-radius 0.42s cubic-bezier(0.32, 0.72, 0, 1);
@@ -1332,6 +1331,10 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 .chat-bar.is-peek .chat-rim {
   opacity: 0.7;
   transition: opacity 0.3s;
+}
+/* On white the edge needs the rim at full strength to catch the eye */
+.v-theme--light .chat-bar.is-peek .chat-rim {
+  opacity: 1;
 }
 .chat-bar.is-peek.is-lit .chat-rim {
   opacity: 1;
@@ -1389,8 +1392,6 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   color: rgb(var(--v-theme-on-surface));
   background: var(--chat-veil);
   box-shadow: var(--chat-rim), 0 8px 24px rgba(0, 0, 0, 0.14);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
 }
 .chat-pill-enter-active {
