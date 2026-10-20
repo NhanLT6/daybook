@@ -190,6 +190,8 @@ const placeholder = computed(() => {
   if (command.value) return `${command.value.hint}…`;
   return xs.value ? 'What did you work on?' : 'What did you work on? / for commands'; // the long one clips on phones
 });
+// The default placeholder is drawn as markup so its / reads as a key, like the shortcut hint beside it
+const keyPlaceholder = computed(() => !isDragOver.value && !command.value && !xs.value);
 
 const focusInput = () => inputEl.value?.focus({ preventScroll: true });
 
@@ -1108,7 +1110,8 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
               ref="inputEl"
               v-model="inputText"
               rows="1"
-              :placeholder="placeholder"
+              :placeholder="keyPlaceholder ? undefined : placeholder"
+              :aria-placeholder="placeholder"
               aria-label="Message"
               @keydown="onKeydown"
               @input="syncCaret"
@@ -1118,6 +1121,9 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
               @paste="onPaste"
               @focus="state === 'hidden' && reveal({ focus: false })"
             />
+            <span v-if="keyPlaceholder && !inputText" class="composer-placeholder" aria-hidden="true">
+              What did you work on? <kbd>/</kbd> for commands
+            </span>
             <!-- How to bring the chat back, inside the empty field and away from the placeholder -->
             <span v-if="!inputText && !command && !isTouch && mdAndUp" class="composer-hint" aria-hidden="true">
               <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> to open
@@ -1807,6 +1813,19 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   color: transparent;
   text-shadow: none;
   pointer-events: none;
+}
+.composer-placeholder {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 15px;
+  line-height: 21px;
+  white-space: nowrap;
+  pointer-events: none;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+.composer-placeholder kbd {
+  font-size: 12px;
 }
 /* Right-aligned beside the placeholder, next to the image button */
 .composer-hint {
