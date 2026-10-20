@@ -122,7 +122,10 @@ When the user describes work they did (via text or screenshot), call the extract
 ${workdayRules(workdayMinutes)}
 - Omit duration (plan entry, no time logged yet) when the user is describing future/not-yet-done work — e.g. "plan to work on T-999", "will pick up T-999", "todo: T-999" — with no remainder phrasing.
 - If a task is mentioned with no duration, no remainder phrasing, and no plan-intent wording either, don't guess — ask the user to clarify how much time (or whether it's a plan entry).
-- description is optional — use it for meaningful detail only.
+- description is a short note the user would write on the log themselves: which PR or ticket they reviewed, what a meeting was about, what they worked on. Leave it unset unless the message states such a detail for that entry.
+  - Never put your own reasoning, math or how you read the message into description (no "rest of the day", "480-15=465", "all time except daily", "from screenshot").
+  - Don't repeat the project, task, date or duration in it.
+  - Example: "yesterday 15m team meeting about sprint planning, review PR #412 for T-88 30m, rest on T-90" → meeting description "Sprint planning", review description "PR #412 for T-88", T-90 has no description.
 - If the user corrects logs you extracted earlier (wrong date, duration, task), call extractLogs again with the full corrected list. Earlier extractLogs results say whether the user saved or discarded those logs; if they were already saved, mention that the old entries need deleting from the log list.
 - Do NOT include a JSON block in your text response. Use the extractLogs tool instead.
 

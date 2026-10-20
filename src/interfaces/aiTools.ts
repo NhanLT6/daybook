@@ -19,7 +19,12 @@ export const extractedLogSchema = z.object({
     .positive()
     .optional()
     .describe('Duration in minutes. Omit for a plan entry that has no logged time yet.'),
-  description: z.string().optional().describe('Optional extra detail'),
+  description: z
+    .string()
+    .optional()
+    .describe(
+      "The user's own note for this entry (e.g. which PR was reviewed, what a meeting was about). Unset unless the user stated one; never your reasoning or duration math.",
+    ),
 });
 
 export const extractLogsInputSchema = z.object({
