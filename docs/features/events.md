@@ -4,8 +4,8 @@
 
 Events are **markers** on the calendar: holidays, and custom things like "Sprint 42" or "Standup hosted by Sam".
 They never notify, pop up, or remind — by design. The motivating case: the user and a coworker alternate
-hosting the Tuesday daily standup (a biweekly repeat, with a skipped date when they swap), and sprint
-start/end markers are planned next (a Mon→Fri range repeating every 2 weeks).
+hosting the Tuesday daily standup (a biweekly repeat, with a skipped date when they swap), and sprints
+(a Mon→Fri range repeating every 2 weeks, each sprint named for you — see Sprints).
 
 ## Data Model
 
@@ -216,6 +216,32 @@ the rule is untouched.
 - `validateRepeat` only inspects the first 50 occurrences (`end` is replaced by `count: 50`).
 - `interval` is clamped to an integer >= 1 and `count` to >= 1 in `toRRule`/`describeRepeat`; form validation
   should still keep the UI from producing them.
+
+## Sprints
+
+A sprint series is a plain back-to-back range event plus `sprint: SprintNaming { format, first }`, so the
+calendar, list, skips and backups treat it like any other series (no migration). Created from the Events
+toolbar's split button (**New Event** | ▾ → New sprints, Vuetify `VBtnGroup divided` + `VMenu`), edited in
+`SprintForm.vue` (the list opens it for any event with `sprint`); `EventForm` never sees sprints.
+
+- **Names**: `src/common/sprintNaming.ts`. `format` is text with `{tokens}` (`year`, `yy`, `quarter`, `month`,
+  `inQuarter`, `inYear`, `number`, `week` (ISO), `start`, `end`); unknown `{words}` stay text. Users never type
+  tokens: the form offers three styles (by quarter `Sprint {year} Q{quarter}.{inQuarter}`, running number,
+  by year) and **Custom…**, a chip editor (`SprintNameInput.vue`: contenteditable with non-editable chip
+  spans, each followed by a zero-width space so the caret can sit after it; Backspace after a chip removes
+  it; a palette inserts chips at the caret via `@mousedown.prevent`).
+- **Numbering**: by the sprint's place in the series, skipped sprints left out. A sprint belongs to the
+  quarter / year it **starts** in (Dec 28 → Jan 8 is Q4). `first` offsets the running number and the
+  per-quarter / per-year number **in the first sprint's period only** (a team joining at Q4.3).
+- **Titles**: `atOccurrence` fills in each occurrence's own `title` (`sprintTitle`), so every renderer that
+  shows an occurrence (calendar, list row, day card, Home's today line) gets the sprint name for free. Code
+  that shows an event without an occurrence must go through `atOccurrence` too; the stored `title` is only
+  the first sprint's name, for anything that reads raw events.
+- **Dates**: start date + 1–4 weeks; a sprint ends on the last work day before the next one starts (Mon →
+  Thu under a Fri–Sun weekend), repeated with `backToBackRule`. Ends never / on a date / after N sprints (1 =
+  a one-off sprint, stored without `repeat`).
+- **Different lengths / resets** (a 1-week Christmas sprint): end the series on a date, add a one-off sprint,
+  start a new series after it, using **First number** to carry the count on. No per-occurrence overrides.
 
 ## What Is NOT Implemented
 

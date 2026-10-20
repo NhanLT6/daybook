@@ -7,6 +7,7 @@ import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import EventForm from '@/components/EventForm.vue';
 import GroupedTable from '@/components/GroupedTable.vue';
 import ListPanel from '@/components/ListPanel.vue';
+import SprintForm from '@/components/SprintForm.vue';
 
 import type { TableColumn, TableGroup } from '@/components/GroupedTable.vue';
 import type { AppEvent } from '@/interfaces/Event';
@@ -51,13 +52,19 @@ const filterLabel = computed(
   () => `${timeFilter.value === 'upcoming' ? 'Upcoming' : 'All time'} · ${typeLabels[typeFilter.value]}`,
 );
 
-// One table row per event; `next` is its next occurrence (null once the series is over).
-// Computed once per event here so the template never recomputes it.
+// One table row per event; `next` is its next occurrence (null once the series is over), `title` that
+// occurrence's title (a sprint series names each sprint). Computed once per event so the template never does.
 interface EventRow {
   id: string;
   event: AppEvent;
   next: string | null;
+  title: string;
 }
+
+const rowFor = (event: AppEvent): EventRow => {
+  const next = getNextOccurrence(event, undefined, workCalendar.value);
+  return { id: event.id, event, next, title: atOccurrence(event, next ?? event.date).title };
+};
 
 // Events filtered by type + time + search, sorted by next occurrence (ended events fall back to their first date)
 const filteredEvents = computed<EventRow[]>(() => {
@@ -65,8 +72,8 @@ const filteredEvents = computed<EventRow[]>(() => {
   return (
     events.value
       .filter((e) => typeFilter.value === 'all' || e.type === typeFilter.value)
-      .filter((e) => !q || e.title.toLowerCase().includes(q) || !!e.description?.toLowerCase().includes(q))
-      .map((event) => ({ id: event.id, event, next: getNextOccurrence(event, undefined, workCalendar.value) }))
+      .map(rowFor)
+      .filter((row) => !q || row.title.toLowerCase().includes(q) || !!row.event.description?.toLowerCase().includes(q))
       // An event is past iff it has no occurrence left
       .filter((row) => timeFilter.value === 'all' || row.next !== null)
       .sort((a, b) => dayjs(a.next ?? a.event.date).diff(dayjs(b.next ?? b.event.date)))
@@ -129,18 +136,22 @@ watch(
 );
 
 // ─── Modal state ─────────────────────────────────────────────
+// Which form the dialog shows: sprint series have their own
 const isModalOpen = ref(false);
 const editingEvent = ref<AppEvent | null>(null);
+const isSprintForm = ref(false);
 
 // ─── Actions ─────────────────────────────────────────────────
 
-const openAddModal = () => {
+const openAddModal = (sprints = false) => {
   editingEvent.value = null;
+  isSprintForm.value = sprints;
   isModalOpen.value = true;
 };
 
 const openEditModal = (event: AppEvent) => {
   editingEvent.value = event;
+  isSprintForm.value = !!event.sprint;
   isModalOpen.value = true;
 };
 
@@ -178,7 +189,7 @@ const skipNextOccurrence = (event: AppEvent, next: string) => {
   addEvent(withSkip(event, [...(event.repeat.skip ?? []), next]));
 
   const id = notificationCenter.success(`Skipped ${occurrenceLabel(event, next)}`, {
-    message: event.title,
+    message: atOccurrence(event, next).title,
     expandOnEnqueue: true, // the chat panel's notification list opens expanded too
     actions: [
       {
@@ -204,8 +215,8 @@ const skipNextOccurrence = (event: AppEvent, next: string) => {
 };
 
 const deleteEvent = (event: AppEvent) => {
-  notificationCenter.confirm('Delete event?', {
-    message: event.title,
+  notificationCenter.confirm(event.sprint ? 'Delete these sprints?' : 'Delete event?', {
+    message: event.sprint ? `The whole series, from ${event.title}` : event.title,
     actions: [
       {
         id: 'cancel',
@@ -268,20 +279,28 @@ const deleteEvent = (event: AppEvent) => {
         </VMenu>
       </template>
 
+      <!-- New Event in one click; the arrow opens the other ways to add (Vuetify's split button pattern) -->
       <template #actions>
-        <VBtn
-          color="primary"
-          variant="tonal"
-          rounded="lg"
-          height="32"
-          prepend-icon="mdi-plus"
-          class="list-icon-on-xs"
-          aria-label="New Event"
-          v-tooltip="'Add event'"
-          @click="openAddModal"
-        >
-          <span class="d-none d-sm-inline">New Event</span>
-        </VBtn>
+        <VBtnGroup color="primary" variant="tonal" rounded="lg" divided class="event-new-group">
+          <VBtn
+            prepend-icon="mdi-plus"
+            class="list-icon-on-xs"
+            aria-label="New Event"
+            v-tooltip="'Add event'"
+            @click="openAddModal()"
+          >
+            <span class="d-none d-sm-inline">New Event</span>
+          </VBtn>
+          <VMenu location="bottom end" offset="8">
+            <template #activator="{ props }">
+              <VBtn v-bind="props" icon="mdi-chevron-down" size="small" aria-label="More ways to add" />
+            </template>
+            <VList density="compact" rounded="lg" min-width="220">
+              <VListItem title="New event" subtitle="A day, range or repeating marker" @click="openAddModal()" />
+              <VListItem title="New sprints" subtitle="Back to back, named for you" @click="openAddModal(true)" />
+            </VList>
+          </VMenu>
+        </VBtnGroup>
       </template>
 
       <!-- Events grouped by month; rows select their event on the calendar -->
@@ -302,13 +321,13 @@ const deleteEvent = (event: AppEvent) => {
         <template #cell.type="{ row }">
           <VAvatar size="28" variant="tonal">
             <VImg v-if="row.event.type === 'holiday'" :src="holidayImg" alt="Holiday" />
-            <VIcon v-else icon="mdi-account-outline" size="16" class="text-disabled" />
+            <VIcon v-else :icon="row.event.sprint ? 'mdi-run-fast' : 'mdi-account-outline'" size="16" class="text-disabled" />
           </VAvatar>
         </template>
 
         <!-- Title + optional muted description line -->
         <template #cell.title="{ row }">
-          <div>{{ row.event.title }}</div>
+          <div>{{ row.title }}</div>
           <div v-if="row.event.description" class="text-caption text-medium-emphasis">
             {{ row.event.description }}
           </div>
@@ -381,12 +400,23 @@ const deleteEvent = (event: AppEvent) => {
 
     <!-- Add / Edit Modal -->
     <VDialog v-model="isModalOpen" max-width="520" persistent scrollable>
-      <EventForm :item="editingEvent" @save-event="onSaveEvent" @cancel-modify-event="onCancelModifyEvent" />
+      <SprintForm
+        v-if="isSprintForm"
+        :item="editingEvent"
+        @save-event="onSaveEvent"
+        @cancel-modify-event="onCancelModifyEvent"
+      />
+      <EventForm v-else :item="editingEvent" @save-event="onSaveEvent" @cancel-modify-event="onCancelModifyEvent" />
     </VDialog>
   </VCard>
 </template>
 
 <style scoped>
+/* Same 32px as the other toolbar buttons */
+.event-new-group {
+  height: 32px;
+}
+
 .event-month-count {
   font-size: 0.8125rem;
   color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));

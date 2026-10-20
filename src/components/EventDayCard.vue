@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
 
 import { isoDateFormat } from '@/common/DateFormat';
 import { formatEventDate } from '@/common/DateHelpers';
-import { atOccurrence, nextEventDay, occurrenceOn } from '@/common/eventRecurrence';
+import { atOccurrence, getNextOccurrence, nextEventDay, occurrenceOn } from '@/common/eventRecurrence';
 
 const { day, selectedEventId = null } = defineProps<{
   day: string; // YYYY-MM-DD: today, or the day picked on the calendar
@@ -58,7 +58,7 @@ const dayItems = computed<DayItem[]>(() =>
       return [
         {
           id: event.id,
-          title: event.title,
+          title: atOccurrence(event, occurrence).title,
           type: event.type,
           when: describeOn(event, occurrence),
           sortKey: event.startTime ?? '',
@@ -72,10 +72,10 @@ const dayItems = computed<DayItem[]>(() =>
 const nextUp = computed(() => {
   if (dayItems.value.length) return null;
   const from = dayjs(day).add(1, 'day').format(isoDateFormat);
-  let best: { event: AppEvent; on: string } | null = null;
+  let best: { event: AppEvent; on: string; occurrence: string } | null = null;
   for (const event of events.value) {
     const on = nextEventDay(event, from, workCalendar.value);
-    if (on && (!best || on < best.on)) best = { event, on };
+    if (on && (!best || on < best.on)) best = { event, on, occurrence: getNextOccurrence(event, from, workCalendar.value) ?? on };
   }
   if (!best) return null;
 
@@ -85,7 +85,7 @@ const nextUp = computed(() => {
     day === today.value ? (gap === 1 ? 'tomorrow' : `in ${gap} days`) : `${gap} ${gap === 1 ? 'day' : 'days'} later`;
   return {
     id: best.event.id,
-    title: best.event.title,
+    title: atOccurrence(best.event, best.occurrence).title,
     type: best.event.type,
     when: `${dayjs(best.on).format('ddd, MMM D')} · ${relative}`,
   };

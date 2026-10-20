@@ -4,6 +4,8 @@ import { RRule, type Options, type Weekday } from 'rrule';
 
 import type { AppEvent, MonthlyDayKind, MonthlyNth, RepeatRule, WorkCalendar } from '@/interfaces/Event';
 
+import { sprintName } from '@/common/sprintNaming';
+
 /**
  * Repeating events: our stored `RepeatRule` is a friendly, typed layer; rrule only does the date math.
  *
@@ -303,7 +305,19 @@ export function nextEventDay(
 }
 
 /**
- * Copy of the event moved to a given occurrence, so date formatters/renderers work unchanged.
+ * Name of a sprint series' occurrence, numbered by its place in the series (skipped sprints don't count).
+ * Sprint rules never depend on work days, so the default work calendar is enough.
+ */
+export function sprintTitle(event: AppEvent, occurrence: string): string {
+  if (!event.sprint) return event.title;
+  const starts = getOccurrences(event, toDay(event.date), occurrence);
+  if (starts.at(-1) !== occurrence) starts.push(occurrence);
+  return sprintName(event.sprint, starts, starts.length - 1, spanDays(event));
+}
+
+/**
+ * Copy of the event moved to a given occurrence, so date formatters/renderers work unchanged. A sprint series
+ * also gets that sprint's own title.
  * Ranges keep their length. Multiple-day events keep their spacing: monthly/yearly series keep each
  * day's day-of-month (the 5th and 20th stay the 5th and 20th), shorter ones shift by whole days.
  */
@@ -318,6 +332,7 @@ export function atOccurrence(event: AppEvent, occurrence: string): AppEvent {
   return {
     ...event,
     date: occurrence,
+    ...(event.sprint ? { title: sprintTitle(event, occurrence) } : {}),
     ...(event.endDate ? { endDate: dayjs(occurrence).add(spanDays(event), 'day').format('YYYY-MM-DD') } : {}),
     ...(event.dates && event.dates.length > 1 ? { dates: eventDays(event).map(shift) } : {}),
   };

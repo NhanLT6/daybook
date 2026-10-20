@@ -8,7 +8,7 @@ import { useNow } from '@vueuse/core';
 import dayjs from 'dayjs';
 
 import { isoDateFormat } from '@/common/DateFormat';
-import { occurrenceOn } from '@/common/eventRecurrence';
+import { atOccurrence, occurrenceOn } from '@/common/eventRecurrence';
 import { useEvents } from '@/composables/useEvents';
 import { useWorkCalendar } from '@/composables/useWorkCalendar';
 
@@ -21,7 +21,10 @@ const today = computed(() => dayjs(now.value).format(isoDateFormat));
 // Today's events, all-day first then by start time; the line hides itself when there are none
 const items = computed(() =>
   events.value
-    .filter((event) => occurrenceOn(event, today.value, workCalendar.value) !== null)
+    .flatMap((event) => {
+      const occurrence = occurrenceOn(event, today.value, workCalendar.value);
+      return occurrence ? [atOccurrence(event, occurrence)] : [];
+    })
     .map((event) => ({
       id: event.id,
       label: event.startTime ? `${event.title} · ${event.startTime}` : event.title,

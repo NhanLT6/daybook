@@ -26,6 +26,15 @@ export interface RepeatRule {
   monthlyBy?: 'dayOfMonth' | 'nthWeekday' | 'lastWeekday' | 'lastWorkday';
 }
 
+/**
+ * Auto-naming for a sprint series: every occurrence gets its own title from `format` (see
+ * `src/common/sprintNaming.ts`). Set only by the sprint form; plain events never have it.
+ */
+export interface SprintNaming {
+  format: string; // Text with {token}s, e.g. "Sprint {year} Q{quarter}.{inQuarter}"
+  first: number; // Number of the first sprint: the running number, or its number within its quarter / year
+}
+
 export interface AppEvent {
   id: string // Holiday: "holiday-{date}-{slug}" | Custom: nanoid()
   title: string // Event name
@@ -40,6 +49,7 @@ export interface AppEvent {
   dayOff?: boolean
   description?: string
   repeat?: RepeatRule // Undefined = one-off event
+  sprint?: SprintNaming // Sprint series: occurrences are named from this; `title` is the first sprint's name
 }
 
 /**

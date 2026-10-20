@@ -55,7 +55,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
 - **Sticky Notes**: Card-based rich-text notes page (`/notes`) with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch), pasted images (Blobs in a separate `daybook-images` IndexedDB, corner-drag resize, click to zoom); the chat bar (`ChatBar.vue`, on every page, Ctrl+K) reads notes via the client-side `searchNotes` tool and Catch-up includes open note items (see `docs/features/notes.md`)
 - **Chat Bar**: Glass chat bar docked on every page (peek / bar / open: at rest only its top edge shows at the bottom of the screen, overlaying the page; Ctrl+K, `/`, a click or hovering the edge raises it), also the notification surface (toast from the peek, pill above the open chat, list in the panel; `NotificationIsland` is gone); history in localStorage (see `docs/features/chat.md`)
-- **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates, incl. a holiday-aware "last work day of the month"; the Events page pairs a calendar (with a picked-day/today card under it) with the list, selection linked both ways (see `docs/features/events.md`)
+- **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates, incl. a holiday-aware "last work day of the month"; the Events page pairs a calendar (with a picked-day/today card under it) with the list, selection linked both ways; Sprints (New Event ▾ → New sprints) are back-to-back series auto-named per sprint from a format like `Sprint {year} Q{quarter}.{inQuarter}` (see `docs/features/events.md`)
 
 ## Feature Documentation
 Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.
@@ -64,7 +64,7 @@ Detailed docs for non-trivial features live in `docs/features/`. Read the releva
 - `docs/features/notes.md` — Note data model + IndexedDB versioning, images (storage, compression, zoom, sweep), HTML sanitization rules, native drag & drop (reorder/trash) design, undo mechanism
 - `docs/features/daily-target.md` — Daily target setting + `useDailyTarget()` consumers, Remaining chip rules, quick picks
 - `docs/features/chat.md` — Chat tools (extractLogs, searchNotes, addNote, addEvent; which run in the browser), slash commands and how they narrow the model's tools, `/` mentions of projects/tasks/Jira tickets
-- `docs/features/events.md` — Event/RepeatRule data model (no migration), `eventRecurrence.ts` date logic, work-day rules (`WorkCalendar`), repeat form rules, Events page calendar selection, skip dates, timezone/UTC-midnight and day-of-month gotchas
+- `docs/features/events.md` — Event/RepeatRule data model, sprint naming (`sprintNaming.ts`, `SprintForm`) (no migration), `eventRecurrence.ts` date logic, work-day rules (`WorkCalendar`), repeat form rules, Events page calendar selection, skip dates, timezone/UTC-midnight and day-of-month gotchas
 
 ## Branches, Deploys & Test Resources
 Every pushed branch gets a Vercel preview build, and the Neon integration creates a Neon branch plus branch-scoped env vars for each preview (the free tier runs out fast).
