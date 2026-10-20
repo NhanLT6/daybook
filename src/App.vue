@@ -444,40 +444,35 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 }
 
 .rail-item {
-  width: 60px;
+  width: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 5px 0 6px;
-  border-radius: 12px;
+  gap: 2px;
+  padding: 8px 0 7px;
+  border-radius: 14px;
   font-size: 11px;
   line-height: 1.2;
   text-decoration: none;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-}
-
-/* The pill sits behind the icon only, so the label stays plain text under it */
-.rail-item__pill {
-  width: 48px;
-  height: 30px;
-  border-radius: 15px;
-  display: grid;
-  place-items: center;
   transition: background-color 0.2s;
 }
 
-.rail-item:hover .rail-item__pill {
+/* The highlight wraps icon and label together, a rounded tile rather than an oval behind the icon */
+.rail-item__pill {
+  display: grid;
+  place-items: center;
+  height: 24px;
+}
+
+.rail-item:hover {
   background: rgba(var(--v-theme-on-surface), 0.06);
 }
 
-.rail-item--active {
+.rail-item--active,
+.rail-item--active:hover {
   color: rgb(var(--v-theme-on-surface));
   font-weight: 500;
-}
-
-.rail-item--active .rail-item__pill,
-.rail-item--active:hover .rail-item__pill {
   background: rgba(var(--v-theme-on-surface), 0.1);
 }
 

@@ -383,33 +383,47 @@ const onCsvPicked = (event: Event) => {
         @click="chartCollapsed = !chartCollapsed"
       />
 
-      <!-- Less frequent actions -->
-      <VMenu location="bottom end" offset="6">
-        <template #activator="{ props: moreProps }">
-          <VIconBtn
-            icon="mdi-dots-horizontal"
-            aria-label="More log actions"
-            size="32"
-            icon-size="20"
-            rounded="lg"
-            variant="text"
-            v-bind="moreProps"
-          />
-        </template>
-
-        <VList class="glass-acrylic" rounded="lg" density="compact" min-width="200">
-          <VListItem rounded="lg" prepend-icon="mdi-unfold-more-horizontal" title="Expand all days" @click="onExpand" />
-          <VListItem
-            rounded="lg"
-            prepend-icon="mdi-unfold-less-horizontal"
-            title="Collapse all days"
-            @click="onCollapse"
-          />
-          <VDivider class="my-1" />
-          <VListItem rounded="lg" prepend-icon="mdi-upload" title="Import CSV" @click="csvInput?.click()" />
-          <VListItem rounded="lg" prepend-icon="mdi-download" title="Export CSV" @click="emit('export')" />
-        </VList>
-      </VMenu>
+      <!-- List actions, always at hand: expand/collapse every day, CSV import/export -->
+      <VIconBtn
+        icon="mdi-arrow-expand"
+        aria-label="Expand logs"
+        size="32"
+        icon-size="20"
+        rounded="lg"
+        variant="text"
+        v-tooltip="'Expand logs'"
+        @click="onExpand"
+      />
+      <VIconBtn
+        icon="mdi-arrow-collapse"
+        aria-label="Collapse logs"
+        size="32"
+        icon-size="20"
+        rounded="lg"
+        variant="text"
+        v-tooltip="'Collapse logs'"
+        @click="onCollapse"
+      />
+      <VIconBtn
+        icon="mdi-import"
+        aria-label="Import CSV"
+        size="32"
+        icon-size="20"
+        rounded="lg"
+        variant="text"
+        v-tooltip="'Import data from CSV template'"
+        @click="csvInput?.click()"
+      />
+      <VIconBtn
+        icon="mdi-export"
+        aria-label="Export CSV"
+        size="32"
+        icon-size="20"
+        rounded="lg"
+        variant="text"
+        v-tooltip="'Export to CSV'"
+        @click="emit('export')"
+      />
       <input ref="csvInput" type="file" accept=".csv" hidden @change="onCsvPicked" />
     </div>
 

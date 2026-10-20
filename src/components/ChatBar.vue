@@ -453,7 +453,7 @@ const MORPH_MS = 420; // between toast, bar and panel
 const CLOSE_MS = 400;
 // The rim is bright while the line turns into the chat, then settles to a quiet outline
 const RIM_REST = 0.75;
-const HALO_REST = 0.26;
+const HALO_REST = 0; // the glow only flashes during the morph; at rest only the rim carries colour
 
 const shape = ref<Shape>('line');
 const desiredShape = computed<Shape>(() => (state.value === 'hidden' ? (notice.value ? 'toast' : 'line') : state.value));
@@ -532,7 +532,7 @@ const light = (opening: boolean, duration: number, easing: string) => {
     { duration, easing, fill: 'forwards' },
   );
   haloAnim = haloEl.value?.animate(
-    [{ opacity: opening ? 0.9 : HALO_REST }, { opacity: opening ? HALO_REST : 0.9 }],
+    [{ opacity: opening ? 0.5 : HALO_REST }, { opacity: opening ? HALO_REST : 0.5 }],
     { duration, easing, fill: 'forwards' },
   );
 };
@@ -1391,14 +1391,15 @@ const lineHasDraft = computed(() => state.value === 'hidden' && hasDraft.value);
   }
 }
 
-/* Halo: the same light, blurred, under the chat; syncFrame keeps it on the chat's box */
+/* Halo: the same light, blurred, under the chat while it morphs; at rest the glass stays neutral
+   and only the rim is coloured. syncFrame keeps it on the chat's box */
 .chat-halo {
   position: fixed;
   z-index: 1006;
   border-radius: 999px;
   background: var(--halo-grad);
   filter: blur(18px);
-  opacity: 0.26;
+  opacity: 0;
   pointer-events: none;
 }
 .chat-bar.is-hidden .chat-halo {
