@@ -307,8 +307,7 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 
     <VMain style="overflow-y: auto">
       <RouterView />
-      <!-- Leave room for the chat at rest so it covers no content: the bar on touch screens,
-           the peek strip with a mouse -->
+      <!-- Touch screens keep the chat bar resting at the bottom: leave room so it covers no content -->
       <div class="chat-bar-spacer" />
       <AppBackground />
     </VMain>
@@ -338,25 +337,13 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
   }
 }
 
-/* Room for the chat at rest. With a mouse it is a 28px peek: 24px on top of the pages' own 12px
-   bottom gutter keeps an 8px gap above it. Small screens scroll the page, so an in-flow spacer
-   after the content; md and up the pages fill VMain (flex children that won't shrink below their
-   content), so VMain's own bottom padding instead */
 .chat-bar-spacer {
-  flex: none;
-  height: 24px;
+  display: none;
 }
 @media (hover: none) {
   .chat-bar-spacer {
+    display: block;
     height: 88px;
-  }
-}
-@media (hover: hover) and (min-width: 960px) {
-  .v-application .v-main {
-    padding-bottom: calc(var(--v-layout-bottom, 0px) + 24px);
-  }
-  .chat-bar-spacer {
-    display: none;
   }
 }
 

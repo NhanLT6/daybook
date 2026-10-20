@@ -563,9 +563,10 @@ const morphTo = async (next: Shape) => {
   }
 
   freeze(true);
-  // Rising from the peek is a slide at the same width: no clip, so the hover bridge under it
-  // stays under a pointer resting where the peek was
-  if (prev === 'peek') el.style.overflow = '';
+  // Rising out of the peek or sinking into it: no clip, so the hover bridge under the chat stays
+  // under a pointer resting where the peek is (clipped, it would count as leaving and the chat
+  // would bob straight back up). The body's own overflow still hides the panel as it folds
+  if (prev === 'peek' || next === 'peek') el.style.overflow = '';
   await nextTick();
   if (token !== morphToken) return;
   applyBodyHeight();
@@ -811,12 +812,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   if (e.propertyName === 'height' && !showHistory.value) threadEl.value?.scrollTo({ top: threadEl.value.scrollHeight });
 };
 
-// The peek shows a draft left in the bar (with its command) in place of the placeholder
-const peekText = computed(() => {
-  if (!hasDraft.value) return placeholder.value;
-  const text = inputText.value.trim() || (attachedFile.value ? '(image)' : '');
-  return command.value ? `/${command.value.name} ${text}` : text;
-});
+
 </script>
 
 <template>
@@ -846,13 +842,9 @@ const peekText = computed(() => {
     >
       <div ref="rimEl" class="chat-rim" aria-hidden="true" />
 
-      <!-- At rest: the composer's top edge peeks up from the bottom of the screen (the rest of it
-           sits below the edge) with the placeholder, or the draft left in it -->
-      <button v-if="shape === 'peek'" type="button" class="chat-peek" aria-label="Open chat" @click="reveal()">
-        <VIcon icon="mdi-creation-outline" size="15" />
-        <span class="chat-peek__text" :class="{ 'is-draft': hasDraft }">{{ peekText }}</span>
-        <span class="chat-peek__keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
-      </button>
+      <!-- At rest: only the composer's top edge shows above the bottom of the screen (the rest of
+           it sits below); the whole edge is the click target -->
+      <button v-if="shape === 'peek'" type="button" class="chat-peek" aria-label="Open chat" @click="reveal()" />
 
       <!-- Notification toast (chat hidden): opens the panel with the list -->
       <div
@@ -1323,22 +1315,22 @@ const peekText = computed(() => {
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   border-radius: 23px;
 }
-/* Peek (the rest state with a mouse): the bar's own box sunk below the screen edge, so only its
-   top --peek-h shows. Its composer stays underneath, invisible, so the box keeps the bar's size
-   and rising is a plain slide. Hover lifts it a little while the dwell runs */
+/* Peek (the rest state with a mouse): the bar's own box sunk below the screen edge, so only an
+   edge of it (--peek-h, inside the 12px bottom gutter) shows. It overlays the page: nothing makes
+   room for it. Its composer stays underneath, invisible, so the box keeps the bar's size and
+   rising is a plain slide. Hover lifts it a little while the dwell runs */
 .chat-bar.is-peek .chat {
-  --peek-h: 28px;
+  --peek-h: 10px;
   --bar-h: 56px;
   height: var(--bar-h);
   bottom: calc(var(--peek-h) - var(--bar-h));
-  overflow: hidden;
   transition: bottom 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .chat-bar.is-peek.is-lit .chat {
   bottom: calc(var(--peek-h) + 4px - var(--bar-h));
 }
 .chat-bar.is-peek .chat-rim {
-  opacity: 0.45;
+  opacity: 0.7;
   transition: opacity 0.3s;
 }
 .chat-bar.is-peek.is-lit .chat-rim {
@@ -1357,36 +1349,14 @@ const peekText = computed(() => {
   inset: 0 0 auto;
   z-index: 2;
   height: var(--peek-h);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 20px 0 18px;
+  padding: 0;
   border: 0;
   background: none;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-  font-size: 13px;
-  cursor: text;
+  cursor: pointer;
   outline: none;
-  text-shadow: 0 0 6px var(--chat-halo);
 }
 .chat-peek:focus-visible {
   background: var(--chat-tile);
-}
-.chat-peek__text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.chat-peek__text.is-draft {
-  color: rgb(var(--v-theme-on-surface));
-}
-.chat-peek__keys {
-  display: flex;
-  gap: 3px;
-  flex: none;
 }
 
 /* Toast: one line, 46px tall */
