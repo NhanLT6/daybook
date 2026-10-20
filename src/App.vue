@@ -180,6 +180,7 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
             />
             <path class="rail-brand__check" d="M10.5 16.5 14.5 20.5 21.5 12" stroke-width="3.2" />
           </svg>
+          <span class="rail-brand__name">Daybook</span>
         </RouterLink>
 
         <RouterLink
@@ -439,19 +440,29 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 
 /* Brand mark: the app icon, doubles as the Home link */
 .rail-brand {
-  width: 40px;
-  height: 40px;
   flex: 0 0 auto;
   border-radius: 8px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   margin-bottom: 14px;
+  text-decoration: none;
+  color: inherit;
   transition: opacity 0.15s;
 }
 
 .rail-brand svg {
   width: 36px;
   height: 36px;
+}
+
+/* App name under the icon, a touch bolder than the nav labels */
+.rail-brand__name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
 }
 
 /* Icon colours as in favicon.svg, keyed to the app theme */

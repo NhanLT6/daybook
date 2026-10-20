@@ -334,6 +334,9 @@ const importCsv = async (file?: File) => {
           </template>
         </WorkTimeBarChart>
 
+        <!-- Full-width hairline between the chart and the logs -->
+        <VDivider v-if="!smAndDown" class="chart-logs-divider" />
+
         <!-- Log list -->
         <LogList
           class="flex-grow-1"
@@ -395,6 +398,10 @@ const importCsv = async (file?: File) => {
 </template>
 
 <style scoped>
+.chart-logs-divider {
+  flex: 0 0 auto;
+}
+
 /* Three-column viewport-fill layout: form | content | insights */
 .home-layout {
   display: flex;

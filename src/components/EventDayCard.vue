@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { useEvents } from '@/composables/useEvents';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
+
 import type { AppEvent } from '@/interfaces/Event';
 
 import { useNow } from '@vueuse/core';
@@ -10,8 +13,6 @@ import dayjs from 'dayjs';
 import { isoDateFormat } from '@/common/DateFormat';
 import { formatEventDate } from '@/common/DateHelpers';
 import { atOccurrence, nextEventDay, occurrenceOn } from '@/common/eventRecurrence';
-import { useEvents } from '@/composables/useEvents';
-import { useWorkCalendar } from '@/composables/useWorkCalendar';
 
 const { day, selectedEventId = null } = defineProps<{
   day: string; // YYYY-MM-DD: today, or the day picked on the calendar
@@ -81,11 +82,7 @@ const nextUp = computed(() => {
   // Count days from the shown day: "in 4 days" for today, "4 days later" for a picked day
   const gap = dayjs(best.on).diff(dayjs(day), 'day');
   const relative =
-    day === today.value
-      ? gap === 1
-        ? 'tomorrow'
-        : `in ${gap} days`
-      : `${gap} ${gap === 1 ? 'day' : 'days'} later`;
+    day === today.value ? (gap === 1 ? 'tomorrow' : `in ${gap} days`) : `${gap} ${gap === 1 ? 'day' : 'days'} later`;
   return {
     id: best.event.id,
     title: best.event.title,
@@ -99,7 +96,7 @@ const dotColor = (type: AppEvent['type']) => (type === 'holiday' ? 'accent' : 'i
 </script>
 
 <template>
-  <VCard class="glass-acrylic event-day-card">
+  <VCard class="event-day-card">
     <!-- Header: which day this is -->
     <div class="d-flex align-baseline justify-space-between ga-2 px-4 pt-3">
       <span class="text-subtitle-1 font-weight-medium">{{ heading }}</span>

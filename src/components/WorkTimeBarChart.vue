@@ -38,17 +38,14 @@ const chartColors = computed(() => ({
   legendColor: isDark.value ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)',
   // Target line is informative only, so it sits just above the grid lines in strength
   targetLineColor: isDark.value ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)',
-  // Border between stacked segments — matches the card surface so it reads as a thin gap,
-  // separating similar pastel fills without changing the palette
-  segmentBorder: theme.global.current.value.colors.surface,
   // Theme warning at reduced alpha: a gentle flag, not an alarm
   offDayOutline: `rgba(${hexToRgb(theme.global.current.value.colors.warning)}, ${isDark.value ? 0.5 : 0.45})`,
 }));
 
-// Shared per-dataset border config: a hairline gap between stacked segments
+// Shared per-dataset border config: segments touch, no hairline between them (Nhan: the white edge read as noise)
 const segmentBorder = computed(() => ({
-  borderColor: chartColors.value.segmentBorder,
-  borderWidth: 1,
+  borderColor: 'transparent',
+  borderWidth: 0,
   borderSkipped: false as const,
 }));
 
@@ -520,7 +517,7 @@ onUnmounted(() => {
 
 /* Same curve as the Insights column: fast start, long soft settle, no overshoot */
 .month-chart__wrap {
-  height: 182px;
+  height: 177px;
   overflow: hidden;
   padding: 0 8px;
   transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
@@ -538,7 +535,7 @@ onUnmounted(() => {
 
 .chart-container {
   position: relative;
-  height: 162px;
+  height: 157px;
   width: 100%;
 }
 </style>
