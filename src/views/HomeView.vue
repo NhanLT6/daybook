@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
+import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
+import { getRememberedDate, REMEMBER_DATE_EXPIRY_MS } from '@/composables/useRememberDate';
+import { useTimeLogs } from '@/composables/useTimeLogs';
+import { useWorkspace } from '@/composables/useWorkspace';
+
 import BulkLogForm from '@/components/BulkLogForm.vue';
 import InsightsPanel from '@/components/InsightsPanel.vue';
 import LogList from '@/components/LogList.vue';
@@ -18,11 +24,6 @@ import dayjs from 'dayjs';
 
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
-import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
-import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
-import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
-import { useTimeLogs } from '@/composables/useTimeLogs';
-import { useWorkspace } from '@/composables/useWorkspace';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { xeroExportCsv, xeroImportCsv } from '@/xero/xeroCsv';
@@ -112,7 +113,13 @@ const chartCollapsed = useStorage(storageKeys.settings.homeChartCollapsed, false
 
 // Logs for the calendar's current month (ISO 'YYYY-MM'). Assumes current year —
 // matches prior behavior; cross-year navigation would need a year threaded alongside.
-const timeLogs = computed(() => forMonth(dayjs().month(currentMonth.value - 1).format('YYYY-MM')));
+const timeLogs = computed(() =>
+  forMonth(
+    dayjs()
+      .month(currentMonth.value - 1)
+      .format('YYYY-MM'),
+  ),
+);
 
 const dateBounds = computed(() => computeDateBounds(dateRangeModel.value));
 const hasActiveFilter = computed(
@@ -158,7 +165,10 @@ const saveBulkLogs = async (incoming: TimeLog[]) => {
     settingsStore.lastSelectedDate = { date: selectedDates.value[0].toISOString(), savedAt: Date.now() };
     startAutoDeselectTimer(REMEMBER_DATE_EXPIRY_MS);
   } else {
-    if (autoDeselectTimer) { clearTimeout(autoDeselectTimer); autoDeselectTimer = null; }
+    if (autoDeselectTimer) {
+      clearTimeout(autoDeselectTimer);
+      autoDeselectTimer = null;
+    }
     settingsStore.lastSelectedDate = null;
     selectedDates.value = [];
   }
@@ -237,7 +247,12 @@ const importCsv = async (file?: File) => {
   }
 
   await addLogs(dataWithIds.map((l) => ({ ...l, id: l.id ?? nanoid() })));
-  await addProjects(uniqBy(dataWithIds.map((l) => ({ title: l.project })), 'title'));
+  await addProjects(
+    uniqBy(
+      dataWithIds.map((l) => ({ title: l.project })),
+      'title',
+    ),
+  );
   await addTasks(
     uniqBy(
       dataWithIds.filter((l) => l.task).map((l) => ({ project: l.project, title: l.task! })),
@@ -325,7 +340,6 @@ const importCsv = async (file?: File) => {
           :items="timeLogs"
           :current-month="currentMonth"
           :selected-dates="selectedDates"
-          :has-chart="!smAndDown"
           v-model:selected-project="selectedProject"
           v-model:selected-task="selectedTask"
           v-model:date-range="dateRangeModel"

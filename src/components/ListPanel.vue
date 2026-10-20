@@ -6,18 +6,11 @@ import { useScroll } from '@vueuse/core';
 // Shared shell for the list pages (Logs, Tasks, Events): one toolbar row — title + count,
 // optional search, filter slot, right-aligned actions — over a scrolling body. Pages bring
 // their own body (usually a GroupedTable) so every list reads the same.
-const {
-  title,
-  count,
-  searchPlaceholder,
-  divided = false,
-} = defineProps<{
+const { title, count, searchPlaceholder } = defineProps<{
   title: string;
   count?: number;
   // Shows the search field when set
   searchPlaceholder?: string;
-  // Draws a hairline above the toolbar too, for a list that sits under other content in one card
-  divided?: boolean;
 }>();
 
 const search = defineModel<string>('search', { default: '' });
@@ -33,7 +26,7 @@ const { y: scrollTop } = useScroll(body);
 <template>
   <section class="list-panel">
     <!-- Toolbar: title + count, search, filters, then actions on the right; wraps on phones -->
-    <div class="list-toolbar" :class="{ 'list-toolbar--divided': divided }">
+    <div class="list-toolbar">
       <div class="list-toolbar__heading">
         <h3 class="list-toolbar__title">{{ title }}</h3>
         <span v-if="count !== undefined" class="list-toolbar__count">{{ count }}</span>
@@ -90,12 +83,7 @@ const { y: scrollTop } = useScroll(body);
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 12px 8px 18px;
-  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.09);
-}
-
-.list-toolbar--divided {
-  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.09);
+  padding: 8px 12px 8px 20px;
 }
 
 .list-toolbar__heading {

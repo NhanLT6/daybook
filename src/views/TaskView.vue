@@ -214,7 +214,8 @@ const tableGroups = computed<(TableGroup<Task> & { project: ProjectWithTasks; ca
     group.projects.map((project) => ({
       key: project.title,
       rows: project.tasks,
-      section: settingsStore.useCategories ? (group.categoryName ?? undefined) : undefined,
+      block: settingsStore.useCategories ? (group.categoryId ?? 'uncategorized') : undefined,
+      blockLabel: settingsStore.useCategories ? (group.categoryName ?? undefined) : undefined,
       project,
       categoryId: group.categoryId,
     })),
@@ -524,7 +525,7 @@ const showTaskField = computed(
           @row-click="editTask"
         >
           <!-- Category section: name + rename / delete / add project -->
-          <template #section="{ label, group }">
+          <template #block-label="{ label, group }">
             <div class="d-flex align-center ga-1">
               <span class="flex-grow-1">{{ label }}</span>
               <template v-if="group.categoryId">

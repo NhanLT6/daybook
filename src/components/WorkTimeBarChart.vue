@@ -3,8 +3,11 @@ import { computed, onMounted, onUnmounted, ref, toRefs, watch } from 'vue';
 
 import { useDailyTarget } from '@/composables/useDailyTarget';
 import { useProjectColors } from '@/composables/useProjectColors';
+import { NO_TASK, useTaskBreakdown } from '@/composables/useTaskBreakdown';
+import { useTimeLogs } from '@/composables/useTimeLogs';
 
 import type { TimeLog } from '@/interfaces/TimeLog';
+import type { Plugin, TooltipItem } from 'chart.js';
 
 import { useTheme } from 'vuetify';
 
@@ -12,11 +15,8 @@ import dayjs from 'dayjs';
 
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes, sumMinutesToHours } from '@/common/DateHelpers';
-import { NO_TASK, useTaskBreakdown } from '@/composables/useTaskBreakdown';
-import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useSettingsStore } from '@/stores/settings';
 import { Chart } from 'chart.js/auto';
-import type { Plugin, TooltipItem } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { chain } from 'lodash';
 
@@ -29,8 +29,7 @@ const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === 'dark');
 
 // '#FB8C00' → '251, 140, 0' for rgba()
-const hexToRgb = (hex: string) =>
-  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ');
+const hexToRgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ');
 
 // Theme-aware colors for chart
 const chartColors = computed(() => ({
@@ -116,6 +115,24 @@ const thisWeekMinutes = computed(() => {
     .reduce((sum, log) => sum + (log.duration ?? 0), 0);
 });
 
+// Tiny segments (a 15m standup next to a 7h task) would draw as a hairline nobody can hover, so each
+// logged segment is drawn at least MIN_SEGMENT_SHARE of the month's tallest day. Only the drawing
+// changes: `realMinutes` keeps the true time for the tooltip, and Remaining shrinks by the same amount so
+// a full day still ends at the target.
+const MIN_SEGMENT_SHARE = 0.08;
+
+type HoursDataset = { label: string; data: number[]; realMinutes: number[] };
+
+const withMinSegments = <D extends HoursDataset>(datasets: D[]): D[] => {
+  const dayCount = datasets[0]?.data.length ?? 0;
+  const dayTotals = Array.from({ length: dayCount }, (_, i) => datasets.reduce((sum, ds) => sum + ds.data[i], 0));
+  const minHours = Math.max(...dayTotals, 0) * MIN_SEGMENT_SHARE;
+  return datasets.map((ds) => ({
+    ...ds,
+    data: ds.data.map((h) => (h > 0 && h < minHours ? minHours : h)),
+  }));
+};
+
 // Chart data computed property (automatically reactive to props and storage changes)
 const chartData = computed(() => {
   try {
@@ -123,6 +140,8 @@ const chartData = computed(() => {
     const dayKeys = daysInMonth.value.map((d) => d.format(isoDateFormat));
 
     // Per-day logged hours (summed then rounded once) for a set of logs, indexed by day-of-month
+    const dailyMinutes = (logs: TimeLog[]) =>
+      dayKeys.map((key) => logs.filter((l) => l.date === key).reduce((sum, l) => sum + (l.duration ?? 0), 0));
     const dailyHours = (logs: TimeLog[]) =>
       dayKeys.map((key) => sumMinutesToHours(logs.filter((l) => l.date === key).map((l) => l.duration ?? 0)));
 
@@ -157,36 +176,45 @@ const chartData = computed(() => {
         backgroundColor: s.color,
         ...segmentBorder.value,
         data: dailyHours(s.logs),
+        realMinutes: dailyMinutes(s.logs),
       }));
 
-      return { labels, datasets };
+      return { labels, datasets: withMinSegments(datasets) };
     }
 
     // All-projects view: one series per project
-    const loggedDataSet = chain(timeLogs.value)
-      .groupBy((l) => l.project)
-      .map((logsByProject, projectName) => {
-        const projectColor = projectColors.getProjectColor(projectName);
-        return {
-          label: projectName,
-          backgroundColor: projectColor,
-          ...segmentBorder.value,
-          data: dailyHours(logsByProject),
-        };
-      })
-      .value();
+    const loggedDataSet = withMinSegments(
+      chain(timeLogs.value)
+        .groupBy((l) => l.project)
+        .map((logsByProject, projectName) => {
+          const projectColor = projectColors.getProjectColor(projectName);
+          return {
+            label: projectName,
+            backgroundColor: projectColor,
+            ...segmentBorder.value,
+            data: dailyHours(logsByProject),
+            realMinutes: dailyMinutes(logsByProject),
+          };
+        })
+        .value(),
+    );
 
     // No daily target ("no limit") → nothing to fill up to
     if (targetMinutes.value === null) return { labels, datasets: loggedDataSet };
 
-    // Remaining fills each workday up to the daily target; weekends and holidays get none (an outline flags logs there)
-    const loggedPerDay = dailyHours(timeLogs.value);
+    // Remaining fills each workday up to the daily target; weekends and holidays get none (an outline flags logs there).
+    // Drawn from the drawn (min-height) segments so the column still ends at the target; the tooltip shows the true gap.
+    const targetHours = targetMinutes.value / 60;
+    const remainingFrom = (perDay: number[]) =>
+      perDay.map((h, i) => (isOffDay(dayKeys[i]) ? 0 : Math.max(targetHours - h, 0)));
+    const drawnPerDay = dayKeys.map((_, i) => loggedDataSet.reduce((sum, ds) => sum + ds.data[i], 0));
 
     const remainingDataSet = {
       label: REMAINING,
       backgroundColor: projectColors.remainingDataColor(),
       ...segmentBorder.value,
-      data: loggedPerDay.map((h, i) => (isOffDay(dayKeys[i]) ? 0 : Math.max(targetMinutes.value! / 60 - h, 0))),
+      data: remainingFrom(drawnPerDay),
+      realMinutes: remainingFrom(dailyMinutes(timeLogs.value).map((m) => m / 60)).map((h) => Math.round(h * 60)),
     };
 
     return { labels, datasets: [...loggedDataSet, remainingDataSet] };
@@ -330,7 +358,11 @@ const chartOptions = computed(() => ({
           const dataset = tooltipItems[0]?.dataset;
           return dataset?.label || '';
         },
-        label: (tooltipItem: TooltipItem<'bar'>) => `${tooltipItem.parsed.y}h`,
+        // True hours, not the drawn (possibly min-height) segment
+        label: (tooltipItem: TooltipItem<'bar'>) => {
+          const real = (tooltipItem.dataset as { realMinutes?: number[] }).realMinutes?.[tooltipItem.dataIndex];
+          return real === undefined ? `${tooltipItem.parsed.y}h` : minutesToHourWithMinutes(real);
+        },
       },
     },
   },
@@ -434,10 +466,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- The wrap animates its height; the canvas keeps a fixed height so Chart.js never redraws squashed bars -->
+    <!-- The wrap animates its height; the canvas keeps a fixed height so Chart.js never redraws squashed bars.
+         Chart + legend sit in a solid (tier-1) card on the glass, like the log list's week cards below -->
     <div class="month-chart__wrap" :class="{ 'month-chart__wrap--collapsed': collapsed }" :aria-hidden="collapsed">
-      <div class="chart-container">
-        <canvas ref="chartCanvas"></canvas>
+      <div class="month-chart__card">
+        <div class="chart-container">
+          <canvas ref="chartCanvas"></canvas>
+        </div>
       </div>
     </div>
   </section>
@@ -448,7 +483,7 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  padding: 14px 12px 4px 18px;
+  padding: 14px 12px 8px 20px;
 }
 
 .month-chart__heading {
@@ -485,9 +520,9 @@ onUnmounted(() => {
 
 /* Same curve as the Insights column: fast start, long soft settle, no overshoot */
 .month-chart__wrap {
-  height: 196px;
+  height: 182px;
   overflow: hidden;
-  padding: 0 14px;
+  padding: 0 8px;
   transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
@@ -495,9 +530,15 @@ onUnmounted(() => {
   height: 0;
 }
 
+.month-chart__card {
+  padding: 8px 8px 4px;
+  border-radius: 8px;
+  background: rgb(var(--v-theme-surface));
+}
+
 .chart-container {
   position: relative;
-  height: 188px;
+  height: 162px;
   width: 100%;
 }
 </style>

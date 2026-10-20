@@ -42,7 +42,7 @@ HomeView.selectedProject (ref)
 3. **Date range** — `log.date` within `[from, to]` (see clamping below)
 4. **Search** — case-insensitive substring across `project` / `task` / `description`
 
-`loggedTimeByDates` groups `filteredItems` (not the raw props) into `GroupedTable` groups — one collapsible group per day (`<tbody id="YYYY-MM-DD">`, `expanded` = `openedPanels`), a gap before each new week, the day total under the Duration column — so week-grouping, totals, and the empty state all follow the filter. Empty result → "No logs match filters" (vs "No data" when the month is genuinely empty).
+`loggedTimeByDates` groups `filteredItems` (not the raw props) into `GroupedTable` groups — one collapsible group per day (`<tbody id="YYYY-MM-DD">`, `expanded` = `openedPanels`), each week's days in their own solid card (`block` = week start) so weeks read by space alone, the day total under the Duration column — so week-grouping, totals, and the empty state all follow the filter. Empty result → "No logs match filters" (vs "No data" when the month is genuinely empty).
 
 ### Options
 
@@ -60,7 +60,7 @@ HomeView.selectedProject (ref)
 
 On desktop the chart and the logs are **one glass card** in `HomeView`: `WorkTimeBarChart` is the card's top section and `LogList` the rest. Neither component renders a card of its own; on mobile `HomeView` wraps `LogList` alone in the card (`MobileWeekChart` sits above it) and passes `has-chart=false`.
 
-- **Header** (`WorkTimeBarChart`): month title + "Hours logged per day · stacked by project", today / this-week stats (current month only), then whatever the parent puts in the `actions` slot — Home puts the **Insights toggle** there (see below).
+- **Header** (`WorkTimeBarChart`, on the glass; chart + legend below it in a solid card, ~160px canvas, tiny segments drawn at a min height with true values in the tooltip): month title + "Hours logged per day · stacked by project", today / this-week stats (current month only), then whatever the parent puts in the `actions` slot — Home puts the **Insights toggle** there (see below).
 - **Chart**: no nested inner card. Its wrapper animates `height` to 0 when `collapsed`; the canvas keeps a fixed height inside, so Chart.js never redraws squashed bars mid-animation.
 - **Toolbar** (`LogList` → shared `ListPanel`, see CLAUDE.md "List pages"), framed by hairlines: **Logs** + the filtered count, the always-visible search, the project filter button and four always-visible icon buttons: Expand logs, Collapse logs, Import CSV, Export CSV (Nhan wants these at hand, not in a menu). Import clicks a hidden `<input type="file">`, reset after each pick so the same file can be imported again.
 - **Chart header actions** (`WorkTimeBarChart`'s `actions` slot, filled by `HomeView`): Hide/Show chart (chevron, remembered in localStorage under `homeChartCollapsed`), then the Insights toggle.

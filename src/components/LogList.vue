@@ -30,12 +30,9 @@ export interface LogListProps {
 
   // Selected dates to auto-expand panels
   selectedDates?: Date[];
-
-  // Sits under a chart in the same card: draws the hairline above the toolbar and shows the chart toggle
-  hasChart?: boolean;
 }
 
-const { items: logItems, selectedDates, currentMonth, hasChart = false } = defineProps<LogListProps>();
+const { items: logItems, selectedDates, currentMonth } = defineProps<LogListProps>();
 
 // Project focus — two-way synced with Insights + chart through HomeView
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
@@ -179,13 +176,13 @@ const loggedTimeByDates = computed(() => {
     .orderBy((item) => item.date)
     .value();
 
-  // One table group per day, keyed (and DOM id'd) by its date; a gap opens before each new week
-  return groups.map((group, i) => ({
+  // One table group per day, keyed (and DOM id'd) by its date; each week's days share a card
+  return groups.map((group) => ({
     ...group,
     key: group.date,
     id: group.date,
     rows: group.tasks,
-    gapBefore: i > 0 && weekStartOf(groups[i - 1].date) !== weekStartOf(group.date),
+    block: weekStartOf(group.date),
   }));
 });
 
@@ -282,7 +279,6 @@ const onCsvPicked = (event: Event) => {
     title="Logs"
     :count="filteredItems.length"
     search-placeholder="Search logs"
-    :divided="hasChart"
   >
     <!-- Project filter: shows the focused project; the popup also holds task + date range -->
     <template #filters>
