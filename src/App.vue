@@ -23,7 +23,7 @@ import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { RouterView, useRoute } from 'vue-router';
 
-const { events, replaceAll, ready } = useEvents();
+const { events, addEvent, replaceAll, ready } = useEvents();
 const { isAuthenticated, isAuthConfigured, user, signOut, ready: authReady } = useAuth();
 const { openAuthDialog } = useAuthDialog();
 
@@ -50,12 +50,23 @@ const glassStyle = computed(() => {
 const autoFetchEvents = async () => {
   await ready;
   const currentYear = new Date().getFullYear();
-  const hasHolidaysThisYear = events.value.some((e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)));
-  if (!hasHolidaysThisYear) {
+  const holidaysThisYear = events.value.filter((e) => e.type === 'holiday' && e.date.startsWith(String(currentYear)));
+  if (!holidaysThisYear.length) {
     const holidays = await fetchHolidays(currentYear);
     // fetchHolidays swallows API failures and returns [] — rewriting the collection
     // with nothing new to add would be a pure risk to the user's own events.
     if (holidays.length) await replaceAll([...events.value, ...holidays]);
+    return;
+  }
+
+  // Holidays saved before the dayOff flag count every observance as a day off; fetch once more to
+  // learn which ones are, and patch only that flag so any edits to the events stay.
+  if (holidaysThisYear.every((e) => e.dayOff === undefined)) {
+    const dayOffById = new Map((await fetchHolidays(currentYear)).map((h) => [h.id, h.dayOff]));
+    for (const event of holidaysThisYear) {
+      const dayOff = dayOffById.get(event.id);
+      if (dayOff !== undefined) await addEvent({ ...event, dayOff });
+    }
   }
 };
 

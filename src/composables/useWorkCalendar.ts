@@ -8,7 +8,7 @@ import { useEvents } from '@/composables/useEvents';
 import { useSettingsStore } from '@/stores/settings';
 
 /**
- * The user's work calendar: Settings weekend days plus every day covered by a holiday event. Feeds
+ * The user's work calendar: Settings weekend days plus every day covered by a day-off holiday event. Feeds
  * work-day repeat rules ("the last work day of the month") and workday counts in Insights.
  */
 export function useWorkCalendar() {
@@ -18,7 +18,8 @@ export function useWorkCalendar() {
   return computed<WorkCalendar>(() => {
     const holidays = new Set<string>();
     for (const event of events.value) {
-      if (event.type !== 'holiday') continue;
+      // Observances (dayOff false) stay calendar markers without taking the day off
+      if (event.type !== 'holiday' || event.dayOff === false) continue;
       const start = dayjs(event.date);
       const end = dayjs(event.endDate ?? event.date);
       // An invalid date never compares as after, which would loop forever

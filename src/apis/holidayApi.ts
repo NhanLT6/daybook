@@ -6,6 +6,7 @@ import { httpClient } from './httpClient';
 interface CalendarificHoliday {
   name: string;
   description?: string;
+  type?: string[]; // "National holiday", "Observance", "Season", ...
   date: {
     iso: string;
   };
@@ -18,6 +19,10 @@ interface CalendarificResponse {
     error?: { code: number; message: string };
   };
 }
+
+// Calendarific also lists observances and seasons (Women's Day, Teachers' Day, equinoxes) that are no day off.
+// Any "... holiday" type (National, Public, Local...) counts as one; an untyped entry keeps the old day-off reading.
+const isDayOff = (types: string[] = []) => !types.length || types.some((t) => /holiday/i.test(t));
 
 /**
  * Fetch Vietnam holidays for a given year from Calendarific.
@@ -40,6 +45,7 @@ export async function fetchHolidays(year: number = new Date().getFullYear()): Pr
       title: holiday.name,
       date: holiday.date.iso,
       type: 'holiday' as const,
+      dayOff: isDayOff(holiday.type),
       description: holiday.description,
     }));
   } catch (error) {

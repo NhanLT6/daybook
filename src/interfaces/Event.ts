@@ -35,6 +35,9 @@ export interface AppEvent {
   startTime?: string // Start time: HH:mm. Undefined = all-day event
   endTime?: string // End time: HH:mm. Undefined = all-day event
   type: 'holiday' | 'custom'
+  // Holidays only: false for observances (Vietnamese Women's Day) that are markers, not days off.
+  // Undefined = day off, as holidays fetched before this flag existed always were.
+  dayOff?: boolean
   description?: string
   repeat?: RepeatRule // Undefined = one-off event
 }
