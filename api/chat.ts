@@ -115,6 +115,7 @@ ${taskList}
 When the user describes work they did (via text or screenshot), call the extractLogs tool with the extracted entries.
 - Match project names to the known list where possible. If not found, use what the user said.
 - Match task names to the known list for that project where possible. If not found, use what the user said.
+- "Project › Task" in the message is a project and its task picked from the user's list: use both exactly as written.
 - Task is optional. Only set it when the user's message actually mentions a task; leave it unset otherwise. Do not default it to the project name.
 - Resolve relative dates ("yesterday", "this morning", "last Friday", "monday this week") from the dates listed above.
 - Duration must be in minutes (integer).

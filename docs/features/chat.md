@@ -42,6 +42,16 @@ The client sends the local date (`dayjs`, not `toISOString()`, which is UTC). Th
 
 Notes and events save straight away (Undo instead of a confirm step); logs keep the confirm card.
 
+## Mentions (`/` for projects, tasks, Jira tickets)
+
+`src/common/chatMentions.ts` (pure helpers, unit-tested), `useChatMentions.ts` (the list), wired in `ChatBar.vue`. Same `/` menu as commands (aria-label "Suggestions").
+
+- **Trigger**: a `/` at the start of the message or after whitespace, up to the caret (`findMentionQuery`). `10/20`, `và/hoặc` and URLs don't open it; a line break, a leading space or a query over 40 chars ends it. At the very start, commands come first; mid-message only mentions.
+- **Matching** (`matchMentions`): accent- and case-insensitive (`foldText`: "dao tao" finds "Đào tạo"), label start first, then any word start (`/login`, `/123` find "DS-123 Login bug"). Order before matching: recent Project › Task pairs, recent projects, pinned + the rest, remaining tasks. 8 rows max.
+- **Keys**: Tab or Enter picks while the menu shows (Nhan: Enter must never send while suggestions are on screen); Enter sends once it's closed (no match, or Esc). Esc hides it for that `/` only. Key handling skips IME composition (`isComposing` / keyCode 229) for Telex/VNI.
+- **Insert**: plain text `DS-123 Summary` or `Project › Task` (+ space) via `execCommand('insertText')` so Ctrl+Z works. The model prompt says `Project › Task` names both exactly.
+- **Chip** (`.mention-chip`, global style): a quiet tonal outline (Nhan: subtle, not coloured). In the composer it is drawn on `.composer-backdrop`, a transparent-text copy behind the textarea with the same font and wrapping; only picked labels (`draftMentions`) are chipped, editing one turns it back into text, Backspace right after one selects and deletes it whole. Sent user bubbles chip any known label (`splitMentions`, whole-label matches only).
+
 ## Slash commands
 
 `src/common/chatCommands.ts`: `/log`, `/note`, `/event`, `/ask`, `/catchup`. Typing `/` opens the menu (arrows, Enter/Tab to pick, Esc to hide); a picked command becomes a chip in front of the textarea.

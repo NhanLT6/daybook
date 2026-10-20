@@ -219,6 +219,7 @@ export function useWorkspace() {
 
     myProjects,
     sortedProjectTitles,
+    recentProjectTitles,
     sortedProjectItems,
     recentProjectTasks,
     pinProject,

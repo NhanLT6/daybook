@@ -59,7 +59,7 @@ test('/note saves a sticky note through the addNote tool, and Undo removes it', 
 
   // Typing / opens the menu; picking a command turns it into a chip and clears the textarea
   await input.fill('/no');
-  await expect(page.getByLabel('Commands')).toBeVisible();
+  await expect(page.getByLabel('Suggestions')).toBeVisible();
   await input.press('Enter');
   await expect(page.locator('.chat-composer .command-chip')).toContainText('/note');
   await expect(input).toHaveValue('');
@@ -141,4 +141,53 @@ test('a message without a command sends no command', async ({ page }) => {
 
   await expect(page.getByText('How long did it take?')).toBeVisible();
   expect(requests[0].command).toBeUndefined();
+});
+
+test('/ suggests projects and tasks mid-message; Tab inserts one as a chip', async ({ page }) => {
+  const requests: ChatRequest[] = [];
+  await page.route('**/api/chat', async (route) => {
+    requests.push(route.request().postDataJSON());
+    return fulfillStream(route, textReply('Got it.'));
+  });
+
+  // Home seeds the "Team work" preset (Daily meeting, Code review, …)
+  const input = await openChat(page);
+  const menu = page.getByLabel('Suggestions');
+
+  // A date is not a mention
+  await input.pressSequentially('sync 10/20');
+  await expect(menu).toBeHidden();
+  await input.fill('');
+
+  // Mid-message: no commands, only projects / tasks, matched without accents or case
+  await input.pressSequentially('2h /dai');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('option').first()).toContainText('Daily meeting');
+  await expect(menu).not.toContainText('/log');
+  await input.press('Tab');
+  await expect(input).toHaveValue('2h Team work › Daily meeting ');
+  await expect(page.locator('.composer-backdrop .mention-chip')).toHaveText('Team work › Daily meeting');
+
+  // Esc hides the menu for that / only; Enter then sends
+  await input.pressSequentially('/cod');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await input.press('Backspace');
+  await input.press('Backspace');
+  await input.press('Backspace');
+  await input.press('Backspace');
+
+  // Backspace right after a chip takes the whole chip, and Ctrl+Z brings it back
+  await input.press('Backspace'); // the trailing space
+  await input.press('Backspace');
+  await expect(input).toHaveValue('2h ');
+  await page.keyboard.press('Control+z');
+  await expect(input).toHaveValue('2h Team work › Daily meeting');
+
+  await input.press('Enter');
+  await expect(page.getByText('Got it.')).toBeVisible();
+  const sent = requests[0].messages.at(-1)?.parts.find((p) => p.type === 'text');
+  expect(sent?.text).toBe('2h Team work › Daily meeting');
+  await expect(page.locator('.chat-msg.is-me .mention-chip')).toHaveText('Team work › Daily meeting');
 });

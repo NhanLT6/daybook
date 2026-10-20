@@ -11,6 +11,7 @@ import { getToolName, isToolUIPart } from 'ai';
 import dayjs from 'dayjs';
 
 import { parseChatCommand } from '@/common/chatCommands';
+import { splitMentions } from '@/common/chatMentions';
 import { removeAddedItem } from '@/composables/useAiChat';
 
 import AiLogCard from './AiLogCard.vue';
@@ -20,6 +21,7 @@ const props = defineProps<{
   isSaveable: boolean;
   isUndoable: boolean;
   canRetry: boolean;
+  mentionLabels?: string[]; // known projects / tasks, drawn as chips in the user's text
 }>();
 
 const emit = defineEmits<{
@@ -49,6 +51,7 @@ const readNotes = computed(() =>
 // User messages: a leading /command shows as a chip, the rest as the message text
 const userCommand = computed(() => (props.message.role === 'user' ? parseChatCommand(displayText.value) : undefined));
 const userText = computed(() => (userCommand.value?.command ? userCommand.value.rest : displayText.value));
+const userSegments = computed(() => splitMentions(userText.value, props.mentionLabels ?? []));
 
 // Notes and events the model saved in this reply, each with its own Undo
 interface AddedItem {
@@ -138,7 +141,8 @@ const copyMessage = () => {
       >
         <VIcon :icon="userCommand.command.icon" size="14" />/{{ userCommand.command.name }}
       </span>
-      <span v-if="userText" class="message-text">{{ userText }}</span>
+      <!-- One line: message-text keeps whitespace (pre-wrap) -->
+      <span v-if="userText" class="message-text"><template v-for="(seg, i) in userSegments" :key="i"><span v-if="seg.mention" class="mention-chip">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
     </div>
 
     <div class="message-actions" :class="{ 'is-pinned': canRetry }">

@@ -2,10 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { type ChatCommand, CHAT_COMMANDS, suggestChatCommands } from '@/common/chatCommands';
+import { type ChatMention, findMentionQuery, matchMentions, splitMentions } from '@/common/chatMentions';
 import { useAiChat } from '@/composables/useAiChat';
 import { noticeColor, useChatNotices } from '@/composables/useChatNotices';
 import { fetchCatchUpItems } from '@/composables/useCatchUpSummary';
 import { type ChatConversation, useChatHistory } from '@/composables/useChatHistory';
+import { useChatMentions } from '@/composables/useChatMentions';
 import { useDailyTarget } from '@/composables/useDailyTarget';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
@@ -63,6 +65,7 @@ const {
 const { conversations, upsert, get: getConversation } = useChatHistory();
 const { addMany: addLogs, remove: removeLog } = useTimeLogs();
 const { addProjects, addTasks, allProjects: projects, allTasks: tasks } = useWorkspace();
+const { mentions, labels: mentionLabels } = useChatMentions();
 const notificationCenter = useNotificationCenterStore();
 const { sortedItems: notifications, isExpanded: notificationsExpanded } = storeToRefs(notificationCenter);
 const { notice, dropPassive, dropAll } = useChatNotices();
@@ -204,14 +207,53 @@ const autosize = () => {
   el.style.height = `${Math.min(el.scrollHeight, 105)}px`;
 };
 
-// Slash menu: open while the user types the command word (`/`, `/no`)
-const menuDismissed = ref(false); // Esc hides it until the text changes
+// Slash menu: `/` at the start of the message or after a space. At the start, commands come first
+// (`/`, `/no`); projects, tasks and Jira tickets follow, matched by any word (`/login` → "DS-123 Login bug")
+type Suggestion = { kind: 'command'; key: string; command: ChatCommand } | { kind: 'mention'; key: string; mention: ChatMention };
+
+const MENU_LIMIT = 8;
+const MENTION_ICONS: Record<ChatMention['kind'], string> = {
+  project: 'mdi-folder-outline',
+  task: 'mdi-subdirectory-arrow-right',
+  jira: 'mdi-jira',
+};
+
+const caret = ref(0);
+const syncCaret = () => {
+  caret.value = inputEl.value?.selectionStart ?? inputText.value.length;
+};
+const mentionQuery = computed(() => findMentionQuery(inputText.value, caret.value));
+const menuDismissedAt = ref<number | null>(null); // Esc hides the menu for this `/` until another one is typed
 const menuIndex = ref(0);
-const suggestions = computed(() => (command.value || menuDismissed.value ? [] : suggestChatCommands(inputText.value)));
+
+const suggestions = computed((): Suggestion[] => {
+  const q = mentionQuery.value;
+  if (!q || q.start === menuDismissedAt.value) return [];
+  const commands = command.value ? [] : suggestChatCommands(inputText.value.slice(0, caret.value));
+  const picked = matchMentions(mentions.value, q.query, MENU_LIMIT - commands.length);
+  return [
+    ...commands.map((c): Suggestion => ({ kind: 'command', key: `/${c.name}`, command: c })),
+    ...picked.map((m): Suggestion => ({ kind: 'mention', key: m.label, mention: m })),
+  ];
+});
 const menuOpen = computed(() => suggestions.value.length > 0);
 
+// Picked mentions in the draft, drawn as chips behind the textarea's text; editing one turns it back into text
+const draftMentions = ref<string[]>([]);
+const draftSegments = computed(() =>
+  draftMentions.value.length ? splitMentions(inputText.value, draftMentions.value) : [],
+);
+const hasDraftChips = computed(() => draftSegments.value.some((s) => s.mention));
+const backdropEl = ref<HTMLElement | null>(null);
+const syncBackdropScroll = () => {
+  if (backdropEl.value && inputEl.value) backdropEl.value.scrollTop = inputEl.value.scrollTop;
+};
+
+watch(mentionQuery, (q, prev) => {
+  if (q?.start !== prev?.start) menuDismissedAt.value = null;
+});
+
 watch(inputText, async (text) => {
-  menuDismissed.value = false;
   menuIndex.value = 0;
   // Typing "/note " turns the word into a chip
   const typed = /^\/(\w+)\s$/.exec(text);
@@ -221,7 +263,9 @@ watch(inputText, async (text) => {
     return;
   }
   await nextTick();
+  syncCaret();
   autosize();
+  syncBackdropScroll();
 });
 
 const pickCommand = (picked: ChatCommand) => {
@@ -231,8 +275,30 @@ const pickCommand = (picked: ChatCommand) => {
   if (picked.name === 'catchup') void send(); // needs no text
 };
 
+const pickSuggestion = (picked: Suggestion) => {
+  if (picked.kind === 'command') pickCommand(picked.command);
+  else pickMention(picked.mention);
+};
+
+// Replaces `/query` with the label. insertText keeps the browser's undo (Ctrl+Z) working
+const pickMention = (picked: ChatMention) => {
+  const el = inputEl.value;
+  const q = mentionQuery.value;
+  if (!el || !q) return;
+  const text = `${picked.label} `;
+  el.focus();
+  el.setSelectionRange(q.start, caret.value);
+  if (!document.execCommand('insertText', false, text)) {
+    el.setRangeText(text, q.start, caret.value, 'end');
+    inputText.value = el.value;
+  }
+  if (!draftMentions.value.includes(picked.label)) draftMentions.value.push(picked.label);
+  syncCaret();
+};
+
 const clearDraft = () => {
   inputText.value = '';
+  draftMentions.value = [];
   command.value = null;
   removeAttachment();
   focusInput();
@@ -271,6 +337,8 @@ const onDrop = (event: DragEvent) => {
 
 const onKeydown = (e: KeyboardEvent) => {
   const el = e.target as HTMLTextAreaElement;
+  // An input method (Vietnamese Telex/VNI, CJK) is still composing: its Enter/Tab aren't ours
+  if (e.isComposing || e.keyCode === 229) return;
 
   if (menuOpen.value) {
     const count = suggestions.value.length;
@@ -281,8 +349,21 @@ const onKeydown = (e: KeyboardEvent) => {
     }
     if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
       e.preventDefault();
-      pickCommand(suggestions.value[menuIndex.value]);
+      pickSuggestion(suggestions.value[menuIndex.value]);
       return;
+    }
+  }
+
+  // Backspace right after a chip removes the whole chip: select it and let the browser delete it (keeps undo)
+  if (e.key === 'Backspace' && hasDraftChips.value && el.selectionStart === el.selectionEnd) {
+    let at = 0;
+    for (const seg of draftSegments.value) {
+      at += seg.text.length;
+      if (seg.mention && at === el.selectionStart) {
+        el.setSelectionRange(at - seg.text.length, at);
+        return;
+      }
+      if (at >= el.selectionStart) break;
     }
   }
 
@@ -358,6 +439,7 @@ const send = async () => {
   const file = attachedFile.value;
 
   inputText.value = '';
+  draftMentions.value = [];
   command.value = null;
   attachedFile.value = null;
   attachedPreview.value = null;
@@ -738,7 +820,7 @@ const onDocumentKeydown = (e: KeyboardEvent) => {
   }
   if (e.key === 'Escape' && state.value !== 'hidden' && (inChat || state.value === 'open')) {
     e.preventDefault();
-    if (menuOpen.value) menuDismissed.value = true;
+    if (menuOpen.value) menuDismissedAt.value = mentionQuery.value?.start ?? null;
     else if (showHistory.value) backToChat();
     else close();
   }
@@ -924,6 +1006,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             :is-saveable="msg.id === latestLogsMessageId"
             :is-undoable="msg.metadata?.saveState === 'saved' && msg.id === savedLogsMessageId"
             :can-retry="msg.id === lastUserMessageId && !!error"
+            :mention-labels="mentionLabels"
             @save-logs="(logs) => saveLogs(msg.id, logs)"
             @undo="() => undoLogs(msg.id)"
             @discard="() => markDiscarded(msg.id)"
@@ -988,23 +1071,30 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 
       <!-- Composer -->
       <div v-show="shape !== 'toast'" ref="composerEl" class="chat-composer" @dragover.prevent="isDragOver = true" @drop.prevent="onDrop">
-        <!-- Slash command menu, rising above the bar -->
-        <div v-if="menuOpen" class="chat-menu" role="listbox" aria-label="Commands" @mousedown.prevent>
+        <!-- Slash menu, rising above the bar: commands, then projects / tasks / Jira tickets -->
+        <div v-if="menuOpen" class="chat-menu" role="listbox" aria-label="Suggestions" @mousedown.prevent>
           <button
-            v-for="(cmd, i) in suggestions"
-            :key="cmd.name"
+            v-for="(item, i) in suggestions"
+            :key="item.key"
             type="button"
             role="option"
             :aria-selected="i === menuIndex"
-            :class="{ 'is-active': i === menuIndex }"
-            :style="{ '--chip-color': `var(--v-theme-${cmd.color})` }"
+            :class="{ 'is-active': i === menuIndex, 'is-mention': item.kind === 'mention' }"
+            :style="item.kind === 'command' ? { '--chip-color': `var(--v-theme-${item.command.color})` } : undefined"
             @mousemove="menuIndex = i"
-            @click="pickCommand(cmd)"
+            @click="pickSuggestion(item)"
           >
-            <VIcon :icon="cmd.icon" size="18" class="menu-icon" />
-            <b>/{{ cmd.name }}</b>
-            <span>{{ cmd.hint }}</span>
-            <span v-if="i === menuIndex" class="menu-key">Enter</span>
+            <template v-if="item.kind === 'command'">
+              <VIcon :icon="item.command.icon" size="18" class="menu-icon" />
+              <b>/{{ item.command.name }}</b>
+              <span>{{ item.command.hint }}</span>
+            </template>
+            <template v-else>
+              <VIcon :icon="MENTION_ICONS[item.mention.kind]" size="18" class="menu-icon" />
+              <b>{{ item.mention.task ?? item.mention.label }}</b>
+              <span v-if="item.mention.task">{{ item.mention.project }}</span>
+            </template>
+            <span v-if="i === menuIndex" class="menu-key">Tab</span>
           </button>
         </div>
 
@@ -1025,16 +1115,25 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
           >
             <VIcon :icon="command.icon" size="14" />/{{ command.name }}
           </span>
-          <textarea
-            ref="inputEl"
-            v-model="inputText"
-            rows="1"
-            :placeholder="placeholder"
-            aria-label="Message"
-            @keydown="onKeydown"
-            @paste="onPaste"
-            @focus="state === 'hidden' && reveal({ focus: false })"
-          />
+          <div class="composer-field">
+            <!-- Picked mentions drawn as chips behind the textarea's own text (same font and wrapping) -->
+            <!-- One line on purpose: the backdrop keeps whitespace (pre-wrap); the trailing space holds a final line break -->
+            <div v-if="hasDraftChips" ref="backdropEl" class="composer-backdrop" aria-hidden="true"><template v-for="(seg, i) in draftSegments" :key="i"><span v-if="seg.mention" class="mention-chip">{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template>&#32;</div>
+            <textarea
+              ref="inputEl"
+              v-model="inputText"
+              rows="1"
+              :placeholder="placeholder"
+              aria-label="Message"
+              @keydown="onKeydown"
+              @input="syncCaret"
+              @keyup="syncCaret"
+              @click="syncCaret"
+              @scroll="syncBackdropScroll"
+              @paste="onPaste"
+              @focus="state === 'hidden' && reveal({ focus: false })"
+            />
+          </div>
           <input
             ref="fileInputEl"
             type="file"
@@ -1212,6 +1311,18 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   background: rgba(var(--chip-color), 0.14);
 }
 
+/* Project / task mention, in the composer and in sent messages (shared with AiChatMessage).
+   Quiet tonal outline: enough to tell it from plain text. Padding with matching negative
+   margin, so the chip doesn't shift the text it sits under */
+.mention-chip {
+  padding: 1px 2px;
+  margin: 0 -2px;
+  border-radius: 5px;
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-on-surface), 0.16);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
 .chat-bar kbd {
   padding: 1px 5px;
   border-radius: 4px;
@@ -1692,12 +1803,35 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 .composer-chip {
   margin: 0 2px 9px 0;
 }
-.chat-composer textarea {
+/* Textarea over a backdrop that draws picked mentions as chips: both share font, width and wrapping */
+.composer-field {
+  position: relative;
   flex: 1;
   min-width: 0;
+  margin: 0 4px 10px;
+}
+.composer-backdrop,
+.chat-composer textarea {
+  font: 15px/21px inherit;
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.composer-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: transparent;
+  text-shadow: none;
+  pointer-events: none;
+}
+.chat-composer textarea {
+  position: relative;
+  display: block;
+  width: 100%;
   height: 21px;
   max-height: 105px;
-  margin: 0 4px 10px;
+  margin: 0;
   padding: 0;
   border: 0;
   outline: none;
@@ -1706,8 +1840,6 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   scrollbar-width: none;
   background: none;
   color: inherit;
-  font: 15px/21px inherit;
-  font-family: inherit;
   caret-color: rgb(var(--v-theme-primary));
 }
 .chat-composer textarea::placeholder {
@@ -1801,6 +1933,26 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 }
 .chat-menu b {
   font-weight: 500;
+}
+.chat-menu button.is-mention {
+  --chip-color: var(--v-theme-on-surface);
+}
+.chat-menu button.is-mention .menu-icon {
+  opacity: var(--v-medium-emphasis-opacity);
+}
+.chat-menu button.is-mention b {
+  font-weight: 400;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-menu button.is-mention span:not(.menu-key) {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .chat-menu span {
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
