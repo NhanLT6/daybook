@@ -444,14 +444,16 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 }
 
 .rail-item {
-  width: 64px;
+  /* Same footprint language as the brand mark: a 48px-wide tile with its 12px radius, so it sits
+     inset from the rail's edges instead of running into them */
+  width: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 0 7px;
-  border-radius: 14px;
-  font-size: 11px;
+  padding: 7px 0 6px;
+  border-radius: 12px;
+  font-size: 10.5px;
   line-height: 1.2;
   text-decoration: none;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
