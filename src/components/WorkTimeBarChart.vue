@@ -179,14 +179,14 @@ const chartData = computed(() => {
     // No daily target ("no limit") → nothing to fill up to
     if (targetMinutes.value === null) return { labels, datasets: loggedDataSet };
 
-    // Remaining fills every day up to the daily target, weekends and holidays too (they get an outline instead)
+    // Remaining fills each workday up to the daily target; weekends and holidays get none (an outline flags logs there)
     const loggedPerDay = dailyHours(timeLogs.value);
 
     const remainingDataSet = {
       label: REMAINING,
       backgroundColor: projectColors.remainingDataColor(),
       ...segmentBorder.value,
-      data: loggedPerDay.map((h) => Math.max(targetMinutes.value! / 60 - h, 0)),
+      data: loggedPerDay.map((h, i) => (isOffDay(dayKeys[i]) ? 0 : Math.max(targetMinutes.value! / 60 - h, 0))),
     };
 
     return { labels, datasets: [...loggedDataSet, remainingDataSet] };

@@ -9,19 +9,18 @@ How many hours a workday should add up to. Stored in localStorage as two values 
 
 **Single source:** `useDailyTarget()` (`src/composables/useDailyTarget.ts`). Never hardcode 8h / 480 again.
 
-- `targetMinutes`: the day target in minutes, or `null` for no limit. The same on every day.
-- `isOffDay(date)`: weekend day or day-off holiday (`useWorkCalendar`). Drives the off-day **warning** only.
+- `targetMinutes`: the workday target in minutes, or `null` for no limit.
+- `isOffDay(date)`: weekend day (Settings) or day-off holiday (`useWorkCalendar`).
 
-**Off days warn, they don't zero the target.** People log side work on weekends (studying on a Saturday), so a
-weekend or holiday keeps Remaining and the target like any day; logging on one is flagged in amber (`warning`),
-never red. Holidays from Calendarific carry `dayOff`: observances (Women's Day, Teachers' Day) are `false`, so they
+**Off days have no Remaining, and logging on one warns in amber, never red.** People log side work on weekends
+(studying on a Saturday), so those bars keep their project colours and get a soft amber outline (`warning`). Holidays from Calendarific carry `dayOff`: observances (Women's Day, Teachers' Day) are `false`, so they
 aren't off days at all.
 - `dailyTargetMinutes(enabled, hours)`: the pure version, for code outside components.
 
 | Consumer | With a target | No limit |
 |---|---|---|
 | Remaining chip (BulkLogForm) | target − logged | hidden |
-| WorkTimeBarChart | grey Remaining bars up to the target on every day; amber outline around an off-day column that has logs (`offDayOutline` plugin; bars keep their project colours); dashed target line once any day goes past it; y-axis not capped | no Remaining bars, no line |
+| WorkTimeBarChart | grey Remaining bars up to the target on workdays (none on off days); amber outline around an off-day column that has logs (`offDayOutline` plugin; bars keep their project colours); dashed target line once any day goes past it; y-axis not capped | no Remaining bars, no line |
 | MobileWeekChart | scale floor = target | scale to the largest day (1h floor) |
 | LogList day total colour | error above target, else warning on an off day, else primary within 30 min of it | no colour |
 | Catch-up effort label | "Xd Yh" with a day = target (caller passes it to `fetchCatchUpItems`) | plain hours |
@@ -38,6 +37,7 @@ Fills Duration with what's left of the target on the selected day. It **replaces
 Shown only when all of these hold. Otherwise it's hidden, not disabled.
 
 - Exactly one date is selected. Bulk-logging full days is deliberately not encouraged.
+- That date is a workday (not a weekend or holiday).
 - The day already has logged time (plans don't count).
 - Logged time is below the target, and a target is set.
 
