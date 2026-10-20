@@ -96,7 +96,7 @@ Every pushed branch gets a Vercel preview build, and the Neon integration create
 - **Chart.js**: Uses `useTheme()` + computed colors for grid, ticks, and legend
 
 ### List pages (Logs, Tasks, Events)
-- One pattern, shared code: `ListPanel.vue` (toolbar: title + count, search, `filters` slot, `actions` slot; scrolling body) wrapping `GroupedTable.vue` (sticky column titles, full-width group rows with totals under their column via `group.<key>` slots, hover-revealed row actions, `hideBelow` columns)
+- One pattern, shared code: `ListPanel.vue` (toolbar: title + count, search, `filters` slot, `actions` slot; scrolling body) wrapping `GroupedTable.vue` (built from Vuetify: one `VExpansionPanel` per group with a `VDataTable` of its rows; adds sticky column titles, full-width group rows with totals under their column via `group.<key>` slots, hover-revealed row actions, `hideBelow` columns)
 - Three tiers: glass card → toolbar + column titles on the glass → rows in solid surface cards (tier 1). Groups sharing a `block` share a card and blocks are spaced apart (Logs: one card per week, so a light week shows as a small card; Tasks: one card per category). Home's chart + legend sit in the same kind of card
 - Lists span the card's full width (no centered `page-inner` container); wide screens get useful columns, not empty space
 - Filters go in a `.list-filter-btn` popup; toolbar buttons are 32px, `rounded="lg"`, `list-icon-on-xs` to drop to the icon on phones. Don't restyle a list locally: change the shared component

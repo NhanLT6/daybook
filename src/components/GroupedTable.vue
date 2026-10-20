@@ -1,16 +1,16 @@
 <script setup lang="ts" generic="G extends TableGroup<any>">
 import { computed, inject, ref, useSlots } from 'vue';
 
-import { useDisplay } from 'vuetify';
-
 import { LIST_SCROLLED_KEY } from '@/components/listPanelKeys';
 
-// The one table the list pages share. Column titles sit on the glass; the rows sit in solid
-// (tier-1) cards: consecutive groups with the same `block` share a card, and blocks are spaced
-// apart (a week of logs, a category of projects), so a light week reads as a small card. Inside a
-// card, groups (a day, a project, a month) open with a full-width group row and are split by
-// hairlines. Cells, group rows and row actions come in through slots; spacing, hairlines, hover
-// and the hover-revealed actions live here so the pages can't drift.
+import { useDisplay } from 'vuetify';
+
+// The one grouped list the list pages share, built from Vuetify parts: each group (a day, a project,
+// a month) is a VExpansionPanel whose title is the group row and whose body is a VDataTable of its
+// rows. On top of that it adds only what Vuetify doesn't have: one row of column titles on the glass,
+// group totals lined up under their column, and solid (tier-1) cards: consecutive groups with the
+// same `block` share a card and blocks are spaced apart (a week of logs, a category of projects), so
+// a light week reads as a small card. Pages fill cells, group rows and row actions through slots.
 export interface TableColumn {
   key: string;
   title: string;
@@ -23,7 +23,7 @@ export interface TableColumn {
 export interface TableGroup<R> {
   key: string;
   rows: R[];
-  // DOM id on the group's <tbody>, e.g. a date to scroll to
+  // DOM id on the group's panel, e.g. a date to scroll to
   id?: string;
   // Consecutive groups with the same block share one card (e.g. a week); omitted = one card for all
   block?: string;
@@ -70,12 +70,30 @@ defineSlots<
   }
 >();
 
-// Optional columns drop out on narrow screens. Done here rather than in CSS so colspans stay right.
+// Optional columns drop out on narrow screens
 const { smAndUp, mdAndUp } = useDisplay();
 const columns = computed(() =>
-  allColumns.filter(
-    (col) => !col.hideBelow || (col.hideBelow === 'sm' ? smAndUp.value : mdAndUp.value),
-  ),
+  allColumns.filter((col) => !col.hideBelow || (col.hideBelow === 'sm' ? smAndUp.value : mdAndUp.value)),
+);
+
+const toWidth = (width?: number | string) => (typeof width === 'number' ? `${width}px` : width);
+
+// VDataTable headers: the page's columns plus the row-actions column
+const headers = computed(() => [
+  ...columns.value.map((col) => ({
+    key: col.key,
+    title: col.title,
+    width: col.width,
+    align: col.align,
+    sortable: false,
+  })),
+  { key: 'actions', title: '', width: actionsWidth, sortable: false },
+]);
+
+// Group rows and column titles are grids with the table's column widths (free columns share the
+// rest, like a fixed-layout table), so totals and titles line up with the cells below
+const gridColumns = computed(() =>
+  [...columns.value.map((col) => toWidth(col.width) ?? 'minmax(0, 1fr)'), `${actionsWidth}px`].join(' '),
 );
 
 // The group title spans every column up to the first one that has a `group.<key>` slot
@@ -85,156 +103,172 @@ const groupSpan = computed(() => {
   return first === -1 ? columns.value.length : first;
 });
 
-const isOpen = (group: G) => !collapsible || expanded.value.includes(group.key);
-
-const toggle = (group: G) => {
-  if (!collapsible) return;
-  expanded.value = isOpen(group)
-    ? expanded.value.filter((k) => k !== group.key)
-    : [...expanded.value, group.key];
-};
-
-// Consecutive groups sharing a block key form one card
-const blocks = computed(() => {
-  const out: { key: string; label?: string; groups: G[] }[] = [];
-  for (const group of groups) {
-    const key = group.block ?? '';
-    const last = out.at(-1);
-    if (last && last.key === key) last.groups.push(group);
-    else out.push({ key, label: group.blockLabel, groups: [group] });
-  }
-  return out;
+// Not collapsible: every group stays open (the panels are read-only)
+const openPanels = computed({
+  get: () => (collapsible ? expanded.value : groups.map((g) => g.key)),
+  set: (keys: string[]) => {
+    if (collapsible) expanded.value = keys;
+  },
 });
 
-const colWidth = (col: TableColumn) => (typeof col.width === 'number' ? `${col.width}px` : col.width);
+const isOpen = (group: G) => !collapsible || expanded.value.includes(group.key);
 
-// ListPanel says when its body has scrolled, so the pinned head can take a fill
+// Consecutive groups sharing a block form one card: flag each block's first and last panel
+const panels = computed(() =>
+  groups.map((group, i) => {
+    const block = group.block ?? '';
+    const blockStart = i === 0 || (groups[i - 1].block ?? '') !== block;
+    const blockEnd = i === groups.length - 1 || (groups[i + 1].block ?? '') !== block;
+    return { group, blockStart, blockEnd };
+  }),
+);
+
+// ListPanel says when its body has scrolled, so the pinned column titles can take a fill
 const listScrolled = inject(LIST_SCROLLED_KEY, ref(false));
 
-const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : undefined);
+const rowProps = ({ item }: { item: Row }) => ({ class: ['gt-row', rowClass?.(item)] });
+const cellValue = (row: Row, key: string) => (row as Record<string, unknown>)[key];
+const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item);
 </script>
 
 <template>
-  <div class="gt">
+  <div class="gt" :style="{ '--gt-columns': gridColumns }">
     <!-- Column titles on the glass, pinned under the toolbar while the body scrolls -->
     <div class="gt-head" :class="{ 'gt-head--frosted': listScrolled }">
-      <table class="gt-table">
-        <colgroup>
-          <col v-for="col in columns" :key="col.key" :style="{ width: colWidth(col) }" />
-          <col :style="{ width: `${actionsWidth}px` }" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th v-for="col in columns" :key="col.key" :class="alignClass(col)">{{ col.title }}</th>
-            <th aria-label="Actions" />
-          </tr>
-        </thead>
-      </table>
+      <div class="gt-grid">
+        <span v-for="col in columns" :key="col.key" :class="{ 'text-end': col.align === 'end' }">
+          {{ col.title }}
+        </span>
+      </div>
     </div>
 
-    <template v-for="block in blocks" :key="block.key">
-      <!-- Label above a block's card (e.g. a category) -->
-      <div v-if="block.label" class="gt-block-label">
-        <slot name="block-label" :label="block.label" :group="block.groups[0]">{{ block.label }}</slot>
-      </div>
+    <VExpansionPanels
+      v-model="openPanels"
+      variant="accordion"
+      multiple
+      flat
+      static
+      :readonly="!collapsible"
+      class="gt-panels"
+      :class="{ 'gt-panels--readonly': !collapsible }"
+    >
+      <template v-for="{ group, blockStart, blockEnd } in panels" :key="group.key">
+        <!-- Label above a block's card (e.g. a category) -->
+        <div v-if="blockStart && group.blockLabel" class="gt-block-label">
+          <slot name="block-label" :label="group.blockLabel" :group="group">{{ group.blockLabel }}</slot>
+        </div>
 
-      <!-- One solid card per block; same colgroup as the head so columns line up -->
-      <div class="gt-block">
-        <table class="gt-table">
-          <colgroup>
-            <col v-for="col in columns" :key="col.key" :style="{ width: colWidth(col) }" />
-            <col :style="{ width: `${actionsWidth}px` }" />
-          </colgroup>
-
-          <tbody v-for="group in block.groups" :id="group.id" :key="group.key" class="gt-group">
-            <!-- Group row: the page's group slot fills the first column(s) (title, count); `group.<key>` slots
-                 put group totals under their column; `group-actions` sits over the row actions -->
-            <tr
-              class="gt-group-row"
-              :class="{ 'gt-group-row--toggle': collapsible }"
-              :aria-expanded="collapsible ? isOpen(group) : undefined"
-              @click="toggle(group)"
-            >
-              <td :colspan="groupSpan">
-                <div class="gt-group-row__inner">
-                  <VIcon
-                    v-if="collapsible"
-                    :icon="isOpen(group) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
-                    size="18"
-                    class="gt-chevron"
-                  />
-                  <slot name="group" :group="group" :open="isOpen(group)" />
-                </div>
-              </td>
-              <td v-for="col in columns.slice(groupSpan)" :key="col.key" :class="alignClass(col)">
+        <VExpansionPanel
+          :id="group.id"
+          :value="group.key"
+          class="gt-panel"
+          :class="{ 'gt-panel--block-start': blockStart, 'gt-panel--block-end': blockEnd }"
+        >
+          <!-- Group row: the page's group slot fills the first column(s) (title, count); `group.<key>` slots
+               put group totals under their column; `group-actions` sits over the row actions -->
+          <VExpansionPanelTitle hide-actions class="gt-group-title">
+            <div class="gt-grid gt-group-row">
+              <div class="gt-group-row__main" :style="{ gridColumn: `span ${groupSpan}` }">
+                <VIcon
+                  v-if="collapsible"
+                  :icon="isOpen(group) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                  size="18"
+                  class="gt-chevron"
+                />
+                <slot name="group" :group="group" :open="isOpen(group)" />
+              </div>
+              <div v-for="col in columns.slice(groupSpan)" :key="col.key" :class="{ 'text-end': col.align === 'end' }">
                 <slot :name="`group.${col.key}`" :group="group" />
-              </td>
-              <td class="gt-actions" @click.stop>
-                <div class="gt-actions__inner"><slot name="group-actions" :group="group" /></div>
-              </td>
-            </tr>
+              </div>
+              <!-- Room for the group actions, which sit outside the title: it is a <button> -->
+              <div />
+            </div>
+          </VExpansionPanelTitle>
 
-            <template v-if="isOpen(group)">
-              <tr
-                v-for="row in group.rows"
-                :key="rowKey(row)"
-                class="gt-row"
-                :class="rowClass?.(row)"
-                @click="emit('rowClick', row)"
-              >
-                <td v-for="col in columns" :key="col.key" :class="alignClass(col)">
-                  <slot :name="`cell.${col.key}`" :row="row">{{ (row as Record<string, unknown>)[col.key] }}</slot>
-                </td>
-                <td class="gt-actions" @click.stop>
-                  <div class="gt-actions__inner"><slot name="actions" :row="row" /></div>
-                </td>
-              </tr>
+          <div v-if="$slots['group-actions']" class="gt-actions gt-group-actions">
+            <slot name="group-actions" :group="group" />
+          </div>
+
+          <!-- The group's rows -->
+          <VExpansionPanelText class="gt-group-body">
+            <VDataTable
+              :headers="headers"
+              :items="group.rows"
+              :item-value="rowKey"
+              :items-per-page="-1"
+              :mobile="false"
+              :row-props="rowProps"
+              hide-default-header
+              hide-default-footer
+              hover
+              class="gt-table bg-transparent"
+              @click:row="onRowClick"
+            >
+              <template v-for="col in columns" :key="col.key" #[`item.${col.key}`]="{ item }">
+                <slot :name="`cell.${col.key}`" :row="item">{{ cellValue(item, col.key) }}</slot>
+              </template>
+
+              <!--suppress VueUnrecognizedSlot -->
+              <template #item.actions="{ item }">
+                <div class="gt-actions" @click.stop><slot name="actions" :row="item" /></div>
+              </template>
 
               <!-- A group with no rows (e.g. a project without tasks) -->
-              <tr v-if="group.rows.length === 0 && $slots['group-empty']" class="gt-empty-row">
-                <td :colspan="columns.length + 1"><slot name="group-empty" :group="group" /></td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </template>
+              <template #no-data>
+                <div class="gt-empty"><slot name="group-empty" :group="group" /></div>
+              </template>
+            </VDataTable>
+          </VExpansionPanelText>
+        </VExpansionPanel>
+      </template>
+    </VExpansionPanels>
   </div>
 </template>
 
 <style scoped>
-/* Cards are inset from the glass edge like Insights' cards; spaced apart by the glass between them */
+/* Cards are inset from the glass edge like Insights' cards */
 .gt {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   padding: 0 8px 12px;
 }
 
-.gt-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+/* Fixed layout keeps every group's columns at the same widths */
+.gt :deep(table) {
   table-layout: fixed;
-  font-size: 0.875rem;
 }
 
-/* Column titles: small, muted, on the glass, pinned. Once the list scrolls they take a solid fill
-   so rows don't show through (ListPanel marks its body as scrolled). */
+/* Header and group rows: a grid with the table's columns, cells padded like VDataTable's */
+.gt-grid {
+  display: grid;
+  grid-template-columns: var(--gt-columns);
+  align-items: center;
+  width: 100%;
+}
+
+.gt-grid > * {
+  min-width: 0;
+  padding: 0 16px;
+}
+
+/* Column titles on the glass, pinned. Once rows scroll under them they take a strip of the same
+   frosted glass as the card (ListPanel provides the scroll state). */
 .gt-head {
   position: sticky;
   top: 0;
-  z-index: 1;
-  margin: 0 -8px -8px;
+  z-index: 2;
+  margin: 0 -8px;
   padding: 0 8px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
-/* Once rows scroll under it, the head turns into a strip of the same frosted glass as the card
-   (ListPanel provides the scroll state) */
 .gt-head--frosted {
   backdrop-filter: blur(var(--glass-blur, 25.6px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
-  box-shadow: 0 1px 0 rgba(var(--v-theme-on-surface), 0.09);
+  box-shadow: 0 1px 0 rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
 .v-theme--light .gt-head--frosted {
@@ -245,24 +279,32 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
   background: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77));
 }
 
-.gt-head th {
-  height: 40px;
-  padding: 0 16px;
-  text-align: start;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+/* Tier 1: blocks are solid cards spaced apart on the glass. The selectors sit in Vuetify's
+   accordion context (with its !important) to out-specify its middle-panel radius reset. */
+.gt-panels :deep(> .v-expansion-panel.gt-panel--block-start) {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+  overflow: hidden;
 }
 
-/* Tier 1: the solid card the rows sit in */
-.gt-block {
+.gt-panels :deep(> .v-expansion-panel.gt-panel--block-end) {
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
   overflow: hidden;
-  border-radius: 8px;
-  background: rgb(var(--v-theme-surface));
+}
+
+.gt-panels :deep(> .v-expansion-panel.gt-panel--block-start:not(:first-child)) {
+  margin-top: 12px;
+}
+
+/* The accordion's hairline between groups only inside a card */
+.gt-panels :deep(> .v-expansion-panel.gt-panel--block-start::after) {
+  opacity: 0;
 }
 
 .gt-block-label {
-  margin: 4px 0 -6px;
+  width: 100%;
+  margin: 16px 0 6px;
   padding: 0 4px 0 16px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -271,39 +313,25 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
-/* Numbers line up in their columns */
-.gt-table td.text-end {
-  font-variant-numeric: tabular-nums;
+.gt-block-label:first-child {
+  margin-top: 4px;
 }
 
-/* Group row: the hairline above it is what separates groups within a card */
-.gt-group-row td {
-  height: 52px;
-  padding: 8px 16px;
+/* Group row: the panel title, padded by its grid cells instead */
+.gt-group-title {
+  padding: 0;
+  min-height: 48px;
   font-size: 0.8125rem;
+  line-height: 1.3;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
 }
 
-.gt-group:first-of-type .gt-group-row td {
-  border-top-color: transparent;
-}
-
-.gt-group-row__inner {
+.gt-group-row__main {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
   font-size: 0.875rem;
   color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
-}
-
-.gt-group-row--toggle {
-  cursor: pointer;
-}
-
-.gt-group-row--toggle:hover td {
-  background-color: rgba(var(--v-theme-on-surface), 0.03);
 }
 
 .gt-chevron {
@@ -311,30 +339,48 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
-/* Rows: plain, a soft tint on hover */
-.gt-row td {
-  height: 52px;
-  padding: 8px 16px;
-  vertical-align: middle;
+/* Read-only groups (Tasks, Events) don't toggle */
+.gt-panels--readonly .gt-group-title {
+  cursor: default;
+}
+
+/* Over the group row's last column */
+.gt-group-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  height: 48px;
+  align-items: center;
+  padding-inline: 16px;
+}
+
+.gt-group-body :deep(.v-expansion-panel-text__wrapper) {
+  padding: 0;
+}
+
+/* The rows: a hairline from the group row, multi-line cells (a wrapped name) keep some air */
+.gt-table {
+  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.gt-table :deep(.gt-row > td) {
+  padding-block: 8px !important;
   overflow-wrap: anywhere;
 }
 
-.gt-row:hover td {
-  background-color: rgba(var(--v-theme-on-surface), 0.05);
+/* Numbers line up in their columns */
+.gt-table :deep(td.v-data-table-column--align-end) {
+  font-variant-numeric: tabular-nums;
 }
 
-.gt-group > .gt-row:last-child td,
-.gt-empty-row td {
-  padding-bottom: 8px;
-}
-
-.gt-empty-row td {
-  padding: 0 16px 14px;
+.gt-empty {
+  text-align: start;
   font-size: 0.8125rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
-.gt-actions__inner {
+.gt-actions {
   display: flex;
   justify-content: flex-end;
   gap: 2px;
@@ -342,14 +388,15 @@ const alignClass = (col: TableColumn) => (col.align === 'end' ? 'text-end' : und
 
 /* Row actions stay quiet until the row is hovered or focused (pointer devices only) */
 @media (hover: hover) {
-  .gt-actions__inner {
+  .gt-actions {
     opacity: 0;
     transition: opacity 0.15s;
   }
 
-  .gt-row:hover .gt-actions__inner,
-  .gt-group-row:hover .gt-actions__inner,
-  .gt-actions__inner:focus-within {
+  .gt-table :deep(.gt-row:hover) .gt-actions,
+  .gt-group-title:hover + .gt-actions,
+  .gt-group-actions:hover,
+  .gt-actions:focus-within {
     opacity: 1;
   }
 }

@@ -42,7 +42,7 @@ HomeView.selectedProject (ref)
 3. **Date range** — `log.date` within `[from, to]` (see clamping below)
 4. **Search** — case-insensitive substring across `project` / `task` / `description`
 
-`loggedTimeByDates` groups `filteredItems` (not the raw props) into `GroupedTable` groups — one collapsible group per day (`<tbody id="YYYY-MM-DD">`, `expanded` = `openedPanels`), each week's days in their own solid card (`block` = week start) so weeks read by space alone, the day total under the Duration column — so week-grouping, totals, and the empty state all follow the filter. Empty result → "No logs match filters" (vs "No data" when the month is genuinely empty).
+`loggedTimeByDates` groups `filteredItems` (not the raw props) into `GroupedTable` groups — one collapsible expansion panel per day (`id="YYYY-MM-DD"`, `expanded` = `openedPanels`), each week's days in their own solid card (`block` = week start) so weeks read by space alone, the day total under the Duration column — so week-grouping, totals, and the empty state all follow the filter. Empty result → "No logs match filters" (vs "No data" when the month is genuinely empty).
 
 ### Options
 

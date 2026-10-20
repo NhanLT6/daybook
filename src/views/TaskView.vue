@@ -765,6 +765,11 @@ const showTaskField = computed(
   padding-inline-start: 18px;
 }
 
+/* A wrapped task name stays indented */
+.task-title {
+  display: block;
+}
+
 .empty-category {
   display: flex;
   align-items: center;
