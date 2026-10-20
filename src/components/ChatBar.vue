@@ -1202,6 +1202,8 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   --chat-line: rgba(20, 28, 38, 0.12);
   --chat-tile: rgba(20, 28, 38, 0.05);
   --chat-menu: rgba(255, 255, 255, 0.94);
+  --chat-send-bg: #5f656d; /* soft graphite: pure ink read too harsh (Nhan) */
+  --chat-send-fg: #fff;
   --chat-ai: rgba(20, 28, 38, 0.05);
   --chat-halo: rgba(255, 255, 255, 0.75);
   --chat-thumb: rgba(20, 28, 38, 0.22);
@@ -1228,6 +1230,8 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   --chat-line: rgba(232, 236, 239, 0.12);
   --chat-tile: rgba(255, 255, 255, 0.05);
   --chat-menu: #404040;
+  --chat-send-bg: #c4c7cb;
+  --chat-send-fg: #2d2d2d;
   --chat-ai: rgba(255, 255, 255, 0.07);
   --chat-halo: rgba(20, 22, 26, 0.7);
   --chat-thumb: rgba(255, 255, 255, 0.2);
@@ -1858,9 +1862,9 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   place-items: center;
   border: 0;
   border-radius: 20px;
-  /* Ink rather than brand green: dark in light mode, white in dark mode, so green stays rare */
-  background: rgb(var(--v-theme-on-surface));
-  color: rgb(var(--v-theme-surface));
+  /* Muted ink rather than brand green, so green stays rare */
+  background: var(--chat-send-bg);
+  color: var(--chat-send-fg);
   cursor: pointer;
   transition:
     opacity 0.2s,
