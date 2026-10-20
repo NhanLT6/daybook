@@ -215,7 +215,7 @@ const MENU_LIMIT = 8;
 const MENTION_ICONS: Record<ChatMention['kind'], string> = {
   project: 'mdi-folder-outline',
   task: 'mdi-subdirectory-arrow-right',
-  jira: 'mdi-jira',
+  ticket: 'mdi-ticket-outline', // generic, not a Jira logo: other trackers (Linear, …) may feed tickets later
 };
 
 const caret = ref(0);

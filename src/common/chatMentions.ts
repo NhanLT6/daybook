@@ -6,7 +6,7 @@
 
 export interface ChatMention {
   label: string; // inserted text, and what the chip matches
-  kind: 'project' | 'task' | 'jira';
+  kind: 'project' | 'task' | 'ticket'; // ticket: synced from an issue tracker (Jira today), one generic icon for any tracker
   project: string;
   task?: string;
 }

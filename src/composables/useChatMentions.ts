@@ -21,7 +21,7 @@ export function useChatMentions() {
 
     const project = (title: string): ChatMention => ({
       label: title,
-      kind: jiraTitles.has(title) ? 'jira' : 'project',
+      kind: jiraTitles.has(title) ? 'ticket' : 'project',
       project: title,
     });
     const task = (projectTitle: string, title: string): ChatMention => ({
