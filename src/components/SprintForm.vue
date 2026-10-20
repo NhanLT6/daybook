@@ -221,8 +221,8 @@ const onSave = () => {
 
         <div>
           <div class="text-caption text-medium-emphasis mb-1">Length</div>
-          <VBtnToggle v-model="weeks" mandatory variant="outlined" divided density="compact" rounded="lg" class="w-100">
-            <VBtn v-for="w in weekOptions" :key="w" :value="w" class="flex-1-1">{{ w }} {{ w === 1 ? 'week' : 'weeks' }}</VBtn>
+          <VBtnToggle v-model="weeks" mandatory color="primary" variant="outlined" divided density="compact" rounded="lg" class="w-100">
+            <VBtn v-for="w in weekOptions" :key="w" :value="w" class="flex-1-1 text-none">{{ w }} {{ w === 1 ? 'week' : 'weeks' }}</VBtn>
           </VBtnToggle>
           <div class="text-caption text-medium-emphasis mt-1">{{ lengthHint }}</div>
         </div>

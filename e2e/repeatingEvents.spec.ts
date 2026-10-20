@@ -57,7 +57,7 @@ test('repeat preset and custom rule save from the form', async ({ page }) => {
   await dialog.getByLabel('Title').fill('Sprint review');
 
   // Preset: derived from the default date (today, a Wednesday)
-  await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
+  await dialog.locator('.repeat-select').click();
   await page.getByRole('option', { name: 'Every 2 weeks on Wednesday' }).click();
   await dialog.getByRole('button', { name: 'Add' }).click();
 
@@ -67,7 +67,7 @@ test('repeat preset and custom rule save from the form', async ({ page }) => {
 
   // Custom: every 3 weeks, ending after 4 times
   await row.locator('button:has(.mdi-pencil-outline)').click();
-  await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
+  await dialog.locator('.repeat-select').click();
   await page.getByRole('option', { name: 'Custom…' }).click();
   await dialog.getByLabel('Repeat interval').fill('3');
   await dialog.getByRole('button', { name: 'After' }).click();
@@ -86,14 +86,14 @@ test('range picked in the date picker repeats via the custom panel', async ({ pa
   await dialog.getByLabel('Title').fill('Sprint');
 
   // The picker emits Date objects; picking a range here used to crash the Repeat field
-  await dialog.getByRole('textbox', { name: 'Date' }).click();
-  await page.getByRole('button', { name: 'Range' }).click();
+  await dialog.getByRole('button', { name: 'Date range' }).click();
+  await dialog.getByRole('textbox', { name: 'Dates' }).click();
   await page.getByRole('button', { name: 'Next month' }).click();
   await pickDay(page, nextMonthDay(5));
   await pickDay(page, nextMonthDay(16));
   await page.keyboard.press('Escape');
 
-  await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
+  await dialog.locator('.repeat-select').click();
   await page.getByRole('option', { name: 'Custom…' }).click();
 
   // A 12-day range can't repeat weekly: Custom starts at every 2 weeks, and forcing weekly is rejected
@@ -122,13 +122,13 @@ test('"When it ends" repeats a range back to back and follows date changes', asy
     await pickDay(page, nextMonthDay(to));
     await page.keyboard.press('Escape');
   };
-  const dateField = dialog.getByRole('textbox', { name: 'Date' });
+  await dialog.getByRole('button', { name: 'Date range' }).click();
+  const dateField = dialog.getByRole('textbox', { name: 'Dates' });
 
   await dateField.click();
-  await page.getByRole('button', { name: 'Range' }).click();
   await page.getByRole('button', { name: 'Next month' }).click();
   await pickRange(5, 16);
-  const repeat = dialog.locator('.v-select', { hasText: 'Repeat' });
+  const repeat = dialog.locator('.repeat-select');
   await repeat.click();
   await page.getByRole('option', { name: /^When it ends/ }).click();
   await expect(repeat).toContainText(/When it ends \(every (2 weeks on \w+day|12 days)\)/);
@@ -160,8 +160,8 @@ test('separate days picked in Multiple mode repeat as a set', async ({ page }) =
   const dialog = page.locator('.v-dialog');
   await dialog.getByLabel('Title').fill('Gym');
 
-  await dialog.getByRole('textbox', { name: 'Date' }).click();
-  await page.getByRole('button', { name: 'Multiple' }).click();
+  await dialog.getByRole('button', { name: 'Several days' }).click();
+  await dialog.getByRole('textbox', { name: 'Days' }).click();
   await page.getByRole('button', { name: 'Next month' }).click();
   for (const day of [5, 6, 9]) await pickDay(page, nextMonthDay(day));
   // Today starts out picked; untick it
@@ -171,10 +171,10 @@ test('separate days picked in Multiple mode repeat as a set', async ({ page }) =
     .getByRole('button', { name: /^Today, / })
     .click();
   await page.keyboard.press('Escape');
-  await expect(dialog.getByRole('textbox', { name: 'Date' })).toHaveValue(/\w{3} 5, 6, 9/);
+  await expect(dialog.getByRole('textbox', { name: 'Days' })).toHaveValue(/\w{3} 5, 6, 9/);
 
   // Weekly presets name every picked weekday
-  await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
+  await dialog.locator('.repeat-select').click();
   await page.getByRole('option', { name: /^Every week on \w+day, \w+day and \w+day$/ }).click();
   await dialog.getByRole('button', { name: 'Add' }).click();
 

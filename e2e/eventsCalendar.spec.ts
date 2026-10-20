@@ -54,10 +54,12 @@ test('"the last work day" preset moves the start and previews the next dates', a
   const dialog = page.locator('.v-dialog');
   await dialog.getByLabel('Title').fill('Give Bonusly points');
 
-  await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
+  await dialog.locator('.repeat-select').click();
   await page.getByRole('option', { name: 'Every month on the last work day' }).click();
   await expect(dialog).toContainText('Oct 30');
-  await expect(dialog).toContainText('Next: Fri, Oct 30 · Mon, Nov 30 · Thu, Dec 31');
+  await expect(dialog).toContainText('Fri, Oct 30');
+  await expect(dialog).toContainText('Mon, Nov 30');
+  await expect(dialog).toContainText('Thu, Dec 31');
 
   await dialog.getByRole('button', { name: 'Add' }).click();
   const row = page.locator('main tr', { hasText: 'Give Bonusly points' });
@@ -69,26 +71,29 @@ test('Custom repeats on a monthly position or moves off days off', async ({ page
   await page.getByRole('button', { name: 'New Event' }).click();
   const dialog = page.locator('.v-dialog');
   await dialog.getByLabel('Title').fill('Payroll');
-  await dialog.locator('.v-select', { hasText: 'Repeat' }).click();
+  await dialog.locator('.repeat-select').click();
   await page.getByRole('option', { name: 'Custom…' }).click();
-  await dialog.locator('.v-select').nth(1).click();
-  await page.getByRole('option', { name: 'month', exact: true }).click();
+  await dialog.getByRole('button', { name: 'month', exact: true }).click();
 
   // "The second work day" moves the start from Wed Oct 7 to Nov 3 (Oct 2 has passed)
-  await dialog.getByLabel('On the').check();
+  await dialog.getByRole('button', { name: 'The…' }).click();
   await dialog.locator('.v-select').filter({ has: page.getByLabel('Which one') }).click();
   await page.getByRole('option', { name: 'second' }).click();
   await dialog.locator('.v-select').filter({ has: page.getByLabel('Day', { exact: true }) }).click();
   await page.getByRole('option', { name: 'work day' }).click();
   await expect(dialog).toContainText('Every month on the second work day');
-  await expect(dialog).toContainText('Next: Tue, Nov 3 · Wed, Dec 2 · Mon, Jan 4');
+  await expect(dialog).toContainText('Tue, Nov 3');
+  await expect(dialog).toContainText('Wed, Dec 2');
+  await expect(dialog).toContainText('Mon, Jan 4');
 
   // Back to the day number: Jan 3 2027 is a Sunday, so it moves to Fri Jan 1
-  await dialog.getByLabel('On day 3').check();
+  await dialog.getByRole('button', { name: 'Day 3' }).click();
   await dialog.locator('.v-select', { hasText: 'Keep it' }).click();
   await page.getByRole('option', { name: 'Move to the work day before' }).click();
   await expect(dialog).toContainText('Every month on day 3, or the work day before if off');
-  await expect(dialog).toContainText('Next: Tue, Nov 3 · Thu, Dec 3 · Fri, Jan 1');
+  await expect(dialog).toContainText('Tue, Nov 3');
+  await expect(dialog).toContainText('Thu, Dec 3');
+  await expect(dialog).toContainText('Fri, Jan 1');
 
   await dialog.getByRole('button', { name: 'Add' }).click();
   await expect(page.locator('main tr', { hasText: 'Payroll' })).toContainText('Nov 3');

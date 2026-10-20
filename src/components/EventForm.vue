@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 
 import { formatEventDate } from '@/common/DateHelpers';
 import {
+  atOccurrence,
   backToBackRule,
   describeDayKind,
   describeNth,
@@ -301,17 +302,22 @@ const repeatError = computed(() => {
   return validateRepeat(shape.value, rule);
 });
 
-// The next few dates, shown under the Repeat field so a rule can be checked at a glance — work-day
-// rules move around weekends and holidays, which the summary sentence can't show
-const upcomingDates = computed(() => {
+// The next few dates, shown in a preview under the Repeat field so a rule can be checked at a glance —
+// work-day rules move around weekends and holidays, which the summary sentence can't show
+const upcomingDates = computed<string[]>(() => {
   const rule = normalizedRule.value;
-  if (!rule || repeatError.value) return '';
+  if (!rule || repeatError.value) return [];
   const series: AppEvent = { id: '', title: '', type: 'custom', ...shape.value, repeat: rule };
   const today = dayjs().format('YYYY-MM-DD');
   const from = dateField.value.value > today ? dateField.value.value : today;
   const to = dayjs(from).add(2, 'year').format('YYYY-MM-DD');
-  const next = getOccurrences(series, from, to, workCalendar.value).slice(0, 3);
-  return next.length ? `Next: ${next.map((d) => dayjs(d).format('ddd, MMM D')).join(' · ')}` : 'No upcoming dates';
+  return getOccurrences(series, from, to, workCalendar.value)
+    .slice(0, 3)
+    .map((d) =>
+      shape.value.endDate || isMultiple.value
+        ? formatEventDate({ ...atOccurrence(series, d), startTime: undefined, endTime: undefined })
+        : dayjs(d).format('ddd, MMM D'),
+    );
 });
 
 const unskipDate = (date: string) => {
@@ -356,11 +362,19 @@ const datePickerModel = computed({
   },
 });
 
-// Text shown in the date trigger field: "Oct 5", "Oct 5, 6, 9" or "Oct 5 – Oct 16"
-const displayDate = computed(() => formatEventDate({ id: '', title: '', type: 'custom', ...shape.value }));
+// Text shown in the date trigger field: "Tue, Oct 20, 2026", "Oct 5, 6, 9" or "Mon, Nov 2 → Wed, Nov 4, 2026 · 3 days"
+const displayDate = computed(() => {
+  const { date, endDate } = shape.value;
+  if (isMultiple.value) return formatEventDate({ id: '', title: '', type: 'custom', ...shape.value });
+  if (!endDate || endDate === date) return dayjs(date).format('ddd, MMM D, YYYY');
+  const days = dayjs(endDate).diff(dayjs(date), 'day') + 1;
+  return `${dayjs(date).format('ddd, MMM D')} → ${dayjs(endDate).format('ddd, MMM D, YYYY')} · ${days} days`;
+});
 
-// Title shown in the date picker
-const datePickerTitle = computed(() => displayDate.value);
+const dateLabel = computed(() => ({ single: 'Date', multiple: 'Days', range: 'Dates' })[dateMode.value]);
+
+// Title shown in the date picker: the short form, which fits its header
+const datePickerTitle = computed(() => formatEventDate({ id: '', title: '', type: 'custom', ...shape.value }));
 
 // Validation — end time must be after start time on same-day, non-all-day events
 const timeError = computed(() => {
@@ -407,54 +421,48 @@ const onCancelModifyEvent = () => {
 </script>
 
 <template>
-  <VCard rounded="lg">
+  <VCard rounded="lg" class="event-form">
     <VCardTitle>{{ item ? 'Edit Event' : 'Add Event' }}</VCardTitle>
 
-    <VCardText>
+    <VCardText class="d-flex flex-column ga-4">
       <!-- Title (only required field) -->
-      <VTextField v-model="titleField.value.value" label="Title" autofocus :error-messages="titleField.errors.value" />
-
-      <!-- All day toggle — default ON -->
-      <VSwitch
-        v-model="allDayField.value.value"
-        label="All day"
-        color="primary"
-        density="compact"
-        hide-details
-        class="mb-3"
+      <VTextField
+        v-model="titleField.value.value"
+        label="Title"
+        autofocus
+        :error-messages="titleField.errors.value"
+        hide-details="auto"
       />
 
-      <!-- Date — trigger field opens a popover with single/range toggle + picker -->
-      <VMenu v-model="isDatePickerOpen" :close-on-content-click="false">
-        <template #activator="{ props }">
-          <VTextField
-            v-bind="props"
-            :model-value="displayDate"
-            label="Date"
-            append-inner-icon="mdi-calendar"
-            readonly
-            class="mb-3"
-          />
-        </template>
+      <!-- When: the kind of date, the date(s), then all day or a time on one row -->
+      <section class="d-flex flex-column ga-3">
+        <div class="form-section-title">When</div>
+        <VBtnToggle v-model="dateMode" mandatory color="primary" variant="outlined" divided density="compact" rounded="lg" class="w-100">
+          <VBtn value="single" class="flex-1-1 text-none">One day</VBtn>
+          <VBtn value="multiple" class="flex-1-1 text-none">Several days</VBtn>
+          <VBtn value="range" class="flex-1-1 text-none">Date range</VBtn>
+        </VBtnToggle>
 
-        <VSheet rounded="lg" class="pa-2">
-          <!-- Single / Multiple / Range toggle -->
-          <VBtnToggle v-model="dateMode" variant="tonal" density="compact" rounded="lg" class="d-flex justify-center">
-            <VBtn value="single" size="small">Single</VBtn>
-            <VBtn value="multiple" size="small">Multiple</VBtn>
-            <VBtn value="range" size="small">Range</VBtn>
-          </VBtnToggle>
+        <VMenu v-model="isDatePickerOpen" :close-on-content-click="false">
+          <template #activator="{ props }">
+            <VTextField
+              v-bind="props"
+              :model-value="displayDate"
+              :label="dateLabel"
+              append-inner-icon="mdi-calendar"
+              readonly
+              hide-details
+            />
+          </template>
 
-          <!-- Date picker — range prop driven by toggle -->
           <VDatePicker
             :model-value="datePickerModel"
             :multiple="dateMode === 'range' ? 'range' : dateMode === 'multiple'"
             :first-day-of-week="settingsStore.firstDayOfWeek"
             hide-title
-            class="mx-auto"
             @update:model-value="datePickerModel = $event"
           >
-            <!-- Replace "2 selected" with actual date range, using Vuetify's transition -->
+            <!-- Replace "2 selected" with the picked dates, using Vuetify's transition -->
             <template #header>
               <VFadeTransition hide-on-leave>
                 <div :key="datePickerTitle" class="text-center pa-4">
@@ -462,175 +470,211 @@ const onCancelModifyEvent = () => {
                 </div>
               </VFadeTransition>
             </template>
+            <template #actions>
+              <VBtn variant="text" @click="isDatePickerOpen = false">Done</VBtn>
+            </template>
           </VDatePicker>
-        </VSheet>
-      </VMenu>
-
-      <!-- Time pickers — visible only when All Day is OFF -->
-      <div v-if="!allDayField.value.value" class="d-flex ga-2 mb-3">
-        <VMenu v-model="isStartTimeOpen" :close-on-content-click="false">
-          <template #activator="{ props }">
-            <VTextField
-              v-bind="props"
-              :model-value="startTimeField.value.value"
-              label="Start"
-              prepend-icon="mdi-clock-start"
-              readonly
-              density="compact"
-              flex-1
-            />
-          </template>
-          <VTimePicker
-            v-model="startTimeField.value.value"
-            format="24hr"
-            @update:model-value="isStartTimeOpen = false"
-          />
         </VMenu>
 
-        <VMenu v-model="isEndTimeOpen" :close-on-content-click="false">
-          <template #activator="{ props }">
-            <VTextField
-              v-bind="props"
-              :model-value="endTimeField.value.value"
-              label="End"
-              prepend-icon="mdi-clock-end"
-              readonly
-              density="compact"
-              flex-1
-              :error-messages="timeError ? [timeError] : []"
-            />
+        <!-- All day, or a start and end time beside it -->
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <VSwitch v-model="allDayField.value.value" label="All day" color="primary" density="compact" hide-details class="flex-grow-0" />
+          <VSpacer v-if="!allDayField.value.value" />
+          <template v-if="!allDayField.value.value">
+            <VMenu v-model="isStartTimeOpen" :close-on-content-click="false">
+              <template #activator="{ props }">
+                <VTextField
+                  v-bind="props"
+                  :model-value="startTimeField.value.value"
+                  label="Start"
+                  readonly
+                  density="compact"
+                  hide-details
+                  class="time-field"
+                />
+              </template>
+              <VTimePicker
+                v-model="startTimeField.value.value"
+                format="24hr"
+                @update:model-value="isStartTimeOpen = false"
+              />
+            </VMenu>
+            <span class="text-medium-emphasis">→</span>
+            <VMenu v-model="isEndTimeOpen" :close-on-content-click="false">
+              <template #activator="{ props }">
+                <VTextField
+                  v-bind="props"
+                  :model-value="endTimeField.value.value"
+                  label="End"
+                  readonly
+                  density="compact"
+                  hide-details
+                  :error="!!timeError"
+                  class="time-field"
+                />
+              </template>
+              <VTimePicker v-model="endTimeField.value.value" format="24hr" @update:model-value="isEndTimeOpen = false" />
+            </VMenu>
           </template>
-          <VTimePicker v-model="endTimeField.value.value" format="24hr" @update:model-value="isEndTimeOpen = false" />
-        </VMenu>
-      </div>
-
-      <!-- Repeat — presets derived from the start date, or a custom rule -->
-      <VSelect
-        v-model="repeatSelect"
-        :items="repeatItems"
-        label="Repeat"
-        :error-messages="!showCustomPanel && repeatError ? [repeatError] : []"
-        :hint="upcomingDates"
-        persistent-hint
-        class="mb-3"
-      >
-        <!-- Show the saved rule's own wording when it came from the custom panel -->
-        <template v-if="showCustomPanel" #selection>{{ repeatSummary }}</template>
-      </VSelect>
-
-      <!-- Custom repeat panel -->
-      <VSheet v-if="showCustomPanel && repeatRule" rounded="lg" border class="pa-3 mb-3 d-flex flex-column ga-3">
-        <!-- Every N units -->
-        <div class="d-flex align-center ga-2">
-          <span class="text-body-2">Every</span>
-          <VNumberInput
-            :model-value="repeatRule.interval"
-            :min="1"
-            aria-label="Repeat interval"
-            density="compact"
-            hide-details
-            class="repeat-interval"
-            @update:model-value="updateRule({ interval: $event })"
-          />
-          <VSelect
-            :model-value="repeatRule.freq"
-            :items="freqItems"
-            density="compact"
-            hide-details
-            @update:model-value="updateRule({ freq: $event })"
-          />
+          <span v-else class="text-caption text-medium-emphasis">Turn off to pick a start and end time</span>
         </div>
+        <div v-if="timeError" class="text-caption text-error">{{ timeError }}</div>
+      </section>
 
-        <!-- Monthly: the start date's day number, or "the <nth> <day>" (a single start day or range only) -->
-        <VRadioGroup v-if="repeatRule.freq === 'month' && !isMultiple" v-model="monthlyMode" density="compact" hide-details>
-          <VRadio :label="`On day ${dayjs(dateField.value.value).date()}`" value="dayOfMonth" />
-          <!-- Selects sit beside the radio, not in its label, which would swallow their clicks -->
-          <div class="d-flex align-center ga-2">
-            <VRadio label="On the" value="position" class="flex-grow-0 text-no-wrap" />
-            <VSelect
-              :model-value="repeatRule.monthlyOn?.nth ?? 1"
-              :items="nthItems"
-              :disabled="!repeatRule.monthlyOn"
-              aria-label="Which one"
-              density="compact"
-              hide-details
-              @update:model-value="updatePosition({ nth: $event })"
-            />
-            <VSelect
-              :model-value="repeatRule.monthlyOn?.day ?? 'day'"
-              :items="dayKindItems"
-              :disabled="!repeatRule.monthlyOn"
-              aria-label="Day"
-              density="compact"
-              hide-details
-              @update:model-value="updatePosition({ day: $event })"
-            />
-          </div>
-        </VRadioGroup>
-
-        <!-- Weekend days and holidays: keep, skip, or move to the nearest work day (single days only) -->
+      <!-- Repeat: presets from the picked date(s); Custom opens flat rows right under the field -->
+      <section class="d-flex flex-column ga-3">
+        <div class="form-section-title">Repeat</div>
         <VSelect
-          v-if="canAdjustNonWorkday"
-          v-model="nonWorkdayMode"
-          :items="nonWorkdayItems"
-          label="On a weekend or holiday"
-          density="compact"
-          hide-details
-        />
+          v-model="repeatSelect"
+          :items="repeatItems"
+          :label="showCustomPanel ? 'Custom' : undefined"
+          aria-label="Repeat"
+          class="repeat-select"
+          :error-messages="!showCustomPanel && repeatError ? [repeatError] : []"
+          hide-details="auto"
+        >
+          <!-- Show the saved rule's own wording when it came from the custom panel -->
+          <template v-if="showCustomPanel" #selection>{{ repeatSummary }}</template>
+        </VSelect>
 
-        <!-- Ends: never / on a date / after N occurrences -->
-        <div class="d-flex flex-column ga-2">
+        <div v-if="showCustomPanel && repeatRule" class="repeat-rows">
+          <!-- Every N units -->
+          <span class="repeat-row-label">Every</span>
           <div class="d-flex align-center ga-2">
-            <span class="text-body-2">Ends</span>
+            <VNumberInput
+              :model-value="repeatRule.interval"
+              :min="1"
+              aria-label="Repeat interval"
+              control-variant="hidden"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="repeat-interval"
+              @update:model-value="updateRule({ interval: $event })"
+            />
             <VBtnToggle
-              v-model="endMode"
+              :model-value="repeatRule.freq"
               mandatory
-              variant="tonal"
+              color="primary"
+              variant="outlined"
+              divided
               density="compact"
               rounded="lg"
-                          >
-              <VBtn value="never" size="small">Never</VBtn>
-              <VBtn value="until" size="small">On date</VBtn>
-              <VBtn value="count" size="small">After</VBtn>
+              class="flex-grow-1"
+              @update:model-value="updateRule({ freq: $event })"
+            >
+              <VBtn v-for="f in freqItems" :key="f.value" :value="f.value" class="flex-1-1 text-none">{{ f.title }}</VBtn>
             </VBtnToggle>
           </div>
 
-          <VTextField
-            v-if="repeatRule.end && 'until' in repeatRule.end"
-            :model-value="repeatRule.end.until"
-            type="date"
-            label="Last date"
-            density="compact"
-            hide-details
-            @update:model-value="updateRule({ end: { until: $event } })"
-          />
-          <VNumberInput
-            v-if="repeatRule.end && 'count' in repeatRule.end"
-            :model-value="repeatRule.end.count"
-            :min="1"
-            label="Occurrences"
-            density="compact"
-            hide-details
-            @update:model-value="updateRule({ end: { count: $event } })"
-          />
+          <!-- Monthly: the start date's day number, or "the <nth> <day>" (a single start day or range only) -->
+          <template v-if="repeatRule.freq === 'month' && !isMultiple">
+            <span class="repeat-row-label">On</span>
+            <div class="d-flex align-center ga-2">
+              <VBtnToggle v-model="monthlyMode" class="flex-shrink-0" mandatory color="primary" variant="outlined" divided density="compact" rounded="lg">
+                <VBtn value="dayOfMonth" class="text-none">Day {{ dayjs(dateField.value.value).date() }}</VBtn>
+                <VBtn value="position" class="text-none">The…</VBtn>
+              </VBtnToggle>
+              <template v-if="repeatRule.monthlyOn">
+                <VSelect
+                  :model-value="repeatRule.monthlyOn.nth"
+                  :items="nthItems"
+                  aria-label="Which one"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="position-select position-nth"
+                  @update:model-value="updatePosition({ nth: $event })"
+                />
+                <VSelect
+                  :model-value="repeatRule.monthlyOn.day"
+                  :items="dayKindItems"
+                  aria-label="Day"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="position-select"
+                  @update:model-value="updatePosition({ day: $event })"
+                />
+              </template>
+            </div>
+          </template>
+
+          <!-- Weekend days and holidays: keep, skip, or move to the nearest work day (single days only) -->
+          <template v-if="canAdjustNonWorkday">
+            <span class="repeat-row-label">Days off</span>
+            <VSelect
+              v-model="nonWorkdayMode"
+              :items="nonWorkdayItems"
+              aria-label="On a weekend or holiday"
+              variant="outlined"
+              density="compact"
+              hide-details
+            />
+          </template>
+
+          <!-- Ends: never / on a date / after N occurrences -->
+          <span class="repeat-row-label">Ends</span>
+          <div class="d-flex align-center ga-2">
+            <VBtnToggle v-model="endMode" mandatory color="primary" variant="outlined" divided density="compact" rounded="lg" class="flex-shrink-0">
+              <VBtn value="never" class="text-none">Never</VBtn>
+              <VBtn value="until" class="text-none">On date</VBtn>
+              <VBtn value="count" class="text-none">After</VBtn>
+            </VBtnToggle>
+            <VTextField
+              v-if="repeatRule.end && 'until' in repeatRule.end"
+              :model-value="repeatRule.end.until"
+              type="date"
+              aria-label="Last date"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @update:model-value="updateRule({ end: { until: $event } })"
+            />
+            <VNumberInput
+              v-if="repeatRule.end && 'count' in repeatRule.end"
+              :model-value="repeatRule.end.count"
+              :min="1"
+              aria-label="Occurrences"
+              suffix="times"
+              control-variant="hidden"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @update:model-value="updateRule({ end: { count: $event } })"
+            />
+          </div>
         </div>
 
         <!-- Validation — the summary itself already shows in the Repeat field -->
-        <div v-if="repeatError" class="text-caption text-error">{{ repeatError }}</div>
-      </VSheet>
+        <div v-if="showCustomPanel && repeatError" class="text-caption text-error">{{ repeatError }}</div>
 
-      <!-- Skipped dates — remove a chip to bring that date back -->
-      <div v-if="repeatRule && skipDates.length" class="mb-3">
-        <div class="text-caption text-medium-emphasis mb-1">Skipped dates</div>
-        <div class="d-flex flex-wrap ga-1">
-          <VChip v-for="d in skipDates" :key="d" size="small" variant="tonal" closable @click:close="unskipDate(d)">
-            {{ dayjs(d).format('MMM D, YYYY') }}
-          </VChip>
-        </div>
-      </div>
+        <!-- Preview: the next dates, and skipped ones (remove a chip to bring that date back) -->
+        <VSheet
+          v-if="repeatRule && (upcomingDates.length || skipDates.length)"
+          color="container"
+          rounded="lg"
+          class="pa-3 d-flex flex-column ga-2"
+        >
+          <template v-if="upcomingDates.length">
+            <div class="text-caption text-medium-emphasis">Next dates</div>
+            <div class="d-flex flex-wrap ga-2">
+              <VChip v-for="d in upcomingDates" :key="d" size="small" variant="outlined" label>{{ d }}</VChip>
+            </div>
+          </template>
+          <template v-if="skipDates.length">
+            <div class="text-caption text-medium-emphasis">Skipped</div>
+            <div class="d-flex flex-wrap ga-2">
+              <VChip v-for="d in skipDates" :key="d" size="small" variant="tonal" label closable @click:close="unskipDate(d)">
+                {{ dayjs(d).format('MMM D, YYYY') }}
+              </VChip>
+            </div>
+          </template>
+        </VSheet>
+      </section>
 
       <!-- Description (optional) -->
-      <VTextField v-model="descriptionField.value.value" label="Description" multiline rows="2" />
+      <VTextarea v-model="descriptionField.value.value" label="Description (optional)" rows="2" auto-grow hide-details />
     </VCardText>
 
     <!-- Modal actions -->
@@ -647,8 +691,56 @@ const onCancelModifyEvent = () => {
 </template>
 
 <style scoped>
+/* Segmented choices read as plain words, like the mock */
+.event-form :deep(.v-btn-group .v-btn) {
+  letter-spacing: normal;
+}
+
+.form-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+.time-field {
+  max-width: 96px;
+}
+
+/* Custom repeat: label column + control, flat under the Repeat field */
+.repeat-rows {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.repeat-row-label {
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
 .repeat-interval {
-  max-width: 128px;
+  max-width: 64px;
   flex: 0 0 auto;
+}
+
+.repeat-interval :deep(input) {
+  text-align: center;
+}
+
+.position-select {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* "first"/"last" is short: leave the room to the day name */
+.position-nth {
+  flex: 0 0 104px;
+}
+
+.position-select :deep(.v-field) {
+  padding-inline: 10px 6px;
 }
 </style>
