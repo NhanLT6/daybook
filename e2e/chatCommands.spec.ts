@@ -1,4 +1,5 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
+import dayjs from 'dayjs';
 
 /**
  * Slash commands and the client-side addNote / addEvent tools. /api/chat is mocked with
@@ -90,13 +91,21 @@ test('/note saves a sticky note through the addNote tool, and Undo removes it', 
 });
 
 test('/event adds a calendar event through the addEvent tool', async ({ page }) => {
+  // Next Friday, relative to today: a fixed date drops out of the Events page's Upcoming list once it passes
+  const today = dayjs();
+  const friday = today.add((5 - today.day() + 7) % 7 || 7, 'day');
   const requests: ChatRequest[] = [];
   await page.route('**/api/chat', async (route) => {
     requests.push(route.request().postDataJSON());
     return fulfillStream(
       route,
       requests.length === 1
-        ? toolCall('addEvent', { title: 'Sprint review', date: '2026-10-16', startTime: '14:00', endTime: '15:00' })
+        ? toolCall('addEvent', {
+            title: 'Sprint review',
+            date: friday.format('YYYY-MM-DD'),
+            startTime: '14:00',
+            endTime: '15:00',
+          })
         : textReply('Added to your calendar.'),
     );
   });
@@ -109,11 +118,14 @@ test('/event adds a calendar event through the addEvent tool', async ({ page }) 
   await input.press('Enter');
 
   await expect(page.getByText('Added to your calendar.')).toBeVisible();
-  await expect(page.locator('.added-item', { hasText: 'Sprint review · Fri 16 Oct 14:00–15:00' })).toBeVisible();
+  await expect(
+    page.locator('.added-item', { hasText: `Sprint review · ${friday.format('ddd D MMM')} 14:00–15:00` }),
+  ).toBeVisible();
   expect(requests[0].command).toBe('event');
 
+  // Scoped to the list: the chat history (hidden, still in the DOM) also holds "sprint review"
   await page.goto('/events');
-  await expect(page.getByText('Sprint review').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('.event-row', { hasText: 'Sprint review' })).toBeVisible({ timeout: 20000 });
 });
 
 test('a message without a command sends no command', async ({ page }) => {
