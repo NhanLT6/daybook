@@ -183,6 +183,9 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
           <span class="rail-brand__name">Daybook</span>
         </RouterLink>
 
+        <!-- Inset hairline between the brand and the nav items -->
+        <span class="rail-brand-divider" aria-hidden="true" />
+
         <RouterLink
           v-for="item in railItems"
           :key="item.to"
@@ -446,10 +449,17 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  margin-bottom: 14px;
   text-decoration: none;
   color: inherit;
   transition: opacity 0.15s;
+}
+
+.rail-brand-divider {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 1px;
+  margin: 8px 0 10px;
+  background: rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .rail-brand svg {
@@ -457,10 +467,9 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
   height: 36px;
 }
 
-/* App name under the icon, a touch bolder than the nav labels */
+/* App name under the icon */
 .rail-brand__name {
   font-size: 0.75rem;
-  font-weight: 600;
   letter-spacing: 0.01em;
   color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
 }
