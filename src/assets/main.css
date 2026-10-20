@@ -231,3 +231,10 @@
   padding: 48px 16px;
   color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }
+
+/* Outlined buttons and chips: Vuetify draws the border in the text colour, which reads heavy next to the
+   app's hairlines. Use the same thin border as button groups and fields instead. */
+.v-btn.v-btn--variant-outlined,
+.v-chip.v-chip--variant-outlined {
+  border-color: rgba(var(--v-border-color), var(--v-border-opacity));
+}

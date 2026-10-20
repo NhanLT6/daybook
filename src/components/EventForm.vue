@@ -421,7 +421,7 @@ const onCancelModifyEvent = () => {
 </script>
 
 <template>
-  <VCard rounded="lg" class="event-form">
+  <VCard rounded="lg">
     <VCardTitle>{{ item ? 'Edit Event' : 'Add Event' }}</VCardTitle>
 
     <VCardText class="d-flex flex-column ga-4">
@@ -575,7 +575,12 @@ const onCancelModifyEvent = () => {
                 <VBtn value="dayOfMonth" class="text-none">Day {{ dayjs(dateField.value.value).date() }}</VBtn>
                 <VBtn value="position" class="text-none">The…</VBtn>
               </VBtnToggle>
-              <template v-if="repeatRule.monthlyOn">
+            </div>
+
+            <!-- "The <nth> <day>" gets its own row so long day names fit -->
+            <template v-if="repeatRule.monthlyOn">
+              <span />
+              <div class="d-flex align-center ga-2">
                 <VSelect
                   :model-value="repeatRule.monthlyOn.nth"
                   :items="nthItems"
@@ -583,7 +588,7 @@ const onCancelModifyEvent = () => {
                   variant="outlined"
                   density="compact"
                   hide-details
-                  class="position-select position-nth"
+                  class="position-select"
                   @update:model-value="updatePosition({ nth: $event })"
                 />
                 <VSelect
@@ -596,8 +601,8 @@ const onCancelModifyEvent = () => {
                   class="position-select"
                   @update:model-value="updatePosition({ day: $event })"
                 />
-              </template>
-            </div>
+              </div>
+            </template>
           </template>
 
           <!-- Weekend days and holidays: keep, skip, or move to the nearest work day (single days only) -->
@@ -691,11 +696,6 @@ const onCancelModifyEvent = () => {
 </template>
 
 <style scoped>
-/* Segmented choices read as plain words, like the mock */
-.event-form :deep(.v-btn-group .v-btn) {
-  letter-spacing: normal;
-}
-
 .form-section-title {
   font-size: 0.75rem;
   font-weight: 600;
@@ -714,6 +714,20 @@ const onCancelModifyEvent = () => {
   grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+/* One height per row: Vuetify's compact button groups are shorter than compact fields */
+.repeat-rows :deep(.v-btn-group) {
+  height: 40px;
+}
+
+.repeat-rows :deep(.v-field__input) {
+  min-height: 40px;
+  padding-block: 0;
+}
+
+.position-select :deep(.v-field__append-inner) {
+  padding-inline-start: 0;
 }
 
 .repeat-row-label {
@@ -736,10 +750,6 @@ const onCancelModifyEvent = () => {
 }
 
 /* "first"/"last" is short: leave the room to the day name */
-.position-nth {
-  flex: 0 0 104px;
-}
-
 .position-select :deep(.v-field) {
   padding-inline: 10px 6px;
 }
