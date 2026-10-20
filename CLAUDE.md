@@ -54,7 +54,7 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Dark Theme**: Toggle in the nav rail (hamburger menu on small screens), persisted to localStorage
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
 - **Sticky Notes**: Card-based rich-text notes page (`/notes`) with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch), pasted images (Blobs in a separate `daybook-images` IndexedDB, corner-drag resize, click to zoom); the chat bar (`ChatBar.vue`, on every page, Ctrl+K) reads notes via the client-side `searchNotes` tool and Catch-up includes open note items (see `docs/features/notes.md`)
-- **Chat Bar**: Glass chat bar docked on every page (line of light / bar / open; Ctrl+K, `/` or bottom-edge hover reveals), also the notification surface (toast from the line, pill above the open chat, list in the panel; `NotificationIsland` is gone); history in localStorage (see `docs/features/chat.md`)
+- **Chat Bar**: Glass chat bar docked on every page (peek / bar / open: at rest only its top edge shows at the bottom of the screen, overlaying the page; Ctrl+K, `/`, a click or hovering the edge raises it), also the notification surface (toast from the peek, pill above the open chat, list in the panel; `NotificationIsland` is gone); history in localStorage (see `docs/features/chat.md`)
 - **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates, incl. a holiday-aware "last work day of the month"; the Events page pairs a calendar (with a picked-day/today card under it) with the list, selection linked both ways (see `docs/features/events.md`)
 
 ## Feature Documentation
