@@ -12,11 +12,12 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 
 import { useDisplay } from 'vuetify';
 
-import { useNow } from '@vueuse/core';
+import { useNow, useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
+import { storageKeys } from '@/common/storageKeys';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
 import { REMEMBER_DATE_EXPIRY_MS, getRememberedDate } from '@/composables/useRememberDate';
@@ -98,7 +99,16 @@ watch(todayDateStr, () => {
 });
 
 const { smAndDown } = useDisplay();
-const { isOpen: insightsDrawerOpen, isInline: insightsInline, showInline: insightsShowInline } = useInsightsDrawer();
+const {
+  isOpen: insightsDrawerOpen,
+  isInline: insightsInline,
+  showInline: insightsShowInline,
+  isShown: insightsShown,
+  toggle: toggleInsights,
+} = useInsightsDrawer();
+
+// Chart folded away under the card header (toggled from the Logs toolbar), remembered per device
+const chartCollapsed = useStorage(storageKeys.settings.homeChartCollapsed, false);
 
 // Logs for the calendar's current month (ISO 'YYYY-MM'). Assumes current year —
 // matches prior behavior; cross-year navigation would need a year threaded alongside.
@@ -258,7 +268,7 @@ const importCsv = async (file?: File) => {
       </div>
     </VCard>
 
-    <!-- Middle column: chart stacked above log list -->
+    <!-- Middle column: chart and logs share one glass card (mobile: week strip chart above the logs card) -->
     <div class="content-column">
       <!-- Mobile: compact week strip chart driven by calendar selection -->
       <MobileWeekChart
@@ -269,39 +279,72 @@ const importCsv = async (file?: File) => {
         class="flex-shrink-0"
       />
 
-      <!-- Desktop: full month bar chart -->
-      <WorkTimeBarChart v-else :current-month="currentMonth" :selected-project="selectedProject" class="flex-shrink-0" />
+      <VCard class="glass-acrylic center-card d-flex flex-column overflow-hidden">
+        <!-- Desktop: full month bar chart as the card's header section -->
+        <WorkTimeBarChart
+          v-if="!smAndDown"
+          :current-month="currentMonth"
+          :selected-project="selectedProject"
+          :collapsed="chartCollapsed"
+          class="flex-shrink-0"
+        >
+          <!-- Insights toggle: hides the column on wide screens, opens the drawer on narrow ones. The chevron
+               points where the panel will go, and turns around once it is gone -->
+          <template #actions>
+            <VIconBtn
+              icon="mdi-chevron-double-right"
+              class="insights-toggle"
+              :class="{ 'insights-toggle--closed': !insightsShown }"
+              size="32"
+              icon-size="20"
+              rounded="lg"
+              variant="text"
+              :aria-label="insightsShown ? 'Hide Insights' : 'Show Insights'"
+              :aria-expanded="insightsShown"
+              v-tooltip="insightsShown ? 'Hide Insights' : 'Show Insights'"
+              @click="toggleInsights"
+            />
+          </template>
+        </WorkTimeBarChart>
 
-      <!-- Log list -->
-      <LogList
-        class="flex-grow-1 overflow-hidden"
-        :items="timeLogs"
-        :current-month="currentMonth"
-        :selected-dates="selectedDates"
-        v-model:selected-project="selectedProject"
-        v-model:selected-task="selectedTask"
-        v-model:date-range="dateRangeModel"
-        v-model:search-text="searchText"
-        @edit-log="onEditLog"
-        @clone-log="onCloneLog"
-        @delete-log="onDeleteLog"
-        @import="importCsv"
-        @export="exportToCsv"
-      />
+        <!-- Log list -->
+        <LogList
+          class="flex-grow-1"
+          :items="timeLogs"
+          :current-month="currentMonth"
+          :selected-dates="selectedDates"
+          :has-chart="!smAndDown"
+          v-model:chart-collapsed="chartCollapsed"
+          v-model:selected-project="selectedProject"
+          v-model:selected-task="selectedTask"
+          v-model:date-range="dateRangeModel"
+          v-model:search-text="searchText"
+          @edit-log="onEditLog"
+          @clone-log="onCloneLog"
+          @delete-log="onDeleteLog"
+          @import="importCsv"
+          @export="exportToCsv"
+        />
+      </VCard>
     </div>
 
-    <!-- Right panel: Insights — inline only on wide viewports (>= INSIGHTS_INLINE_MIN), hideable from the header -->
-    <InsightsPanel
-      v-if="insightsShowInline"
-      class="insights-panel"
-      :time-logs="timeLogs"
-      :current-month="currentMonth"
-      :filtered-time-logs="filteredTimeLogs"
-      :has-active-filter="hasActiveFilter"
-      :selected-dates="selectedDates"
-      @toggle-date="onToggleMissingDate"
-      v-model:selected-project="selectedProject"
-    />
+    <!-- Right panel: Insights — inline only on wide viewports (>= INSIGHTS_INLINE_MIN), hideable from the
+         card header. Only the wrapper's width animates; the panel inside keeps its width, so its content
+         never reflows mid-animation while the center card grows or shrinks beside it. -->
+    <VExpandXTransition>
+      <div v-if="insightsShowInline" class="insights-wrap">
+        <InsightsPanel
+          class="insights-panel"
+          :time-logs="timeLogs"
+          :current-month="currentMonth"
+          :filtered-time-logs="filteredTimeLogs"
+          :has-active-filter="hasActiveFilter"
+          :selected-dates="selectedDates"
+          @toggle-date="onToggleMissingDate"
+          v-model:selected-project="selectedProject"
+        />
+      </div>
+    </VExpandXTransition>
 
     <!-- Small screens: same panel in an opt-in right drawer (toggled from the header).
          Transparent shell + side gaps so the panel floats like the app's other glass cards. -->
@@ -351,16 +394,62 @@ const importCsv = async (file?: File) => {
   gap: 12px;
 }
 
-/* Right panel: fixed-width insights column (only rendered on lg+) */
-.insights-panel {
-  flex: 0 0 320px;
+/* Center card: chart header on top, the log list takes the rest of the height */
+.center-card {
+  flex: 1;
+  min-height: 0;
 }
 
-/* Insights drawer (small screens): float the panel like the app's other glass
-   cards — start below the app bar, gaps on the sides — instead of an
-   edge-to-edge slab. The transparent shell lets the panel's own glass show. */
+/* Insights toggle: the chevron turns around when the panel is gone */
+.insights-toggle :deep(.v-icon) {
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.insights-toggle--closed :deep(.v-icon) {
+  transform: rotate(180deg);
+}
+
+/* Right column wrapper (only rendered on wide screens). It owns the 12px gap to the center card as the
+   panel's margin, cancelling the layout's flex gap, so at width 0 no stray gap is left behind. Content is
+   pinned to the right edge and clipped, so the panel slides out under the center card's edge. */
+.insights-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  margin-left: -12px;
+  overflow: hidden;
+}
+
+.insights-panel {
+  flex: 0 0 320px;
+  width: 320px;
+  margin-left: 12px;
+  transition:
+    opacity 0.3s,
+    transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Vuetify's expand-x transition defaults to 0.3s on a standard curve; use the app's sheet curve instead.
+   Two classes out-specify Vuetify's single-class !important rule. */
+.insights-wrap.expand-x-transition-enter-active,
+.insights-wrap.expand-x-transition-leave-active {
+  transition-duration: 0.45s !important;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1) !important;
+}
+
+.insights-wrap.expand-x-transition-enter-from > .insights-panel,
+.insights-wrap.expand-x-transition-leave-to > .insights-panel {
+  opacity: 0;
+  transform: translateX(24px);
+}
+
+/* Insights drawer (below the inline breakpoint): float the panel like the app's
+   other glass cards — 12px off the window edges, below the small-screen app bar
+   when there is one — instead of an edge-to-edge slab. The transparent shell
+   lets the panel's own glass show. --v-layout-top comes from VMain (0 on desktop,
+   where the nav is a left rail). */
 .insights-drawer {
-  top: 65px !important; /* clear the 53px app bar + a 12px gap */
+  top: calc(var(--v-layout-top, 0px) + 12px) !important;
   bottom: 12px !important;
   height: auto !important;
   background: transparent !important;
@@ -402,7 +491,7 @@ const importCsv = async (file?: File) => {
     overflow: visible;
   }
 
-  /* LogList loses its flex-grow-1 source of height; give it an explicit viewport height */
+  /* The logs card loses its flex source of height; give it an explicit viewport height */
   .content-column > :last-child {
     flex: none !important;
     height: 70vh;

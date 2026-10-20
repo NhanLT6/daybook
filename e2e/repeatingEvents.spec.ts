@@ -44,7 +44,7 @@ test('biweekly series shows next occurrence, skips and undoes', async ({ page })
   await row.locator('button:has(.mdi-calendar-remove-outline)').click();
   await expect(row).toContainText('Oct 27');
 
-  await page.locator('.island-action-btn', { hasText: 'Undo' }).click();
+  await page.locator('.notice-action', { hasText: 'Undo' }).click();
   await expect(row).toContainText('Oct 13');
 });
 

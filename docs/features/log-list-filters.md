@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Logs** panel (`LogList.vue`) has a filter bar: **Project**, **Task**, **Date range**, and **Search**. It lets you drill the current month's logs down to exact per-day hours — complementing the bar chart, which shows *where* time landed but not *how much on which day*.
+The **Logs** section (`LogList.vue`) has a filter bar: **Project**, **Task**, **Date range**, and **Search**. It lets you drill the current month's logs down to exact per-day hours — complementing the bar chart, which shows *where* time landed but not *how much on which day*.
 
 The **Project** filter is shared two-way with the **Insights** panel and the **bar chart** via a single `selectedProject` ref in `HomeView`. Picking a project anywhere (Insights accordion, the LogList filter, or clearing it) updates all three at once. Task / Date range / Search are LogList-local.
 
@@ -28,9 +28,9 @@ HomeView.selectedProject (ref)
 | File | Role |
 |------|------|
 | `src/components/LogList.vue` | Filter bar UI, `filteredItems` pipeline, panel-expansion logic |
-| `src/views/HomeView.vue` | Owns `selectedProject`; wires it to Insights (`v-model`), LogList (`v-model`), chart (`:prop`); passes `:current-month` |
+| `src/views/HomeView.vue` | Owns `selectedProject`; wires it to Insights (`v-model`), LogList (`v-model`), chart (`:prop`); passes `:current-month`; owns the shared chart + logs card, the remembered `chartCollapsed` state and the Insights column transition |
 | `src/components/InsightsPanel.vue` | Writes `selectedProject` from its project accordion |
-| `src/components/WorkTimeBarChart.vue` | Reads `selectedProject` to filter the chart dataset |
+| `src/components/WorkTimeBarChart.vue` | Reads `selectedProject` to filter the chart dataset; renders the card header (month, today / this week, an `actions` slot for the Insights toggle) |
 | `e2e/logListFilters.spec.ts` | Playwright coverage (search, project, task, Insights sync) |
 
 ## Filtering
@@ -56,25 +56,29 @@ HomeView.selectedProject (ref)
 
 ## UI
 
-### Search — collapse/expand
+### Layout (desktop)
 
-Search is a magnify **button** (`variant="flat"`) that expands into a field:
+On desktop the chart and the logs are **one glass card** in `HomeView`: `WorkTimeBarChart` is the card's top section and `LogList` the rest. Neither component renders a card of its own; on mobile `HomeView` wraps `LogList` alone in the card (`MobileWeekChart` sits above it) and passes `has-chart=false`.
 
-- Click the button → `searchExpanded = true`, the button is `v-if`'d out, the field animates open (`.log-search__wrap` width 0 → 180px), and auto-focuses.
-- Empty + focus leaves → collapses (button returns). Non-empty + focus leaves → stays open, so an active query stays visible.
-- Clicking the magnify again (`toggleSearch`) collapses **and clears** the query.
+- **Header** (`WorkTimeBarChart`): month title + "Hours logged per day · stacked by project", today / this-week stats (current month only), then whatever the parent puts in the `actions` slot — Home puts the **Insights toggle** there (see below).
+- **Chart**: no nested inner card. Its wrapper animates `height` to 0 when `collapsed`; the canvas keeps a fixed height inside, so Chart.js never redraws squashed bars mid-animation.
+- **Toolbar** (`LogList`), framed by hairlines: **Logs** + the filtered count, the always-visible search, the project filter button, the chart toggle (only with `has-chart`; `v-model:chart-collapsed`, remembered in localStorage under `homeChartCollapsed`) and a **⋯** menu with Expand all days / Collapse all days / Import CSV / Export CSV. Import clicks a hidden `<input type="file">`, reset after each pick so the same file can be imported again.
 
-**Gotchas (why the handlers look the way they do):**
-- Collapse uses `@update:focused`, not `@blur` — native `blur` doesn't bubble on a Vuetify field, so `@blur` fires unreliably.
-- The clear `×` uses an explicit `@click:clear="searchText = ''"` — Vuetify's built-in clearable emitted `click:clear` but did not reliably write our `v-model` ref for this plain/single-line field.
+### Insights toggle
+
+The toggle sits at the right end of the card header and is always visible on Home desktop. One button for both modes (`useInsightsDrawer().toggle`): at ≥ `INSIGHTS_INLINE_MIN` (1440px) it shows/hides the inline column (remembered per device), below it opens the right drawer. The icon is `mdi-chevron-double-right` while Insights is shown (pointing where the panel goes) and rotates 180° when it is hidden. On small screens the hamburger menu keeps its own Insights item.
+
+The inline column animates with `VExpandXTransition` on a `.insights-wrap` wrapper: only the wrapper's width changes (0.45s, `cubic-bezier(.32,.72,0,1)`, overriding Vuetify's 0.3s default with a two-class `!important` rule). `InsightsPanel` inside keeps a fixed 320px width and is pinned to the wrapper's right edge, so its content never reflows while the center card grows or shrinks; it also fades and slides 24px. The wrapper carries the 12px gap as the panel's margin (and cancels the layout's flex gap with `margin-left: -12px`), so no stray gap is left at width 0.
+
+### Search
+
+An always-visible compact field (`placeholder="Search logs"`, `.log-search__field`). Its clear `×` uses an explicit `@click:clear="searchText = ''"` — Vuetify's built-in clearable emitted `click:clear` but did not reliably write our `v-model` ref for this single-line field.
 
 ### Filter popup
 
-- A funnel `VIconBtn` (`variant="flat"`) opens a `VMenu` (`:close-on-content-click="false"`) holding **Project**, **Task**, **Date range** selects (default *filled* variant, matching `BulkLogForm`) and a **Clear all** footer.
-- A `VBadge` on the funnel shows `panelFilterCount` — **project + task + date range only** (search is excluded because it has its own always-visible field). Hidden at 0.
+- The project filter button (funnel icon, label = the focused project or "All projects"; label hidden on phones) opens a `VMenu` (`:close-on-content-click="false"`) holding **Project**, **Task**, **Date range** selects (default *filled* variant, matching `BulkLogForm`) and a **Clear all** footer.
+- A `VBadge` on the button shows `panelFilterCount` — **project + task + date range only** (search is excluded because it has its own always-visible field). Hidden at 0.
 - **Clear all** resets all four filters *and* closes the popup (`isFilterMenuOpen = false`).
-
-All toolbar buttons (search, filter, expand, collapse, import, export) use `variant="flat"` for a unified look.
 
 ## Panel Expansion
 
@@ -87,7 +91,7 @@ All toolbar buttons (search, filter, expand, collapse, import, export) use `vari
 
 ## Testing
 
-`e2e/logListFilters.spec.ts` seeds logs straight into localStorage (current month) for determinism and forces the lg+ viewport so Insights renders inline. Covered: search + clear, project filter + badge + Clear-all-closes-popup, task scoping, Insights→LogList sync.
+`e2e/logListFilters.spec.ts` seeds logs straight into localStorage (current month) for determinism and forces a 1440px viewport so Insights renders inline. Covered: search + clear, project filter + badge + Clear-all-closes-popup, task scoping, Insights→LogList sync.
 
 Two Playwright notes for anyone extending it: scope combobox labels with `exact: true` (the clear icon's aria-label is e.g. "Clear Project"), and click the `.v-field` container rather than the `input` (the input is covered by `.v-field__input`, which intercepts pointer events).
 

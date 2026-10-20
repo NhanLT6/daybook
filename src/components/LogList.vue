@@ -6,8 +6,6 @@ import { useDateDisplay } from '@/composables/useDateDisplay';
 import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
 import { NO_TASK } from '@/composables/useTaskBreakdown';
 
-import SingleFilePicker from '@/components/app/SingleFilePicker.vue';
-
 import type { TimeLog } from '@/interfaces/TimeLog';
 
 import dayjs from 'dayjs';
@@ -26,9 +24,15 @@ export interface LogListProps {
 
   // Selected dates to auto-expand panels
   selectedDates?: Date[];
+
+  // Sits under a chart in the same card: draws the hairline above the toolbar and shows the chart toggle
+  hasChart?: boolean;
 }
 
-const { items: logItems, selectedDates, currentMonth } = defineProps<LogListProps>();
+const { items: logItems, selectedDates, currentMonth, hasChart = false } = defineProps<LogListProps>();
+
+// Chart folded away (only meaningful with hasChart) — owned by HomeView, which remembers it
+const chartCollapsed = defineModel<boolean>('chartCollapsed', { default: false });
 
 // Project focus — two-way synced with Insights + chart through HomeView
 const selectedProject = defineModel<string | null>('selectedProject', { default: null });
@@ -85,27 +89,6 @@ const selectedTask = defineModel<string | null>('selectedTask', { default: null 
 const searchText = defineModel<string>('searchText', { default: '' });
 const dateRangeModel = defineModel<unknown[]>('dateRange', { default: () => [] }); // raw VDatePicker range output (Date[])
 const isFilterMenuOpen = ref(false);
-
-// Toolbar search: collapsed to a magnify button, expands to a field on demand
-const searchExpanded = ref(false);
-const searchFieldRef = ref<{ focus: () => void } | null>(null);
-
-const toggleSearch = async () => {
-  // Toggling closed also clears the query so no hidden filter lingers
-  if (searchExpanded.value) {
-    searchExpanded.value = false;
-    searchText.value = '';
-    return;
-  }
-  searchExpanded.value = true;
-  await nextTick();
-  searchFieldRef.value?.focus();
-};
-
-// Collapse when focus leaves an empty field — an active query stays visible
-const onSearchFocusChange = (focused: boolean) => {
-  if (!focused && !searchText.value.trim()) searchExpanded.value = false;
-};
 
 // Day total colour against the daily target: over it → error, logged on a weekend/holiday → warning, within
 // 30 min of it → primary. No colour when there's no target at all.
@@ -277,165 +260,158 @@ const onDeleteLog = (log: TimeLog) => {
   });
 };
 
-const readCsv = (file?: File) => {
-  emit('import', file);
+// CSV import: the ⋯ menu item clicks this hidden input. Reset after each pick so the same file can be re-imported.
+const csvInput = ref<HTMLInputElement | null>(null);
+const onCsvPicked = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  emit('import', input.files?.[0]);
+  input.value = '';
 };
 </script>
 
 <template>
-  <VCard class="glass-acrylic d-flex flex-column">
-    <VCardTitle style="position: sticky; top: 0; z-index: 1000">
-      <VToolbar>
-        <VToolbarTitle class="ms-0">Logs</VToolbarTitle>
+  <!-- Logs section: renders no card of its own, the parent card wraps it (with the chart on desktop) -->
+  <section class="log-list d-flex flex-column">
+    <!-- Toolbar: title + count, search, project filter, chart toggle, ⋯ menu -->
+    <div class="log-toolbar" :class="{ 'log-toolbar--below-chart': hasChart }">
+      <h3 class="log-toolbar__title">Logs</h3>
+      <span class="log-toolbar__count">{{ filteredItems.length }}</span>
 
-        <VSpacer />
+      <!-- Search: always visible, compact -->
+      <div class="log-search">
+        <VTextField
+          v-model="searchText"
+          placeholder="Search logs"
+          prepend-inner-icon="mdi-magnify"
+          variant="solo"
+          flat
+          density="compact"
+          hide-details
+          single-line
+          clearable
+          class="log-search__field"
+          @click:clear="searchText = ''"
+        />
+      </div>
 
-        <div class="d-flex ga-2 align-center">
-          <!-- Search: magnify button that expands into a field (button hides while open) -->
-          <div class="log-search" :class="{ 'log-search--open': searchExpanded }">
-            <VIconBtn
-              v-if="!searchExpanded"
-              icon="mdi-magnify"
-              icon-size="small"
-              rounded="lg"
+      <!-- Project filter: shows the focused project; the popup also holds task + date range -->
+      <VMenu v-model="isFilterMenuOpen" :close-on-content-click="false" location="bottom end" offset="8">
+        <template #activator="{ props: menuProps }">
+          <VBadge
+            :model-value="panelFilterCount > 0"
+            :content="panelFilterCount"
+            color="error"
+            offset-x="4"
+            offset-y="4"
+            class="log-filter"
+          >
+            <VBtn
+              class="log-filter__btn text-none"
               variant="flat"
-              @click="toggleSearch"
-              v-tooltip="'Search'"
-            />
-            <div class="log-search__wrap">
+              rounded="lg"
+              height="32"
+              prepend-icon="mdi-filter-variant"
+              append-icon="mdi-chevron-down"
+              v-bind="menuProps"
+              v-tooltip="'Filter logs'"
+            >
+              <span class="log-filter__label">{{ selectedProject ?? 'All projects' }}</span>
+            </VBtn>
+          </VBadge>
+        </template>
+
+        <!-- Controls mirror BulkLogForm styling (default filled variant) -->
+        <VCard min-width="300" class="pa-3 d-flex flex-column ga-2">
+          <!-- Project (shared with Insights) -->
+          <VSelect v-model="selectedProject" :items="projectOptions" label="Project" hide-details clearable />
+
+          <!-- Task (scoped to the selected project) -->
+          <VSelect
+            v-model="selectedTask"
+            :items="taskOptions"
+            label="Task"
+            hide-details
+            clearable
+            :disabled="taskOptions.length === 0"
+          />
+
+          <!-- Date range (current month) -->
+          <VMenu :close-on-content-click="false" location="bottom">
+            <template #activator="{ props: dateProps }">
               <VTextField
-                ref="searchFieldRef"
-                v-model="searchText"
-                placeholder="Search"
-                prepend-inner-icon="mdi-magnify"
-                variant="plain"
-                density="compact"
+                v-bind="dateProps"
+                :model-value="dateRangeLabel"
+                label="Date range"
                 hide-details
-                single-line
+                readonly
                 clearable
-                class="log-search__field"
-                @click:clear="searchText = ''"
-                @update:focused="onSearchFocusChange"
+                append-inner-icon="mdi-calendar"
+                @click:clear="dateRangeModel = []"
               />
-            </div>
-          </div>
-
-          <!-- Filters -->
-          <VMenu v-model="isFilterMenuOpen" :close-on-content-click="false" location="bottom end" offset="8">
-            <template #activator="{ props: menuProps }">
-              <VBadge
-                :model-value="panelFilterCount > 0"
-                :content="panelFilterCount"
-                color="error"
-                offset-x="6"
-                offset-y="6"
-              >
-                <VIconBtn
-                  icon="mdi-filter-variant"
-                  icon-size="small"
-                  rounded="lg"
-                  variant="flat"
-                  v-bind="menuProps"
-                  v-tooltip="'Filter logs'"
-                />
-              </VBadge>
             </template>
-
-            <!-- Controls mirror BulkLogForm styling (default filled variant) -->
-            <VCard min-width="300" class="pa-3 d-flex flex-column ga-2">
-              <!-- Project (shared with Insights) -->
-              <VSelect v-model="selectedProject" :items="projectOptions" label="Project" hide-details clearable />
-
-              <!-- Task (scoped to the selected project) -->
-              <VSelect
-                v-model="selectedTask"
-                :items="taskOptions"
-                label="Task"
-                hide-details
-                clearable
-                :disabled="taskOptions.length === 0"
-              />
-
-              <!-- Date range (current month) -->
-              <VMenu :close-on-content-click="false" location="bottom">
-                <template #activator="{ props: dateProps }">
-                  <VTextField
-                    v-bind="dateProps"
-                    :model-value="dateRangeLabel"
-                    label="Date range"
-                    hide-details
-                    readonly
-                    clearable
-                    append-inner-icon="mdi-calendar"
-                    @click:clear="dateRangeModel = []"
-                  />
-                </template>
-                <VDatePicker
-                  :model-value="dateRangeModel"
-                  multiple="range"
-                  :first-day-of-week="settingsStore.firstDayOfWeek"
-                  :min="monthMin"
-                  :max="monthMax"
-                  hide-title
-                  @update:model-value="dateRangeModel = $event"
-                />
-              </VMenu>
-
-              <!-- Footer -->
-              <div class="d-flex justify-end">
-                <VBtn variant="text" size="small" :disabled="!hasActiveFilter" @click="clearFilters"> Clear all </VBtn>
-              </div>
-            </VCard>
+            <VDatePicker
+              :model-value="dateRangeModel"
+              multiple="range"
+              :first-day-of-week="settingsStore.firstDayOfWeek"
+              :min="monthMin"
+              :max="monthMax"
+              hide-title
+              @update:model-value="dateRangeModel = $event"
+            />
           </VMenu>
 
-          <!-- Expand logs-->
-          <VIconBtn
-            icon="mdi-arrow-expand"
-            icon-size="small"
-            rounded="lg"
-            variant="flat"
-            @click="onExpand"
-            v-tooltip="'Expand logs'"
-          />
+          <!-- Footer -->
+          <div class="d-flex justify-end">
+            <VBtn variant="text" size="small" :disabled="!hasActiveFilter" @click="clearFilters"> Clear all </VBtn>
+          </div>
+        </VCard>
+      </VMenu>
 
-          <!-- Collapse logs -->
+      <VSpacer />
+
+      <!-- Fold the chart away to give the list its height -->
+      <VIconBtn
+        v-if="hasChart"
+        :icon="chartCollapsed ? 'mdi-arrow-expand-down' : 'mdi-arrow-collapse-up'"
+        :aria-label="chartCollapsed ? 'Show chart' : 'Collapse chart'"
+        :aria-expanded="!chartCollapsed"
+        size="32"
+        icon-size="20"
+        rounded="lg"
+        variant="text"
+        v-tooltip="chartCollapsed ? 'Show chart' : 'Collapse chart'"
+        @click="chartCollapsed = !chartCollapsed"
+      />
+
+      <!-- Less frequent actions -->
+      <VMenu location="bottom end" offset="6">
+        <template #activator="{ props: moreProps }">
           <VIconBtn
-            icon="mdi-arrow-collapse"
-            icon-size="small"
+            icon="mdi-dots-horizontal"
+            aria-label="More log actions"
+            size="32"
+            icon-size="20"
             rounded="lg"
-            variant="flat"
+            variant="text"
+            v-bind="moreProps"
+          />
+        </template>
+
+        <VList class="glass-acrylic" rounded="lg" density="compact" min-width="200">
+          <VListItem rounded="lg" prepend-icon="mdi-unfold-more-horizontal" title="Expand all days" @click="onExpand" />
+          <VListItem
+            rounded="lg"
+            prepend-icon="mdi-unfold-less-horizontal"
+            title="Collapse all days"
             @click="onCollapse"
-            v-tooltip="'Collapse logs'"
           />
-
-          <!-- Import from file -->
-          <VTooltip>
-            <template #activator="{ props }">
-              <SingleFilePicker
-                file-types=".csv"
-                @file-selected="readCsv"
-                icon="mdi-import"
-                icon-size="small"
-                rounded="lg"
-                variant="flat"
-                v-bind="props"
-              />
-            </template>
-            Import data from CSV template
-          </VTooltip>
-
-          <!-- Export to file -->
-          <VIconBtn
-            icon="mdi-export"
-            icon-size="small"
-            rounded="lg"
-            variant="flat"
-            @click="emit('export')"
-            v-tooltip="'Export to CSV'"
-          />
-        </div>
-      </VToolbar>
-    </VCardTitle>
+          <VDivider class="my-1" />
+          <VListItem rounded="lg" prepend-icon="mdi-upload" title="Import CSV" @click="csvInput?.click()" />
+          <VListItem rounded="lg" prepend-icon="mdi-download" title="Export CSV" @click="emit('export')" />
+        </VList>
+      </VMenu>
+      <input ref="csvInput" type="file" accept=".csv" hidden @change="onCsvPicked" />
+    </div>
 
     <!-- Scrollable content area -->
     <div ref="scrollContentRef" class="scroll-content">
@@ -446,7 +422,6 @@ const readCsv = (file?: File) => {
           <div class="text-subtitle-1 text-disabled">{{ hasActiveFilter ? 'No logs match filters' : 'No data' }}</div>
         </div>
       </VCard>
-
       <VExpansionPanels variant="accordion" v-model="openedPanels" multiple flat class="pa-2 pt-2 pe-2">
         <VExpansionPanel
           v-for="group in loggedTimeByDates"
@@ -514,52 +489,99 @@ const readCsv = (file?: File) => {
         </VExpansionPanel>
       </VExpansionPanels>
     </div>
-  </VCard>
+  </section>
 </template>
 
 <style scoped>
+.log-list {
+  min-height: 0;
+}
+
 .scroll-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
-/* Toolbar search: magnify button expands into a field */
-.log-search {
+/* Toolbar row, framed by hairlines like the mock's sheet; the top one only when a chart sits above it */
+.log-toolbar {
   display: flex;
   align-items: center;
+  gap: 6px;
+  padding: 8px 12px 8px 18px;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.09);
 }
 
-/* Collapsed = width 0; opening animates the wrap open (field is clipped by overflow) */
-.log-search__wrap {
-  width: 0;
-  overflow: hidden;
-  transition: width 0.25s ease;
+.log-toolbar--below-chart {
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.09);
 }
 
-.log-search--open .log-search__wrap {
-  width: 180px;
+.log-toolbar__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
 }
 
-/* Keep the field's intrinsic width so text doesn't reflow mid-animation */
-.log-search__field {
-  min-width: 180px;
+.log-toolbar__count {
+  font-size: 0.8125rem;
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
 }
 
-/* Match the icon buttons' 40px height (compact density otherwise makes it shorter) */
+.log-search {
+  flex: 1 1 260px;
+  min-width: 120px;
+  max-width: 260px;
+  margin-left: 10px;
+}
+
+/* 32px tall, softly tinted fields: out-specifies .glass-acrylic .v-field's solid surface */
+.log-search__field :deep(.v-field),
+.log-filter__btn {
+  background-color: rgba(var(--v-theme-on-surface), 0.05) !important;
+}
+
 .log-search__field :deep(.v-field) {
-  border-radius: 8px;
-  min-height: 40px;
+  border-radius: 9px;
+  min-height: 32px;
+  font-size: 0.8125rem;
 }
 
 .log-search__field :deep(.v-field__input) {
-  min-height: 40px;
+  min-height: 32px;
   padding-top: 0;
   padding-bottom: 0;
 }
 
-/* Nudge the magnify icon off the left edge */
 .log-search__field :deep(.v-field__prepend-inner) {
-  padding-inline-start: 8px;
+  padding-inline-start: 2px;
+}
+
+.log-search__field :deep(.v-field__prepend-inner .v-icon) {
+  font-size: 18px;
+}
+
+.log-filter__btn {
+  font-size: 0.8125rem;
+  letter-spacing: normal;
+  padding-inline: 10px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+.log-filter__label {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Phones: the funnel + chevron alone, the search field keeps the room */
+@media (max-width: 599px) {
+  .log-filter__label {
+    display: none;
+  }
 }
 
 /* Week grouping: gap between weeks + rounded corners so each week reads as its own card.

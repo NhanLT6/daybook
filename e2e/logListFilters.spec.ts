@@ -53,8 +53,7 @@ const SEED: Seed[] = [
 const ALL_DAYS = SEED.map((s) => s.day);
 
 // Locators (scoped by the stable classes / icons the component already uses)
-const searchToggle = (page: Page) => page.locator('.log-search .v-icon-btn');
-const searchInput = (page: Page) => page.getByPlaceholder('Search');
+const searchInput = (page: Page) => page.getByPlaceholder('Search logs');
 const searchClear = (page: Page) => page.locator('.log-search__field .v-field__clearable');
 const filterButton = (page: Page) => page.locator('button:has(.mdi-filter-variant)');
 const filterBadge = (page: Page) => page.locator('.v-badge__badge');
@@ -102,9 +101,7 @@ test.describe('LogList filters', () => {
     await seedAndOpen(page);
     await expectVisibleDays(page, ALL_DAYS);
 
-    // Expand the search field and type a description-only match
-    await searchToggle(page).click();
-    await expect(searchInput(page)).toBeFocused();
+    // The search field is always visible in the toolbar: type a description-only match
     await searchInput(page).fill('wireframes');
 
     // Only Alpha/Design (day 6) has that description

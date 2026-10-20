@@ -147,7 +147,7 @@ const skipNextOccurrence = (event: AppEvent, next: string) => {
 
   const id = notificationCenter.success(`Skipped ${occurrenceLabel(event, next)}`, {
     message: event.title,
-    expandOnEnqueue: true, // actions only render in the expanded island
+    expandOnEnqueue: true, // the chat panel's notification list opens expanded too
     actions: [
       {
         id: 'undo',

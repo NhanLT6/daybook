@@ -6,15 +6,16 @@ import { useAuthDialog } from '@/composables/useAuthDialog';
 
 /**
  * Sign-in surface for the server-backed features. Signing in is optional — time
- * logging works entirely offline — so this is a quiet affordance in the dock
- * rather than a gate in front of the app.
+ * logging works entirely offline — so this is a quiet affordance at the foot of
+ * the nav rail rather than a gate in front of the app.
  */
 
 const { user, isAuthenticated, isLoading, error, isAuthConfigured, signInEmail, signUpEmail, signInGoogle, signOut } =
   useAuth();
 
-// Small screens show the account inside the hamburger menu instead, so only the dialog renders here
-defineProps<{ hideTrigger?: boolean }>();
+// Small screens show the account inside the hamburger menu instead, so only the dialog renders here.
+// `rail`: the trigger sits in the desktop nav rail, so the menu opens to its right and signed-out shows an icon.
+defineProps<{ hideTrigger?: boolean; rail?: boolean }>();
 
 const { isAuthDialogOpen: isDialogOpen, openAuthDialog: openDialog } = useAuthDialog();
 const mode = ref<'signin' | 'signup'>('signin');
@@ -57,13 +58,11 @@ const submit = async () => {
   <!-- Nothing to show when the deployment has no auth configured at all -->
   <template v-if="isAuthConfigured">
     <!-- Signed in: avatar menu -->
-    <VMenu v-if="isAuthenticated && !hideTrigger" location="bottom end" :offset="8">
+    <VMenu v-if="isAuthenticated && !hideTrigger" :location="rail ? 'end bottom' : 'bottom end'" :offset="8">
       <template #activator="{ props }">
-        <!-- comfortable density: an icon button is otherwise 12px taller than its size (40px, not 28px), which
-             would stretch the whole dock the moment the avatar appears. me-2 insets it from the dock's right
-             edge as far as the brand text sits from the left -->
-        <VBtn icon variant="text" size="small" density="comfortable" class="me-2" v-bind="props" aria-label="Account">
-          <VAvatar size="26" color="primary" variant="tonal">
+        <!-- comfortable density: an icon button is otherwise 12px taller than its size (40px, not 28px) -->
+        <VBtn icon variant="text" :size="rail ? 40 : 'small'" density="comfortable" v-bind="props" aria-label="Account">
+          <VAvatar :size="rail ? 32 : 26" color="primary" variant="tonal">
             <VImg v-if="user?.image" :src="user.image" alt="" />
             <span v-else class="text-caption">{{ initials }}</span>
           </VAvatar>
@@ -76,6 +75,21 @@ const submit = async () => {
         <VListItem rounded="lg" prepend-icon="mdi-logout" title="Sign out" @click="signOut" />
       </VList>
     </VMenu>
+
+    <!-- Signed out, in the rail: a narrow column has no room for a text button -->
+    <VBtn
+      v-else-if="!isAuthenticated && !hideTrigger && rail"
+      icon
+      variant="text"
+      rounded="lg"
+      :width="40"
+      :height="40"
+      aria-label="Sign in"
+      @click="openDialog"
+    >
+      <VIcon icon="mdi-account-circle-outline" size="22" />
+      <VTooltip activator="parent" location="end" text="Sign in" />
+    </VBtn>
 
     <!-- Signed out: sign-in entry point -->
     <VBtn

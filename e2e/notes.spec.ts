@@ -83,7 +83,7 @@ test('deletes a note and undo restores it', async ({ page }) => {
 
   await expect(page.locator('.note-card')).toHaveCount(0);
 
-  const undoButton = page.locator('.island-action-btn', { hasText: 'Undo' });
+  const undoButton = page.locator('.notice-action', { hasText: 'Undo' });
   await expect(undoButton).toBeVisible();
   await undoButton.click();
 
@@ -196,7 +196,7 @@ test('drags a note onto the trash and undo restores it', async ({ page }) => {
 
   await expect(page.locator('.note-card')).toHaveCount(0);
 
-  const undoButton = page.locator('.island-action-btn', { hasText: 'Undo' });
+  const undoButton = page.locator('.notice-action', { hasText: 'Undo' });
   await expect(undoButton).toBeVisible();
   await undoButton.click();
 

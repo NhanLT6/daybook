@@ -6,8 +6,8 @@ import { useStorage } from '@vueuse/core';
 
 import { storageKeys } from '@/common/storageKeys';
 
-// Module-level singletons so App.vue (the toggle) and HomeView (the panel)
-// share one open/close state without lifting Home's data up.
+// Module-level singletons so the toggles (Home card header on desktop, App.vue's
+// hamburger menu on small screens) and HomeView's panel share one open/close state.
 const isOpen = ref(false);
 // Wide screens: the inline column can be hidden too. Remembered per device, shown by default
 const inlineVisible = useStorage(storageKeys.settings.insightsVisible, true);

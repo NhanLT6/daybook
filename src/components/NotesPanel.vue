@@ -199,7 +199,7 @@ const closeEditor = () => {
 const deleteWithUndo = async (note: Note) => {
   await removeNote(note.id);
   const id = notificationCenter.success('Note deleted', {
-    expandOnEnqueue: true, // actions only render in the expanded island
+    expandOnEnqueue: true, // the chat panel's notification list opens expanded too
     actions: [{ id: 'undo', label: 'Undo', tone: 'primary', closeOnComplete: true, onClick: () => saveNote(note) }],
   });
   // Store forces actionable notifications persistent by design; auto-close the undo offer ourselves.
@@ -244,7 +244,7 @@ const addSampleNotes = import.meta.env.DEV
 onBeforeUnmount(() => persist.flush());
 
 // ── Editor open/close animation ─────────────────────────────────────────────
-// Same curve as the notification island's pill → panel expand (NotificationIsland.vue).
+// The curve the old notification island used for its pill → panel expand.
 const EXPAND_EASING = 'cubic-bezier(0.4, 1.02, 0.5, 1)';
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -892,7 +892,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* Editor content settles in while the card expands — mirrors NotificationIsland's island-pop */
+/* Editor content settles in while the card expands */
 .notes-editor-card > * {
   animation: note-editor-pop 0.2s cubic-bezier(0.32, 1, 0.5, 1) 0.06s both;
 }

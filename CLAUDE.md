@@ -49,16 +49,18 @@ VITE_XERO_TEMPLATE_PATH= # Download folder for Excel templates
 - **Calendar View**: Visual time tracking overview
 - **Data Export**: CSV export functionality
 - **Charts**: Visual time tracking with Chart.js
-- **Dark Theme**: Toggle in app toolbar, persisted to localStorage
+- **Navigation**: Desktop (mdAndUp) has no top bar — a floating glass nav rail on the left (`App.vue`: brand, Home/Notes/Tasks/Events, theme toggle, Settings, account); small screens keep a compact top bar with a hamburger menu
+- **Home layout**: form | one glass card holding the month chart (header with stats + Insights toggle) and the Logs toolbar/list | collapsible Insights column (see `docs/features/log-list-filters.md`)
+- **Dark Theme**: Toggle in the nav rail (hamburger menu on small screens), persisted to localStorage
 - **Categories**: Optional project grouping (see `docs/features/categories.md`)
 - **Sticky Notes**: Card-based rich-text notes page (`/notes`) with pin (pinned-first), colors, search, drag reorder / drag-to-trash (mouse + touch), pasted images (Blobs in a separate `daybook-images` IndexedDB, corner-drag resize, click to zoom); the chat bar (`ChatBar.vue`, on every page, Ctrl+K) reads notes via the client-side `searchNotes` tool and Catch-up includes open note items (see `docs/features/notes.md`)
-- **Chat Bar**: Glass chat bar docked on every page (hidden lip / bar / open; Ctrl+K, `/` or bottom-edge hover reveals); history in localStorage (see `docs/features/chat.md`)
+- **Chat Bar**: Glass chat bar docked on every page (line of light / bar / open; Ctrl+K, `/` or bottom-edge hover reveals), also the notification surface (toast from the line, pill above the open chat, list in the panel; `NotificationIsland` is gone); history in localStorage (see `docs/features/chat.md`)
 - **Events**: Calendar markers (no notifications), optionally repeating via a friendly typed `RepeatRule` (rrule under the hood) with skippable dates, incl. a holiday-aware "last work day of the month"; the Events page pairs a calendar (with a picked-day/today card under it) with the list, selection linked both ways (see `docs/features/events.md`)
 
 ## Feature Documentation
 Detailed docs for non-trivial features live in `docs/features/`. Read the relevant file before modifying a feature.
 - `docs/features/categories.md` — Category grouping for projects, VCombobox grouping pattern, BulkLogForm category rules
-- `docs/features/log-list-filters.md` — LogList filter bar (project/task/date/search), Insights↔chart project sync, panel-expansion coordination
+- `docs/features/log-list-filters.md` — Home chart + logs card layout, LogList toolbar and filters (project/task/date/search), Insights toggle + width transition, Insights↔chart project sync, panel-expansion coordination
 - `docs/features/notes.md` — Note data model + IndexedDB versioning, images (storage, compression, zoom, sweep), HTML sanitization rules, native drag & drop (reorder/trash) design, undo mechanism
 - `docs/features/daily-target.md` — Daily target setting + `useDailyTarget()` consumers, Remaining chip rules, quick picks
 - `docs/features/chat.md` — Chat tools (extractLogs, searchNotes, addNote, addEvent; which run in the browser), slash commands and how they narrow the model's tools
@@ -89,7 +91,7 @@ Every pushed branch gets a Vercel preview build, and the Neon integration create
 ### Theming & Colors
 - **Use semantic colors**: `primary`, `secondary`, `accent` instead of hardcoded colors like `green-darken-3`
 - **Theme config**: Light/dark themes defined in `src/main.ts`
-- **Theme toggle**: `useTheme()` from Vuetify + `useStorage()` for persistence in `App.vue`
+- **Theme toggle**: `useTheme()` from Vuetify + `useStorage()` for persistence in `App.vue` (button in the nav rail)
 - **v-calendar**: Uses `is-dark` prop + custom CSS variables (`.vc-primary`) to sync with Vuetify theme
 - **Chart.js**: Uses `useTheme()` + computed colors for grid, ticks, and legend
 

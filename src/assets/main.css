@@ -3,11 +3,13 @@
 /* VMain viewport height — allows child views to use height:100% to fill VMain.
    Vuetify's .v-application__wrap uses min-height:100dvh (not a fixed height), so
    without this, flex children can't establish a bounded scroll context.
-   --v-layout-top is set by VAppBar via Vuetify's layout composable. */
+   --v-layout-top is set on VMain by Vuetify's layout composable: the small-screen
+   VAppBar's height, or 0 on desktop where the nav is a left rail (its width comes
+   through --v-layout-left as VMain's left padding instead). */
 .v-main {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - var(--v-layout-top, 48px));
+  height: calc(100dvh - var(--v-layout-top, 0px));
   overflow: hidden;
 }
 

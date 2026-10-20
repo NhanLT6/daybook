@@ -6,6 +6,7 @@ export const storageKeys = {
     eventCalendarView: 'eventCalendarView',
     projectColorMaps: 'projectColorMaps',
     insightsVisible: 'insightsVisible',
+    homeChartCollapsed: 'homeChartCollapsed',
   },
   jira: {
     config: 'jiraConfig',

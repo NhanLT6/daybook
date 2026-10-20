@@ -53,6 +53,8 @@ const props = defineProps<{
   currentMonth?: number; // 1-based month, default to current month
   timeLogs?: TimeLog[]; // External time logs for reactivity
   selectedProject?: string | null;
+  // Folds the chart away under the header (Home's Logs toolbar owns the toggle)
+  collapsed?: boolean;
 }>();
 
 const { currentMonth } = toRefs(props);
@@ -399,51 +401,98 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <VCard class="glass-acrylic">
-    <!-- Header -->
-    <VCardTitle>
-      <VToolbar>
-        <VToolbarTitle class="ms-0">
-          <div>{{ selectedMonth.format('MMMM YYYY') }}</div>
-          <div class="text-caption text-medium-emphasis font-weight-regular">
-            Hours logged per day · stacked by project
-          </div>
-        </VToolbarTitle>
-        <!-- TODAY / THIS WEEK — right side of header, current month only -->
+  <!-- Chart section of Home's shared chart + logs card: renders no card of its own -->
+  <section class="month-chart">
+    <!-- Header: month + subtitle on the left; today / this week stats and any parent actions on the right -->
+    <div class="month-chart__head">
+      <div class="month-chart__heading">
+        <h2 class="month-chart__title">{{ selectedMonth.format('MMMM YYYY') }}</h2>
+        <div class="text-caption text-medium-emphasis">Hours logged per day · stacked by project</div>
+      </div>
+
+      <VSpacer />
+
+      <div class="d-flex align-center ga-4">
+        <!-- TODAY / THIS WEEK — current month only -->
         <template v-if="isCurrentMonth">
-          <VSpacer />
-          <div class="d-flex ga-4 me-2">
-            <div class="d-flex align-baseline ga-1">
-              <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(todayMinutes) }}</span>
-              <span class="text-caption text-medium-emphasis">TODAY</span>
-            </div>
-            <div class="d-flex align-baseline ga-1">
-              <span class="text-subtitle-1 font-weight-bold">{{ minutesToHourWithMinutes(thisWeekMinutes) }}</span>
-              <span class="text-caption text-medium-emphasis">THIS WEEK</span>
-            </div>
+          <div class="month-chart__stat">
+            <b>{{ minutesToHourWithMinutes(todayMinutes) }}</b>
+            <span>Today</span>
+          </div>
+          <div class="month-chart__stat">
+            <b>{{ minutesToHourWithMinutes(thisWeekMinutes) }}</b>
+            <span>This week</span>
           </div>
         </template>
-      </VToolbar>
-    </VCardTitle>
 
-    <!-- Chart card -->
-    <div class="px-2 pb-2">
-      <VCard>
-        <div class="pa-4">
-          <!-- Chart -->
-          <div class="chart-container">
-            <canvas ref="chartCanvas"></canvas>
-          </div>
-        </div>
-      </VCard>
+        <slot name="actions" />
+      </div>
     </div>
-  </VCard>
+
+    <!-- The wrap animates its height; the canvas keeps a fixed height so Chart.js never redraws squashed bars -->
+    <div class="month-chart__wrap" :class="{ 'month-chart__wrap--collapsed': collapsed }" :aria-hidden="collapsed">
+      <div class="chart-container">
+        <canvas ref="chartCanvas"></canvas>
+      </div>
+    </div>
+  </section>
 </template>
 
 <style scoped>
+.month-chart__head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 12px 4px 18px;
+}
+
+.month-chart__heading {
+  min-width: 0;
+}
+
+.month-chart__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* "3h 30m TODAY": value first, small caps label after it on the same baseline */
+.month-chart__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-chart__stat b {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.month-chart__stat span {
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+/* Same curve as the Insights column: fast start, long soft settle, no overshoot */
+.month-chart__wrap {
+  height: 196px;
+  overflow: hidden;
+  padding: 0 14px;
+  transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.month-chart__wrap--collapsed {
+  height: 0;
+}
+
 .chart-container {
   position: relative;
-  height: 140px;
+  height: 188px;
   width: 100%;
 }
 </style>

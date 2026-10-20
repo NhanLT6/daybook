@@ -12,7 +12,6 @@ import { useServerSettings } from '@/composables/useServerSettings';
 import AppBackground from '@/components/AppBackground.vue';
 import AuthMenu from '@/components/AuthMenu.vue';
 import ChatBar from '@/components/ChatBar.vue';
-import NotificationIsland from '@/components/NotificationIsland.vue';
 
 import { useDisplay, useTheme } from 'vuetify';
 
@@ -123,7 +122,8 @@ onUnmounted(() => {
 
 const route = useRoute();
 
-const { isShown: insightsShown, toggle: toggleInsights } = useInsightsDrawer();
+// Small screens toggle Insights from the hamburger menu; on desktop the Home card header owns the toggle
+const { toggle: toggleInsights } = useInsightsDrawer();
 
 const { smAndDown } = useDisplay();
 
@@ -148,47 +148,83 @@ watch(
   },
 );
 
-const navItems = [
-  { text: 'Home', to: '/' },
-  { text: 'Notes', to: '/notes' },
-  { text: 'Tasks', to: '/task' },
-  { text: 'Events', to: '/events' },
-  { text: 'Settings', to: '/setting' },
+// Desktop rail: the pages, each with an outline icon that fills in while it is the current page
+const railItems = [
+  { text: 'Home', to: '/', icon: 'mdi-home-outline', activeIcon: 'mdi-home' },
+  { text: 'Notes', to: '/notes', icon: 'mdi-sticker-text-outline', activeIcon: 'mdi-sticker-text' },
+  { text: 'Tasks', to: '/task', icon: 'mdi-format-list-checks', activeIcon: 'mdi-format-list-checks' },
+  { text: 'Events', to: '/events', icon: 'mdi-calendar-month-outline', activeIcon: 'mdi-calendar-month' },
 ];
+
+// Mobile hamburger menu: same pages plus Settings, which the rail keeps at its foot
+const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'Settings', to: '/setting' }];
 </script>
 
 <template>
   <VApp :style="glassStyle">
-    <!-- 53px: sized for the dock row; see the geometry note at .dock-row below before changing it -->
-    <VAppBar height="53" class="elevation-0" color="transparent">
-      <!-- Centered glass pill: brand + theme toggle + nav (desktop) / hamburger (mobile) -->
+    <!-- Desktop: floating glass nav rail on the left; there is no top bar at all -->
+    <VNavigationDrawer v-if="!smAndDown" permanent rail :rail-width="80" floating class="app-rail-shell">
+      <nav class="app-rail glass-acrylic" aria-label="Main">
+        <RouterLink to="/" class="rail-brand" aria-label="Daybook" title="Daybook">D</RouterLink>
+
+        <RouterLink
+          v-for="item in railItems"
+          :key="item.to"
+          :to="item.to"
+          class="rail-item"
+          :class="{ 'rail-item--active': item.to === route.path }"
+        >
+          <span class="rail-item__pill">
+            <VIcon :icon="item.to === route.path ? item.activeIcon : item.icon" size="20" />
+          </span>
+          {{ item.text }}
+        </RouterLink>
+
+        <span class="rail-spacer" />
+
+        <VBtn
+          icon
+          variant="text"
+          rounded="lg"
+          :width="40"
+          :height="40"
+          :aria-label="isDarkMode ? 'Light mode' : 'Dark mode'"
+          @click="toggleTheme"
+        >
+          <VIcon :icon="themeIcon" size="20" />
+          <VTooltip activator="parent" location="end" :text="isDarkMode ? 'Light mode' : 'Dark mode'" />
+        </VBtn>
+
+        <VBtn
+          icon
+          variant="text"
+          rounded="lg"
+          :width="40"
+          :height="40"
+          to="/setting"
+          :active="route.path === '/setting'"
+          aria-label="Settings"
+        >
+          <VIcon :icon="route.path === '/setting' ? 'mdi-cog' : 'mdi-cog-outline'" size="20" />
+          <VTooltip activator="parent" location="end" text="Settings" />
+        </VBtn>
+
+        <!-- Account avatar (or sign-in) at the very foot, like most apps -->
+        <AuthMenu rail />
+      </nav>
+    </VNavigationDrawer>
+
+    <!-- Small screens: compact glass top bar with the brand and a hamburger menu.
+         53px: sized for the dock row; see the geometry note at .dock-row below before changing it -->
+    <VAppBar v-else height="53" class="elevation-0" color="transparent">
       <div class="dock-row">
         <nav class="app-dock glass-acrylic">
           <RouterLink v-if="route.path !== '/'" to="/" class="dock-brand dock-brand--link">Daybook</RouterLink>
           <span v-else class="dock-brand">Daybook</span>
 
-          <NotificationIsland />
-
           <span class="dock-spacer" />
 
-          <!-- Icon actions grouped with their own breathing room: text buttons get visual space from
-               their padding, bare icons don't, so a shared 2px gap made these look cramped -->
-          <div v-if="!smAndDown" class="dock-icons">
-            <VIconBtn :icon="themeIcon" size="small" variant="text" @click="toggleTheme" />
-
-            <!-- Insights toggle — Home only: hides the column on wide screens, opens the drawer on narrow ones -->
-            <VIconBtn
-              v-if="route.path === '/'"
-              :icon="insightsShown ? 'mdi-chart-box' : 'mdi-chart-box-outline'"
-              size="small"
-              variant="text"
-              :aria-label="insightsShown ? 'Hide Insights' : 'Show Insights'"
-              :title="insightsShown ? 'Hide Insights' : 'Show Insights'"
-              @click="toggleInsights"
-            />
-          </div>
-
-          <!-- Desktop nav links -->
+          <!-- Nav links where they fit (sm), the hamburger holds them on every small screen -->
           <VBtn
             v-for="(item, i) in navItems"
             :key="i"
@@ -198,10 +234,9 @@ const navItems = [
             size="small"
           />
 
-          <!-- Mobile hamburger menu -->
-          <VMenu v-if="smAndDown" location="bottom end" :offset="8">
+          <VMenu location="bottom end" :offset="8">
             <template #activator="{ props: menuProps }">
-              <VBtn icon="mdi-menu" variant="text" size="small" v-bind="menuProps" />
+              <VBtn icon="mdi-menu" variant="text" size="small" v-bind="menuProps" aria-label="Menu" />
             </template>
 
             <VList class="glass-acrylic" rounded="lg" min-width="160">
@@ -215,7 +250,7 @@ const navItems = [
                 <VListItemTitle>{{ item.text }}</VListItemTitle>
               </VListItem>
 
-              <!-- Insights, theme and account live here on small screens so the dock has room for the notification pill -->
+              <!-- Insights, theme and account live here on small screens to keep the bar short -->
               <VDivider class="my-1" />
               <VListItem
                 v-if="route.path === '/'"
@@ -249,10 +284,8 @@ const navItems = [
             </VList>
           </VMenu>
 
-          <!-- Account avatar sits last, after nav, like most apps -->
-          <div :class="{ 'dock-account': !smAndDown }">
-            <AuthMenu :hide-trigger="smAndDown" />
-          </div>
+          <!-- Renders only the sign-in dialog here; the account entries live in the menu above -->
+          <AuthMenu hide-trigger />
         </nav>
       </div>
     </VAppBar>
@@ -270,11 +303,6 @@ const navItems = [
 </template>
 
 <style>
-:root {
-  --header-height: 56px;
-  --nv-root-top: var(--header-height);
-}
-
 /* Let the custom backgrounds show through */
 .v-theme--dark.v-application,
 .v-theme--light.v-application {
@@ -304,7 +332,7 @@ const navItems = [
   }
 }
 
-/* App bar — transparent shell; the glass dock inside handles visuals */
+/* Small-screen app bar — transparent shell; the glass dock inside handles visuals */
 .v-app-bar {
   border-bottom: none !important;
   box-shadow: none !important;
@@ -318,8 +346,8 @@ const navItems = [
   overflow: visible !important;
 }
 
-/* Dock layout.
-   Vertical geometry, measured (signed in or out, they must match — see AuthMenu's avatar button):
+/* Dock layout (small screens only; desktop uses the rail below).
+   Vertical geometry, measured (the account lives in the hamburger menu here, so signed in or out match):
      dock       = 4 + 28 (tallest child: a small button) + 4 = 42px
      dock-row   = 12 (padding-top) + 42 = 54px, centred in the 53px app bar, so it overhangs by 1px and
                   sits 0.5px high (row top -0.5, dock 11.5 -> 53.5)
@@ -365,23 +393,105 @@ const navItems = [
   opacity: 0.7;
 }
 
-/* Icon buttons: wider gap inside the group, and a margin that separates it from the nav links */
-.dock-icons {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-inline: 4px 12px;
-}
-
-/* Keep the avatar a little apart from the last nav link */
-.dock-account {
-  display: flex;
-  align-items: center;
-  margin-left: 8px;
-}
-
 /* Pushes brand left, actions right */
 .dock-spacer {
   flex: 1;
+}
+
+/* ── Desktop nav rail ──────────────────────────────────────────────────────────
+   The drawer itself is an invisible 80px layout column (so VMain pads past it);
+   the glass card inside floats 12px off the window edges like every other card. */
+.app-rail-shell {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.app-rail-shell .v-navigation-drawer__content {
+  overflow: visible;
+}
+
+.app-rail {
+  height: calc(100% - 24px);
+  margin: 12px 0 12px 12px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0;
+}
+
+/* Brand mark: inverted rounded square, doubles as the Home link */
+.rail-brand {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  font-weight: 700;
+  font-size: 17px;
+  text-decoration: none;
+  background: rgb(var(--v-theme-on-surface));
+  color: rgb(var(--v-theme-surface));
+  transition: opacity 0.15s;
+}
+
+.rail-brand:hover {
+  opacity: 0.85;
+}
+
+.rail-item {
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 0 6px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.2;
+  text-decoration: none;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+/* The pill sits behind the icon only, so the label stays plain text under it */
+.rail-item__pill {
+  width: 48px;
+  height: 30px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  transition: background-color 0.2s;
+}
+
+.rail-item:hover .rail-item__pill {
+  background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+.rail-item--active {
+  color: rgb(var(--v-theme-on-surface));
+  font-weight: 500;
+}
+
+.rail-item--active .rail-item__pill,
+.rail-item--active:hover .rail-item__pill {
+  background: rgba(var(--v-theme-on-surface), 0.1);
+}
+
+.rail-item:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+/* Rail buttons read as secondary to the page links */
+.app-rail .v-btn {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 </style>
