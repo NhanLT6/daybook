@@ -1904,6 +1904,8 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   right: 8px;
   bottom: calc(100% + 8px);
   display: grid;
+  /* minmax(0, …): a long ticket title truncates instead of widening the menu past the bar */
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   padding: 6px;
   border-radius: 18px;
@@ -1918,6 +1920,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 .chat-menu button {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: 10px;
   padding: 8px 10px;
   border: 0;
@@ -1944,7 +1947,11 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 .chat-menu button.is-mention .menu-icon {
   opacity: var(--v-medium-emphasis-opacity);
 }
+.chat-menu button.is-mention .menu-icon {
+  flex: none;
+}
 .chat-menu button.is-mention b {
+  flex: 0 1 auto;
   font-weight: 400;
   min-width: 0;
   overflow: hidden;
@@ -1952,8 +1959,9 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   white-space: nowrap;
 }
 .chat-menu button.is-mention span:not(.menu-key) {
-  flex: none;
-  max-width: 40%;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1962,6 +1970,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 .chat-menu .menu-key {
+  flex: none;
   margin-left: auto;
   font-size: 11px;
   color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
