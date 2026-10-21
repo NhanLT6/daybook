@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import axios, { type AxiosResponse } from 'axios';
 
 import type { JiraConfig } from '../../src/interfaces/JiraConfig.js';
@@ -10,7 +12,7 @@ import { getSettings } from './settingsRepo.js';
 // - classic tokens work against the site URL (https://{site}.atlassian.net/rest/api/3)
 // - scoped tokens (picked scopes like read:jira-work) are rejected there (401, sometimes 404) and only
 //   work through the gateway: https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3
-// Both use Basic email:token. We try the site URL first and fall back to the gateway on a 401/404.
+// Both use Basic email:token. needsGateway works out which one a token is before the real call.
 
 export interface JiraCredentials {
   domain: string;
@@ -60,33 +62,47 @@ async function getCloudId(site: string): Promise<string> {
   return data.cloudId;
 }
 
+// (site + token) -> whether that token needs the gateway, so the probe runs once per warm instance
+const gatewayCache = new Map<string, boolean>();
+
+/**
+ * A scoped token is not only refused by the site URL: some endpoints there answer 200 with empty
+ * results (JRACLOUD-94545), so a 401/404 fallback is not enough. Probe /myself on the site URL once:
+ * a classic token gets 200 there, a scoped token never does.
+ */
+async function needsGateway(site: string, creds: JiraCredentials, headers: Record<string, string>): Promise<boolean> {
+  const key = `${site}:${createHash('sha256').update(`${creds.email}:${creds.apiToken}`).digest('hex')}`;
+  const cached = gatewayCache.get(key);
+  if (cached !== undefined) return cached;
+
+  try {
+    await axios.get(`https://${site}.atlassian.net/rest/api/3/myself`, { headers, timeout: 15000 });
+    gatewayCache.set(key, false);
+    return false;
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    if (status !== 401 && status !== 403 && status !== 404) throw error;
+    gatewayCache.set(key, true);
+    return true;
+  }
+}
+
 export async function jiraGet<T>(
   creds: JiraCredentials,
   path: string,
   params?: Record<string, unknown>,
 ): Promise<AxiosResponse<T>> {
   const site = normalizeDomain(creds.domain);
-  const config = {
-    headers: {
-      Authorization: `Basic ${encodeCredentials(creds.email, creds.apiToken)}`,
-      Accept: 'application/json',
-    },
-    params,
-    timeout: 30000,
+  const headers = {
+    Authorization: `Basic ${encodeCredentials(creds.email, creds.apiToken)}`,
+    Accept: 'application/json',
   };
 
-  try {
-    return await axios.get<T>(`https://${site}.atlassian.net/rest/api/3${path}`, config);
-  } catch (error) {
-    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-    if (status !== 401 && status !== 404) throw error;
+  const baseURL = (await needsGateway(site, creds, headers))
+    ? `https://api.atlassian.com/ex/jira/${await getCloudId(site)}/rest/api/3`
+    : `https://${site}.atlassian.net/rest/api/3`;
 
-    // Likely a scoped token: retry through the gateway. If the cloudId lookup fails, keep the original error.
-    const cloudId = await getCloudId(site).catch(() => {
-      throw error;
-    });
-    return axios.get<T>(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3${path}`, config);
-  }
+  return axios.get<T>(`${baseURL}${path}`, { headers, params, timeout: 30000 });
 }
 
 export function jiraErrorMessage(error: unknown, fallback: string): { status: number; message: string } {
