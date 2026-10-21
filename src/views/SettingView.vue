@@ -23,7 +23,15 @@ const { sortedCategories } = useCategories();
 // are inert until the user signs in. Everything else here is local and stays open.
 const { isAuthenticated } = useAuth();
 
-const { isTesting, isSyncing, testConnection, syncTicketsToLocalStorage } = useJira();
+const {
+  isTesting,
+  isSyncing,
+  isLoadingStatuses,
+  jiraStatuses,
+  testConnection,
+  syncTicketsToLocalStorage,
+  loadStatuses,
+} = useJira();
 
 const { saveSettings } = useServerSettings();
 const showApiToken = ref(false);
@@ -147,6 +155,21 @@ const projectKeyField = useField<string>(() => settingsStore.jiraConfig.projectK
 
 const statusesField = useField<string>(() => settingsStore.jiraConfig.statuses, {
   validateOnValueUpdate: false,
+});
+
+// Statuses are stored as one "a;b;c" string; the picker works with an array
+const selectedStatuses = computed<string[]>({
+  get: () =>
+    settingsStore.jiraConfig.statuses
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  set: (statuses) => {
+    settingsStore.jiraConfig.statuses = statuses
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .join(';');
+  },
 });
 
 // Smart domain detection from email when user finishes typing (on blur)
@@ -610,15 +633,22 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
               hint="Your project key (e.g., 'ABC' from ticket 'ABC-123')"
             />
 
-            <VTextField
-              v-model="settingsStore.jiraConfig.statuses"
+            <!-- Suggestions come from the project's Jira workflow; typed values still work -->
+            <VCombobox
+              v-model="selectedStatuses"
+              :items="jiraStatuses"
+              :loading="isLoadingStatuses"
               label="Ticket Statuses"
-              placeholder="To Do;In Progress;Done"
+              placeholder="In Progress, Code Review, QA…"
+              multiple
+              chips
+              closable-chips
               :disabled="!settingsStore.jiraConfig.enabled"
               :error-messages="settingsStore.jiraConfig.enabled ? statusesField.errorMessage.value : undefined"
+              @focus="loadStatuses"
               @blur="statusesField.handleBlur"
               persistent-hint
-              hint="Statuses to fetch, separated by semicolon (;). Example: To Do;In Progress;In Review;Done;QA"
+              hint="Tickets in these statuses are synced. Pick from your project's statuses or type your own"
             />
 
             <div class="d-flex ga-2">

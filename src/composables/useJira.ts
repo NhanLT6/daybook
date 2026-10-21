@@ -7,7 +7,7 @@ import { useStorage } from '@vueuse/core';
 
 import dayjs from 'dayjs';
 
-import { fetchJiraTickets, testJiraConnection as testJiraConnectionApi } from '@/apis/jiraApi';
+import { fetchJiraStatuses, fetchJiraTickets, testJiraConnection as testJiraConnectionApi } from '@/apis/jiraApi';
 import { shortDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
@@ -22,6 +22,7 @@ export function useJira() {
   // Separate loading states for different operations (TanStack Query style)
   const isSyncing = ref(false);
   const isTesting = ref(false);
+  const isLoadingStatuses = ref(false);
   const error = ref<string | null>(null);
 
   // Storage for last sync date - tracks when we last auto-synced
@@ -29,7 +30,9 @@ export function useJira() {
 
   const jiraProjects = useStorage<JiraProject[]>(JIRA_PROJECTS_KEY, []);
 
-  const { jiraConfig } = useSettingsStore();
+  // Read jiraConfig through the store every time: populateFromServer swaps the whole object,
+  // so a destructured copy taken before settings load stays the empty default
+  const settingsStore = useSettingsStore();
   const notificationCenter = useNotificationCenterStore();
 
   const transformTicketToJiraProject = (ticket: JiraTicket): JiraProject => ({
@@ -46,7 +49,7 @@ export function useJira() {
    * Returns true if last sync was on a different day
    */
   const shouldAutoSync = (): boolean => {
-    if (!jiraConfig.enabled) return false;
+    if (!settingsStore.jiraConfig.enabled) return false;
 
     if (!lastSyncDate.value) {
       return true; // Never synced before
@@ -61,7 +64,7 @@ export function useJira() {
     error.value = null;
 
     try {
-      const tickets = await fetchJiraTickets(jiraConfig);
+      const tickets = await fetchJiraTickets(settingsStore.jiraConfig);
       const newJiraProjects = tickets.map(transformTicketToJiraProject);
       const projectsToAdd = differenceBy(newJiraProjects, jiraProjects.value, (p) => p.title);
       jiraProjects.value.push(...projectsToAdd);
@@ -89,7 +92,7 @@ export function useJira() {
     isTesting.value = true;
 
     try {
-      const result = await testJiraConnectionApi(jiraConfig);
+      const result = await testJiraConnectionApi(settingsStore.jiraConfig);
       if (result.success) {
         notificationCenter.success(result.message);
       } else {
@@ -104,22 +107,51 @@ export function useJira() {
     }
   };
 
+  // Project workflow statuses for the Settings picker, fetched once per project key
+  const jiraStatuses = ref<string[]>([]);
+  let statusesLoadedFor = '';
+
+  const loadStatuses = async (): Promise<void> => {
+    const { domain, email, apiToken, projectKey } = settingsStore.jiraConfig;
+    if (!domain || !email || !apiToken || !projectKey) return;
+
+    const loadKey = `${domain}/${projectKey}`;
+    if (loadKey === statusesLoadedFor || isLoadingStatuses.value) return;
+
+    isLoadingStatuses.value = true;
+    try {
+      jiraStatuses.value = await fetchJiraStatuses(settingsStore.jiraConfig);
+      statusesLoadedFor = loadKey;
+    } catch (err) {
+      // The field still accepts typed statuses, so a failed lookup only warrants a notice
+      notificationCenter.error('Could not load Jira statuses', {
+        message: err instanceof Error ? err.message : 'Unknown error occurred',
+      });
+    } finally {
+      isLoadingStatuses.value = false;
+    }
+  };
+
   const myJiraProjects = computed((): JiraProject[] => {
     return jiraProjects.value.filter(
-      (project) => project.jiraAssigneeEmail?.toLowerCase() === jiraConfig.email.toLowerCase(),
+      (project) => project.jiraAssigneeEmail?.toLowerCase() === settingsStore.jiraConfig.email.toLowerCase(),
     );
   });
 
   const teamJiraProjects = computed((): JiraProject[] => {
     return jiraProjects.value.filter(
-      (project) => project.jiraAssigneeEmail?.toLowerCase() !== jiraConfig.email.toLowerCase(),
+      (project) => project.jiraAssigneeEmail?.toLowerCase() !== settingsStore.jiraConfig.email.toLowerCase(),
     );
   });
 
   return {
     isSyncing,
     isTesting,
+    isLoadingStatuses,
     error,
+
+    jiraStatuses,
+    loadStatuses,
 
     testConnection,
     syncTicketsToLocalStorage,

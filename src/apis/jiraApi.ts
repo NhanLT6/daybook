@@ -89,3 +89,23 @@ export const fetchJiraTickets = async (config: JiraConfig): Promise<JiraTicket[]
 
   return response.data.tickets;
 };
+
+// Fetch the project's workflow statuses (for the Settings status picker)
+export const fetchJiraStatuses = async (config: JiraConfig): Promise<string[]> => {
+  const response = await httpClient.post<{ success: boolean; statuses?: string[]; message?: string }>(
+    `${API_BASE_URL}/jira/statuses`,
+    {
+      domain: config.domain,
+      email: config.email,
+      apiToken: config.apiToken,
+      projectKey: config.projectKey,
+    },
+    { headers: await requireAuthHeaders() },
+  );
+
+  if (!response.data.success || !response.data.statuses) {
+    throw new Error(response.data.message || 'Failed to fetch statuses');
+  }
+
+  return response.data.statuses;
+};
