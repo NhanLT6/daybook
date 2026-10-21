@@ -4,9 +4,9 @@ import axios, { type AxiosResponse } from 'axios';
 //
 // Atlassian has two kinds of API tokens:
 // - classic tokens work against the site URL (https://{site}.atlassian.net/rest/api/3)
-// - scoped tokens (picked scopes like read:jira-work) are rejected there with a 401 and only
+// - scoped tokens (picked scopes like read:jira-work) are rejected there (401, sometimes 404) and only
 //   work through the gateway: https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3
-// Both use Basic email:token. We try the site URL first and fall back to the gateway on a 401.
+// Both use Basic email:token. We try the site URL first and fall back to the gateway on a 401/404.
 
 export interface JiraCredentials {
   domain: string;
@@ -59,9 +59,10 @@ export async function jiraGet<T>(
   try {
     return await axios.get<T>(`https://${site}.atlassian.net/rest/api/3${path}`, config);
   } catch (error) {
-    if (!axios.isAxiosError(error) || error.response?.status !== 401) throw error;
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    if (status !== 401 && status !== 404) throw error;
 
-    // Likely a scoped token: retry through the gateway. If the cloudId lookup fails, keep the original 401.
+    // Likely a scoped token: retry through the gateway. If the cloudId lookup fails, keep the original error.
     const cloudId = await getCloudId(site).catch(() => {
       throw error;
     });
