@@ -25,6 +25,11 @@ describe('isAiAvailable', () => {
     expect(isAiAvailable(legacyOwn)).toBe(true);
   });
 
+  it("reads the removed 'off' mode as shared", () => {
+    vi.stubEnv('AI_GATEWAY_ENABLED', 'true');
+    expect(isAiAvailable(off)).toBe(true);
+  });
+
   it('honours an explicit choice', () => {
     expect(isAiAvailable(shared)).toBe(false); // gateway not enabled on this deployment
     expect(isAiAvailable(ownWithKey)).toBe(true);
@@ -32,14 +37,13 @@ describe('isAiAvailable', () => {
 
     vi.stubEnv('AI_GATEWAY_ENABLED', 'true');
     expect(isAiAvailable(shared)).toBe(true);
-    expect(isAiAvailable(off)).toBe(false); // off stays off even with the gateway on
     expect(isAiAvailable(ownNoKey)).toBe(false); // own with no key does not silently use the gateway
   });
 });
 
 describe('resolveAi', () => {
   it('refuses to run when AI is not available', () => {
-    expect(() => resolveAi(off)).toThrow('not set up');
+    expect(() => resolveAi(shared)).toThrow('not set up'); // gateway not enabled on this deployment
     expect(() => resolveAi(ownNoKey)).toThrow('not set up');
   });
 

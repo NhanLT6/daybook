@@ -96,7 +96,7 @@ const initServerSettings = async () => {
   // A migrated legacy config was just saved, so re-read to get it back without its token
   if (await migrateJiraFromLocalStorage(serverSettings)) serverSettings = (await loadSettings()) ?? serverSettings;
 
-  settingsStore.populateFromServer(serverSettings.jiraConfig, serverSettings.aiConfig, serverSettings.aiGatewayAvailable);
+  settingsStore.populateFromServer(serverSettings.jiraConfig, serverSettings.aiConfig);
 };
 
 onMounted(async () => {

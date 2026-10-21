@@ -121,8 +121,6 @@ export const useSettingsStore = defineStore('settings', () => {
   // These are plain refs — not persisted in localStorage. Saved secrets arrive masked (maskSecret)
   const jiraConfig = ref<JiraConfig>({ ...DEFAULT_JIRA_CONFIG });
   const aiConfig = ref<AiConfig>({ ...DEFAULT_AI_CONFIG });
-  // Whether the deployment runs a shared AI gateway; false = AI needs the user's own key
-  const aiGatewayAvailable = ref(false);
 
   let resolveSettingsReady: (() => void) | null = null;
   const settingsReadyPromise = new Promise<void>((resolve) => {
@@ -137,10 +135,9 @@ export const useSettingsStore = defineStore('settings', () => {
    * Called from App.vue after /api/settings is fetched.
    * Replaces the in-memory jiraConfig and aiConfig with server values.
    */
-  function populateFromServer(serverJira: JiraConfig, serverAi: AiConfig, gatewayAvailable = false) {
+  function populateFromServer(serverJira: JiraConfig, serverAi: AiConfig) {
     jiraConfig.value = serverJira;
     aiConfig.value = serverAi;
-    aiGatewayAvailable.value = gatewayAvailable;
     resolveSettingsReady?.();
   }
 
@@ -151,7 +148,6 @@ export const useSettingsStore = defineStore('settings', () => {
   function resetServerConfigs() {
     jiraConfig.value = { ...DEFAULT_JIRA_CONFIG };
     aiConfig.value = { ...DEFAULT_AI_CONFIG };
-    aiGatewayAvailable.value = false;
   }
 
   // ── Computed ──────────────────────────────────────────────────────────
@@ -177,7 +173,6 @@ export const useSettingsStore = defineStore('settings', () => {
     isBackgroundVideo,
     jiraConfig,
     aiConfig,
-    aiGatewayAvailable,
     waitForSettings,
     populateFromServer,
     resetServerConfigs,

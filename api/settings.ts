@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js'
 import { getSettings, saveSettings } from './_lib/settingsRepo.js'
-import { isGatewayEnabled } from './_lib/ai.js'
 import { isMaskedSecret, maskSecret, resolveAiMode, type AiConfig } from '../src/interfaces/ServerSettings.js'
 import type { JiraConfig } from '../src/interfaces/JiraConfig.js'
 
@@ -27,13 +26,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Secrets never leave the server: the Jira proxies and AI routes read them from the DB,
       // and the browser only gets a masked value so Settings can show that a key is saved.
       const { jiraConfig, aiConfig } = await getSettings(userId)
-      const aiGatewayAvailable = isGatewayEnabled()
       return res.status(200).json({
         jiraConfig: { ...jiraConfig, apiToken: maskSecret(jiraConfig.apiToken) },
         // Resolve the mode here: the legacy rule needs the real key, which the client no longer sees
-        aiConfig: { ...aiConfig, apiKey: maskSecret(aiConfig.apiKey), mode: resolveAiMode(aiConfig, aiGatewayAvailable) },
-        // Tells the Settings page whether AI works without the user's own key
-        aiGatewayAvailable,
+        aiConfig: { ...aiConfig, apiKey: maskSecret(aiConfig.apiKey), mode: resolveAiMode(aiConfig) },
       })
     }
 

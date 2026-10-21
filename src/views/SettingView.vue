@@ -40,7 +40,7 @@ const isSavingSettings = ref(false);
 
 // How AI runs. Stored on the account as aiConfig.mode; `enabled` mirrors "own key" for older readers.
 const aiMode = computed<AiMode>({
-  get: () => resolveAiMode(settingsStore.aiConfig, settingsStore.aiGatewayAvailable),
+  get: () => resolveAiMode(settingsStore.aiConfig),
   set: (mode) => {
     settingsStore.aiConfig.mode = mode;
     settingsStore.aiConfig.enabled = mode === 'own';
@@ -50,17 +50,6 @@ const aiMode = computed<AiMode>({
 // What the chosen mode means right now: a short label for the title chip and one sentence for the alert
 const aiStatus = computed(() => {
   const hasKey = !!settingsStore.aiConfig.apiKey;
-  if (aiMode.value === 'off') {
-    return {
-      label: 'Off',
-      icon: 'mdi-power',
-      color: undefined,
-      alertType: 'info' as const,
-      description: settingsStore.aiGatewayAvailable
-        ? 'AI is off — Chat and Catch up are unavailable. Pick Shared or your own key to turn it on.'
-        : 'AI is off — Chat and Catch up are unavailable. Pick Own key to turn it on.',
-    };
-  }
   if (aiMode.value === 'default') {
     return {
       label: 'Shared',
@@ -444,7 +433,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
           </VCardTitle>
 
           <VCardText class="d-flex flex-column ga-3">
-            <!-- Mode picker. Shared is greyed out until the deployment turns the gateway on -->
+            <!-- Mode picker: shared gateway or the user's own key -->
             <VBtnToggle
               v-model="aiMode"
               mandatory
@@ -454,21 +443,9 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
               density="comfortable"
               class="ai-mode-toggle"
             >
-              <VBtn value="off" prepend-icon="mdi-power" class="text-none">Off</VBtn>
-              <VBtn
-                value="default"
-                prepend-icon="mdi-shield-check-outline"
-                class="text-none"
-                :disabled="!settingsStore.aiGatewayAvailable"
-              >
-                Shared
-              </VBtn>
+              <VBtn value="default" prepend-icon="mdi-shield-check-outline" class="text-none">Shared</VBtn>
               <VBtn value="own" prepend-icon="mdi-key-outline" class="text-none">Own key</VBtn>
             </VBtnToggle>
-
-            <div v-if="!settingsStore.aiGatewayAvailable" class="text-caption text-medium-emphasis mt-n1">
-              Shared AI isn&apos;t turned on for this site yet.
-            </div>
 
             <!-- One sentence for the chosen mode -->
             <VAlert :type="aiStatus.alertType" variant="tonal" density="compact" class="text-caption">
@@ -727,7 +704,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
   padding: 12px;
 }
 
-/* Mode picker spans the card, the three choices sharing the width equally */
+/* Mode picker spans the card, the two choices sharing the width equally */
 .ai-mode-toggle {
   width: 100%;
 }

@@ -22,7 +22,7 @@ export function isGatewayEnabled(): boolean {
 
 /** What the user chose in Settings, falling back to the old behaviour for settings saved before the choice existed. */
 export function aiModeOf(config: AiConfig): AiMode {
-  return resolveAiMode(config, isGatewayEnabled());
+  return resolveAiMode(config);
 }
 
 /** True when the request runs on the user's own Gemini key (billed to them). */
@@ -31,8 +31,8 @@ export function usesOwnKey(config: AiConfig): boolean {
 }
 
 /**
- * AI can answer when the user turned it on and it has something to run on: their own key, or the shared
- * gateway (only if the deployment enabled it).
+ * AI can answer when it has something to run on: the user's own key, or the shared gateway (only if
+ * the deployment enabled it, which production always does).
  */
 export function isAiAvailable(config: AiConfig): boolean {
   const mode = aiModeOf(config);
