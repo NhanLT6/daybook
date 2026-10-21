@@ -8,6 +8,7 @@ import { object, string } from 'yup';
 
 import dayjs from 'dayjs';
 
+import DateField from '@/components/DateField.vue';
 import { formatEventDate } from '@/common/DateHelpers';
 import {
   atOccurrence,
@@ -626,10 +627,11 @@ const onCancelModifyEvent = () => {
               <VBtn value="until" class="text-none">On date</VBtn>
               <VBtn value="count" class="text-none">After</VBtn>
             </VBtnToggle>
-            <VTextField
+            <DateField
               v-if="repeatRule.end && 'until' in repeatRule.end"
               :model-value="repeatRule.end.until"
-              type="date"
+              display-format="MMM D, YYYY"
+              hide-icon
               aria-label="Last date"
               variant="outlined"
               density="compact"

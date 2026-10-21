@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import DateField from '@/components/DateField.vue';
 import SprintNameInput from '@/components/SprintNameInput.vue';
 
 import type { AppEvent, RepeatRule } from '@/interfaces/Event';
@@ -184,9 +185,8 @@ const onSave = () => {
       <section class="d-flex flex-column ga-3">
         <div class="sprint-section-title">Dates</div>
         <div class="d-flex ga-2">
-          <VTextField
+          <DateField
             v-model="startDate"
-            type="date"
             label="First sprint starts"
             :error-messages="errors.start"
             hide-details="auto"
@@ -202,10 +202,10 @@ const onSave = () => {
             hide-details
           />
         </div>
-        <VTextField
+        <DateField
           v-if="endMode === 'until'"
           v-model="until"
-          type="date"
+          :min="startDate"
           label="Last sprint starts by"
           :error-messages="errors.until"
           hide-details="auto"

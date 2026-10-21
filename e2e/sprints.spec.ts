@@ -7,13 +7,16 @@ import { expect, test } from '@playwright/test';
 
 test('sprints are named per sprint, by quarter or a custom format', async ({ page }) => {
   // Tue Oct 20 2026: the second sprint of a series starting Mon Oct 5 is running
-  await page.clock.setFixedTime(new Date('2026-10-20T10:00:00'));
+  // install + resume (not setFixedTime): a frozen clock keeps Vuetify's date picker menu from opening
+  await page.clock.install({ time: new Date('2026-10-20T10:00:00') });
+  await page.clock.resume();
   await page.goto('/events');
 
   await page.getByRole('button', { name: 'More ways to add' }).click();
   await page.getByText('New sprints').click();
   const dialog = page.locator('.v-dialog');
-  await dialog.getByLabel('First sprint starts').fill('2026-10-05');
+  await dialog.getByLabel('First sprint starts').click();
+  await page.locator('.v-date-picker').getByRole('button', { name: 'Monday, October 5, 2026' }).click();
 
   // Default style: by quarter, restarting each quarter; a sprint counts in the quarter it starts in
   await expect(dialog).toContainText('Sprint 2026 Q4.2');
