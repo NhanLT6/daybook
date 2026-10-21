@@ -255,17 +255,41 @@ const clipTo = (el: HTMLElement) => {
 // Overlay children: the padded editor card, and inside it the NoteEditor root.
 const editorCardOf = (overlay: Element) => overlay.firstElementChild as HTMLElement;
 
-// Side by side the editor has its own column, so it fades in and out instead of growing from the card
-const fade = (el: Element, from: number, done: () => void) => {
-  (el as HTMLElement).animate([{ opacity: from }, { opacity: 1 - from }], {
-    duration: 150,
-    easing: 'ease-out',
-    fill: 'forwards',
-  }).onfinish = () => done();
+// Side by side the editor has its own column (the clip-path grow can't reach the card in the grid), so it
+// slides in from the grid's side instead, and back out towards it
+const slideIn = (el: Element, distance: number, done?: () => void) => {
+  (el as HTMLElement).animate(
+    [
+      { transform: `translateX(-${distance}px)`, opacity: 0 },
+      { transform: 'none', opacity: 1 },
+    ],
+    { duration: 260, easing: EXPAND_EASING },
+  ).onfinish = () => done?.();
 };
 
+const slideOut = (el: Element, done: () => void) => {
+  (el as HTMLElement).animate(
+    [
+      { transform: 'none', opacity: 1 },
+      { transform: 'translateX(-20px)', opacity: 0 },
+    ],
+    { duration: 160, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' },
+  ).onfinish = () => done();
+};
+
+// Switching notes keeps the editor mounted, so the card slides in again, a shorter way
+watch(
+  () => editing.value?.id,
+  (id, prev) => {
+    if (!split.value || !id || !prev || prefersReducedMotion()) return;
+    const card = panelEl.value?.querySelector('.notes-editor-card');
+    if (card) slideIn(card, 14);
+  },
+  { flush: 'post' },
+);
+
 const onOverlayEnter = (el: Element, done: () => void) => {
-  if (split.value && !prefersReducedMotion()) return fade(el, 0, done);
+  if (split.value && !prefersReducedMotion()) return slideIn(el, 28, done);
   if (!originEl?.isConnected || prefersReducedMotion()) return done();
   (el as HTMLElement).animate(
     [
@@ -286,7 +310,7 @@ const onOverlayLeave = (el: Element, done: () => void) => {
   closingToTrash = false;
   // Deleted: the crumpling copy already covers the editor, so the overlay just goes.
   if (toTrash || prefersReducedMotion()) return done();
-  if (split.value) return fade(el, 1, done);
+  if (split.value) return slideOut(el, done);
   const editorCard = editorCardOf(el);
   // Tiptap clears its content on unmount, so fade the editor out first rather than let the body
   // vanish while the header lingers — what shrinks is a blank card shape.

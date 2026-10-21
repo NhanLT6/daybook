@@ -66,8 +66,9 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 With at least one note on an md+ screen, NotesPanel splits like a mail client (`split`): the toolbar + card
 grid take a left column (`--notes-list-width: clamp(400px, 34%, 560px)`, two card columns), the open note fills
 the rest, and its card gets a primary ring (`NoteCard` `selected`). The grid stays live while a note is open:
-clicking another card saves (or drops, if empty) the current one first (`finishEditing`). The editor fades in
-and out there instead of growing from the card (the clip-path grow can't reach outside its column), the trash
+clicking another card saves (or drops, if empty) the current one first (`finishEditing`). The editor slides in
+from the grid's side there (and again, shorter, when switching notes) instead of growing from the card (the
+clip-path grow can't reach outside its column), the trash
 sits under the grid column, and with nothing open the right column shows a dashed "Pick a note" placeholder.
 Narrow screens, and a page with no notes yet, keep the full-page editor overlay described below.
 
