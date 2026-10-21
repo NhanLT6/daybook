@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import axios from 'axios';
 
+import { jiraErrorMessage, jiraGet } from '../_lib/jira.js';
 import { AuthError, headerReader, requireUser } from '../_lib/neonAuth.js';
 
 // Interface for request body
@@ -10,19 +10,10 @@ interface TestConnectionRequest {
   apiToken: string;
 }
 
-// Helper to encode credentials
-function encodeCredentials(email: string, apiToken: string): string {
-  const credentials = `${email}:${apiToken}`;
-  return Buffer.from(credentials, 'utf-8').toString('base64');
-}
-
-// Normalize domain
-function normalizeDomain(domain: string): string {
-  let normalized = domain.replace(/^https?:\/\//, '');
-  normalized = normalized.replace(/\.atlassian\.net.*$/i, '');
-  normalized = normalized.replace(/\.(com|net|org|io)$/i, '');
-  normalized = normalized.replace(/\/.*$/, '');
-  return normalized.trim();
+interface JiraMyself {
+  accountId: string;
+  displayName: string;
+  emailAddress?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -47,47 +38,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Normalize domain and create Jira API URL
-    const cleanDomain = normalizeDomain(domain);
-    const baseURL = `https://${cleanDomain}.atlassian.net/rest/api/3`;
-    const authToken = encodeCredentials(email, apiToken);
+    const creds = { domain, email, apiToken };
 
-    // Make request to Jira API
-    const response = await axios.get(`${baseURL}/myself`, {
-      headers: {
-        Authorization: `Basic ${authToken}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Connected successfully! Welcome, ${response.data.displayName}`,
-      user: {
-        accountId: response.data.accountId,
-        displayName: response.data.displayName,
-        emailAddress: response.data.emailAddress,
-      },
-    });
+    try {
+      const { data } = await jiraGet<JiraMyself>(creds, '/myself');
+      return res.status(200).json({
+        success: true,
+        message: `Connected successfully! Welcome, ${data.displayName}`,
+        user: {
+          accountId: data.accountId,
+          displayName: data.displayName,
+          emailAddress: data.emailAddress,
+        },
+      });
+    } catch {
+      // A scoped token with only issue/board read scopes cannot read /myself.
+      // What the app needs is issue search, so test that before giving up.
+      await jiraGet(creds, '/search/jql', { jql: 'order by created DESC', maxResults: 1, fields: 'summary' });
+      return res.status(200).json({
+        success: true,
+        message: 'Connected successfully! The token can read issues.',
+      });
+    }
   } catch (error) {
     if (error instanceof AuthError) {
       return res.status(error.status).json({ success: false, message: error.message });
     }
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status || 500;
-      const message = error.response?.data?.errorMessages?.[0] || error.response?.data?.message || error.message;
-
-      return res.status(status).json({
-        success: false,
-        message,
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: error instanceof Error ? error.message : 'Connection failed',
-    });
+    const { status, message } = jiraErrorMessage(error, 'Connection failed');
+    return res.status(status).json({ success: false, message });
   }
 }

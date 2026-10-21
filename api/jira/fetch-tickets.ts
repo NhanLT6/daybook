@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-import axios from 'axios';
-
+import { jiraErrorMessage, jiraGet } from '../_lib/jira.js';
 import { AuthError, headerReader, requireUser } from '../_lib/neonAuth.js';
 
 // Interface for request body
@@ -41,11 +40,6 @@ interface JiraSearchResponse {
 }
 
 // Helper functions
-function encodeCredentials(email: string, apiToken: string): string {
-  const credentials = `${email}:${apiToken}`;
-  return Buffer.from(credentials, 'utf-8').toString('base64');
-}
-
 function buildJqlQuery(projectKey: string, statuses: string[]): string {
   const statusList = statuses.map((status) => `"${status}"`).join(',');
   return `project = ${projectKey} AND status IN (${statusList}) AND sprint in openSprints() ORDER BY created DESC`;
@@ -81,23 +75,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const baseURL = `https://${domain}.atlassian.net/rest/api/3`;
-    const authToken = encodeCredentials(email, apiToken);
     const jql = buildJqlQuery(projectKey, statuses);
 
-    const response = await axios.get<JiraSearchResponse>(`${baseURL}/search/jql`, {
-      headers: {
-        Authorization: `Basic ${authToken}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      params: {
-        jql,
-        fields: 'summary,assignee,status,issuetype,description',
-        maxResults: 100,
-        startAt: 0,
-      },
-      timeout: 30000,
+    const response = await jiraGet<JiraSearchResponse>({ domain, email, apiToken }, '/search/jql', {
+      jql,
+      fields: 'summary,assignee,status,issuetype,description',
+      maxResults: 100,
+      startAt: 0,
     });
 
     // Transform and return tickets (flattened structure)
@@ -130,19 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error instanceof AuthError) {
       return res.status(error.status).json({ success: false, message: error.message });
     }
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status || 500;
-      const message = error.response?.data?.errorMessages?.[0] || error.response?.data?.message || error.message;
-
-      return res.status(status).json({
-        success: false,
-        message,
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: error instanceof Error ? error.message : 'Failed to fetch tickets',
-    });
+    const { status, message } = jiraErrorMessage(error, 'Failed to fetch tickets');
+    return res.status(status).json({ success: false, message });
   }
 }
