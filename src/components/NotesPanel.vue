@@ -610,7 +610,7 @@ onBeforeUnmount(() => {
             rounded="lg"
             height="32"
             prepend-icon="mdi-flask-outline"
-            class="list-icon-on-xs"
+            :class="split ? 'list-icon-only' : 'list-icon-on-xs'"
             aria-label="Add 20 sample notes"
             v-tooltip="'Add 20 sample notes (dev only)'"
             @click="addSampleNotes"
@@ -623,11 +623,13 @@ onBeforeUnmount(() => {
             rounded="lg"
             height="32"
             prepend-icon="mdi-plus"
-            class="list-icon-on-xs"
+            :class="split ? 'list-icon-only' : 'list-icon-on-xs'"
             aria-label="New note"
+            v-tooltip="'New note'"
             @click="addNote"
           >
-            <span class="d-none d-sm-inline">New note</span>
+            <!-- Icon only in the narrow list column beside an open note -->
+            <span v-if="!split" class="d-none d-sm-inline">New note</span>
           </VBtn>
         </template>
 
@@ -799,7 +801,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* A smaller search basis keeps title, search and New note on one row in the narrow list column */
+/* A smaller search basis keeps title, search and the icon buttons on one row in the narrow list column */
 .notes-list :deep(.list-search) {
   flex-basis: 140px;
 }

@@ -207,6 +207,16 @@
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
+/* A toolbar button shown as its icon alone (the page leaves its label out), e.g. in a narrow column */
+.list-icon-only.v-btn {
+  min-width: 32px;
+  padding-inline: 6px;
+}
+
+.list-icon-only .v-btn__prepend {
+  margin-inline: 0;
+}
+
 /* A toolbar button that drops to its icon on phones (its label is wrapped in d-none d-sm-inline) */
 @media (max-width: 599px) {
   .list-icon-on-xs.v-btn {
