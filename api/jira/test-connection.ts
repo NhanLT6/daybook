@@ -42,7 +42,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {
       // A scoped token with only issue/board read scopes cannot read /myself.
       // What the app needs is issue search, so test that before giving up.
-      await jiraGet(creds, '/search/jql', { jql: 'order by created DESC', maxResults: 1, fields: 'summary' });
+      // /search/jql rejects unbounded JQL, so restrict to the configured project (or recent issues)
+      const jql = creds.projectKey ? `project = "${creds.projectKey.trim()}"` : 'created >= -30d';
+      await jiraGet(creds, '/search/jql', { jql, maxResults: 1, fields: 'summary' });
       return res.status(200).json({
         success: true,
         message: 'Connected successfully! The token can read issues.',
