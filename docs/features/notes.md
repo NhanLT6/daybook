@@ -4,8 +4,8 @@
 
 A lightweight, Windows-Sticky-Notes-style scratchpad on its own page (`/notes`, header nav link "Notes", `src/views/NotesView.vue` wrapping `NotesPanel`) rather than a Home tab: day-to-day work memory for
 things like reminders about the ticket in progress, questions to raise in daily standup, or whether a
-workaround is still needed. Notes render as flat cards in a grid (not a list) under a toolbar (note count
-left, search + `+` right); pinned notes sort first in the same grid. With no notes, the toolbar is hidden and
+workaround is still needed. Notes render as flat cards in a grid (not a list) under the shared list toolbar
+(`ListPanel`, like Logs/Tasks/Events: title + count, search, New note); pinned notes sort first in the same grid. With no notes, the toolbar is hidden and
 an empty-state card fills the page, with a "New note" button (the note editor grows out of
 it). Clicking a card expands it to fill the whole Notes page for
 editing; clicking a checklist checkbox on a card ticks it in place.
@@ -63,18 +63,20 @@ Note { id, content, order, createdAt, updatedAt, pinned?, color? }   ← Indexed
 
 ## Search
 
-Toolbar magnify button that expands into a field — same markup, CSS, and collapse/clear handlers as LogList's
-search (see `docs/features/log-list-filters.md` for the `@update:focused` / `@click:clear` gotchas). Hidden when
-there are no notes.
+The shared `ListPanel` search field, always visible like Logs. With no notes the toolbar is hidden (CSS) and
+its actions aren't rendered, so the empty state's New note is the only one.
 
 - Case-insensitive substring match on the note's **visible text**, not its HTML: each note is parsed once per
   notes change with `DOMParser` (inert document, safe on raw note HTML) and `body.textContent` is cached in a
   `computed` Map. Searching "strong" doesn't match every bold note.
-- Count shows `N of M notes` while filtering; no match shows a centered "No matching notes" message.
+- The count is the shown (filtered) notes, like Logs; matches are marked in the cards with the CSS Custom
+  Highlight API (`useSearchHighlight`, `::highlight(notes-search)` in main.css): no `<mark>` is written into
+  the rendered HTML. Vuetify's `VHighlight` is plain-text only and needs Vuetify 4.3, so it isn't used. A word
+  split by formatting still filters but isn't marked; no match shows a centered "No matching notes" message.
 - **Drag is disabled while a query is active** (drag library re-initialized with `disabled`): `reorder(ids)`
   assigns `order = index` over the ids it gets, so reordering a filtered subset would collide with hidden
   notes' orders.
-- `+` clears and collapses the search first: a new note starts empty and would otherwise vanish behind the
+- New note clears the search first: a new note starts empty and would otherwise vanish behind the
   query once saved.
 
 ## Pin, Colors, Tick From Card

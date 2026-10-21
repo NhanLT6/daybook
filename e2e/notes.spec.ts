@@ -215,12 +215,11 @@ test('search filters notes by visible text and clearing restores all', async ({ 
   }
   await expect(page.locator('.note-card')).toHaveCount(2);
 
-  await page.locator('[aria-label="Search notes"]').click();
-  const search = page.locator('.notes-search__field input');
+  const search = page.getByPlaceholder('Search notes');
   await search.fill('t-123'); // case-insensitive
   await expect(page.locator('.note-card')).toHaveCount(1);
   await expect(page.locator('.note-card .note-preview')).toContainText('Ask Bob about T-123');
-  await expect(page.locator('.notes-toolbar')).toContainText('1 of 2 notes');
+  await expect(page.locator('.notes-list .list-toolbar__count')).toHaveText('1');
   // Reordering a filtered subset is undefined, so drag is off while searching
   await expect(page.locator('.note-card')).toHaveAttribute('draggable', 'false');
 

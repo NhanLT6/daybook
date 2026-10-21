@@ -148,6 +148,7 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
       multiple
       flat
       static
+      focusable
       :readonly="!collapsible"
       class="gt-panels"
       :class="{ 'gt-panels--readonly': !collapsible }"
@@ -297,9 +298,25 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
   margin-top: 12px;
 }
 
-/* The accordion's hairline between groups only inside a card */
-.gt-panels :deep(> .v-expansion-panel.gt-panel--block-start::after) {
+/* Hairline between the groups of a card (flat drops Vuetify's): not at a card's top edge, and not under
+   an open group, whose last row already draws one */
+.gt-panels :deep(> .v-expansion-panel:not(:first-child)::after) {
+  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.gt-panels :deep(> .v-expansion-panel.gt-panel--block-start::after),
+.gt-panels :deep(> .v-expansion-panel--active + .v-expansion-panel::after) {
   opacity: 0;
+}
+
+/* An open group's row takes a faint tint (Vuetify's `focusable` activated overlay, toned down), so it
+   reads apart from its rows */
+.gt-panels {
+  --v-activated-opacity: 0.04;
+}
+
+.v-theme--dark .gt-panels {
+  --v-activated-opacity: 0.07;
 }
 
 .gt-block-label {

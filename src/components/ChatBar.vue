@@ -22,7 +22,7 @@ import type { TimeLog } from '@/interfaces/TimeLog';
 import type { TextUIPart } from 'ai';
 
 import { storeToRefs } from 'pinia';
-import { useDisplay } from 'vuetify';
+import { useDisplay, useHotkey } from 'vuetify';
 
 import dayjs from 'dayjs';
 
@@ -458,6 +458,14 @@ const send = async () => {
     injectWelcome();
     return;
   }
+  if (cmd?.name === 'new') {
+    newChat();
+    return;
+  }
+  if (cmd?.name === 'history') {
+    openHistory();
+    return;
+  }
   // The text keeps its /command prefix so the conversation still shows what each message was
   await sendMessage(cmd ? `/${cmd.name} ${text}` : text, file, projects.value, tasks.value, cmd?.name);
 };
@@ -468,7 +476,10 @@ const retry = async (messageId: string) => {
   const msg = messages.value.find((m) => m.id === messageId);
   const text = msg?.parts.find((p): p is TextUIPart => p.type === 'text')?.text ?? '';
   const { command: cmd } = parseChatCommand(text);
-  const serverCommand = cmd?.name === 'catchup' || cmd?.name === 'help' ? undefined : cmd?.name;
+  const name = cmd?.name;
+  // Instant commands run in the browser and never reach the model
+  const serverCommand =
+    name === 'catchup' || name === 'help' || name === 'new' || name === 'history' ? undefined : name;
   await sendMessage(text, null, projects.value, tasks.value, serverCommand);
 };
 
@@ -839,13 +850,35 @@ const onDocumentPointerDown = (e: PointerEvent) => {
   if (state.value === 'open' || !hasDraft.value) close();
 };
 
-const onDocumentKeydown = (e: KeyboardEvent) => {
-  const inChat = !!chatEl.value?.contains(document.activeElement);
-  if (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    reveal();
+// Ctrl+K (⌘K on Mac) opens the chat from anywhere, even mid-typing in another field
+useHotkey('cmd+k', () => reveal(), { inputs: true });
+
+// Shift tapped twice on its own (useHotkey can't match a bare modifier) opens a new chat from anywhere
+const SHIFT_TAP_GAP = 400;
+let shiftAlone = false;
+let lastShiftTap = 0;
+
+const onShiftKeyup = (e: KeyboardEvent) => {
+  if (e.key !== 'Shift' || !shiftAlone) return;
+  shiftAlone = false;
+  if (e.timeStamp - lastShiftTap > SHIFT_TAP_GAP) {
+    lastShiftTap = e.timeStamp;
     return;
   }
+  lastShiftTap = 0;
+  reveal();
+  newChat();
+};
+
+const onDocumentKeydown = (e: KeyboardEvent) => {
+  // Any other key (Shift+A for a capital) breaks a Shift Shift
+  if (e.key === 'Shift') shiftAlone = !e.repeat;
+  else {
+    shiftAlone = false;
+    lastShiftTap = 0;
+  }
+
+  const inChat = !!chatEl.value?.contains(document.activeElement);
   // A / outside any field opens the bar; a second / inside it opens the command menu
   if (e.key === '/' && !inChat && !isEditable(document.activeElement)) {
     e.preventDefault();
@@ -868,6 +901,7 @@ const onWindowResize = () => {
 onMounted(() => {
   document.addEventListener('pointerdown', onDocumentPointerDown);
   document.addEventListener('keydown', onDocumentKeydown);
+  document.addEventListener('keyup', onShiftKeyup);
   window.addEventListener('resize', onWindowResize);
   state.value = restState();
   shape.value = desiredShape.value; // the first frame is drawn in place, not morphed
@@ -879,6 +913,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown);
   document.removeEventListener('keydown', onDocumentKeydown);
+  document.removeEventListener('keyup', onShiftKeyup);
   window.removeEventListener('resize', onWindowResize);
   clearTimeout(hoverTimer);
   clearTimeout(hoverLeaveTimer);
@@ -985,7 +1020,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             class="chat-iconbtn"
             :aria-pressed="showHistory"
             aria-label="History"
-            title="History"
+            v-tooltip="'History'"
             @click="toggleHistory"
           >
             <VIcon icon="mdi-history" size="18" />
@@ -994,7 +1029,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             type="button"
             class="chat-iconbtn"
             aria-label="New chat"
-            title="New chat"
+            v-tooltip="'New chat · Shift Shift'"
             :disabled="isLoading"
             @click="newChat"
           >
@@ -1186,7 +1221,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             type="button"
             class="chat-iconbtn"
             aria-label="Attach image"
-            title="Attach image"
+            v-tooltip="'Attach image'"
             @click="fileInputEl?.click()"
           >
             <VIcon icon="mdi-image-outline" size="18" />
@@ -1196,7 +1231,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             type="button"
             class="chat-iconbtn"
             aria-label="Clear text"
-            title="Clear"
+            v-tooltip="'Clear'"
             @click="clearDraft"
           >
             <VIcon icon="mdi-close" size="18" />

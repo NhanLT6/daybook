@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { noteImageUrl, sweepOrphanNoteImages } from '@/composables/useNoteImages';
 import { useNotes } from '@/composables/useNotes';
+import { useSearchHighlight } from '@/composables/useSearchHighlight';
 
+import ListPanel from '@/components/ListPanel.vue';
 import NoteCard from '@/components/NoteCard.vue';
 
 import type { Note, NoteColor } from '@/interfaces/Note';
@@ -61,27 +63,6 @@ const filteredNotes = computed(() =>
   searchQuery.value ? notes.value.filter((n) => plainTexts.value.get(n.id)?.includes(searchQuery.value)) : notes.value,
 );
 
-// Toolbar search: collapsed to a magnify button, expands to a field on demand (same as LogList)
-const searchExpanded = ref(false);
-const searchFieldRef = ref<{ focus: () => void } | null>(null);
-
-const toggleSearch = async () => {
-  // Toggling closed also clears the query so no hidden filter lingers
-  if (searchExpanded.value) {
-    searchExpanded.value = false;
-    searchText.value = '';
-    return;
-  }
-  searchExpanded.value = true;
-  await nextTick();
-  searchFieldRef.value?.focus();
-};
-
-// Collapse when focus leaves an empty field — an active query stays visible
-const onSearchFocusChange = (focused: boolean) => {
-  if (!focused && !searchText.value.trim()) searchExpanded.value = false;
-};
-
 // ── Card order: pinned notes first, then the rest, each by stored `order` ───
 const pinnedFirst = (list: Note[]) => [...list.filter((n) => n.pinned), ...list.filter((n) => !n.pinned)];
 const orderedNotes = computed(() => pinnedFirst(filteredNotes.value));
@@ -118,7 +99,6 @@ const openNote = (note: Note, el: HTMLElement) => {
 const addNote = (e: MouseEvent) => {
   // A new note starts empty and would be hidden by an active query once saved
   searchText.value = '';
-  searchExpanded.value = false;
   originEl = e.currentTarget as HTMLElement;
   const now = Date.now();
   // Not persisted yet — only saved once the user actually types something (see persist()).
@@ -458,6 +438,9 @@ const crumpleIntoTrash = (source: HTMLElement, from: { left: number; top: number
 // One config for mouse and touch: the library uses native drag for desktop mouse and its own
 // pointer-driven clone for touch (after a long-press, so a normal swipe still scrolls).
 const gridEl = ref<HTMLElement | null>(null);
+
+// Search matches are marked in the cards' text
+useSearchHighlight(gridEl, searchQuery, 'notes-search', displayNotes);
 const dragNoteId = ref<string | null>(null);
 
 // Where the pointer grabbed the card, so the trash animation starts exactly where the card was let go.
@@ -552,64 +535,43 @@ onBeforeUnmount(() => {
     <!-- Toolbar + grid. While a note is open they fade out and go inert, so nothing shows through the
          editor card's gutter or is reachable by Tab behind it. -->
     <div class="notes-body" :class="{ 'notes-body--behind': !!editing }" :inert="!!editing">
-      <!-- Toolbar: note count left, actions right. Hidden with no notes: the empty state carries the add action. -->
-      <VToolbar v-if="notes.length" density="compact" class="notes-toolbar">
-        <span class="text-caption text-medium-emphasis">
-          <template v-if="searchQuery">{{ filteredNotes.length }} of </template>
-          {{ notes.length }} {{ notes.length === 1 ? 'note' : 'notes' }}
-        </span>
-        <VSpacer />
-        <div class="d-flex ga-2 align-center">
-          <!-- Search: magnify button that expands into a field (button hides while open) -->
-          <div class="notes-search" :class="{ 'notes-search--open': searchExpanded }">
-            <VIconBtn
-              v-if="!searchExpanded"
-              icon="mdi-magnify"
-              icon-size="small"
-              rounded="lg"
-              variant="flat"
-              aria-label="Search notes"
-              v-tooltip="'Search'"
-              @click="toggleSearch"
-            />
-            <div class="notes-search__wrap">
-              <VTextField
-                ref="searchFieldRef"
-                v-model="searchText"
-                placeholder="Search"
-                prepend-inner-icon="mdi-magnify"
-                variant="plain"
-                density="compact"
-                hide-details
-                single-line
-                clearable
-                class="notes-search__field"
-                @click:clear="searchText = ''"
-                @update:focused="onSearchFocusChange"
-              />
-            </div>
-          </div>
-          <VIconBtn
+      <!-- The shared list toolbar (title + count, search, actions) over the card grid. Hidden with no notes:
+           the empty state carries the add action. -->
+      <ListPanel
+        v-model:search="searchText"
+        class="notes-list"
+        :class="{ 'notes-list--empty': !notes.length }"
+        title="Notes"
+        :count="filteredNotes.length"
+        search-placeholder="Search notes"
+      >
+        <template v-if="notes.length" #actions>
+          <VBtn
             v-if="isDev"
-            icon="mdi-flask-outline"
-            icon-size="small"
+            variant="text"
             rounded="lg"
-            variant="flat"
+            height="32"
+            prepend-icon="mdi-flask-outline"
+            class="list-icon-on-xs"
             aria-label="Add 20 sample notes"
             v-tooltip="'Add 20 sample notes (dev only)'"
             @click="addSampleNotes"
-          />
-          <VIconBtn
-            icon="mdi-plus"
-            icon-size="small"
+          >
+            <span class="d-none d-sm-inline">Samples</span>
+          </VBtn>
+          <VBtn
+            color="primary"
+            variant="tonal"
             rounded="lg"
-            variant="flat"
+            height="32"
+            prepend-icon="mdi-plus"
+            class="list-icon-on-xs"
             aria-label="New note"
-            v-tooltip="'New note'"
             @click="addNote"
-          />
-        </div>
-      </VToolbar>
+          >
+            <span class="d-none d-sm-inline">New note</span>
+          </VBtn>
+        </template>
 
       <!-- Scrollable card grid (pinned notes first) -->
       <div class="notes-scroll" :class="{ 'notes-scroll--empty': !notes.length }">
@@ -654,6 +616,7 @@ onBeforeUnmount(() => {
           </VScaleTransition>
         </div>
       </div>
+      </ListPanel>
     </div>
 
     <!-- Trash drop zone: slides up while a note is dragged (or deleted from the editor) and overlays the
@@ -724,59 +687,29 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
-.notes-toolbar {
-  flex: 0 0 auto;
+.notes-list {
+  flex: 1;
 }
 
-/* Line toolbar content up with the grid's 12px gutter */
-.notes-toolbar :deep(.v-toolbar__content) {
-  padding-inline: 12px;
-}
-
-/* Toolbar search: magnify button expands into a field (mirrors LogList's .log-search) */
-.notes-search {
+/* The grid keeps its own scroll (drag autoscroll and the editor overlay measure it), so the shared body
+   only lays it out */
+.notes-list :deep(.list-panel__body) {
   display: flex;
-  align-items: center;
-}
-
-/* Collapsed = width 0; opening animates the wrap open (field is clipped by overflow) */
-.notes-search__wrap {
-  width: 0;
+  flex-direction: column;
   overflow: hidden;
-  transition: width 0.25s ease;
 }
 
-.notes-search--open .notes-search__wrap {
-  width: 180px;
+/* No notes: no toolbar, the empty state fills the tab */
+.notes-list--empty :deep(.list-toolbar) {
+  display: none;
 }
 
-/* Keep the field's intrinsic width so text doesn't reflow mid-animation */
-.notes-search__field {
-  min-width: 180px;
-}
-
-/* Match the icon buttons' 40px height (compact density otherwise makes it shorter) */
-.notes-search__field :deep(.v-field) {
-  border-radius: 12px;
-  min-height: 40px;
-}
-
-.notes-search__field :deep(.v-field__input) {
-  min-height: 40px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.notes-search__field :deep(.v-field__prepend-inner) {
-  padding-inline-start: 8px;
-}
-
-/* Top padding separates the toolbar from the first row of cards */
 .notes-scroll {
   position: relative; /* leave-absolute positions the fading empty state against this */
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 12px 12px 12px;
+  padding: 4px 12px 12px;
 }
 
 /* No notes: same 8px inset as the Chat panel's card, which the empty state mirrors */

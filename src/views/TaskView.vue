@@ -391,6 +391,14 @@ const dialogTitles: Record<NonNullable<typeof dialogMode.value>, string> = {
 };
 const currentMode = computed(() => (dialogMode.value ? dialogTitles[dialogMode.value] : 'Task Management'));
 
+const saveTooltips: Record<NonNullable<typeof dialogMode.value>, string> = {
+  'new-project': 'Create new project',
+  'new-task': 'Create new task',
+  'edit-project': 'Save project changes',
+  'edit-task': 'Save task changes',
+};
+const saveTooltip = computed(() => (dialogMode.value ? saveTooltips[dialogMode.value] : ''));
+
 const showTaskField = computed(
   () => dialogMode.value === 'new-task' || dialogMode.value === 'edit-task' || dialogMode.value === 'new-project',
 );
@@ -444,35 +452,19 @@ const showTaskField = computed(
         <VCardActions class="pa-4">
           <VSpacer />
 
-          <VTooltip>
-            <template #activator="{ props }">
-              <VBtn variant="text" prepend-icon="mdi-cancel" @click="onCancel" v-bind="props">Cancel</VBtn>
-            </template>
-            Cancel editing and close dialog
-          </VTooltip>
+          <VBtn variant="text" prepend-icon="mdi-cancel" v-tooltip="'Cancel editing and close dialog'" @click="onCancel">
+            Cancel
+          </VBtn>
 
-          <VTooltip>
-            <template #activator="{ props }">
-              <VBtn
-                variant="tonal"
-                color="primary"
-                prepend-icon="mdi-content-save-outline"
-                @click="onSave"
-                v-bind="props"
-              >
-                Save
-              </VBtn>
-            </template>
-            {{
-              dialogMode === 'new-project'
-                ? 'Create new project'
-                : dialogMode === 'new-task'
-                  ? 'Create new task'
-                  : dialogMode === 'edit-project'
-                    ? 'Save project changes'
-                    : 'Save task changes'
-            }}
-          </VTooltip>
+          <VBtn
+            variant="tonal"
+            color="primary"
+            prepend-icon="mdi-content-save-outline"
+            v-tooltip="saveTooltip"
+            @click="onSave"
+          >
+            Save
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -698,19 +690,16 @@ const showTaskField = computed(
       <VCardActions class="pa-4">
         <VSpacer />
 
-        <VTooltip>
-          <template #activator="{ props }">
-            <VBtn variant="text" @click="cancelDeleteProject" v-bind="props">Cancel</VBtn>
-          </template>
-          Cancel deletion
-        </VTooltip>
+        <VBtn variant="text" v-tooltip="'Cancel deletion'" @click="cancelDeleteProject">Cancel</VBtn>
 
-        <VTooltip>
-          <template #activator="{ props }">
-            <VBtn variant="tonal" color="error" @click="executeDeleteProject" v-bind="props">Delete Project</VBtn>
-          </template>
-          Permanently delete project and all its tasks
-        </VTooltip>
+        <VBtn
+          variant="tonal"
+          color="error"
+          v-tooltip="'Permanently delete project and all its tasks'"
+          @click="executeDeleteProject"
+        >
+          Delete Project
+        </VBtn>
       </VCardActions>
     </VCard>
   </VDialog>

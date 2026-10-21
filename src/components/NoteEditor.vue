@@ -121,7 +121,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         variant="text"
         size="small"
         :aria-label="pinned ? 'Unpin note' : 'Pin note'"
-        :title="pinned ? 'Unpin' : 'Pin'"
+        v-tooltip="pinned ? 'Unpin' : 'Pin'"
         @click="emit('togglePin')"
       />
       <!-- Color: default surface + fixed pastel set (theme colors, so dark mode has its own tints) -->
@@ -133,7 +133,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
             variant="text"
             size="small"
             aria-label="Note color"
-            title="Color"
+            v-tooltip="'Color'"
           />
         </template>
         <VCard elevation="6" class="d-flex ga-2 pa-2">
@@ -151,7 +151,14 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
           </button>
         </VCard>
       </VMenu>
-      <VBtn icon="mdi-delete-outline" variant="text" size="small" aria-label="Delete note" @click="emit('delete')" />
+      <VBtn
+        icon="mdi-delete-outline"
+        variant="text"
+        size="small"
+        aria-label="Delete note"
+        v-tooltip="'Delete'"
+        @click="emit('delete')"
+      />
     </div>
 
     <!-- Toolbar: formatting commands, active state reflects current selection.
@@ -163,7 +170,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         size="small"
         :color="editor?.isActive('bold') ? 'primary' : 'default'"
         aria-label="Bold"
-        title="Bold"
+        v-tooltip="'Bold'"
         @mousedown.prevent
         @click="editor?.chain().focus().toggleBold().run()"
       />
@@ -173,7 +180,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         size="small"
         :color="editor?.isActive('italic') ? 'primary' : 'default'"
         aria-label="Italic"
-        title="Italic"
+        v-tooltip="'Italic'"
         @mousedown.prevent
         @click="editor?.chain().focus().toggleItalic().run()"
       />
@@ -183,7 +190,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         size="small"
         :color="editor?.isActive('strike') ? 'primary' : 'default'"
         aria-label="Strikethrough"
-        title="Strikethrough"
+        v-tooltip="'Strikethrough'"
         @mousedown.prevent
         @click="editor?.chain().focus().toggleStrike().run()"
       />
@@ -193,7 +200,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         size="small"
         :color="editor?.isActive('bulletList') ? 'primary' : 'default'"
         aria-label="Bullet list"
-        title="Bullet list"
+        v-tooltip="'Bullet list'"
         @mousedown.prevent
         @click="editor?.chain().focus().toggleBulletList().run()"
       />
@@ -203,7 +210,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         size="small"
         :color="editor?.isActive('taskList') ? 'primary' : 'default'"
         aria-label="Checklist"
-        title="Checklist"
+        v-tooltip="'Checklist'"
         @mousedown.prevent
         @click="editor?.chain().focus().toggleTaskList().run()"
       />
@@ -212,7 +219,7 @@ const updatedAtLabel = computed(() => (props.updatedAt ? dayjs(props.updatedAt).
         variant="text"
         size="small"
         aria-label="Insert image"
-        title="Insert image (or paste / drop one)"
+        v-tooltip="'Insert image (or paste / drop one)'"
         @mousedown.prevent
         @click="fileInput?.click()"
       />

@@ -65,6 +65,11 @@
   background-color: rgba(var(--v-theme-on-surface), 0.04);
 }
 
+/* Search matches (useSearchHighlight): a soft marker, readable in both themes */
+::highlight(notes-search) {
+  background-color: rgba(var(--v-theme-warning), 0.35);
+}
+
 /* Data tables — clean, borderless */
 .v-data-table {
   background-color: transparent !important;

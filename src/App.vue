@@ -210,10 +210,10 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
           :width="40"
           :height="40"
           :aria-label="isDarkMode ? 'Light mode' : 'Dark mode'"
+          v-tooltip:end="isDarkMode ? 'Light mode' : 'Dark mode'"
           @click="toggleTheme"
         >
           <VIcon :icon="themeIcon" size="20" />
-          <VTooltip activator="parent" location="end" :text="isDarkMode ? 'Light mode' : 'Dark mode'" />
         </VBtn>
 
         <VBtn
@@ -225,9 +225,9 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
           to="/setting"
           :active="route.path === '/setting'"
           aria-label="Settings"
+          v-tooltip:end="'Settings'"
         >
           <VIcon :icon="route.path === '/setting' ? 'mdi-cog' : 'mdi-cog-outline'" size="20" />
-          <VTooltip activator="parent" location="end" text="Settings" />
         </VBtn>
 
         <!-- Account avatar (or sign-in) at the very foot, like most apps -->

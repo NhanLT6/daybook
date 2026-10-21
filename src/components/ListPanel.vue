@@ -107,6 +107,8 @@ provide(
 }
 
 .list-toolbar__count {
+  /* Room for three digits, so 9 → 10 → 100 doesn't nudge the search and filters along */
+  min-width: 3ch;
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
   color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));

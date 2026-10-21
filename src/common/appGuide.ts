@@ -23,7 +23,8 @@ Logging time:
 - Plans: an entry with no duration is a plan for later.
 
 Chat (the bar at the bottom of every page; open it with Ctrl+K, the / key, or a click):
-- Commands: /log logs time, /note saves a sticky note, /event adds a calendar event, /ask answers from your notes, /catchup summarises recent work for a standup, /help shows the welcome again.
+- Commands: /log logs time, /note saves a sticky note, /event adds a calendar event, /ask answers from your notes, /catchup summarises recent work for a standup, /help shows the welcome again, /new starts a new chat, /history lists past chats.
+- Keyboard: Ctrl+K (⌘K on Mac) or / opens the chat, Shift twice quickly starts a new chat, Esc goes back or closes. With the message box empty, ← or ↑ opens past chats (↑↓ to move, Enter to open, → to go back).
 - Typing / mid-sentence suggests your projects, tasks and Jira tickets.
 - Past chats are under the History button.
 

@@ -85,10 +85,10 @@ const submit = async () => {
       :width="40"
       :height="40"
       aria-label="Sign in"
+      v-tooltip:end="'Sign in'"
       @click="openDialog"
     >
       <VIcon icon="mdi-account-circle-outline" size="22" />
-      <VTooltip activator="parent" location="end" text="Sign in" />
     </VBtn>
 
     <!-- Signed out: sign-in entry point -->
