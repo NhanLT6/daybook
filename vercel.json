@@ -1,4 +1,5 @@
 {
+  "buildCommand": "yarn db:migrate && yarn build",
   "rewrites": [
     {
       "source": "/((?!api).*)",

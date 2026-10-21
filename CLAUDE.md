@@ -73,6 +73,7 @@ Every pushed branch gets a Vercel preview build, and the Neon integration create
 - **No previews for Claude branches**: `vercel.json` turns off deploys for `claude/*`; keep it that way
 - **Push sparingly**: batch fixes, push only when there is something to review or merge
 - **Test resources**: any Neon branch, DB connection or env key made for testing is prefixed `claude-test-`, kept minimal, and removed when done
+- **DB migrations run on deploy**: `vercel.json` sets the build command to `yarn db:migrate && yarn build`, so a new `db/migrations/NNNN_name.sql` is applied (once, in order, own transaction, recorded in `schema_migrations`) by the next deploy to that environment; a failing migration fails the deploy. Write them re-runnable (`if not exists`). `yarn db:status` lists pending ones
 - **Never touch prod** data, env vars or deployments; ask Nhan before deleting any Vercel/Neon resource or remote branch
 
 ## Important Notes
