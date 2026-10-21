@@ -17,6 +17,7 @@ import { parents, tearDown } from '@formkit/drag-and-drop';
 import { dragAndDrop } from '@formkit/drag-and-drop/vue';
 import { debounce } from 'lodash';
 import { nanoid } from 'nanoid';
+import { useDisplay } from 'vuetify';
 
 // Tiptap (~120 kB gzip) stays out of the Home chunk; it is fetched once the Notes tab is first opened.
 const loadNoteEditor = () => import('./NoteEditor.vue');
@@ -37,6 +38,11 @@ onMounted(async () => {
 const panelEl = ref<HTMLElement | null>(null);
 const editing = ref<Note | null>(null);
 const editorEmpty = ref(false);
+
+// Wide screens read like a mail client: the card grid in a left column, the open note beside it. Narrow
+// screens (and a page with no notes yet) keep the editor over the whole page.
+const { mdAndUp } = useDisplay();
+const split = computed(() => mdAndUp.value && notes.value.length > 0);
 
 // Sanitized once per notes change rather than re-running DOMPurify on every render.
 const sanitizedPreviews = computed(
@@ -91,6 +97,9 @@ let closingId: string | null = null;
 let closingToTrash = false;
 
 const openNote = (note: Note, el: HTMLElement) => {
+  if (editing.value?.id === note.id) return;
+  // Side by side, another note can be open already: save (or drop, if empty) it first
+  if (editing.value) finishEditing();
   originEl = el;
   editing.value = { ...note };
   editorEmpty.value = false;
@@ -99,6 +108,7 @@ const openNote = (note: Note, el: HTMLElement) => {
 const addNote = (e: MouseEvent) => {
   // A new note starts empty and would be hidden by an active query once saved
   searchText.value = '';
+  if (editing.value) finishEditing();
   originEl = e.currentTarget as HTMLElement;
   const now = Date.now();
   // Not persisted yet — only saved once the user actually types something (see persist()).
@@ -167,11 +177,16 @@ const setColor = (color: NoteColor | undefined) => {
   persist();
 };
 
-const closeEditor = () => {
+// Saves pending changes, and drops a note left empty
+const finishEditing = () => {
   persist.flush();
   if (editing.value && editorEmpty.value && notes.value.some((n) => n.id === editing.value!.id)) {
     removeNote(editing.value.id);
   }
+};
+
+const closeEditor = () => {
+  finishEditing();
   closingId = editing.value && !editorEmpty.value ? editing.value.id : null;
   editing.value = null;
 };
@@ -240,7 +255,17 @@ const clipTo = (el: HTMLElement) => {
 // Overlay children: the padded editor card, and inside it the NoteEditor root.
 const editorCardOf = (overlay: Element) => overlay.firstElementChild as HTMLElement;
 
+// Side by side the editor has its own column, so it fades in and out instead of growing from the card
+const fade = (el: Element, from: number, done: () => void) => {
+  (el as HTMLElement).animate([{ opacity: from }, { opacity: 1 - from }], {
+    duration: 150,
+    easing: 'ease-out',
+    fill: 'forwards',
+  }).onfinish = () => done();
+};
+
 const onOverlayEnter = (el: Element, done: () => void) => {
+  if (split.value && !prefersReducedMotion()) return fade(el, 0, done);
   if (!originEl?.isConnected || prefersReducedMotion()) return done();
   (el as HTMLElement).animate(
     [
@@ -261,6 +286,7 @@ const onOverlayLeave = (el: Element, done: () => void) => {
   closingToTrash = false;
   // Deleted: the crumpling copy already covers the editor, so the overlay just goes.
   if (toTrash || prefersReducedMotion()) return done();
+  if (split.value) return fade(el, 1, done);
   const editorCard = editorCardOf(el);
   // Tiptap clears its content on unmount, so fade the editor out first rather than let the body
   // vanish while the header lingers — what shrinks is a blank card shape.
@@ -299,7 +325,9 @@ const lidOpen = computed(() => trashHover.value || trashEating.value);
 // mid slide-in transition when an animation targets it.
 const trashCenter = () => {
   const p = panelEl.value!;
-  return { x: p.clientWidth / 2, y: p.clientHeight - TRASH_BOTTOM - TRASH_SIZE / 2 };
+  // Side by side the bin sits under the card grid, not the whole page
+  const width = split.value ? (bodyEl.value?.offsetWidth ?? p.clientWidth) : p.clientWidth;
+  return { x: width / 2, y: p.clientHeight - TRASH_BOTTOM - TRASH_SIZE / 2 };
 };
 
 // Lid stays open while something falls in, then closes with a small squash, then the trash slides away.
@@ -438,6 +466,7 @@ const crumpleIntoTrash = (source: HTMLElement, from: { left: number; top: number
 // One config for mouse and touch: the library uses native drag for desktop mouse and its own
 // pointer-driven clone for touch (after a long-press, so a normal swipe still scrolls).
 const gridEl = ref<HTMLElement | null>(null);
+const bodyEl = ref<HTMLElement | null>(null);
 
 // Search matches are marked in the cards' text
 useSearchHighlight(gridEl, searchQuery, 'notes-search', displayNotes);
@@ -531,10 +560,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="panelEl" class="notes-panel">
-    <!-- Toolbar + grid. While a note is open they fade out and go inert, so nothing shows through the
-         editor card's gutter or is reachable by Tab behind it. -->
-    <div class="notes-body" :class="{ 'notes-body--behind': !!editing }" :inert="!!editing">
+  <div ref="panelEl" class="notes-panel" :class="{ 'notes-panel--split': split }">
+    <!-- Toolbar + grid. While a note is open over them (narrow screens) they fade out and go inert, so nothing
+         shows through the editor card's gutter or is reachable by Tab behind it. Side by side they stay. -->
+    <div
+      ref="bodyEl"
+      class="notes-body"
+      :class="{ 'notes-body--behind': !!editing && !split }"
+      :inert="!!editing && !split"
+    >
       <!-- The shared list toolbar (title + count, search, actions) over the card grid. Hidden with no notes:
            the empty state carries the add action. -->
       <ListPanel
@@ -557,7 +591,7 @@ onBeforeUnmount(() => {
             v-tooltip="'Add 20 sample notes (dev only)'"
             @click="addSampleNotes"
           >
-            <span class="d-none d-sm-inline">Samples</span>
+            <span v-if="!split" class="d-none d-sm-inline">Samples</span>
           </VBtn>
           <VBtn
             color="primary"
@@ -611,6 +645,7 @@ onBeforeUnmount(() => {
               :key="note.id"
               :note="note"
               :preview-html="sanitizedPreviews.get(note.id) ?? ''"
+              :selected="split && note.id === editing?.id"
               @click="onCardClick(note, $event)"
             />
           </VScaleTransition>
@@ -643,8 +678,14 @@ onBeforeUnmount(() => {
       </div>
     </VSlideYReverseTransition>
 
+    <!-- Side by side with no note open: the reading column says what goes there -->
+    <div v-if="split && !editing" class="notes-detail-empty text-center">
+      <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
+      <p class="text-body-2 text-medium-emphasis">Pick a note to read or edit it here</p>
+    </div>
+
     <!-- Editor: a padded card over the whole tab; grows out of the clicked card / + button and
-         shrinks back into the note's card (or into the trash on delete) -->
+         shrinks back into the note's card (or into the trash on delete). Side by side it fills the right column. -->
     <Transition :css="false" @enter="onOverlayEnter" @leave="onOverlayLeave">
       <div v-if="editing" class="notes-editor-overlay">
         <div class="notes-editor-card rounded-lg" :class="editing.color ? `bg-note-${editing.color}` : 'bg-surface'">
@@ -683,6 +724,41 @@ onBeforeUnmount(() => {
   transition: opacity 0.2s ease;
 }
 
+/* Side by side: the grid takes a third (two card columns on most screens), the open note the rest */
+.notes-panel--split {
+  --notes-list-width: clamp(400px, 34%, 560px);
+  flex-direction: row;
+}
+
+.notes-panel--split .notes-body {
+  flex: 0 0 var(--notes-list-width);
+  min-width: 0;
+}
+
+.notes-panel--split .notes-editor-overlay {
+  left: var(--notes-list-width);
+}
+
+.notes-panel--split .notes-editor-card {
+  left: 0;
+}
+
+.notes-panel--split .notes-trash-zone {
+  right: auto;
+  width: var(--notes-list-width);
+}
+
+.notes-detail-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 12px 12px 0;
+  border: thin dashed rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+}
+
 .notes-body--behind {
   opacity: 0;
 }
@@ -697,6 +773,11 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* A smaller search basis keeps title, search and New note on one row in the narrow list column */
+.notes-list :deep(.list-search) {
+  flex-basis: 140px;
 }
 
 /* No notes: no toolbar, the empty state fills the tab */

@@ -4,7 +4,8 @@ import type { Note } from '@/interfaces/Note';
 import dayjs from 'dayjs';
 
 // previewHtml must already be sanitized (NotesPanel runs sanitizeNoteHtml once per notes change)
-defineProps<{ note: Note; previewHtml: string }>();
+// `selected`: the note open beside the grid
+defineProps<{ note: Note; previewHtml: string; selected?: boolean }>();
 </script>
 
 <template>
@@ -14,6 +15,7 @@ defineProps<{ note: Note; previewHtml: string }>();
     :color="note.color ? `note-${note.color}` : undefined"
     :ripple="false"
     class="note-card"
+    :class="{ 'note-card--selected': selected }"
   >
     <!-- eslint-disable-next-line vue/no-v-html -- sanitized by sanitizeNoteHtml -->
     <div class="note-content note-preview" :class="{ 'note-preview--pinned': note.pinned }" inert v-html="previewHtml" />
@@ -25,6 +27,11 @@ defineProps<{ note: Note; previewHtml: string }>();
 </template>
 
 <style scoped>
+/* The open note: a primary ring inside the card, so the grid doesn't shift */
+.note-card--selected {
+  box-shadow: inset 0 0 0 2px rgba(var(--v-theme-primary), 0.7) !important;
+}
+
 /* min/max instead of height: HomeView's mobile rule forces `height: auto !important` on every panel .v-card */
 .note-card {
   position: relative;
