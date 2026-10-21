@@ -15,6 +15,7 @@ import { AuthError, headerReader, requireUser } from './_lib/neonAuth.js';
 import { AI_NOT_SET_UP_MESSAGE, MAX_OUTPUT_TOKENS, aiErrorMessage, isAiAvailable, resolveAi } from './_lib/ai.js';
 import { getSettings } from './_lib/settingsRepo.js';
 import { dateContext } from './_lib/dateContext.js';
+import { APP_GUIDE } from '../src/common/appGuide.js';
 import { DEFAULT_AI_CONFIG, type AiConfig } from '../src/interfaces/ServerSettings.js';
 
 interface ChatApiRequest {
@@ -144,7 +145,12 @@ Saving notes and events:
 - Call addEvent when they mention a dated thing on their calendar (a meeting, leave, a deadline). Resolve relative dates using today's date. Repeating events can't be added here: point them to the Events page.
 - Work they did is a time log, not a note. If you can't tell which one they mean, ask in one short question instead of guessing.
 - After a save, confirm in a few words. The app shows an Undo button, so don't ask "are you sure".
-- A message may start with a slash command (/log, /note, /event, /ask). It tells you which one the user means.${commandRule}`;
+- A message may start with a slash command (/log, /note, /event, /ask). It tells you which one the user means.
+
+Questions about Daybook itself (how to do something, where data is kept, what a feature does): answer from this guide in a few plain sentences, without Markdown. If it doesn't say, say you're not sure rather than inventing a feature.
+"""
+${APP_GUIDE}
+"""${commandRule}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

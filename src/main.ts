@@ -84,6 +84,7 @@ const vuetify = createVuetify({
           'cmd-event': '#1565C0',
           'cmd-ask': '#7B1FA2',
           'cmd-catchup': '#00796B',
+          'cmd-help': '#546E7A',
         },
       },
       dark: {
@@ -107,6 +108,7 @@ const vuetify = createVuetify({
           'cmd-event': '#64B5F6',
           'cmd-ask': '#CE93D8',
           'cmd-catchup': '#4DB6AC',
+          'cmd-help': '#B0BEC5',
         },
       },
     },

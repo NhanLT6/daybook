@@ -41,7 +41,9 @@ export function describeConversation(messages: DaybookUIMessage[]): Pick<ChatCon
   const first = messages.find((m) => m.role === 'user');
   const text = first?.parts.find((p): p is TextUIPart => p.type === 'text')?.text.trim() ?? '';
   const { command, rest } = parseChatCommand(text);
-  return { title: rest || (command ? `/${command.name}` : text) || 'Image', command: command?.name };
+  // No user message yet: the first-visit welcome, or a message that was only an image
+  const fallback = messages.some((m) => m.metadata?.tool === 'welcome') ? 'Welcome to Daybook' : 'Image';
+  return { title: rest || (command ? `/${command.name}` : text) || fallback, command: command?.name };
 }
 
 export function useChatHistory() {

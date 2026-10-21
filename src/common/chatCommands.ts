@@ -1,12 +1,13 @@
 import type { ServerChatCommand } from '@/interfaces/aiTools';
 
-export type ChatCommandName = ServerChatCommand | 'catchup';
+export type ChatCommandName = ServerChatCommand | 'catchup' | 'help';
 
 export interface ChatCommand {
   name: ChatCommandName;
   icon: string;
   color: string; // theme color (main.ts `cmd-*`), so each feature reads apart at a glance
   hint: string; // shown in the / menu
+  instant?: boolean; // runs in the browser as soon as it's picked, with no text
 }
 
 // Order = order in the / menu: the logging command first, since that is what Chat is mostly for
@@ -15,7 +16,8 @@ export const CHAT_COMMANDS: ChatCommand[] = [
   { name: 'note', icon: 'mdi-note-plus-outline', color: 'cmd-note', hint: 'Save a sticky note' },
   { name: 'event', icon: 'mdi-calendar-plus', color: 'cmd-event', hint: 'Add a calendar event' },
   { name: 'ask', icon: 'mdi-note-search-outline', color: 'cmd-ask', hint: 'Ask about your notes' },
-  { name: 'catchup', icon: 'mdi-history', color: 'cmd-catchup', hint: 'Catch up on recent work' },
+  { name: 'catchup', icon: 'mdi-history', color: 'cmd-catchup', hint: 'Catch up on recent work', instant: true },
+  { name: 'help', icon: 'mdi-help-circle-outline', color: 'cmd-help', hint: 'What Daybook can do', instant: true },
 ];
 
 /** `/note buy milk` → `{ command: 'note', rest: 'buy milk' }`. Unknown or no command → `command` undefined. */

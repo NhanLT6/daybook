@@ -11,6 +11,7 @@ import { Chat } from '@ai-sdk/vue';
 import dayjs from 'dayjs';
 import { DefaultChatTransport, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 
+import { WELCOME_TEXT } from '@/common/appGuide';
 import { plainTextToNoteHtml } from '@/common/plainTextToNoteHtml';
 import { sanitizeNoteHtml } from '@/common/sanitizeNoteHtml';
 import { searchNotes } from '@/common/searchNotes';
@@ -18,7 +19,7 @@ import { addEventInputSchema, addNoteInputSchema, searchNotesInputSchema } from 
 import { nanoid } from 'nanoid';
 import { useSettingsStore } from '@/stores/settings';
 
-import { authHeaders } from './useAuth';
+import { authHeaders, isAuthConfigured } from './useAuth';
 import { dailyTargetMinutes } from './useDailyTarget';
 import { useEvents } from './useEvents';
 import { useNotes } from './useNotes';
@@ -143,15 +144,21 @@ export function useAiChat() {
     transport: new DefaultChatTransport<DaybookUIMessage>({
       headers: async () => (await authHeaders()) ?? {},
       body: () => requestBody,
-      prepareSendMessagesRequest: ({ id, messages, body, trigger, messageId }) => ({
-        body: {
-          ...body,
-          id,
-          messages: withExtractLogsResults(messages, (mid) => metadataMap.value.get(mid)?.saveState),
-          trigger,
-          messageId,
-        },
-      }),
+      prepareSendMessagesRequest: ({ id, messages, body, trigger, messageId, headers }) => {
+        // Signed out: the public help chat, which only explains the app (and limits questions per day).
+        // Without sign-in configured (local dev, e2e) there is no account to wait for, so /api/chat it is
+        const signedIn = Object.keys(headers ?? {}).some((k) => k.toLowerCase() === 'authorization');
+        if (isAuthConfigured && !signedIn) return { api: '/api/help', body: { messages } };
+        return {
+          body: {
+            ...body,
+            id,
+            messages: withExtractLogsResults(messages, (mid) => metadataMap.value.get(mid)?.saveState),
+            trigger,
+            messageId,
+          },
+        };
+      },
     }),
     onToolCall: async ({ toolCall }) => {
       if (toolCall.dynamic || !isClientTool(toolCall.toolName)) return;
@@ -196,7 +203,7 @@ export function useAiChat() {
     (chat.messages as DaybookUIMessage[]).map((m) => {
       const stored = metadataMap.value.get(m.id);
       // Catch-up messages are injected client-side and carry their own metadata.
-      if (stored?.tool === 'catchUp') return { ...m, metadata: stored };
+      if (stored?.tool === 'catchUp' || stored?.tool === 'welcome') return { ...m, metadata: stored };
 
       const logs = extractLogsFromMessage(m);
       const metadata: DaybookMessageMetadata | undefined =
@@ -274,6 +281,27 @@ export function useAiChat() {
     if (latestLogsMessageId.value === id) latestLogsMessageId.value = null;
   };
 
+  // Client-made assistant messages (welcome, canned answers) are plain text, so a follow-up
+  // question sent to the model still has them as context
+  const appendLocal = (role: 'user' | 'assistant', text: string, metadata?: DaybookMessageMetadata) => {
+    const id = `${role === 'user' ? 'local-q' : 'local-a'}-${nanoid(8)}`;
+    chat.messages = [...chat.messages, { id, role, parts: [{ type: 'text', text }] } as DaybookUIMessage];
+    if (metadata) metadataMap.value = new Map(metadataMap.value).set(id, metadata);
+  };
+
+  /** The first-visit welcome (also /help): an assistant message with suggested questions under it. */
+  const injectWelcome = () => {
+    error.value = null;
+    appendLocal('assistant', WELCOME_TEXT, { tool: 'welcome' });
+  };
+
+  /** A suggested question and its prepared answer, without a round trip or using the AI quota. */
+  const injectCannedAnswer = (question: string, answer: string) => {
+    error.value = null;
+    appendLocal('user', question);
+    appendLocal('assistant', answer);
+  };
+
   const injectCatchUp = (items: CatchUpRenderItem[]) => {
     const id = `catchup-${Date.now()}`;
     // Plain-text bullet list for AI conversation context (follow-up questions)
@@ -307,7 +335,7 @@ export function useAiChat() {
     chat.messages = restored;
     const map = new Map<string, DaybookMessageMetadata>();
     for (const m of restored) {
-      if (m.metadata?.tool === 'catchUp') map.set(m.id, m.metadata);
+      if (m.metadata?.tool === 'catchUp' || m.metadata?.tool === 'welcome') map.set(m.id, m.metadata);
       else if (m.metadata?.saveState) map.set(m.id, { saveState: m.metadata.saveState });
     }
     metadataMap.value = map;
@@ -336,6 +364,8 @@ export function useAiChat() {
     markUndone,
     markDiscarded,
     injectCatchUp,
+    injectWelcome,
+    injectCannedAnswer,
     loadMessages,
     clearMessages,
   };

@@ -26,7 +26,7 @@ describe('parseChatCommand', () => {
 
 describe('suggestChatCommands', () => {
   it('lists every command for a lone slash and filters by prefix', () => {
-    expect(suggestChatCommands('/').map((c) => c.name)).toEqual(['log', 'note', 'event', 'ask', 'catchup']);
+    expect(suggestChatCommands('/').map((c) => c.name)).toEqual(['log', 'note', 'event', 'ask', 'catchup', 'help']);
     expect(suggestChatCommands('/no').map((c) => c.name)).toEqual(['note']);
   });
 

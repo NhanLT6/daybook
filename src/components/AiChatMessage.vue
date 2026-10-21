@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { AddEventInput, AddNoteInput, AddedItemOutput } from '@/interfaces/aiTools';
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
+import type { HelpSuggestion } from '@/common/appGuide';
 import type { FileUIPart, TextUIPart } from 'ai';
 
 import { getToolName, isToolUIPart } from 'ai';
@@ -22,6 +23,8 @@ const props = defineProps<{
   isUndoable: boolean;
   canRetry: boolean;
   mentionLabels?: string[]; // known projects / tasks, drawn as chips in the user's text
+  suggestions?: HelpSuggestion[]; // questions offered under the welcome
+  welcomeNote?: string; // small print under them (the signed-out question limit)
 }>();
 
 const emit = defineEmits<{
@@ -29,6 +32,7 @@ const emit = defineEmits<{
   discard: [];
   undo: [];
   retry: [];
+  ask: [suggestion: HelpSuggestion];
 }>();
 
 // A reply that used a tool has text in several steps (before and after the tool call)
@@ -169,6 +173,22 @@ const copyMessage = () => {
 
     <!-- Plain text (conversational or streaming) — hidden for catchUp (text is AI context only) -->
     <p v-if="displayText && tool !== 'catchUp'" class="mb-0 message-text">{{ displayText }}</p>
+
+    <!-- Welcome: suggested questions, answered without the AI -->
+    <template v-if="tool === 'welcome'">
+      <div v-if="suggestions?.length" class="welcome-suggestions">
+        <button
+          v-for="s in suggestions"
+          :key="s.question"
+          type="button"
+          class="welcome-chip"
+          @click="emit('ask', s)"
+        >
+          {{ s.question }}
+        </button>
+      </div>
+      <p v-if="welcomeNote" class="welcome-note">{{ welcomeNote }}</p>
+    </template>
 
     <!-- catchUp tool result -->
     <template v-if="tool === 'catchUp' && catchUpItems?.length">
@@ -315,6 +335,40 @@ const copyMessage = () => {
 .added-item .is-undone {
   text-decoration: line-through;
   opacity: 0.6;
+}
+
+.welcome-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* Quiet outline, like the mention chips: suggestions, not calls to action */
+.welcome-chip {
+  padding: 4px 10px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: inherit;
+  background: transparent;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.welcome-chip:hover,
+.welcome-chip:focus-visible {
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  border-color: rgba(var(--v-theme-on-surface), 0.24);
+  outline: none;
+}
+
+.welcome-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 .catchup-list {

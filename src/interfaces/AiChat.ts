@@ -14,7 +14,7 @@ import type { UIDataTypes, UIMessage } from 'ai';
 // Re-export so existing `@/interfaces/AiChat` importers keep working
 export type { ExtractedLog } from './aiTools';
 
-export type ChatTool = 'extractLogs' | 'catchUp';
+export type ChatTool = 'extractLogs' | 'catchUp' | 'welcome';
 
 export interface DaybookMessageMetadata {
   tool?: ChatTool;

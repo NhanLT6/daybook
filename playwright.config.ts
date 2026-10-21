@@ -1,11 +1,34 @@
 import fs from 'node:fs';
 import process from 'node:process';
 
-import { defineConfig } from '@playwright/test';
+import { defineConfig, type PlaywrightTestOptions } from '@playwright/test';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file
 dotenv.config();
+
+const baseURL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+
+/**
+ * Saved auth cookies (if any), as a returning visitor: on a first visit the welcome opens the chat over
+ * every page. e2e/onboarding.spec.ts starts from an empty state to test the welcome itself.
+ */
+type StorageState = Exclude<PlaywrightTestOptions['storageState'], string | undefined>;
+
+function returningVisitorState(): StorageState {
+  const saved: StorageState = fs.existsSync('./auth-state.json')
+    ? JSON.parse(fs.readFileSync('./auth-state.json', 'utf8'))
+    : { cookies: [], origins: [] };
+  const origin = new URL(baseURL).origin;
+  const own = saved.origins.find((o) => o.origin === origin)?.localStorage ?? [];
+  return {
+    ...saved,
+    origins: [
+      ...saved.origins.filter((o) => o.origin !== origin),
+      { origin, localStorage: [...own, { name: 'notificationGreetingFirstSeenAt', value: '1' }] },
+    ],
+  };
+}
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -34,7 +57,7 @@ export default defineConfig({
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
     actionTimeout: 0,
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+    baseURL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -59,7 +82,7 @@ export default defineConfig({
           ],
         },
         // Reuse saved auth cookies if available to avoid re-login and bot detection
-        storageState: fs.existsSync('./auth-state.json') ? './auth-state.json' : undefined,
+        storageState: returningVisitorState(),
       },
     },
   ],

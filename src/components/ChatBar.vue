@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import { HELP_SIGN_IN_HINT, HELP_SUGGESTIONS, type HelpSuggestion } from '@/common/appGuide';
 import { type ChatCommand, CHAT_COMMANDS, suggestChatCommands } from '@/common/chatCommands';
+import { isFirstVisit, markGreetingShown } from '@/common/firstVisit';
 import { type ChatMention, findMentionQuery, matchMentions, splitMentions } from '@/common/chatMentions';
 import { useAiChat } from '@/composables/useAiChat';
+import { useAuth } from '@/composables/useAuth';
+import { useAuthDialog } from '@/composables/useAuthDialog';
 import { noticeColor, useChatNotices } from '@/composables/useChatNotices';
 import { fetchCatchUpItems } from '@/composables/useCatchUpSummary';
 import { type ChatConversation, useChatHistory } from '@/composables/useChatHistory';
@@ -56,9 +60,13 @@ const {
   markUndone,
   markDiscarded,
   injectCatchUp,
+  injectWelcome,
+  injectCannedAnswer,
   loadMessages,
   clearMessages,
 } = useAiChat();
+const { isAuthenticated, isAuthConfigured, ready: authReady } = useAuth();
+const { openAuthDialog } = useAuthDialog();
 
 const { conversations, upsert, get: getConversation } = useChatHistory();
 const { addMany: addLogs, remove: removeLog } = useTimeLogs();
@@ -183,7 +191,7 @@ const isDragOver = ref(false);
 
 const hasDraft = computed(() => !!inputText.value.trim() || !!command.value || !!attachedFile.value);
 const canSend = computed(
-  () => !isLoading.value && (!!inputText.value.trim() || !!attachedFile.value || command.value?.name === 'catchup'),
+  () => !isLoading.value && (!!inputText.value.trim() || !!attachedFile.value || !!command.value?.instant),
 );
 const placeholder = computed(() => {
   if (isDragOver.value) return 'Drop image here…';
@@ -267,7 +275,7 @@ const pickCommand = (picked: ChatCommand) => {
   command.value = picked;
   inputText.value = '';
   focusInput();
-  if (picked.name === 'catchup') void send(); // needs no text
+  if (picked.instant) void send(); // needs no text
 };
 
 const pickSuggestion = (picked: Suggestion) => {
@@ -430,7 +438,7 @@ const send = async () => {
   const parsed = command.value ? undefined : parseChatCommand(inputText.value.trim());
   const cmd = command.value ?? parsed?.command ?? null;
   const text = parsed?.command ? parsed.rest : inputText.value.trim();
-  if (cmd && cmd.name !== 'catchup' && !text && !attachedFile.value) return; // a bare command isn't a message yet
+  if (cmd && !cmd.instant && !text && !attachedFile.value) return; // a bare command isn't a message yet
   const file = attachedFile.value;
 
   inputText.value = '';
@@ -446,6 +454,10 @@ const send = async () => {
     await runCatchUp();
     return;
   }
+  if (cmd?.name === 'help') {
+    injectWelcome();
+    return;
+  }
   // The text keeps its /command prefix so the conversation still shows what each message was
   await sendMessage(cmd ? `/${cmd.name} ${text}` : text, file, projects.value, tasks.value, cmd?.name);
 };
@@ -456,10 +468,39 @@ const retry = async (messageId: string) => {
   const msg = messages.value.find((m) => m.id === messageId);
   const text = msg?.parts.find((p): p is TextUIPart => p.type === 'text')?.text ?? '';
   const { command: cmd } = parseChatCommand(text);
-  await sendMessage(text, null, projects.value, tasks.value, cmd?.name === 'catchup' ? undefined : cmd?.name);
+  const serverCommand = cmd?.name === 'catchup' || cmd?.name === 'help' ? undefined : cmd?.name;
+  await sendMessage(text, null, projects.value, tasks.value, serverCommand);
 };
 
 const isConfigError = computed(() => error.value?.includes('not set up') ?? false);
+
+// Signed out, the chat is the public help (api/help.ts); its refusals ask the visitor to sign in
+const signedOut = computed(() => isAuthConfigured && !isAuthenticated.value);
+const isSignInError = computed(() => signedOut.value && /sign in/i.test(error.value ?? ''));
+
+// ── Welcome (first visit, /help) ──────────────────────────────────────────
+
+// A suggested question under the welcome: answered from the guide, at once and without using AI quota
+const askSuggestion = (suggestion: HelpSuggestion) => {
+  if (isLoading.value) return;
+  injectCannedAnswer(suggestion.question, suggestion.answer);
+  focusInput();
+};
+
+// First visit, signed out: the chat rises on its own with the welcome. Someone already signed in is
+// a returning user on a new device and gets the usual greeting instead
+const WELCOME_DELAY_MS = 900;
+const showFirstVisitWelcome = async () => {
+  markGreetingShown();
+  await authReady;
+  if (isAuthenticated.value) return;
+  setTimeout(() => {
+    if (messages.value.length || state.value === 'open') return; // already chatting
+    injectWelcome();
+    reveal({ focus: false });
+    setState('open');
+  }, WELCOME_DELAY_MS);
+};
 
 const openSettings = () => {
   close();
@@ -832,6 +873,7 @@ onMounted(() => {
   shape.value = desiredShape.value; // the first frame is drawn in place, not morphed
   resizeObserver = new ResizeObserver(syncFrame);
   if (chatEl.value) resizeObserver.observe(chatEl.value);
+  if (isFirstVisit) void showFirstVisitWelcome();
 });
 
 onBeforeUnmount(() => {
@@ -1000,6 +1042,9 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             :is-undoable="msg.metadata?.saveState === 'saved' && msg.id === savedLogsMessageId"
             :can-retry="msg.id === lastUserMessageId && !!error"
             :mention-labels="mentionLabels"
+            :suggestions="HELP_SUGGESTIONS"
+            :welcome-note="signedOut ? HELP_SIGN_IN_HINT : undefined"
+            @ask="askSuggestion"
             @save-logs="(logs) => saveLogs(msg.id, logs)"
             @undo="() => undoLogs(msg.id)"
             @discard="() => markDiscarded(msg.id)"
@@ -1019,6 +1064,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             </span>
             <template v-else>
               <span class="flex-grow-1">{{ error }}</span>
+              <a v-if="isSignInError" class="chat-link" href="#" @click.prevent="openAuthDialog">Sign in</a>
               <button type="button" class="chat-iconbtn is-small" aria-label="Dismiss" @click="error = null">
                 <VIcon icon="mdi-close" size="16" />
               </button>
