@@ -19,7 +19,7 @@ export const CHAT_COMMANDS: ChatCommand[] = [
   { name: 'catchup', icon: 'mdi-history', color: 'cmd-catchup', hint: 'Catch up on recent work', instant: true },
   { name: 'help', icon: 'mdi-help-circle-outline', color: 'cmd-help', hint: 'What Daybook can do', instant: true },
   // Chat controls, so the whole panel works from the keyboard
-  { name: 'new', icon: 'mdi-plus', color: 'cmd-help', hint: 'New chat (Shift Shift)', instant: true },
+  { name: 'new', icon: 'mdi-plus', color: 'cmd-help', hint: 'New chat (Shift+Shift)', instant: true },
   { name: 'history', icon: 'mdi-forum-outline', color: 'cmd-help', hint: 'Past chats', instant: true },
 ];
 

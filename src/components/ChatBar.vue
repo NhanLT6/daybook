@@ -1029,7 +1029,7 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
             type="button"
             class="chat-iconbtn"
             aria-label="New chat"
-            v-tooltip="'New chat · Shift Shift'"
+            v-tooltip="'New chat · Shift+Shift'"
             :disabled="isLoading"
             @click="newChat"
           >

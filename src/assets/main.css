@@ -20,8 +20,7 @@
 
 /* ── Full-height page shell (shared by the Task/Event/Notes views) ───────────
    .page-fill fills VMain and pads it; its panel VCard fills the height so the
-   card reads as the content area. .page-inner caps the readable width of the
-   scrollable content inside that card. */
+   card reads as the content area. */
 .page-fill {
   height: 100%;
   padding: 12px;
@@ -29,13 +28,6 @@
 
 .page-fill > .v-card {
   height: 100%;
-}
-
-/* !important out-specifies Vuetify's `.v-container` responsive max-width, which
-   otherwise ties on specificity and wins on source order (letting content grow
-   to ~1200px instead of the intended cap). */
-.page-inner {
-  max-width: 900px !important;
 }
 
 /* Sticky card titles with proper background */
