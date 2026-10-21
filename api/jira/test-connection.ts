@@ -1,14 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-import { jiraErrorMessage, jiraGet } from '../_lib/jira.js';
+import { jiraErrorMessage, jiraGet, resolveJiraConfig } from '../_lib/jira.js';
 import { AuthError, headerReader, requireUser } from '../_lib/neonAuth.js';
-
-// Interface for request body
-interface TestConnectionRequest {
-  domain: string;
-  email: string;
-  apiToken: string;
-}
 
 interface JiraMyself {
   accountId: string;
@@ -23,22 +16,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Gated so this cannot be used as an anonymous proxy for probing Atlassian
-    // credentials from our domain. The Jira credentials themselves still come
-    // from the caller's own request body.
-    await requireUser(headerReader(req));
+    // Gated so this cannot be used as an anonymous proxy for probing Atlassian credentials from
+    // our domain. Unsaved form values in the body win, so a new token can be tested before saving.
+    const { userId } = await requireUser(headerReader(req));
+    const creds = await resolveJiraConfig(userId, req.body ?? {});
 
-    const { domain, email, apiToken } = req.body as TestConnectionRequest;
-
-    // Validate required fields
-    if (!domain || !email || !apiToken) {
+    if (!creds.domain || !creds.email || !creds.apiToken) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: domain, email, apiToken'
+        message: 'Jira domain, email and API token are required',
       });
     }
-
-    const creds = { domain, email, apiToken };
 
     try {
       const { data } = await jiraGet<JiraMyself>(creds, '/myself');

@@ -1,5 +1,9 @@
 import axios, { type AxiosResponse } from 'axios';
 
+import type { JiraConfig } from '../../src/interfaces/JiraConfig.js';
+import { isMaskedSecret } from '../../src/interfaces/ServerSettings.js';
+import { getSettings } from './settingsRepo.js';
+
 // Shared Jira REST client for the api/jira handlers.
 //
 // Atlassian has two kinds of API tokens:
@@ -12,6 +16,21 @@ export interface JiraCredentials {
   domain: string;
   email: string;
   apiToken: string;
+}
+
+/**
+ * The caller's Jira settings with any unsaved edits from the request body on top. The browser never
+ * holds the saved token: it sends the masked value (use the saved one), a new one to Test, or '' (none).
+ */
+export async function resolveJiraConfig(userId: string, body: Partial<JiraConfig> = {}): Promise<JiraConfig> {
+  const { jiraConfig: stored } = await getSettings(userId);
+  return {
+    ...stored,
+    domain: body.domain || stored.domain,
+    email: body.email || stored.email,
+    apiToken: body.apiToken === undefined || isMaskedSecret(body.apiToken) ? stored.apiToken : body.apiToken,
+    projectKey: body.projectKey || stored.projectKey,
+  };
 }
 
 // Site subdomain -> cloudId, kept for the life of the warm function instance

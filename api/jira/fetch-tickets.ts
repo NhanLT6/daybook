@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-import { jiraErrorMessage, jiraGet } from '../_lib/jira.js';
+import { jiraErrorMessage, jiraGet, resolveJiraConfig } from '../_lib/jira.js';
 import { AuthError, headerReader, requireUser } from '../_lib/neonAuth.js';
 
-// Interface for request body
+// Request body: the token comes from the caller's saved settings, the rest may be unsaved form values
 interface FetchTicketsRequest {
-  domain: string;
-  email: string;
-  apiToken: string;
-  projectKey: string;
+  domain?: string;
+  email?: string;
+  apiToken?: string;
+  projectKey?: string;
   statuses?: string[];
 }
 
@@ -52,18 +52,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Gated so this cannot be used as an anonymous proxy for probing Atlassian
-    // credentials from our domain. The Jira credentials themselves still come
-    // from the caller's own request body.
-    await requireUser(headerReader(req));
+    // Gated so this cannot be used as an anonymous proxy for probing Atlassian credentials from our domain
+    const { userId } = await requireUser(headerReader(req));
 
-    const { domain, email, apiToken, projectKey, statuses } = req.body as FetchTicketsRequest;
+    const { statuses, ...overrides } = (req.body ?? {}) as FetchTicketsRequest;
+    const creds = await resolveJiraConfig(userId, overrides);
 
     // Validate required fields
-    if (!domain || !email || !apiToken || !projectKey) {
+    if (!creds.domain || !creds.email || !creds.apiToken || !creds.projectKey) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: domain, email, apiToken, projectKey',
+        message: 'Jira domain, email, API token and project key are required',
       });
     }
 
@@ -75,9 +74,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const jql = buildJqlQuery(projectKey, statuses);
+    const jql = buildJqlQuery(creds.projectKey, statuses);
 
-    const response = await jiraGet<JiraSearchResponse>({ domain, email, apiToken }, '/search/jql', {
+    const response = await jiraGet<JiraSearchResponse>(creds, '/search/jql', {
       jql,
       fields: 'summary,assignee,status,issuetype,description',
       maxResults: 100,

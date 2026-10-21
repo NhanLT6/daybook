@@ -1,14 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-import { jiraErrorMessage, jiraGet } from '../_lib/jira.js';
+import type { JiraConfig } from '../../src/interfaces/JiraConfig.js';
+import { jiraErrorMessage, jiraGet, resolveJiraConfig } from '../_lib/jira.js';
 import { AuthError, headerReader, requireUser } from '../_lib/neonAuth.js';
-
-interface StatusesRequest {
-  domain: string;
-  email: string;
-  apiToken: string;
-  projectKey: string;
-}
 
 // GET /project/{key}/statuses answers per issue type, so the same status repeats across types
 interface JiraIssueTypeStatuses {
@@ -25,19 +19,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Gated like the other Jira proxies so it is not an anonymous credential prober
-    await requireUser(headerReader(req));
+    const { userId } = await requireUser(headerReader(req));
 
-    const { domain, email, apiToken, projectKey } = req.body as StatusesRequest;
-    if (!domain || !email || !apiToken || !projectKey) {
+    const creds = await resolveJiraConfig(userId, (req.body ?? {}) as Partial<JiraConfig>);
+    if (!creds.domain || !creds.email || !creds.apiToken || !creds.projectKey) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: domain, email, apiToken, projectKey',
+        message: 'Jira domain, email, API token and project key are required',
       });
     }
 
     const { data } = await jiraGet<JiraIssueTypeStatuses[]>(
-      { domain, email, apiToken },
-      `/project/${encodeURIComponent(projectKey.trim())}/statuses`,
+      creds,
+      `/project/${encodeURIComponent(creds.projectKey.trim())}/statuses`,
     );
 
     const byName = new Map<string, number>();

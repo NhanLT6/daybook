@@ -90,11 +90,13 @@ const autoSyncJiraTickets = async () => {
  * Signed out this resolves to null and the app runs on local data alone.
  */
 const initServerSettings = async () => {
-  const serverSettings = await loadSettings();
+  let serverSettings = await loadSettings();
   if (!serverSettings) return; // signed out, or the server is unreachable locally
 
-  const jiraConfig = await migrateJiraFromLocalStorage(settingsStore.jiraConfig, serverSettings);
-  settingsStore.populateFromServer(jiraConfig, serverSettings.aiConfig, serverSettings.aiGatewayAvailable);
+  // A migrated legacy config was just saved, so re-read to get it back without its token
+  if (await migrateJiraFromLocalStorage(serverSettings)) serverSettings = (await loadSettings()) ?? serverSettings;
+
+  settingsStore.populateFromServer(serverSettings.jiraConfig, serverSettings.aiConfig, serverSettings.aiGatewayAvailable);
 };
 
 onMounted(async () => {

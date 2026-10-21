@@ -15,10 +15,21 @@ export interface ServerSettings {
   jiraConfig: JiraConfig
 }
 
-/** What GET /api/settings returns: the stored settings plus a deployment flag. */
+/**
+ * What GET /api/settings returns: the stored settings with their secrets masked
+ * (see maskSecret), plus a deployment flag.
+ */
 export interface ServerSettingsResponse extends ServerSettings {
   aiGatewayAvailable: boolean // The deployment runs a shared AI gateway, so AI works without the user's own key
 }
+
+// Saved secrets never leave the server. The browser gets this prefix plus the last 4 characters,
+// and sending the masked value back means "keep the saved one". Real tokens never contain "•".
+const SECRET_MASK = '••••••••'
+
+export const maskSecret = (secret: string): string => (secret ? `${SECRET_MASK}${secret.slice(-4)}` : '')
+
+export const isMaskedSecret = (value: string | undefined): boolean => !!value?.startsWith(SECRET_MASK)
 
 /**
  * The mode a stored config means. Configs saved before `mode` existed keep their old behaviour: the

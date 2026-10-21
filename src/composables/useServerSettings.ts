@@ -70,24 +70,22 @@ export function useServerSettings() {
   /**
    * One-time migration: if Jira config exists in localStorage, move it to the
    * server and clear localStorage. Called once during app startup.
+   * Returns true when something was migrated.
    */
-  const migrateJiraFromLocalStorage = async (
-    currentJiraConfig: JiraConfig,
-    serverSettings: ServerSettings,
-  ): Promise<JiraConfig> => {
+  const migrateJiraFromLocalStorage = async (serverSettings: ServerSettings): Promise<boolean> => {
     const raw = localStorage.getItem('jiraConfig')
-    if (!raw) return serverSettings.jiraConfig
+    if (!raw) return false
 
     try {
       const localConfig = JSON.parse(raw) as JiraConfig
       // Only migrate if the local config has actual data
-      if (!localConfig.email && !localConfig.apiToken) return serverSettings.jiraConfig
+      if (!localConfig.email && !localConfig.apiToken) return false
 
-      await saveSettings({ jiraConfig: localConfig })
+      await saveSettings({ jiraConfig: { ...serverSettings.jiraConfig, ...localConfig } })
       localStorage.removeItem('jiraConfig')
-      return localConfig
+      return true
     } catch {
-      return serverSettings.jiraConfig
+      return false
     }
   }
 

@@ -118,7 +118,7 @@ export const useSettingsStore = defineStore('settings', () => {
   });
 
   // ── Server-managed credentials (populated via populateFromServer) ────
-  // These are plain refs — not persisted in localStorage
+  // These are plain refs — not persisted in localStorage. Saved secrets arrive masked (maskSecret)
   const jiraConfig = ref<JiraConfig>({ ...DEFAULT_JIRA_CONFIG });
   const aiConfig = ref<AiConfig>({ ...DEFAULT_AI_CONFIG });
   // Whether the deployment runs a shared AI gateway; false = AI needs the user's own key

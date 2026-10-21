@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
-import { resolveAiMode, type AiMode } from '@/interfaces/ServerSettings';
+import { maskSecret, resolveAiMode, type AiMode } from '@/interfaces/ServerSettings';
 
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
@@ -219,8 +219,15 @@ const handleSaveCredentials = async () => {
       jiraConfig: settingsStore.jiraConfig,
       aiConfig: settingsStore.aiConfig,
     });
-    if (ok) notificationCenter.success('Settings saved');
-    else notificationCenter.error('Failed to save settings');
+    if (ok) {
+      // The server now holds any newly typed secret; keep only its masked form in the browser
+      const { jiraConfig, aiConfig } = settingsStore;
+      jiraConfig.apiToken = maskSecret(jiraConfig.apiToken);
+      aiConfig.apiKey = maskSecret(aiConfig.apiKey);
+      showApiToken.value = false;
+      showGeminiKey.value = false;
+      notificationCenter.success('Settings saved');
+    } else notificationCenter.error('Failed to save settings');
   } finally {
     isSavingSettings.value = false;
   }
