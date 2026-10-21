@@ -610,12 +610,12 @@ onBeforeUnmount(() => {
             rounded="lg"
             height="32"
             prepend-icon="mdi-flask-outline"
-            :class="split ? 'list-icon-only' : 'list-icon-on-xs'"
+            class="notes-tool-btn"
             aria-label="Add 20 sample notes"
             v-tooltip="'Add 20 sample notes (dev only)'"
             @click="addSampleNotes"
           >
-            <span v-if="!split" class="d-none d-sm-inline">Samples</span>
+            <span class="notes-tool-btn__label">Samples</span>
           </VBtn>
           <VBtn
             color="primary"
@@ -623,13 +623,13 @@ onBeforeUnmount(() => {
             rounded="lg"
             height="32"
             prepend-icon="mdi-plus"
-            :class="split ? 'list-icon-only' : 'list-icon-on-xs'"
+            class="notes-tool-btn"
             aria-label="New note"
             v-tooltip="'New note'"
             @click="addNote"
           >
-            <!-- Icon only in the narrow list column beside an open note -->
-            <span v-if="!split" class="d-none d-sm-inline">New note</span>
+            <!-- The label drops when the list column is too narrow for it (container query below) -->
+            <span class="notes-tool-btn__label">New note</span>
           </VBtn>
         </template>
 
@@ -759,6 +759,27 @@ onBeforeUnmount(() => {
 .notes-panel--split .notes-body {
   flex: 0 0 var(--notes-list-width);
   min-width: 0;
+}
+
+/* Toolbar buttons follow the list column's own width (beside an open note, or a phone), not the screen's:
+   their labels show while title, search and buttons still fit on one row */
+.notes-body {
+  container: notes-list / inline-size;
+}
+
+@container notes-list (max-width: 399px) {
+  .notes-tool-btn.v-btn {
+    min-width: 32px;
+    padding-inline: 6px;
+  }
+
+  .notes-tool-btn :deep(.v-btn__prepend) {
+    margin-inline: 0;
+  }
+
+  .notes-tool-btn__label {
+    display: none;
+  }
 }
 
 .notes-panel--split .notes-editor-overlay {
