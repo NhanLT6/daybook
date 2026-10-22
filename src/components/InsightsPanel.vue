@@ -320,7 +320,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
            not dividers -->
       <div>
         <div class="text-overline text-medium-emphasis ms-2">Overview</div>
-        <VCard>
+        <VCard variant="text">
           <div class="pa-4 d-flex flex-column ga-4 text-caption">
             <!-- Days logged + progress against the month's workdays -->
             <div>
@@ -387,7 +387,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       <!-- Time by project -->
       <div v-if="projectBreakdown.length > 0">
         <div class="text-overline text-medium-emphasis ms-2">Time by project</div>
-        <VCard>
+        <VCard variant="text">
           <div class="pa-2">
             <!-- Accordion: each project expands to its task breakdown (simple projects have no chevron/detail) -->
             <VExpansionPanels
@@ -401,6 +401,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
                 :key="item.project"
                 :value="item.project"
                 :hide-actions="!breakdownByProject[item.project]"
+                bg-color="transparent"
               >
                 <!-- Project row (selected → project-colored tint) -->
                 <VExpansionPanelTitle
@@ -498,7 +499,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       <!-- Filtered stats — reflects LogList's current project/task/date/search filter -->
       <div v-if="hasActiveFilter">
         <div class="text-overline text-medium-emphasis ms-2">Filtered</div>
-        <VCard>
+        <VCard variant="text">
           <div class="pa-4">
             <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(filteredMinutes) }}</div>
             <div class="text-caption text-medium-emphasis mt-1">

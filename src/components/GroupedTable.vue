@@ -8,9 +8,9 @@ import { useDisplay } from 'vuetify';
 // The one grouped list the list pages share, built from Vuetify parts: each group (a day, a project,
 // a month) is a VExpansionPanel whose title is the group row and whose body is a VDataTable of its
 // rows. On top of that it adds only what Vuetify doesn't have: one row of column titles on the glass,
-// group totals lined up under their column, and solid (tier-1) cards: consecutive groups with the
-// same `block` share a card and blocks are spaced apart (a week of logs, a category of projects), so
-// a light week reads as a small card. Pages fill cells, group rows and row actions through slots.
+// group totals lined up under their column, and blocks: consecutive groups with the same
+// `block` sit together and blocks are spaced apart with a hairline (a week of logs, a category of projects). Pages fill
+// cells, group rows and row actions through slots.
 export interface TableColumn {
   key: string;
   title: string;
@@ -227,7 +227,7 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 </template>
 
 <style scoped>
-/* Cards are inset from the glass edge like Insights' cards */
+/* Inset from the glass edge like Insights */
 .gt {
   padding: 0 8px 12px;
 }
@@ -277,28 +277,21 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 }
 
 .v-theme--dark .gt-head--frosted {
-  background: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77));
+  background: rgba(44, 52, 64, var(--glass-opacity-dark, 0.77));
 }
 
-/* Tier 1: blocks are solid cards spaced apart on the glass. The selectors sit in Vuetify's
-   accordion context (with its !important) to out-specify its middle-panel radius reset. */
-.gt-panels :deep(> .v-expansion-panel.gt-panel--block-start) {
-  border-top-left-radius: 8px !important;
-  border-top-right-radius: 8px !important;
-  overflow: hidden;
-}
-
-.gt-panels :deep(> .v-expansion-panel.gt-panel--block-end) {
-  border-bottom-left-radius: 8px !important;
-  border-bottom-right-radius: 8px !important;
-  overflow: hidden;
+/* Rows sit directly on the glass: panels have no surface of their own. Blocks are spaced apart and a
+   hairline marks each start after the first. */
+.gt-panels :deep(> .v-expansion-panel) {
+  background: transparent;
 }
 
 .gt-panels :deep(> .v-expansion-panel.gt-panel--block-start:not(:first-child)) {
   margin-top: 12px;
+  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
-/* Hairline between the groups of a card (flat drops Vuetify's): not at a card's top edge, and not under
+/* Hairline between the groups of a block (flat drops Vuetify's): not at a block's top edge, and not under
    an open group, whose last row already draws one */
 .gt-panels :deep(> .v-expansion-panel:not(:first-child)::after) {
   border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));

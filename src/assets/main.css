@@ -23,7 +23,7 @@
    card reads as the content area. */
 .page-fill {
   height: 100%;
-  padding: 12px;
+  padding: 8px;
 }
 
 .page-fill > .v-card {
@@ -106,10 +106,10 @@
 }
 
 .v-theme--dark .glass-acrylic {
-  background: rgba(28, 28, 28, var(--glass-opacity-dark, 0.77)) !important;
+  background: rgba(44, 52, 64, var(--glass-opacity-dark, 0.77)) !important;
   backdrop-filter: blur(var(--glass-blur, 25.6px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Vuetify inputs inside glass panels have near-transparent default backgrounds
@@ -136,11 +136,11 @@
   --vc-color: rgba(255, 255, 255, 0.87);
   --vc-header-title-color: rgba(255, 255, 255, 0.87);
   --vc-weekday-color: rgba(255, 255, 255, 0.6);
-  --vc-popover-content-bg: #2d2d2d;
+  --vc-popover-content-bg: #36404c;
   --vc-time-picker-border: rgba(255, 255, 255, 0.12);
   --vc-header-arrow-color: rgba(255, 255, 255, 0.6);
   --vc-header-arrow-hover-bg: rgba(255, 255, 255, 0.1);
-  --vc-focus-ring: 0 0 0 2px rgba(76, 175, 80, 0.4);
+  --vc-focus-ring: 0 0 0 2px rgba(127, 194, 156, 0.4);
   --vc-nav-hover-bg: rgba(255, 255, 255, 0.1);
   --vc-nav-title-color: rgba(255, 255, 255, 0.87);
 }

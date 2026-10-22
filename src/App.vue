@@ -421,7 +421,7 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 
 /* ── Desktop nav rail ──────────────────────────────────────────────────────────
    The drawer itself is an invisible 80px layout column (so VMain pads past it);
-   the glass card inside floats 12px off the window edges like every other card. */
+   the glass card inside floats 8px off the window edges (and 8px from the page content, VMain's .page-fill padding) like every other card. */
 .app-rail-shell {
   background: transparent !important;
   border: none !important;
@@ -433,8 +433,8 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 }
 
 .app-rail {
-  height: calc(100% - 24px);
-  margin: 12px 0 12px 12px;
+  height: calc(100% - 16px);
+  margin: 8px 0 8px 8px;
   border-radius: 12px;
   display: flex;
   flex-direction: column;

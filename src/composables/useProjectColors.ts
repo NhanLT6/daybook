@@ -150,7 +150,7 @@ export const useProjectColors = () => {
 
   // Theme-aware utility colors
   // Remaining: neutral grey placeholder (Vuetify grey-darken-3 / grey-lighten-3)
-  const remainingDataColor = () => (isDark() ? '#424242' : '#EEEEEE');
+  const remainingDataColor = () => (isDark() ? '#465260' : '#EEEEEE');
 
   return {
     chartPalette,

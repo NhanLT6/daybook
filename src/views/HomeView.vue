@@ -407,8 +407,8 @@ const importCsv = async (file?: File) => {
   display: flex;
   flex-direction: row;
   height: 100%;
-  padding: 12px;
-  gap: 12px;
+  padding: 8px;
+  gap: 8px;
 }
 
 /* Left panel: fixed-width form column */
@@ -423,7 +423,7 @@ const importCsv = async (file?: File) => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* Center card: chart header on top, the log list takes the rest of the height */
@@ -441,21 +441,21 @@ const importCsv = async (file?: File) => {
   transform: rotate(180deg);
 }
 
-/* Right column wrapper (only rendered on wide screens). It owns the 12px gap to the center card as the
+/* Right column wrapper (only rendered on wide screens). It owns the 8px gap to the center card as the
    panel's margin, cancelling the layout's flex gap, so at width 0 no stray gap is left behind. Content is
    pinned to the right edge and clipped, so the panel slides out under the center card's edge. */
 .insights-wrap {
   flex: 0 0 auto;
   display: flex;
   justify-content: flex-end;
-  margin-left: -12px;
+  margin-left: -8px;
   overflow: hidden;
 }
 
 .insights-panel {
   flex: 0 0 320px;
   width: 320px;
-  margin-left: 12px;
+  margin-left: 8px;
   transition:
     opacity 0.3s,
     transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
@@ -476,13 +476,13 @@ const importCsv = async (file?: File) => {
 }
 
 /* Insights drawer (below the inline breakpoint): float the panel like the app's
-   other glass cards — 12px off the window edges, below the small-screen app bar
+   other glass cards — 8px off the window edges, below the small-screen app bar
    when there is one — instead of an edge-to-edge slab. The transparent shell
    lets the panel's own glass show. --v-layout-top comes from VMain (0 on desktop,
    where the nav is a left rail). */
 .insights-drawer {
-  top: calc(var(--v-layout-top, 0px) + 12px) !important;
-  bottom: 12px !important;
+  top: calc(var(--v-layout-top, 0px) + 8px) !important;
+  bottom: 8px !important;
   height: auto !important;
   background: transparent !important;
   border: none !important;
@@ -493,7 +493,7 @@ const importCsv = async (file?: File) => {
    screen edge (top/bottom gaps come from the shell offsets above). */
 .insights-drawer :deep(.v-navigation-drawer__content) {
   display: flex;
-  padding-right: 12px;
+  padding-right: 8px;
 }
 
 .insights-drawer :deep(.v-navigation-drawer__content) > * {

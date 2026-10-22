@@ -44,6 +44,6 @@ const imageStyle = computed(() => {
 }
 
 .v-theme--dark .app-background-static {
-  background-color: #313337;
+  background-color: #1a1f26;
 }
 </style>

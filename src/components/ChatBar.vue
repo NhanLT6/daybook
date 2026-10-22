@@ -1298,16 +1298,16 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
 }
 
 .v-theme--dark .chat-bar {
-  --chat-veil: #363636;
+  --chat-veil: #2c3440;
   --chat-rim:
     inset 1.5px 1.5px 1px -0.5px rgba(255, 255, 255, 0.45), inset -1px -1px 0 0 rgba(0, 0, 0, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   --chat-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.22), 0 24px 60px rgba(0, 0, 0, 0.24);
   --chat-line: rgba(232, 236, 239, 0.12);
   --chat-tile: rgba(255, 255, 255, 0.05);
-  --chat-menu: #404040;
+  --chat-menu: #36404c;
   --chat-send-bg: #c4c7cb;
-  --chat-send-fg: #2d2d2d;
+  --chat-send-fg: #2c3440;
   --chat-ai: rgba(255, 255, 255, 0.07);
   --chat-halo: rgba(20, 22, 26, 0.7);
   --chat-thumb: rgba(255, 255, 255, 0.2);

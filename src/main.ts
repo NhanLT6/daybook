@@ -89,13 +89,15 @@ const vuetify = createVuetify({
       },
       dark: {
         colors: {
-          primary: '#4CAF50', // lighter green for dark mode
+          primary: '#7FC29C', // sage, matches the app icon
           secondary: '#9E9E9E', // grey
           accent: '#CE93D8', // purple-lighten-3
           'accent-light': '#4A148C', // purple-darken-4
           container: '#424242', // grey-darken-3
-          surface: '#2D2D2D',
-          background: '#1E1E1E',
+          surface: '#36404C', // slate palette
+          background: '#1A1F26',
+          'on-surface': '#E6EAEF',
+          'on-background': '#E6EAEF',
           // Sticky note tints: muted so light text stays readable
           'note-yellow': '#4D4523',
           'note-green': '#2F4630',

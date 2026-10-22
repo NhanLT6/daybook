@@ -636,7 +636,7 @@ onBeforeUnmount(() => {
       <!-- Scrollable card grid (pinned notes first) -->
       <div class="notes-scroll" :class="{ 'notes-scroll--empty': !notes.length }">
         <!-- No notes: fills the tab like the Chat panel, with the add action right there -->
-        <VCard v-if="!notes.length" class="notes-empty">
+        <VCard v-if="!notes.length" variant="text" class="notes-empty">
           <div class="d-flex flex-column align-center justify-center text-center pa-6 h-100">
             <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
             <p class="text-body-2 text-medium-emphasis mb-1">Jot down what you need to remember today</p>

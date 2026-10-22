@@ -43,7 +43,7 @@ const onSelectEvent = (id: string) => {
 
 <template>
   <div class="page-fill event-page">
-    <!-- Calendar column (a glass card holding two solid cards, like Home's form column): fixed width, opens on the month (remembered apart from Home's week/month), with the
+    <!-- Calendar column (one glass card; the calendar and the day's events sit directly on it): fixed width, opens on the month (remembered apart from Home's week/month), with the
          picked day's (or today's) events underneath -->
     <VCard class="glass-acrylic event-side">
       <CalendarOverview
@@ -75,6 +75,12 @@ const onSelectEvent = (id: string) => {
 }
 
 /* Calendar + day card keep their natural height instead of the page's full-height panel rule */
+/* The calendar sits directly on the glass (it is a solid VCard when standalone, e.g. in the log form) */
+.event-side :deep(.calendar-overview-card) {
+  background: transparent;
+  box-shadow: none;
+}
+
 .event-side {
   flex: 0 0 340px;
   display: flex;

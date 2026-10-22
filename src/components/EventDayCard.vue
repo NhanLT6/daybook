@@ -96,7 +96,7 @@ const dotColor = (type: AppEvent['type']) => (type === 'holiday' ? 'accent' : 'i
 </script>
 
 <template>
-  <VCard class="event-day-card">
+  <VCard variant="text" class="event-day-card">
     <!-- Header: which day this is -->
     <div class="d-flex align-baseline justify-space-between ga-2 px-4 pt-3">
       <span class="text-subtitle-1 font-weight-medium">{{ heading }}</span>

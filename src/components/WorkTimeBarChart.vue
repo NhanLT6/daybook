@@ -464,7 +464,7 @@ onUnmounted(() => {
     </div>
 
     <!-- The wrap animates its height; the canvas keeps a fixed height so Chart.js never redraws squashed bars.
-         Chart + legend sit in a solid (tier-1) card on the glass, like the log list's week cards below -->
+         Chart + legend sit directly on the glass, like the log list below -->
     <div class="month-chart__wrap" :class="{ 'month-chart__wrap--collapsed': collapsed }" :aria-hidden="collapsed">
       <div class="month-chart__card">
         <div class="chart-container">
@@ -529,8 +529,7 @@ onUnmounted(() => {
 
 .month-chart__card {
   padding: 8px 8px 4px;
-  border-radius: 8px;
-  background: rgb(var(--v-theme-surface));
+  background: transparent;
 }
 
 .chart-container {
