@@ -97,6 +97,11 @@
    by the Glass Effect slider in Settings.
    ──────────────────────────────────────────────────────────────────────── */
 
+/* The one inset content keeps from a glass panel's edge (toolbars, titles, rows, form fields) */
+.glass-acrylic {
+  --panel-pad: 16px;
+}
+
 /* Acrylic — frosted panel */
 .v-theme--light .glass-acrylic {
   background: rgba(255, 255, 255, var(--glass-opacity-light, 0.83));

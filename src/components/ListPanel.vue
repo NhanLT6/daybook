@@ -89,7 +89,7 @@ provide(
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 12px 8px 20px;
+  padding: 8px var(--panel-pad, 16px);
 }
 
 .list-toolbar__heading {

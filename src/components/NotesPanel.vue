@@ -837,7 +837,7 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 12px 12px;
+  padding: 4px var(--panel-pad, 16px) 12px;
 }
 
 /* No notes: same 8px inset as the Chat panel's card, which the empty state mirrors */

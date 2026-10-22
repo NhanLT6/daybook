@@ -480,7 +480,7 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  padding: 14px 12px 8px 20px;
+  padding: 14px var(--panel-pad, 16px) 8px;
 }
 
 .month-chart__heading {
@@ -519,7 +519,7 @@ onUnmounted(() => {
 .month-chart__wrap {
   height: 177px;
   overflow: hidden;
-  padding: 0 8px;
+  padding: 0 var(--panel-pad, 16px);
   transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
@@ -528,7 +528,7 @@ onUnmounted(() => {
 }
 
 .month-chart__card {
-  padding: 8px 8px 4px;
+  padding: 8px 0 4px;
   background: transparent;
 }
 

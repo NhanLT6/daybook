@@ -83,7 +83,7 @@ const onSelectEvent = (id: string) => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px;
+  padding: 8px 0;
   overflow: visible;
 }
 

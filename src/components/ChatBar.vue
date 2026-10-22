@@ -1284,12 +1284,13 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   --chat-halo: rgba(255, 255, 255, 0.75);
   --chat-thumb: rgba(20, 28, 38, 0.22);
   --chat-thumb-hover: rgba(20, 28, 38, 0.36);
-  /* The light ("pha màu"): a near-black core (white in dark) running through blue, pink and
-     amber on the rim; the glow under it runs the whole spectrum. Notifications swap in their own
+  /* The light ("pha màu"): a near-black core (white in dark) running through blue,
+     teal and sage on the rim (a cool palette, same family as the app's primary); the glow under it
+     runs the same hues. Notifications swap in their own
      colour (lightStyle). The rim's angle turns on the rim itself, so it takes stops, not a gradient */
   --light-mono: rgba(16, 18, 22, 0.8);
-  --halo-grad: linear-gradient(90deg, #6f9bff, #a98bff, #ff7eb6, #ffad66, #6fdcc0);
-  --rim-stops: var(--light-mono), #6f9bff, var(--light-mono) 35%, #ff7eb6 55%, var(--light-mono) 70%, #ffad66 85%,
+  --halo-grad: linear-gradient(90deg, #5b9bd5, #4db6ac, #4a8c6a, #4db6ac, #5b9bd5);
+  --rim-stops: var(--light-mono), #5b9bd5, var(--light-mono) 35%, #4db6ac 55%, var(--light-mono) 70%, #4a8c6a 85%,
     var(--light-mono);
 }
 
@@ -1313,6 +1314,9 @@ const onBodyTransitionEnd = (e: TransitionEvent) => {
   --chat-thumb: rgba(255, 255, 255, 0.2);
   --chat-thumb-hover: rgba(255, 255, 255, 0.34);
   --light-mono: rgba(255, 255, 255, 0.85);
+  --halo-grad: linear-gradient(90deg, #5b9bd5, #4db6ac, #7fc29c, #4db6ac, #5b9bd5);
+  --rim-stops: var(--light-mono), #5b9bd5, var(--light-mono) 35%, #4db6ac 55%, var(--light-mono) 70%, #7fc29c 85%,
+    var(--light-mono);
 }
 
 /* Thin themed scrollbars (Vuetify 3 has no scroll-area component) */

@@ -229,7 +229,8 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 <style scoped>
 /* Inset from the glass edge like Insights */
 .gt {
-  padding: 0 8px 12px;
+  --gt-cell-pad: 8px;
+  padding: 0 calc(var(--panel-pad, 16px) - var(--gt-cell-pad)) 12px;
 }
 
 /* Fixed layout keeps every group's columns at the same widths */
@@ -247,7 +248,7 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 
 .gt-grid > * {
   min-width: 0;
-  padding: 0 16px;
+  padding: 0 var(--gt-cell-pad);
 }
 
 /* Column titles on the glass, pinned. Once rows scroll under them they take a strip of the same
@@ -256,8 +257,8 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: 0 -8px;
-  padding: 0 8px;
+  margin: 0 calc(var(--panel-pad, 16px) * -1 + var(--gt-cell-pad));
+  padding: 0 calc(var(--panel-pad, 16px) - var(--gt-cell-pad));
   height: 36px;
   display: flex;
   align-items: center;
@@ -315,7 +316,7 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 .gt-block-label {
   width: 100%;
   margin: 16px 0 6px;
-  padding: 0 4px 0 16px;
+  padding: 0 4px 0 var(--gt-cell-pad);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -362,7 +363,7 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
   z-index: 1;
   height: 48px;
   align-items: center;
-  padding-inline: 16px;
+  padding-inline: var(--gt-cell-pad);
 }
 
 .gt-group-body :deep(.v-expansion-panel-text__wrapper) {
@@ -376,6 +377,7 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 
 .gt-table :deep(.gt-row > td) {
   padding-block: 8px !important;
+  padding-inline: var(--gt-cell-pad) !important;
   overflow-wrap: anywhere;
 }
 
