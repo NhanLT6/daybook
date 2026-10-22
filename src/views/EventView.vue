@@ -55,6 +55,9 @@ const onSelectEvent = (id: string) => {
         @update:selected-dates="onSelectDates"
       />
 
+      <!-- Inset hairline between the calendar and the day's events -->
+      <VDivider class="mx-4" />
+
       <EventDayCard :day="cardDay" :selected-event-id="selectedEventId" @select-event="onSelectEvent" />
     </VCard>
 
@@ -75,12 +78,6 @@ const onSelectEvent = (id: string) => {
 }
 
 /* Calendar + day card keep their natural height instead of the page's full-height panel rule */
-/* The calendar sits directly on the glass (it is a solid VCard when standalone, e.g. in the log form) */
-.event-side :deep(.calendar-overview-card) {
-  background: transparent;
-  box-shadow: none;
-}
-
 .event-side {
   flex: 0 0 340px;
   display: flex;

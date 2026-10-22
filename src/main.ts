@@ -94,8 +94,8 @@ const vuetify = createVuetify({
           accent: '#CE93D8', // purple-lighten-3
           'accent-light': '#4A148C', // purple-darken-4
           container: '#424242', // grey-darken-3
-          surface: '#36404C', // slate palette
-          background: '#1A1F26',
+          surface: '#323B46', // slate palette
+          background: '#171C22',
           'on-surface': '#E6EAEF',
           'on-background': '#E6EAEF',
           // Sticky note tints: muted so light text stays readable

@@ -321,7 +321,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       <div>
         <div class="text-overline text-medium-emphasis ms-2">Overview</div>
         <VCard variant="text">
-          <div class="pa-4 d-flex flex-column ga-4 text-caption">
+          <div class="px-2 py-3 d-flex flex-column ga-4 text-caption">
             <!-- Days logged + progress against the month's workdays -->
             <div>
               <div class="d-flex justify-space-between">
@@ -388,9 +388,10 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       <div v-if="projectBreakdown.length > 0">
         <div class="text-overline text-medium-emphasis ms-2">Time by project</div>
         <VCard variant="text">
-          <div class="pa-2">
+          <div class="py-1">
             <!-- Accordion: each project expands to its task breakdown (simple projects have no chevron/detail) -->
             <VExpansionPanels
+              class="project-panels"
               variant="accordion"
               flat
               :model-value="selectedProject ?? undefined"
@@ -481,14 +482,14 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
             </VExpansionPanels>
 
             <!-- +N more -->
-            <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2 ms-3">
+            <div v-if="extraProjectCount > 0" class="text-caption text-medium-emphasis mt-2 ms-2">
               +{{ extraProjectCount }} more
             </div>
 
             <!-- Focus line -->
             <template v-if="uniqueProjectCount >= 2">
               <VDivider class="mt-4 mb-3" />
-              <div class="text-caption text-medium-emphasis ms-3">
+              <div class="text-caption text-medium-emphasis ms-2">
                 {{ uniqueProjectCount }} tickets · top 2 took {{ top2Pct }}% of your time
               </div>
             </template>
@@ -500,7 +501,7 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       <div v-if="hasActiveFilter">
         <div class="text-overline text-medium-emphasis ms-2">Filtered</div>
         <VCard variant="text">
-          <div class="pa-4">
+          <div class="px-2 py-3">
             <div class="text-h5 font-weight-bold">{{ minutesToHourWithMinutes(filteredMinutes) }}</div>
             <div class="text-caption text-medium-emphasis mt-1">
               {{ filteredEntryCount }} {{ filteredEntryCount === 1 ? 'entry' : 'entries' }} · {{ filteredPctOfMonth }}%
@@ -523,6 +524,16 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
 </template>
 
 <style scoped>
+/* Project rows have no card around them, so drop Vuetify's panel padding: their edges line up with the
+   Overview rows and the section headings */
+.project-panels :deep(.v-expansion-panel-title) {
+  padding-inline: 8px 4px;
+}
+
+.project-panels :deep(.v-expansion-panel-text__wrapper) {
+  padding-inline: 4px;
+}
+
 /* Each cell is "label value", left-aligned, on one line; when the panel can't fit two cells side by side,
    the previous-period cell wraps under the current one */
 .comparison-row {

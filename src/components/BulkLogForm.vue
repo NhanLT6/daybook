@@ -375,7 +375,7 @@ watch(
 </script>
 
 <template>
-  <VCard class="pa-2 ma-2 overflow-visible">
+  <VCard variant="text" class="pa-2 ma-2 overflow-visible">
     <form ref="formEl" class="d-flex flex-column ga-2" autocomplete="off">
       <!-- hide-details="auto": the message line only takes space when there's an error, so the calendar sits the
            same distance from the next field as the other fields do -->
@@ -562,7 +562,7 @@ watch(
       </div>
 
       <!-- Sticky so Cancel/Save stay visible when form overflows on small screens -->
-      <VCard class="d-flex ga-2 pa-2 form-actions rounded-lg">
+      <VCard variant="text" class="d-flex ga-2 pa-2 form-actions rounded-lg">
         <VBtn class="flex-fill" variant="tonal" prepend-icon="mdi-cancel" @click="onCancel"> Cancel </VBtn>
 
         <VBtn class="flex-fill" variant="tonal" color="primary" prepend-icon="mdi-content-save-outline" @click="onSave">

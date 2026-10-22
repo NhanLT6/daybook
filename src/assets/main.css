@@ -106,7 +106,7 @@
 }
 
 .v-theme--dark .glass-acrylic {
-  background: rgba(44, 52, 64, var(--glass-opacity-dark, 0.77)) !important;
+  background: rgba(40, 47, 58, var(--glass-opacity-dark, 0.77)) !important;
   backdrop-filter: blur(var(--glass-blur, 25.6px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 25.6px));
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -136,7 +136,7 @@
   --vc-color: rgba(255, 255, 255, 0.87);
   --vc-header-title-color: rgba(255, 255, 255, 0.87);
   --vc-weekday-color: rgba(255, 255, 255, 0.6);
-  --vc-popover-content-bg: #36404c;
+  --vc-popover-content-bg: #323b46;
   --vc-time-picker-border: rgba(255, 255, 255, 0.12);
   --vc-header-arrow-color: rgba(255, 255, 255, 0.6);
   --vc-header-arrow-hover-bg: rgba(255, 255, 255, 0.1);

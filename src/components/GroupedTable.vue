@@ -277,7 +277,7 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 }
 
 .v-theme--dark .gt-head--frosted {
-  background: rgba(44, 52, 64, var(--glass-opacity-dark, 0.77));
+  background: rgba(40, 47, 58, var(--glass-opacity-dark, 0.77));
 }
 
 /* Rows sit directly on the glass: panels have no surface of their own. Blocks are spaced apart and a
