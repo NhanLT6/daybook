@@ -324,6 +324,8 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
               <VSwitch
                 v-model="settingsStore.dailyTargetEnabled"
                 label="Daily target"
+                class="flex-grow-1"
+                style="min-width: 0"
                 color="primary"
                 persistent-hint
                 :hint="
@@ -341,7 +343,8 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
                 :step="0.5"
                 :precision="1"
                 control-variant="stacked"
-                style="max-width: 140px"
+                class="flex-grow-0 flex-shrink-0"
+                width="140"
               />
             </div>
           </VCardText>
