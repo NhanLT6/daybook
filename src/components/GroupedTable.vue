@@ -227,10 +227,11 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
 </template>
 
 <style scoped>
-/* Inset from the glass edge like Insights */
+/* Rows (their tint and hairlines) start at the panel inset, like the form's fields; cell text sits a
+   cell pad further in */
 .gt {
   --gt-cell-pad: 8px;
-  padding: 0 calc(var(--panel-pad, 16px) - var(--gt-cell-pad)) 12px;
+  padding: 0 var(--panel-pad, 16px) 12px;
 }
 
 /* Fixed layout keeps every group's columns at the same widths */
@@ -257,8 +258,8 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: 0 calc(var(--panel-pad, 16px) * -1 + var(--gt-cell-pad));
-  padding: 0 calc(var(--panel-pad, 16px) - var(--gt-cell-pad));
+  margin: 0 calc(var(--panel-pad, 16px) * -1);
+  padding: 0 var(--panel-pad, 16px);
   height: 36px;
   display: flex;
   align-items: center;
