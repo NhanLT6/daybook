@@ -6,7 +6,7 @@ Daybook's AI features (chat, extract logs, Catch up) run one of three ways, chos
 | Mode | What runs | Billed to |
 |---|---|---|
 | **Off** | nothing — chat and Catch up are unavailable | — |
-| **Shared** | the deployment's Vercel AI Gateway (`AI_GATEWAY_MODEL`, default `openai/gpt-5.4-nano`) | the deployment owner's gateway credit |
+| **Shared** | the deployment's Vercel AI Gateway (`AI_GATEWAY_MODEL`, default `google/gemini-2.5-flash-lite`) | the deployment owner's gateway credit |
 | **Own key** | the user's Gemini key and model (`@ai-sdk/google`) | the user's Google account |
 
 The shared gateway is **off by default**: Vercel asks for a payment card before the free monthly credit applies.
@@ -27,7 +27,7 @@ anonymous traffic.
 | `DATABASE_URL`, `VITE_NEON_AUTH_URL` | From the Neon integration | ✅ Yes (settings + auth) |
 | `AI_GATEWAY_ENABLED` | `true` to turn the shared gateway on | ❌ Optional — unset = own keys only |
 | `AI_GATEWAY_API_KEY` | Vercel dashboard → AI Gateway → API Keys | Local dev only. On Vercel the deployment's OIDC token is used automatically. |
-| `AI_GATEWAY_MODEL` | A gateway model id, e.g. `google/gemini-2.5-flash` | ❌ Optional — overrides the default `openai/gpt-5.4-nano` |
+| `AI_GATEWAY_MODEL` | A gateway model id, e.g. `google/gemini-2.5-flash` | ❌ Optional — overrides the default `google/gemini-2.5-flash-lite` |
 | `AI_GATEWAY_ZDR` | `false` | ❌ Optional — see the next section |
 
 ## 2. Privacy: no training, no retention
@@ -53,8 +53,8 @@ Filter: free-tier credit + no-training provider + zero-data-retention provider +
 | Model | Input / output per 1M tokens | Time to first token | Tokens/s |
 |---|---|---|---|
 | `google/gemini-2.5-flash` | $0.30 / $2.50 | ~380 ms | ~185 |
-| `google/gemini-2.5-flash-lite` | $0.10 / $0.40 | ~270 ms | ~405 |
-| `openai/gpt-5.4-nano` (default) | $0.20 / $1.25 | ~630 ms | ~165 |
+| `google/gemini-2.5-flash-lite` (default) | $0.10 / $0.40 | ~270 ms | ~405 |
+| `openai/gpt-5.4-nano` (default until 2026-10-28) | $0.20 / $1.25 | ~630 ms | ~165 |
 | `openai/gpt-6-luna` (not on the free tier) | $0.10 / $0.50, cache read $0.01 | ~1.3 s (OpenAI) | ~89 |
 | `anthropic/claude-haiku-5.5` (not on the free tier) | $0.10 / $0.50, cache read $0.01 | ~0.8 s (Anthropic) | ~213 |
 

@@ -50,7 +50,7 @@ describe('resolveAi', () => {
   it('uses the gateway with privacy routing in shared mode', () => {
     vi.stubEnv('AI_GATEWAY_ENABLED', 'true');
     const { model, providerOptions } = resolveAi(shared);
-    expect(model).toBe('openai/gpt-5.4-nano');
+    expect(model).toBe('google/gemini-2.5-flash-lite');
     expect(providerOptions).toEqual({ gateway: { disallowPromptTraining: true, caching: 'auto', zeroDataRetention: true } });
   });
 
