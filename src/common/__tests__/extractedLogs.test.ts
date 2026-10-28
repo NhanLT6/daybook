@@ -86,6 +86,37 @@ describe('resolveExtractedLogs', () => {
     expect(entry.description).toBeUndefined();
   });
 
+  describe('categories', () => {
+    const withCategories = ctx({
+      categories: ['Internal', 'Client A'],
+      categoryOf: (p) => (p === 'Team work' ? 'Internal' : undefined),
+    });
+
+    it('are left out while categories are off', () => {
+      const [entry] = resolveExtractedLogs([log({ project: 'New thing', category: 'Internal', duration: 15 })], ctx());
+      expect(entry.category).toBeUndefined();
+    });
+
+    it("show a known project's own category, whatever the model said", () => {
+      const [entry] = resolveExtractedLogs([log({ category: 'Client A', duration: 15 })], withCategories);
+      expect(entry).toMatchObject({ category: 'Internal', newCategory: false });
+    });
+
+    it("snap a new project's category to an existing one, or flag it as new", () => {
+      const resolved = resolveExtractedLogs(
+        [
+          log({ project: 'Website', category: 'client a', duration: 15 }),
+          log({ project: 'Side gig', category: 'Freelance', duration: 15 }),
+        ],
+        withCategories,
+      );
+      expect(resolved.map((l) => [l.category, l.newCategory])).toEqual([
+        ['Client A', false],
+        ['Freelance', true],
+      ]);
+    });
+  });
+
   describe('the rest of the day', () => {
     it('subtracts what is already saved that day', () => {
       const resolved = resolveExtractedLogs(

@@ -21,6 +21,17 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('sticky notes');
   });
 
+  it('lists categories only when the client sends them (categories on)', () => {
+    expect(buildSystemPrompt(context, '2026-10-28', 480, 'log')).not.toContain('Categories (group projects)');
+    const on = buildSystemPrompt(
+      { ...context, categories: [{ name: 'Internal', projects: ['Team work'] }] },
+      '2026-10-28',
+      480,
+      'log',
+    );
+    expect(on).toContain('  - Internal: Team work');
+  });
+
   it('/note gets only the dates, no lists', () => {
     const prompt = buildSystemPrompt(context, '2026-10-28', 480, 'note');
     expect(prompt).toContain('addNote');

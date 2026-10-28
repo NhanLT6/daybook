@@ -15,6 +15,7 @@ import { type ChatConversation, useChatHistory } from '@/composables/useChatHist
 import { useChatMentions } from '@/composables/useChatMentions';
 import { useDailyTarget } from '@/composables/useDailyTarget';
 import { useJira } from '@/composables/useJira';
+import { useCategories } from '@/composables/useCategories';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
 
@@ -57,6 +58,7 @@ const { addProjects, addTasks, allTasks, myProjects, teamWorkTasks } = useWorksp
 const { myJiraProjects, teamJiraProjects } = useJira();
 const settingsStore = useSettingsStore();
 const { targetMinutes } = useDailyTarget();
+const { categories, getCategoryById, addCategory } = useCategories();
 
 // Everything the model may pick from: the same projects and tasks the log form offers (Jira tickets and the
 // Team work preset aren't in the stored lists, and the model can't match what it isn't told about)
@@ -70,6 +72,17 @@ const chatTasks = computed(() => {
     (t) => `${t.project}::${t.title}`,
   ).map((t) => ({ project: t.project, title: t.title }));
 });
+
+// Categories only exist for the AI while the user has them on in Settings
+const chatCategories = computed(() => {
+  if (!settingsStore.useCategories) return undefined;
+  return categories.value.map((c) => ({
+    name: c.name,
+    projects: myProjects.value.filter((p) => p.categoryId === c.id).map((p) => p.title),
+  }));
+});
+const categoryOf = (project: string) =>
+  getCategoryById(myProjects.value.find((p) => p.title === project)?.categoryId)?.name;
 
 const loggedMinutesOn = (date: string) =>
   savedLogs.value.reduce((sum, l) => (l.date === date && l.type === 'log' ? sum + (l.duration ?? 0) : sum), 0);
@@ -98,6 +111,7 @@ const {
       // Capped: a big team board would crowd the prompt, and the newest tickets are the likely reviews
       reviewTickets: teamJiraProjects.value.slice(0, 60).map((p) => p.title),
       tasks: chatTasks.value,
+      categories: chatCategories.value,
     };
   },
   resolveLogs: (logs) =>
@@ -106,6 +120,8 @@ const {
       tasks: chatTasks.value,
       targetMinutes: targetMinutes.value,
       loggedMinutesOn,
+      categories: chatCategories.value?.map((c) => c.name),
+      categoryOf,
     }),
 });
 const { isAuthenticated, isAuthConfigured, ready: authReady } = useAuth();
@@ -580,8 +596,19 @@ const saveLogs = async (messageId: string, extracted: ChatLog[]) => {
   await addLogs(toSave);
   lastSavedLogIds.value = toSave.map((l) => l.id);
 
-  // New projects and tasks join the stored lists, same as a CSV import
-  await addProjects(uniqBy(extracted.map((log) => ({ title: log.project })), 'title'));
+  // New projects (with the category the card showed) and tasks join the stored lists. Only new ones: writing a
+  // known project again would replace it and drop its category
+  const categoryIdFor = (name: string | undefined) =>
+    name && settingsStore.useCategories
+      ? (categories.value.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? addCategory(name)).id
+      : undefined;
+  const known = new Set(chatProjects.value);
+  await addProjects(
+    uniqBy(
+      extracted.filter((log) => !known.has(log.project)),
+      'project',
+    ).map((log) => ({ title: log.project, categoryId: categoryIdFor(log.category) })),
+  );
   await addTasks(
     uniqBy(
       extracted.filter((log) => log.task).map((log) => ({ project: log.project, title: log.task! })),

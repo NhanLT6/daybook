@@ -39,7 +39,12 @@ const amount = computed(() => {
 <template>
   <!-- One extracted log: what (project, task, note), then when and how much on one line -->
   <VCard color="surface-variant" variant="tonal" rounded="lg" class="log-card px-3 py-2">
-    <!-- What -->
+    <!-- What: category (only while categories are on), project, task, note -->
+    <div v-if="log.category" class="log-line log-category text-caption text-medium-emphasis" :title="log.category">
+      <VIcon icon="mdi-shape-outline" size="14" aria-label="Category" />
+      <span class="text-truncate">{{ log.category }}</span>
+      <span v-if="log.newCategory" class="new-tag">New</span>
+    </div>
     <div class="log-line" :title="log.project">
       <VIcon :icon="projectIcon" size="16" class="text-medium-emphasis" aria-label="Project" />
       <span class="text-body-2 font-weight-medium text-truncate">{{ log.project }}</span>
@@ -73,6 +78,11 @@ const amount = computed(() => {
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+/* Icon centred over the 16px icons below it */
+.log-category .v-icon {
+  margin-inline: 1px;
 }
 
 /* The note sits under the names it belongs to, lined up with their text */

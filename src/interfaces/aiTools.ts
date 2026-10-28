@@ -24,6 +24,12 @@ export const extractedLogSchema = z.object({
     .positive()
     .optional()
     .describe('Duration in minutes. Omit for a plan entry that has no logged time yet, or when restOfDay is set.'),
+  category: z
+    .string()
+    .optional()
+    .describe(
+      'Only when Context lists categories, and only for a project not in the lists: the category it belongs in. Unset otherwise.',
+    ),
   restOfDay: z
     .boolean()
     .optional()

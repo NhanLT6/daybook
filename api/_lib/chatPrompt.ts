@@ -25,6 +25,7 @@ const LOG_RULES = `When the user describes work they did (via text or screenshot
 - "Project › Task" in the message is a pick from the lists: use both exactly as written.
 - Routine team work goes under the matching task in the lists, e.g. daily / standup → "Daily meeting", reviewing code, a PR or a ticket → "Code review", retro → "Retro". Pick the task by meaning, never the first one listed.
 - Reviewing a ticket or PR is the review task, not the ticket's own project. Keep what was reviewed in description: "Review ticket " + the whole line when the ticket is in the teammates' or user's list, otherwise "Review " + what the user wrote (DS-4556, PR #412). Never drop a ticket key or PR number the user wrote.
+- category: only when Context lists categories. For a project that isn't in the lists, set the listed category it fits best (the one the user names, or the one whose projects look alike); a new category name only when the user asks for one. Leave it unset for a known project.
 - Task is optional. Only set it when the message names one or a routine above applies; never default it to the project name.
 - Resolve relative dates ("yesterday", "this morning", "last Friday", "monday this week") from the dates in Context.
 - duration is whole minutes: "10mins" = 10, "1h30" = 90, "2hours" = 120.
@@ -80,6 +81,7 @@ export interface PromptContext {
   tickets?: string[]; // the user's issue-tracker tickets ("DS-123 Summary"), each one a project; absent from older clients
   reviewTickets?: string[]; // teammates' tickets, to name what a code review was about
   tasks: Array<{ project: string; title: string }>;
+  categories?: Array<{ name: string; projects: string[] }>; // only when the user turned categories on
 }
 
 // The per-request tail: today's dates always; the target and lists only where log rules read them
@@ -107,6 +109,13 @@ function contextSection(context: PromptContext, currentDate: string, workdayMinu
     '',
     "Teammates' tickets (only for naming what a review was about; never a project):",
     list(context.reviewTickets),
+    ...(context.categories?.length
+      ? [
+          '',
+          'Categories (group projects), with their projects:',
+          context.categories.map((c) => `  - ${c.name}: ${c.projects.join(', ') || 'no projects yet'}`).join('\n'),
+        ]
+      : []),
   ].join('\n');
 }
 

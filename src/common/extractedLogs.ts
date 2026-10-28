@@ -15,6 +15,18 @@ export interface ResolveLogsContext {
   tasks: Array<{ project: string; title: string }>;
   targetMinutes: number | null; // daily target; null = no target, so "the rest" can't be computed
   loggedMinutesOn: (date: string) => number; // time already saved on that day (real logs, not plans)
+  categories?: string[]; // category names; absent while categories are off in Settings
+  categoryOf?: (project: string) => string | undefined; // a known project's category name
+}
+
+// Known project: its own category. New project: the model's pick, spelled like an existing one when it is one
+function resolveCategory(log: ExtractedLog, project: string, isNew: boolean, ctx: ResolveLogsContext) {
+  if (!ctx.categories) return { category: undefined, newCategory: false };
+  if (!isNew) return { category: ctx.categoryOf?.(project), newCategory: false };
+  const name = log.category?.trim();
+  if (!name) return { category: undefined, newCategory: false };
+  const known = ctx.categories.find((c) => same(c, name));
+  return { category: known ?? name, newCategory: !known };
 }
 
 // "DS-4475" at the start of a name, the way Jira (and most trackers) write issue keys
@@ -61,13 +73,15 @@ export function resolveExtractedLogs(logs: ExtractedLog[], ctx: ResolveLogsConte
     // The model sometimes repeats the title as the description; that says nothing the card doesn't
     const description = log.description?.trim();
     const repeatsTitle = [project, task, ticketSummaryOf(project)].some((s) => s && description && same(s, description));
+    // Typos land here too ("DS-4565"), so the card points them out before Save creates them
+    const newProject = !ctx.projects.includes(project);
     return {
       ...log,
       project,
       task,
       description: description && !repeatsTitle ? description : undefined,
-      // Typos land here too ("DS-4565"), so the card points them out before Save creates them
-      newProject: !ctx.projects.includes(project),
+      ...resolveCategory(log, project, newProject, ctx),
+      newProject,
       newTask: !!task && !ctx.tasks.some((t) => t.project === project && t.title === task),
     };
   });

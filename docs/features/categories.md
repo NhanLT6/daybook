@@ -72,3 +72,11 @@ Pinned items in the Pinned section render with `:subtitle="item.raw.categoryName
 
 - Category assignment in Reports/Charts (deferred)
 - Per-log category (by design — category lives on the project)
+
+## Chat (`/log`)
+
+Only while `useCategories` is on; with it off the chat behaves as if categories didn't exist.
+
+- `ChatBar.vue` sends `categories: [{ name, projects }]`; `api/_lib/chatPrompt.ts` lists them in the Context tail and tells the model to set `category` only for a project not in the lists (best fit, or the one the user names; a new name only on request).
+- `resolveExtractedLogs` shows a known project's own category (ignoring the model) and snaps a new project's category to an existing name; an unknown name gets a "New" tag on the card.
+- On Save, only projects that don't exist yet are written, with `categoryId` (an unknown category is created with `addCategory`). Rewriting a known project would replace the record and drop its category.
