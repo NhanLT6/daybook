@@ -52,13 +52,17 @@ const amount = computed(() => {
     </div>
     <p v-if="log.description" class="log-note text-caption text-medium-emphasis mb-0">{{ log.description }}</p>
 
-    <!-- When + how much -->
-    <div class="log-line log-when mt-1 text-caption">
-      <VIcon icon="mdi-calendar-outline" size="14" class="text-medium-emphasis" />
-      <span class="text-medium-emphasis">{{ dateLabel }}</span>
-      <span class="text-medium-emphasis">·</span>
-      <span class="font-weight-medium" :class="amount.error ? 'text-error' : 'text-primary'">{{ amount.text }}</span>
-      <span v-if="amount.hint" class="text-medium-emphasis">{{ amount.hint }}</span>
+    <!-- When | how much: two left-aligned columns, lined up across cards -->
+    <div class="log-when mt-1 text-caption">
+      <div class="log-line when-col">
+        <VIcon icon="mdi-calendar-blank-outline" size="14" class="text-medium-emphasis" aria-label="Date" />
+        <span class="text-medium-emphasis">{{ dateLabel }}</span>
+      </div>
+      <div class="log-line">
+        <VIcon icon="mdi-clock-outline" size="14" class="text-medium-emphasis" aria-label="Duration" />
+        <span class="font-weight-medium" :class="amount.error ? 'text-error' : 'text-primary'">{{ amount.text }}</span>
+        <span v-if="amount.hint" class="text-medium-emphasis">{{ amount.hint }}</span>
+      </div>
     </div>
   </VCard>
 </template>
@@ -77,8 +81,15 @@ const amount = computed(() => {
 }
 
 .log-when {
+  display: flex;
+  align-items: center;
   padding-top: 6px;
   border-top: 1px solid rgba(var(--v-border-color), 0.12);
+}
+
+/* Wide enough for "Wed 28/10/2026", so the duration column starts at the same x on every card */
+.when-col {
+  flex: 0 0 132px;
 }
 
 /* Quiet outline tag, like the mention chips: a name that Save will create */
