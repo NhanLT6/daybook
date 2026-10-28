@@ -38,7 +38,7 @@ describe('resolveExtractedLogs', () => {
       ctx(),
     );
 
-    expect(resolved).toEqual([
+    expect(resolved).toMatchObject([
       log({ task: 'Daily meeting', duration: 10, description: undefined }),
       log({ task: 'Code review', duration: 30, description: 'Review DS-4556' }),
       log({ project: 'DS-4475 Redesigned test tracking flow', task: undefined, duration: 120, description: undefined }),
@@ -57,9 +57,20 @@ describe('resolveExtractedLogs', () => {
     expect(entry).toMatchObject({ project: 'Team work', task: 'Code review' });
   });
 
-  it('keeps a ticket key it does not know, as written', () => {
+  it('keeps a ticket key it does not know, as written, and flags it as new', () => {
     const [entry] = resolveExtractedLogs([log({ project: 'XY-9 Something new', duration: 15 })], ctx());
-    expect(entry.project).toBe('XY-9 Something new');
+    expect(entry).toMatchObject({ project: 'XY-9 Something new', newProject: true, newTask: false });
+  });
+
+  it('flags a task the project does not have yet, not the known ones', () => {
+    const resolved = resolveExtractedLogs(
+      [log({ task: 'Code review', duration: 15 }), log({ task: 'Onboarding', duration: 15 })],
+      ctx(),
+    );
+    expect(resolved.map((l) => [l.newProject, l.newTask])).toEqual([
+      [false, false],
+      [false, true],
+    ]);
   });
 
   it('keeps a real task on a ticket project', () => {

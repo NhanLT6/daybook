@@ -149,7 +149,7 @@ test('/log: the app works out "the rest" and the model gets the Team work tasks'
   await input.fill('/log daily 15m and the rest on admin');
   await input.press('Enter');
 
-  await expect(page.getByText('Rest · 465 min')).toBeVisible();
+  await expect(page.locator('.log-card', { hasText: 'rest of the day' })).toContainText('7h 45m');
   expect(requests[0].tasks).toContainEqual({ project: 'Team work', title: 'Daily meeting' });
 });
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { ChatLog, DaybookUIMessage } from '@/interfaces/AiChat';
 import type { AddEventInput, AddNoteInput, AddedItemOutput } from '@/interfaces/aiTools';
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { HelpSuggestion } from '@/common/appGuide';
@@ -29,7 +29,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  saveLogs: [logs: ExtractedLog[]];
+  saveLogs: [logs: ChatLog[]];
   discard: [];
   undo: [];
   retry: [];

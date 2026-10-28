@@ -18,7 +18,7 @@ import { useJira } from '@/composables/useJira';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
 
-import type { DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { ChatLog, DaybookUIMessage } from '@/interfaces/AiChat';
 import type { NotificationItem } from '@/stores/notificationCenter';
 import type { TimeLog } from '@/interfaces/TimeLog';
 import type { TextUIPart } from 'ai';
@@ -563,7 +563,7 @@ const openSettings = () => {
 // Ids of the last saved batch, for Undo. AI dates are already ISO YYYY-MM-DD
 const lastSavedLogIds = ref<string[]>([]);
 
-const saveLogs = async (messageId: string, extracted: ExtractedLog[]) => {
+const saveLogs = async (messageId: string, extracted: ChatLog[]) => {
   markSaved(messageId, extracted);
   const toSave = extracted.map(
     (log) =>

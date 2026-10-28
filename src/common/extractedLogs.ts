@@ -1,3 +1,4 @@
+import type { ChatLog } from '@/interfaces/AiChat';
 import type { ExtractedLog } from '@/interfaces/aiTools';
 
 /**
@@ -53,14 +54,22 @@ function snapTask(task: string | undefined, project: string, ctx: ResolveLogsCon
 }
 
 /** `restOfDay` without a duration in the result means there was nothing left to fill, or no target. */
-export function resolveExtractedLogs(logs: ExtractedLog[], ctx: ResolveLogsContext): ExtractedLog[] {
+export function resolveExtractedLogs(logs: ExtractedLog[], ctx: ResolveLogsContext): ChatLog[] {
   const snapped = logs.map((log) => {
     const project = snapProject(log.project, ctx.projects);
     const task = snapTask(log.task, project, ctx);
     // The model sometimes repeats the title as the description; that says nothing the card doesn't
     const description = log.description?.trim();
     const repeatsTitle = [project, task, ticketSummaryOf(project)].some((s) => s && description && same(s, description));
-    return { ...log, project, task, description: description && !repeatsTitle ? description : undefined };
+    return {
+      ...log,
+      project,
+      task,
+      description: description && !repeatsTitle ? description : undefined,
+      // Typos land here too ("DS-4565"), so the card points them out before Save creates them
+      newProject: !ctx.projects.includes(project),
+      newTask: !!task && !ctx.tasks.some((t) => t.project === project && t.title === task),
+    };
   });
 
   return snapped.map((log, i) => {

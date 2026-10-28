@@ -1,70 +1,94 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import type { ExtractedLog } from '@/interfaces/AiChat';
+import type { ChatLog } from '@/interfaces/AiChat';
+
+import dayjs from 'dayjs';
+
+import { minutesToHourWithMinutes } from '@/common/DateHelpers';
+import { ticketKeyOf } from '@/common/extractedLogs';
+import { useDateDisplay } from '@/composables/useDateDisplay';
 
 const props = defineProps<{
-  log: ExtractedLog;
+  log: ChatLog;
 }>();
 
-const durationLabel = computed(() => {
+const { formatInternalDateForDisplay } = useDateDisplay();
+
+// Same icons as the chat's / menu, so a ticket, a project and a task read the same everywhere
+const projectIcon = computed(() => (ticketKeyOf(props.log.project) ? 'mdi-ticket-outline' : 'mdi-folder-outline'));
+
+// When: "Today" / "Yesterday" read faster than a date; anything else gets its weekday
+const dateLabel = computed(() => {
+  const date = dayjs(props.log.date);
+  const today = dayjs().startOf('day');
+  if (date.isSame(today, 'day')) return 'Today';
+  if (date.isSame(today.subtract(1, 'day'), 'day')) return 'Yesterday';
+  return `${date.format('ddd')} ${formatInternalDateForDisplay(props.log.date)}`;
+});
+
+// How much: hours and minutes like the log list; a plan has none yet, "the rest" says where it came from
+const amount = computed(() => {
   const { duration, restOfDay } = props.log;
-  if (restOfDay) return duration != null ? `Rest · ${duration} min` : 'Nothing left';
-  return duration != null ? `${duration} min` : 'Plan';
+  if (restOfDay && duration == null) return { text: 'Nothing left to fill', hint: undefined, error: true };
+  if (duration == null) return { text: 'Plan', hint: 'no time yet', error: false };
+  return { text: minutesToHourWithMinutes(duration), hint: restOfDay ? 'rest of the day' : undefined, error: false };
 });
 </script>
 
 <template>
-  <!-- Single extracted log displayed inside an AI chat bubble -->
-  <VCard color="surface-variant" variant="tonal" rounded="lg" class="log-card pa-2">
-    <div class="d-flex align-center ga-2">
-      <!-- Colored dot accent -->
-      <div class="log-dot bg-primary rounded-circle flex-shrink-0" />
+  <!-- One extracted log: what (project, task, note), then when and how much on one line -->
+  <VCard color="surface-variant" variant="tonal" rounded="lg" class="log-card px-3 py-2">
+    <!-- What -->
+    <div class="log-line" :title="log.project">
+      <VIcon :icon="projectIcon" size="16" class="text-medium-emphasis" aria-label="Project" />
+      <span class="text-body-2 font-weight-medium text-truncate">{{ log.project }}</span>
+      <span v-if="log.newProject" class="new-tag">New</span>
+    </div>
+    <div v-if="log.task" class="log-line" :title="log.task">
+      <VIcon icon="mdi-subdirectory-arrow-right" size="16" class="text-medium-emphasis" aria-label="Task" />
+      <span class="text-body-2 text-truncate">{{ log.task }}</span>
+      <span v-if="log.newTask" class="new-tag">New</span>
+    </div>
+    <p v-if="log.description" class="log-note text-caption text-medium-emphasis mb-0">{{ log.description }}</p>
 
-      <div class="flex-grow-1 min-width-0">
-        <!-- Project · task on one line (long names truncate) so every card reads title, date, note -->
-        <div class="d-flex align-center ga-1" :title="log.task ? `${log.project} › ${log.task}` : log.project">
-          <span class="text-body-2 font-weight-medium text-truncate">{{ log.project }}</span>
-          <template v-if="log.task">
-            <span class="text-caption text-medium-emphasis flex-shrink-0">·</span>
-            <span class="text-caption text-medium-emphasis text-truncate flex-shrink-0 task-name">{{ log.task }}</span>
-          </template>
-        </div>
-        <div class="d-flex align-center ga-1 mt-1">
-          <VIcon icon="mdi-calendar-outline" size="12" class="text-medium-emphasis" />
-          <span class="text-caption text-medium-emphasis">{{ log.date }}</span>
-        </div>
-        <p v-if="log.description" class="text-caption text-medium-emphasis mt-1 mb-0">
-          {{ log.description }}
-        </p>
-      </div>
-
-      <!-- Duration chip: plan entries have no logged time yet; "the rest" is worked out from the daily target -->
-      <VChip
-        size="small"
-        variant="tonal"
-        :color="log.restOfDay && log.duration == null ? 'error' : 'primary'"
-        class="flex-shrink-0"
-        :title="log.restOfDay ? 'Daily target minus what is already logged that day' : undefined"
-      >
-        {{ durationLabel }}
-      </VChip>
+    <!-- When + how much -->
+    <div class="log-line log-when mt-1 text-caption">
+      <VIcon icon="mdi-calendar-outline" size="14" class="text-medium-emphasis" />
+      <span class="text-medium-emphasis">{{ dateLabel }}</span>
+      <span class="text-medium-emphasis">·</span>
+      <span class="font-weight-medium" :class="amount.error ? 'text-error' : 'text-primary'">{{ amount.text }}</span>
+      <span v-if="amount.hint" class="text-medium-emphasis">{{ amount.hint }}</span>
     </div>
   </VCard>
 </template>
 
 <style scoped>
-.log-dot {
-  width: 8px;
-  height: 8px;
-}
-
-.min-width-0 {
+.log-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
-/* The task gives way first only past 45%, so a long ticket title still leaves it readable */
-.task-name {
-  max-width: 45%;
+/* The note sits under the names it belongs to, lined up with their text */
+.log-note {
+  padding-left: 22px;
+}
+
+.log-when {
+  padding-top: 6px;
+  border-top: 1px solid rgba(var(--v-border-color), 0.12);
+}
+
+/* Quiet outline tag, like the mention chips: a name that Save will create */
+.new-tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  line-height: 16px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 </style>

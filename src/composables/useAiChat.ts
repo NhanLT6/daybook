@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
-import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
+import type { ChatLog, DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { AddedItemOutput, ExtractLogsInput, ExtractLogsOutput, ServerChatCommand } from '@/interfaces/aiTools';
 import type { FileUIPart } from 'ai';
 
@@ -136,7 +136,7 @@ export interface ChatWorkspaceContext {
 export interface UseAiChatOptions {
   workspace: () => ChatWorkspaceContext;
   /** Tidies extracted logs before they are shown (names, "rest of the day"); see resolveExtractedLogs. */
-  resolveLogs?: (logs: ExtractedLog[]) => ExtractedLog[];
+  resolveLogs?: (logs: ExtractedLog[]) => ChatLog[];
 }
 
 export function useAiChat({ workspace, resolveLogs = (logs) => logs }: UseAiChatOptions) {
@@ -266,7 +266,7 @@ export function useAiChat({ workspace, resolveLogs = (logs) => logs }: UseAiChat
     } as Parameters<typeof chat.sendMessage>[0]);
   };
 
-  const markSaved = (id: string, savedLogs: ExtractedLog[]) => {
+  const markSaved = (id: string, savedLogs: ChatLog[]) => {
     const existing = metadataMap.value.get(id) ?? {};
     metadataMap.value = new Map(metadataMap.value).set(id, { ...existing, saveState: 'saved', extractedLogs: savedLogs });
     savedLogsMessageId.value = id;

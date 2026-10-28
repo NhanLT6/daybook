@@ -14,11 +14,14 @@ import type { UIDataTypes, UIMessage } from 'ai';
 // Re-export so existing `@/interfaces/AiChat` importers keep working
 export type { ExtractedLog } from './aiTools';
 
+/** An extracted log as the card shows it: flags names the user doesn't have yet (saving adds them). */
+export type ChatLog = ExtractedLog & { newProject?: boolean; newTask?: boolean };
+
 export type ChatTool = 'extractLogs' | 'catchUp' | 'welcome';
 
 export interface DaybookMessageMetadata {
   tool?: ChatTool;
-  extractedLogs?: ExtractedLog[];
+  extractedLogs?: ChatLog[];
   saveState?: 'saved' | 'discarded';
   catchUpItems?: CatchUpRenderItem[];
 }
