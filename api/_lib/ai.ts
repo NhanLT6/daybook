@@ -1,9 +1,9 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { resolveAiMode, type AiConfig, type AiMode } from '../../src/interfaces/ServerSettings.js';
 
-// Vercel AI Gateway model id (provider/model). Cheap ($0.10 / $0.50 per 1M, half of gpt-5.4-nano and a newer
-// generation), multimodal (the chat takes screenshots) and supports tool calling. AI_GATEWAY_MODEL overrides it.
-const DEFAULT_GATEWAY_MODEL = 'openai/gpt-6-luna';
+// Vercel AI Gateway model id (provider/model). Cheap ($0.10 / $0.50 per 1M, half of gpt-5.4-nano), fast,
+// multimodal (the chat takes screenshots) and supports tool calling. AI_GATEWAY_MODEL overrides it.
+const DEFAULT_GATEWAY_MODEL = 'anthropic/claude-haiku-5.5';
 const FALLBACK_BYOK_MODEL = 'gemini-2.5-flash';
 
 /**
@@ -66,6 +66,8 @@ export function resolveAi(config: AiConfig) {
     providerOptions: {
       gateway: {
         disallowPromptTraining: true,
+        // Anthropic only caches behind explicit markers; 'auto' lets the gateway add them (OpenAI/Google cache anyway)
+        caching: 'auto',
         zeroDataRetention: process.env.AI_GATEWAY_ZDR !== 'false',
       },
     },
