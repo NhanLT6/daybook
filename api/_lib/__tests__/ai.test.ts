@@ -50,7 +50,7 @@ describe('resolveAi', () => {
   it('uses the gateway with privacy routing in shared mode', () => {
     vi.stubEnv('AI_GATEWAY_ENABLED', 'true');
     const { model, providerOptions } = resolveAi(shared);
-    expect(model).toBe('anthropic/claude-haiku-5.5');
+    expect(model).toBe('openai/gpt-5.4-nano');
     expect(providerOptions).toEqual({ gateway: { disallowPromptTraining: true, caching: 'auto', zeroDataRetention: true } });
   });
 

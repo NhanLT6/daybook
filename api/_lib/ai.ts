@@ -1,9 +1,9 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { resolveAiMode, type AiConfig, type AiMode } from '../../src/interfaces/ServerSettings.js';
 
-// Vercel AI Gateway model id (provider/model). Cheap ($0.10 / $0.50 per 1M, half of gpt-5.4-nano), fast,
-// multimodal (the chat takes screenshots) and supports tool calling. AI_GATEWAY_MODEL overrides it.
-const DEFAULT_GATEWAY_MODEL = 'anthropic/claude-haiku-5.5';
+// Vercel AI Gateway model id (provider/model). On the gateway's free tier (gpt-6-luna and claude-haiku-5.5 are
+// not), multimodal (the chat takes screenshots) and supports tool calling. AI_GATEWAY_MODEL overrides it.
+const DEFAULT_GATEWAY_MODEL = 'openai/gpt-5.4-nano';
 const FALLBACK_BYOK_MODEL = 'gemini-2.5-flash';
 
 /**
