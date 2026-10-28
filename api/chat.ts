@@ -16,11 +16,14 @@ import { AI_NOT_SET_UP_MESSAGE, MAX_OUTPUT_TOKENS, aiErrorMessage, isAiAvailable
 import { getSettings } from './_lib/settingsRepo.js';
 import { dateContext } from './_lib/dateContext.js';
 import { APP_GUIDE } from '../src/common/appGuide.js';
+import { TASK_SEPARATOR } from '../src/common/chatMentions.js';
 import { DEFAULT_AI_CONFIG, type AiConfig } from '../src/interfaces/ServerSettings.js';
 
 interface ChatApiRequest {
   messages: UIMessage[];
   projects: string[];
+  tickets?: string[]; // the user's issue-tracker tickets ("DS-123 Summary"), each one a project; absent from older clients
+  reviewTickets?: string[]; // teammates' tickets, to name what a code review was about
   tasks: Array<{ project: string; title: string }>;
   currentDate: string;
   workdayMinutes?: number | null; // The user's daily target; null = no target. Absent from older clients → 480
@@ -83,50 +86,60 @@ const parseCommand = (value: unknown): ServerChatCommand | undefined =>
 // Remainder rules depend on the user's daily target; with none set there's no "rest of the day" to compute
 function workdayRules(workdayMinutes: number | null): string {
   if (!workdayMinutes) {
-    return `- The user has no standard workday length set, unless they state one in the message.
-- Duration remainder phrasing ("the rest", "remaining time", "rest of the day", "what's left") can only be resolved when the message states the workday length. Otherwise don't guess: ask the user how long their day was.`;
+    return `- "The rest" / "remaining time" / "rest of the day": the user has no daily target set. If the message states how long the day was, set that entry's duration to that length minus the other entries' minutes. Otherwise don't guess: ask how long the day was.`;
   }
-  const rest = workdayMinutes - 15 - 60;
-  return `- The user's standard workday is ${workdayMinutes} minutes unless they state otherwise in the message.
-- Duration remainder phrasing ("the rest", "remaining time", "rest of the day", "what's left") means: workday total minus the sum of every other duration already stated in the same message. When this phrasing is present, compute the remainder and set it as that entry's duration — do not fall back to a plan entry in this case.
-  - Example: "15min daily, T-123 1hour, rest for T-456" → daily=15, T-123=60, T-456=${workdayMinutes}-15-60=${rest}.
-  - If the remainder would be zero or negative, say so in your text reply instead of calling extractLogs with a bad value.`;
+  return `- "The rest" / "remaining time" / "rest of the day" / "what's left": set restOfDay: true on that entry and leave duration unset. Never work out the minutes yourself: the app subtracts the day's other logs (saved earlier and in this message) from the user's ${workdayMinutes}-minute target.`;
 }
 
 function buildSystemPrompt(
-  projects: string[],
-  tasks: Array<{ project: string; title: string }>,
+  context: Pick<ChatApiRequest, 'projects' | 'tickets' | 'reviewTickets' | 'tasks'>,
   currentDate: string,
   workdayMinutes: number | null,
   command: ServerChatCommand | undefined,
 ): string {
-  const projectList = projects.length ? projects.join(', ') : 'none configured';
-  const taskList = tasks.length ? tasks.map((t) => `  - ${t.project}: ${t.title}`).join('\n') : '  none configured';
+  const list = (items: string[] | undefined) => (items?.length ? items.map((i) => `  - ${i}`).join('\n') : '  none');
+  const taskList = context.tasks.length
+    ? context.tasks.map((t) => `  - ${t.project}${TASK_SEPARATOR}${t.title}`).join('\n')
+    : '  none';
 
   const commandRule = command ? `\n\n${COMMAND_RULES[command]}` : '';
 
   return `You are a time log assistant for a daily work tracking app called Daybook.
 ${dateContext(currentDate)}
 
-The user's known projects are: ${projectList}
+The user's projects:
+${list(context.projects)}
 
-The user's known tasks per project:
+The user's tickets. Each one is a project; its name is the whole line, key and summary:
+${list(context.tickets)}
+
+Their tasks, as Project › Task:
 ${taskList}
 
+Teammates' tickets (only for naming what a review was about; never a project):
+${list(context.reviewTickets)}
+
 When the user describes work they did (via text or screenshot), call the extractLogs tool with the extracted entries.
-- Match project names to the known list where possible. If not found, use what the user said.
-- Match task names to the known list for that project where possible. If not found, use what the user said.
-- "Project › Task" in the message is a project and its task picked from the user's list: use both exactly as written.
-- Task is optional. Only set it when the user's message actually mentions a task; leave it unset otherwise. Do not default it to the project name.
+- One entry per piece of work. A new duration starts a new entry; "and" or a full stop usually separates them.
+- project and task come from the lists above whenever the words fit, spelled exactly as listed. Only use new names when nothing fits.
+- Tickets: when the message names a ticket key (DS-4475), with or without its summary after it, the project is that ticket's whole line from the list ("DS-4475 Redesigned test tracking flow"). Task stays unset, and the summary is not a task or description. A key not in any list is still the project, written as the user wrote it. Treat every ticket the same way, wherever it sits in the message.
+- "Project › Task" in the message is a pick from the lists: use both exactly as written.
+- Routine team work goes under the matching task in the lists, e.g. daily / standup → "Daily meeting", reviewing code, a PR or a ticket → "Code review", retro → "Retro". Pick the task by meaning, never the first one listed.
+- Reviewing a ticket or PR is the review task, not the ticket's own project. Keep what was reviewed in description: "Review ticket " + the whole line when the ticket is in the teammates' or user's list, otherwise "Review " + what the user wrote (DS-4556, PR #412). Never drop a ticket key or PR number the user wrote.
+- Task is optional. Only set it when the message names one or a routine above applies; never default it to the project name.
 - Resolve relative dates ("yesterday", "this morning", "last Friday", "monday this week") from the dates listed above.
-- Duration must be in minutes (integer).
+- duration is whole minutes: "10mins" = 10, "1h30" = 90, "2hours" = 120.
 ${workdayRules(workdayMinutes)}
-- Omit duration (plan entry, no time logged yet) when the user is describing future/not-yet-done work — e.g. "plan to work on T-999", "will pick up T-999", "todo: T-999" — with no remainder phrasing.
-- If a task is mentioned with no duration, no remainder phrasing, and no plan-intent wording either, don't guess — ask the user to clarify how much time (or whether it's a plan entry).
-- description is a short note the user would write on the log themselves: which PR or ticket they reviewed, what a meeting was about, what they worked on. Leave it unset unless the message states such a detail for that entry.
-  - Never put your own reasoning, math or how you read the message into description (no "rest of the day", "480-15=465", "all time except daily", "from screenshot").
-  - Don't repeat the project, task, date or duration in it.
-  - Example: "yesterday 15m team meeting about sprint planning, review PR #412 for T-88 30m, rest on T-90" → meeting description "Sprint planning", review description "PR #412 for T-88", T-90 has no description.
+- Omit duration (plan entry, no time logged yet) when the user is describing future/not-yet-done work, e.g. "plan to work on T-999", "will pick up T-999", "todo: T-999".
+- If a task is mentioned with no duration, no "rest" wording and no plan wording, don't guess: ask how much time (or whether it's a plan entry).
+- description is a short note the user would write on the log themselves: which PR or ticket they reviewed, what a meeting was about. Leave it unset unless the message states such a detail for that entry.
+  - Never put your reasoning, maths or reading of the message into it (no "rest of the day", "480-15=465", "from screenshot").
+  - Never repeat the project, task, ticket summary, date or duration in it ("Daily 10mins" for a daily is wrong: leave it unset).
+- Example. Lists hold "Team work › Daily meeting", "Team work › Code review", tickets "AB-7 Login page" and "AB-9 Signup form", teammate ticket "AB-12 Fix export". Message: "daily 15m. code review AB-12 30 mins. 1h for AB-7 Login page and the rest for AB-9 Signup form" →
+  1. Team work › Daily meeting, 15, no description
+  2. Team work › Code review, 30, description "Review ticket AB-12 Fix export"
+  3. project "AB-7 Login page", no task, 60
+  4. project "AB-9 Signup form", no task, ${workdayMinutes ? 'restOfDay: true, no duration' : 'ask how long the day was'}
 - If the user corrects logs you extracted earlier (wrong date, duration, task), call extractLogs again with the full corrected list. Earlier extractLogs results say whether the user saved or discarded those logs; if they were already saved, mention that the old entries need deleting from the log list.
 - Do NOT include a JSON block in your text response. Use the extractLogs tool instead.
 
@@ -179,8 +192,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...resolveAi(aiConfig),
       maxOutputTokens: MAX_OUTPUT_TOKENS,
       system: buildSystemPrompt(
-        body.projects,
-        body.tasks,
+        body,
         body.currentDate,
         body.workdayMinutes === undefined ? 480 : body.workdayMinutes,
         command,

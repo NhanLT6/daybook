@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 
 import { parseChatCommand } from '@/common/chatCommands';
 import { splitMentions } from '@/common/chatMentions';
+import { isUnresolvedRest } from '@/common/extractedLogs';
 import { removeAddedItem } from '@/composables/useAiChat';
 
 import AiLogCard from './AiLogCard.vue';
@@ -113,6 +114,8 @@ const undoAdded = async (item: AddedItem) => {
 const tool = computed(() => props.message.metadata?.tool);
 const extractedLogs = computed(() => props.message.metadata?.extractedLogs);
 const saveState = computed(() => props.message.metadata?.saveState);
+// "The rest of the day" with nothing left (or no daily target) has no duration; saving it would make a plan
+const hasUnresolvedRest = computed(() => extractedLogs.value?.some(isUnresolvedRest) ?? false);
 const catchUpItems = computed<CatchUpRenderItem[] | undefined>(() => props.message.metadata?.catchUpItems);
 const catchUpHasGroups = computed(() => catchUpItems.value?.some((i) => i.group) ?? false);
 const catchUpDidItems = computed(() => catchUpItems.value?.filter((i) => i.group === 'did') ?? []);
@@ -271,7 +274,14 @@ const copyMessage = () => {
           <VBtn size="small" rounded="pill" variant="text" :disabled="!isSaveable" @click="emit('discard')">
             Discard
           </VBtn>
-          <VBtn size="small" rounded="pill" color="primary" variant="tonal" :disabled="!isSaveable" @click="handleSave">
+          <VBtn
+            size="small"
+            rounded="pill"
+            color="primary"
+            variant="tonal"
+            :disabled="!isSaveable || hasUnresolvedRest"
+            @click="handleSave"
+          >
             Save {{ extractedLogs.length }} log{{ extractedLogs.length > 1 ? 's' : '' }}
           </VBtn>
         </template>

@@ -37,6 +37,15 @@ Browser tools have no `execute` on the server. The client answers them in `onToo
 
 The model API rejects a history holding a tool call with no result (`AI_MissingToolResultsError`), so the transport's `prepareSendMessagesRequest` sends a copy where each pending `extractLogs` call is answered with what the user did with its card (`saved`, `discarded`, `not saved yet`; `withExtractLogsResults`). That is also how a correction like "the date is wrong" reaches the model with context.
 
+## What the model is told, and what the client fixes after it
+
+The shared model is small (`openai/gpt-5.4-nano`), so the prompt gets everything it should pick from and the client checks its picks.
+
+- **Lists** (`ChatBar.vue` → `workspace()` in `useAiChat`): the same projects and tasks the log form offers (`myProjects`, the Team work preset when `useDefaultTasks`), the user's Jira tickets separately (each is a project titled `KEY-123 Summary`), and up to 60 teammates' tickets, used only to name a review ("Review ticket …", same wording as the form's code-review suggestions). The stored lists alone missed tickets and the preset, so the model invented names.
+- **Prompt rules** (`api/chat.ts`): a ticket key means the ticket's whole line as project and no task; routine team work maps by meaning (daily → Daily meeting, review → Code review); a review keeps the ticket key in description; a worked example mirrors a real mixed message.
+- **`resolveExtractedLogs`** (`src/common/extractedLogs.ts`, unit-tested with eval-style cases), run on every card before it shows: snaps names to the user's spelling, `DS-1` → the ticket's full title, drops a task or description that only repeats the ticket/task, and turns `restOfDay` into minutes (see `docs/features/daily-target.md`). A saved batch keeps what was saved (`markSaved` stores the logs) so it isn't recounted against itself.
+- **Card** (`AiLogCard.vue`): project · task stay on one line (truncated, full name on hover), so every card reads title, date, note. "Rest · N min" marks a computed remainder.
+
 ## Dates
 
 The client sends the local date (`dayjs`, not `toISOString()`, which is UTC). The server's `dateContext()` (`api/_lib/dateContext.ts`) spells out today's weekday and the dates of this week and last week, Monday-first, because models get the weekday of a bare date wrong ("monday this week" became next Monday).

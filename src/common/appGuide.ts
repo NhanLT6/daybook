@@ -18,7 +18,7 @@ Pages (left rail on desktop, menu at the top left on phones):
 
 Logging time:
 - Use the form on Home. Pick several dates to log the same entry on each. Recent Project + Task pairs are one click. The Remaining chip fills in what is left of the day's target.
-- Or type it in the chat in plain words, e.g. "yesterday 2h DS-123 login bug, 30m team meeting". The chat shows cards to check, then Save. A screenshot of a calendar or timesheet works too.
+- Or type it in the chat in plain words, e.g. "yesterday 2h DS-123 login bug, 30m team meeting". The chat shows cards to check, then Save. A screenshot of a calendar or timesheet works too. "The rest" for an entry fills what is left of that day's target after the day's other logs.
 - Edit or delete a log from its row in the list (hover a row for its actions).
 - Plans: an entry with no duration is a plan for later.
 

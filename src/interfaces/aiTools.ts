@@ -10,15 +10,26 @@ import { z } from 'zod';
  */
 
 export const extractedLogSchema = z.object({
-  project: z.string().describe('Project name, matched to known projects where possible'),
-  task: z.string().optional().describe('Task name, only if explicitly mentioned; leave unset otherwise'),
+  project: z
+    .string()
+    .describe('Project name, exactly as in the known lists where possible. For a ticket, its full "KEY-123 Summary" title'),
+  task: z
+    .string()
+    .optional()
+    .describe('Task name, only if the message names one; leave unset otherwise (always unset for a ticket project)'),
   date: z.string().describe('ISO date YYYY-MM-DD, resolved from relative references using today'),
   duration: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe('Duration in minutes. Omit for a plan entry that has no logged time yet.'),
+    .describe('Duration in minutes. Omit for a plan entry that has no logged time yet, or when restOfDay is set.'),
+  restOfDay: z
+    .boolean()
+    .optional()
+    .describe(
+      'True when the user gives this entry "the rest" of the day. Omit duration then: the app computes it from the daily target and the logs of that day.',
+    ),
   description: z
     .string()
     .optional()

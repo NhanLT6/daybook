@@ -3,8 +3,6 @@ import { computed, ref } from 'vue';
 import type { CatchUpRenderItem } from '@/interfaces/CatchUp';
 import type { DaybookMessageMetadata, DaybookUIMessage, ExtractedLog } from '@/interfaces/AiChat';
 import type { AddedItemOutput, ExtractLogsInput, ExtractLogsOutput, ServerChatCommand } from '@/interfaces/aiTools';
-import type { Project } from '@/interfaces/Project';
-import type { Task } from '@/interfaces/Task';
 import type { FileUIPart } from 'ai';
 
 import { Chat } from '@ai-sdk/vue';
@@ -127,7 +125,21 @@ export async function removeAddedItem(tool: 'addNote' | 'addEvent', id: string) 
 
 // ── Composable ────────────────────────────────────────────────────────────
 
-export function useAiChat() {
+/** What the model is told about the user's workspace, read fresh on every send. */
+export interface ChatWorkspaceContext {
+  projects: string[]; // the user's own projects (Team work preset included), tickets excluded
+  tickets: string[]; // the user's tickets, "DS-123 Summary"; each is also a project
+  reviewTickets: string[]; // teammates' tickets, for naming what a code review was about
+  tasks: Array<{ project: string; title: string }>;
+}
+
+export interface UseAiChatOptions {
+  workspace: () => ChatWorkspaceContext;
+  /** Tidies extracted logs before they are shown (names, "rest of the day"); see resolveExtractedLogs. */
+  resolveLogs?: (logs: ExtractedLog[]) => ExtractedLog[];
+}
+
+export function useAiChat({ workspace, resolveLogs = (logs) => logs }: UseAiChatOptions) {
   const settingsStore = useSettingsStore();
   const error = ref<string | null>(null);
   const latestLogsMessageId = ref<string | null>(null);
@@ -205,7 +217,9 @@ export function useAiChat() {
       // Catch-up messages are injected client-side and carry their own metadata.
       if (stored?.tool === 'catchUp' || stored?.tool === 'welcome') return { ...m, metadata: stored };
 
-      const logs = extractLogsFromMessage(m);
+      // A saved batch keeps what was saved: re-resolving would count its own logs as already logged
+      const raw = extractLogsFromMessage(m);
+      const logs = stored?.saveState === 'saved' && stored.extractedLogs ? stored.extractedLogs : resolveLogs(raw);
       const metadata: DaybookMessageMetadata | undefined =
         logs.length || stored
           ? { ...stored, ...(logs.length ? { tool: 'extractLogs', extractedLogs: logs } : {}) }
@@ -219,13 +233,7 @@ export function useAiChat() {
 
   // `command`: the slash command the text starts with, if any. The text keeps its `/note` prefix
   // so the conversation history still shows what each message was.
-  const sendMessage = async (
-    text: string,
-    attachedFile: File | null,
-    projects: Project[],
-    tasks: Task[],
-    command?: ServerChatCommand,
-  ) => {
+  const sendMessage = async (text: string, attachedFile: File | null, command?: ServerChatCommand) => {
     if (!text.trim() && !attachedFile) return;
 
     error.value = null;
@@ -244,8 +252,7 @@ export function useAiChat() {
     }
 
     requestBody = {
-      projects: projects.map((p) => p.title),
-      tasks: tasks.map((t) => ({ project: t.project, title: t.title })),
+      ...workspace(),
       // Local date: toISOString() is UTC, which is still yesterday for early mornings east of UTC
       currentDate: dayjs().format('YYYY-MM-DD'),
       // The user's workday length for "rest of the day" phrasing; null = no daily target
@@ -259,15 +266,15 @@ export function useAiChat() {
     } as Parameters<typeof chat.sendMessage>[0]);
   };
 
-  const markSaved = (id: string) => {
+  const markSaved = (id: string, savedLogs: ExtractedLog[]) => {
     const existing = metadataMap.value.get(id) ?? {};
-    metadataMap.value = new Map(metadataMap.value).set(id, { ...existing, saveState: 'saved' });
+    metadataMap.value = new Map(metadataMap.value).set(id, { ...existing, saveState: 'saved', extractedLogs: savedLogs });
     savedLogsMessageId.value = id;
   };
 
   const markUndone = (id: string) => {
     const existing = metadataMap.value.get(id) ?? {};
-    metadataMap.value = new Map(metadataMap.value).set(id, { ...existing, saveState: undefined });
+    metadataMap.value = new Map(metadataMap.value).set(id, { ...existing, saveState: undefined, extractedLogs: undefined });
     savedLogsMessageId.value = null;
     latestLogsMessageId.value = id;
   };
@@ -336,6 +343,8 @@ export function useAiChat() {
     const map = new Map<string, DaybookMessageMetadata>();
     for (const m of restored) {
       if (m.metadata?.tool === 'catchUp' || m.metadata?.tool === 'welcome') map.set(m.id, m.metadata);
+      else if (m.metadata?.saveState === 'saved')
+        map.set(m.id, { saveState: 'saved', extractedLogs: m.metadata.extractedLogs });
       else if (m.metadata?.saveState) map.set(m.id, { saveState: m.metadata.saveState });
     }
     metadataMap.value = map;

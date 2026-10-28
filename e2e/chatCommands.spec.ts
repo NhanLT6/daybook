@@ -128,6 +128,31 @@ test('/event adds a calendar event through the addEvent tool', async ({ page }) 
   await expect(page.locator('.event-row', { hasText: 'Sprint review' })).toBeVisible({ timeout: 20000 });
 });
 
+test('/log: the app works out "the rest" and the model gets the Team work tasks', async ({ page }) => {
+  const today = dayjs().format('YYYY-MM-DD');
+  const requests: Array<ChatRequest & { tasks: Array<{ project: string; title: string }> }> = [];
+  await page.route('**/api/chat', async (route) => {
+    requests.push(route.request().postDataJSON());
+    return fulfillStream(
+      route,
+      toolCall('extractLogs', {
+        logs: [
+          { project: 'Team work', task: 'Daily meeting', date: today, duration: 15 },
+          // A wrong sum from the model is ignored: the app subtracts from the daily target itself
+          { project: 'Admin', date: today, restOfDay: true, duration: 999 },
+        ],
+      }),
+    );
+  });
+
+  const input = await openChat(page);
+  await input.fill('/log daily 15m and the rest on admin');
+  await input.press('Enter');
+
+  await expect(page.getByText('Rest · 465 min')).toBeVisible();
+  expect(requests[0].tasks).toContainEqual({ project: 'Team work', title: 'Daily meeting' });
+});
+
 test('a message without a command sends no command', async ({ page }) => {
   const requests: ChatRequest[] = [];
   await page.route('**/api/chat', async (route) => {

@@ -24,7 +24,7 @@ aren't off days at all.
 | MobileWeekChart | scale floor = target | scale to the largest day (1h floor) |
 | LogList day total colour | error above target, else warning on an off day, else primary within 30 min of it | no colour |
 | Catch-up effort label | "Xd Yh" with a day = target (caller passes it to `fetchCatchUpItems`) | plain hours |
-| AI chat (`api/chat.ts`) | client sends `workdayMinutes`; "rest of the day" = target − stated durations | prompt tells the model to ask for the day length |
+| AI chat (`api/chat.ts`, `src/common/extractedLogs.ts`) | the model only flags "the rest" (`restOfDay`); the client fills target − that day's saved logs − the batch's other entries (≤ 0: "Nothing left", Save disabled) | prompt tells the model to ask for the day length |
 
 Older clients that don't send `workdayMinutes` get 480.
 

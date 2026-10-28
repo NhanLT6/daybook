@@ -4,6 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { HELP_SIGN_IN_HINT, HELP_SUGGESTIONS, type HelpSuggestion } from '@/common/appGuide';
 import { type ChatCommand, CHAT_COMMANDS, suggestChatCommands } from '@/common/chatCommands';
 import { isFirstVisit, markGreetingShown } from '@/common/firstVisit';
+import { resolveExtractedLogs } from '@/common/extractedLogs';
 import { type ChatMention, findMentionQuery, matchMentions, splitMentions } from '@/common/chatMentions';
 import { useAiChat } from '@/composables/useAiChat';
 import { useAuth } from '@/composables/useAuth';
@@ -13,6 +14,7 @@ import { fetchCatchUpItems } from '@/composables/useCatchUpSummary';
 import { type ChatConversation, useChatHistory } from '@/composables/useChatHistory';
 import { useChatMentions } from '@/composables/useChatMentions';
 import { useDailyTarget } from '@/composables/useDailyTarget';
+import { useJira } from '@/composables/useJira';
 import { useTimeLogs } from '@/composables/useTimeLogs';
 import { useWorkspace } from '@/composables/useWorkspace';
 
@@ -29,6 +31,7 @@ import dayjs from 'dayjs';
 import { parseChatCommand } from '@/common/chatCommands';
 
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
+import { useSettingsStore } from '@/stores/settings';
 import { uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
 import { useRouter } from 'vue-router';
@@ -49,6 +52,28 @@ type BarState = 'hidden' | 'bar' | 'open';
 // What is drawn: the line (hidden), the notification toast (hidden), the bar or the panel
 type Shape = 'peek' | 'toast' | 'bar' | 'open';
 
+const { logs: savedLogs, addMany: addLogs, remove: removeLog } = useTimeLogs();
+const { addProjects, addTasks, allTasks, myProjects, teamWorkTasks } = useWorkspace();
+const { myJiraProjects, teamJiraProjects } = useJira();
+const settingsStore = useSettingsStore();
+const { targetMinutes } = useDailyTarget();
+
+// Everything the model may pick from: the same projects and tasks the log form offers (Jira tickets and the
+// Team work preset aren't in the stored lists, and the model can't match what it isn't told about)
+const chatTickets = computed(() => myJiraProjects.value.map((p) => p.title));
+const chatProjects = computed(() => myProjects.value.map((p) => p.title));
+const chatTasks = computed(() => {
+  const projects = new Set(chatProjects.value);
+  const tasks = [...allTasks.value, ...(settingsStore.useDefaultTasks ? teamWorkTasks : [])];
+  return uniqBy(
+    tasks.filter((t) => projects.has(t.project) && t.title !== t.project),
+    (t) => `${t.project}::${t.title}`,
+  ).map((t) => ({ project: t.project, title: t.title }));
+});
+
+const loggedMinutesOn = (date: string) =>
+  savedLogs.value.reduce((sum, l) => (l.date === date && l.type === 'log' ? sum + (l.duration ?? 0) : sum), 0);
+
 const {
   messages,
   isLoading,
@@ -64,19 +89,34 @@ const {
   injectCannedAnswer,
   loadMessages,
   clearMessages,
-} = useAiChat();
+} = useAiChat({
+  workspace: () => {
+    const tickets = new Set(chatTickets.value);
+    return {
+      projects: chatProjects.value.filter((p) => !tickets.has(p)),
+      tickets: chatTickets.value,
+      // Capped: a big team board would crowd the prompt, and the newest tickets are the likely reviews
+      reviewTickets: teamJiraProjects.value.slice(0, 60).map((p) => p.title),
+      tasks: chatTasks.value,
+    };
+  },
+  resolveLogs: (logs) =>
+    resolveExtractedLogs(logs, {
+      projects: chatProjects.value,
+      tasks: chatTasks.value,
+      targetMinutes: targetMinutes.value,
+      loggedMinutesOn,
+    }),
+});
 const { isAuthenticated, isAuthConfigured, ready: authReady } = useAuth();
 const { openAuthDialog } = useAuthDialog();
 
 const { conversations, upsert, get: getConversation } = useChatHistory();
-const { addMany: addLogs, remove: removeLog } = useTimeLogs();
-const { addProjects, addTasks, allProjects: projects, allTasks: tasks } = useWorkspace();
 const { mentions, labels: mentionLabels } = useChatMentions();
 const notificationCenter = useNotificationCenterStore();
 const { sortedItems: notifications, isExpanded: notificationsExpanded } = storeToRefs(notificationCenter);
 const { notice, dropPassive, dropAll } = useChatNotices();
 const router = useRouter();
-const { targetMinutes } = useDailyTarget();
 const { xs, mdAndUp } = useDisplay();
 
 const rootEl = ref<HTMLElement | null>(null);
@@ -467,7 +507,7 @@ const send = async () => {
     return;
   }
   // The text keeps its /command prefix so the conversation still shows what each message was
-  await sendMessage(cmd ? `/${cmd.name} ${text}` : text, file, projects.value, tasks.value, cmd?.name);
+  await sendMessage(cmd ? `/${cmd.name} ${text}` : text, file, cmd?.name);
 };
 
 const lastUserMessageId = computed(() => [...messages.value].reverse().find((m) => m.role === 'user')?.id ?? null);
@@ -480,7 +520,7 @@ const retry = async (messageId: string) => {
   // Instant commands run in the browser and never reach the model
   const serverCommand =
     name === 'catchup' || name === 'help' || name === 'new' || name === 'history' ? undefined : name;
-  await sendMessage(text, null, projects.value, tasks.value, serverCommand);
+  await sendMessage(text, null, serverCommand);
 };
 
 const isConfigError = computed(() => error.value?.includes('not set up') ?? false);
@@ -524,7 +564,7 @@ const openSettings = () => {
 const lastSavedLogIds = ref<string[]>([]);
 
 const saveLogs = async (messageId: string, extracted: ExtractedLog[]) => {
-  markSaved(messageId);
+  markSaved(messageId, extracted);
   const toSave = extracted.map(
     (log) =>
       ({
