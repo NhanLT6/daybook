@@ -40,6 +40,9 @@ const chartColors = computed(() => ({
   targetLineColor: isDark.value ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)',
   // Theme warning at reduced alpha: a gentle flag, not an alarm
   offDayOutline: `rgba(${hexToRgb(theme.global.current.value.colors.warning)}, ${isDark.value ? 0.5 : 0.45})`,
+  // Today's ring: v-calendar's green outline highlight (CalendarOverview's today), so both read the same
+  todayRing: isDark.value ? '#86efac' : '#16a34a',
+  todayText: isDark.value ? '#bbf7d0' : '#15803d',
 }));
 
 // Shared per-dataset border config: segments touch, no hairline between them (Nhan: the white edge read as noise)
@@ -259,6 +262,38 @@ const offDayOutline: Plugin<'bar'> = {
   },
 };
 
+// Today's column (current month only): its day number gets the calendar's today ring
+const todayIndex = computed(() => (isCurrentMonth.value ? dayjs().date() - 1 : -1));
+
+const TODAY_RING_RADIUS = 9;
+const TICK_PADDING = 6;
+
+const todayRing: Plugin<'bar'> = {
+  id: 'todayRing',
+  afterDraw(chart) {
+    const i = todayIndex.value;
+    const scale = chart.scales.x;
+    // Skip when the labels are tilted or thinned out (a narrow chart): no clean spot for the ring
+    if (i < 0 || !scale || scale.labelRotation !== 0 || scale.ticks.length < daysInMonth.value.length) return;
+    const { ctx } = chart;
+    // Centred on the day number as Chart.js laid it out (top-aligned text under the axis)
+    const label = scale.getLabelItems()[i];
+    if (!label) return;
+    const [x, top] = (label.options.translation as [number, number] | undefined) ?? [
+      scale.getPixelForValue(i),
+      scale.top,
+    ];
+    const y = top + Number(label.font.lineHeight) / 2;
+    ctx.save();
+    ctx.strokeStyle = chartColors.value.todayRing;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, TODAY_RING_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
 // Dashed target line, only in the all-projects view and only once some day goes past the target: below it the
 // Remaining bars already mark where a full day ends.
 const targetLineHours = computed((): number | null => {
@@ -279,7 +314,11 @@ const chartOptions = computed(() => ({
         display: false,
       },
       ticks: {
-        color: chartColors.value.tickColor,
+        // Room under the bars for today's ring
+        padding: TICK_PADDING,
+        color: (ctx: { index: number }) =>
+          ctx.index === todayIndex.value ? chartColors.value.todayText : chartColors.value.tickColor,
+        font: (ctx: { index: number }) => (ctx.index === todayIndex.value ? { weight: 'bold' as const } : {}),
       },
     },
     y: {
@@ -377,7 +416,7 @@ const initializeChart = () => {
       type: 'bar',
       data: chartData.value,
       options: chartOptions.value,
-      plugins: [offDayOutline],
+      plugins: [offDayOutline, todayRing],
     });
   } catch (error) {
     console.error('Chart initialization failed:', error);
@@ -408,7 +447,7 @@ watch(
 
 // Watch for theme changes and update chart colors (no animation)
 // Theme and off days are read at draw time (colours, outline plugin), not from chartData
-watch([isDark, offDayIndexes], () => {
+watch([isDark, offDayIndexes, todayIndex], () => {
   updateChart('none');
 });
 

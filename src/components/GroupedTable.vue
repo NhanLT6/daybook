@@ -9,7 +9,7 @@ import { useDisplay } from 'vuetify';
 // a month) is a VExpansionPanel whose title is the group row and whose body is a VDataTable of its
 // rows. On top of that it adds only what Vuetify doesn't have: one row of column titles on the glass,
 // group totals lined up under their column, and blocks: consecutive groups with the same
-// `block` sit together and blocks are spaced apart with a hairline (a week of logs, a category of projects). Pages fill
+// `block` sit together, marked down their left edge, and blocks are spaced apart (a week of logs, a category of projects). Pages fill
 // cells, group rows and row actions through slots.
 export interface TableColumn {
   key: string;
@@ -25,10 +25,12 @@ export interface TableGroup<R> {
   rows: R[];
   // DOM id on the group's panel, e.g. a date to scroll to
   id?: string;
-  // Consecutive groups with the same block share one card (e.g. a week); omitted = one card for all
+  // Consecutive groups with the same block sit together under one edge marker (e.g. a week); omitted = no blocks
   block?: string;
   // Label shown above the block's card (e.g. a category name)
   blockLabel?: string;
+  // Draw this block's edge marker in the primary colour (e.g. the current week)
+  blockCurrent?: boolean;
 }
 
 type Row = G['rows'][number];
@@ -113,7 +115,7 @@ const openPanels = computed({
 
 const isOpen = (group: G) => !collapsible || expanded.value.includes(group.key);
 
-// Consecutive groups sharing a block form one card: flag each block's first and last panel
+// Consecutive groups sharing a block sit together: flag each block's first and last panel
 const panels = computed(() =>
   groups.map((group, i) => {
     const block = group.block ?? '';
@@ -163,7 +165,12 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
           :id="group.id"
           :value="group.key"
           class="gt-panel"
-          :class="{ 'gt-panel--block-start': blockStart, 'gt-panel--block-end': blockEnd }"
+          :class="{
+            'gt-panel--block-start': blockStart,
+            'gt-panel--block-end': blockEnd,
+            'gt-panel--in-block': !!group.block,
+            'gt-panel--block-current': group.blockCurrent,
+          }"
         >
           <!-- Group row: the page's group slot fills the first column(s) (title, count); `group.<key>` slots
                put group totals under their column; `group-actions` sits over the row actions -->
@@ -282,15 +289,44 @@ const onRowClick = (_: Event, { item }: { item: Row }) => emit('rowClick', item)
   background: rgba(40, 47, 58, var(--glass-opacity-dark, 0.77));
 }
 
-/* Rows sit directly on the glass: panels have no surface of their own. Blocks are spaced apart and a
-   hairline marks each start after the first. */
+/* Rows sit directly on the glass: panels have no surface of their own. Blocks are spaced apart, and a
+   thin marker in the gutter left of the rows runs the length of each block, broken between blocks, so
+   the groups of a block (a week's days) read as one piece without a wider gap. */
 .gt-panels :deep(> .v-expansion-panel) {
   background: transparent;
 }
 
 .gt-panels :deep(> .v-expansion-panel.gt-panel--block-start:not(:first-child)) {
   margin-top: 12px;
-  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.gt-panels :deep(> .gt-panel--in-block::before) {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: calc(var(--panel-pad, 16px) * -1 + 7px);
+  width: 2px;
+  background: rgba(var(--v-theme-on-surface), 0.16);
+}
+
+.v-theme--dark .gt-panels :deep(> .gt-panel--in-block::before) {
+  background: rgba(var(--v-theme-on-surface), 0.22);
+}
+
+.gt-panels :deep(> .gt-panel--in-block.gt-panel--block-current::before) {
+  background: rgba(var(--v-theme-primary), 0.7);
+}
+
+.gt-panels :deep(> .gt-panel--in-block.gt-panel--block-start::before) {
+  top: 4px;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+}
+
+.gt-panels :deep(> .gt-panel--in-block.gt-panel--block-end::before) {
+  bottom: 4px;
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 2px;
 }
 
 /* Hairline between the groups of a block (flat drops Vuetify's): not at a block's top edge, and not under

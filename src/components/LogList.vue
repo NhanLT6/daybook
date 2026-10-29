@@ -176,13 +176,16 @@ const loggedTimeByDates = computed(() => {
     .orderBy((item) => item.date)
     .value();
 
-  // One table group per day, keyed (and DOM id'd) by its date; each week's days share a card
+  // One table group per day, keyed (and DOM id'd) by its date; each week's days form a block, the
+  // current week's marked in primary
+  const thisWeek = weekStartOf(dayjs().format(isoDateFormat));
   return groups.map((group) => ({
     ...group,
     key: group.date,
     id: group.date,
     rows: group.tasks,
     block: weekStartOf(group.date),
+    blockCurrent: weekStartOf(group.date) === thisWeek,
   }));
 });
 
