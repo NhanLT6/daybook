@@ -196,7 +196,7 @@ const onSave = handleSubmit((values) => {
   }
 
   if (task) {
-    const isTaskExisting = allTasks.value.some((t) => t.title === task);
+    const isTaskExisting = allTasks.value.some((t) => t.title === task && t.project === values.project);
     if (!isTaskExisting) void addTasks([{ title: task, project: values.project! } satisfies Task]);
   }
 

@@ -187,15 +187,8 @@ export function useWorkspace() {
    * Get all tasks for a specific project
    * @param projectTitle - The project to get tasks for
    */
-  const getTasksByProject = (projectTitle: string) => {
-    const tasks: Task[] = allTasks.value.filter((t) => t.project === projectTitle);
-
-    const jiraTasks: Task[] = myJiraProjects.value
-      .filter((jp) => jp.title === projectTitle)
-      .map(() => ({ title: projectTitle, project: projectTitle }) satisfies Task);
-
-    return uniqBy([...tasks, ...jiraTasks], (t) => t.title);
-  };
+  // A Jira ticket is a project of its own with no tasks until the user adds some
+  const getTasksByProject = (projectTitle: string) => allTasks.value.filter((t) => t.project === projectTitle);
 
   const codeReviewDescriptions = computed(() => {
     if (!settingsStore.useDefaultTasks) return [];
@@ -209,7 +202,19 @@ export function useWorkspace() {
    * directly to the underlying collections.
    */
   const addProjects = (list: Project[]) => projectsCol.addMany(list.map((p) => ({ ...p, id: p.title })));
-  const addTasks = (list: Task[]) => tasksCol.addMany(list.map((t) => ({ ...t, id: `${t.project}::${t.title}` })));
+  // A task's project is stored too when it only exists outside the projects collection (a Jira ticket from the
+  // month's sync cache), so the task shows on the Tasks page and outlives the cache
+  const addTasks = async (list: Task[]) => {
+    const stored = new Set(allProjects.value.map((p) => p.title));
+    const jiraCategoryId = settingsStore.jiraConfig.defaultCategoryId ?? undefined;
+    const missing = uniq(list.map((t) => t.project).filter((title) => !stored.has(title)));
+    if (missing.length) {
+      await addProjects(
+        missing.map((title) => myProjects.value.find((p) => p.title === title) ?? { title, categoryId: jiraCategoryId }),
+      );
+    }
+    await tasksCol.addMany(list.map((t) => ({ ...t, id: `${t.project}::${t.title}` })));
+  };
 
   return {
     allTasks,

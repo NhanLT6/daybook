@@ -38,7 +38,7 @@ Your data:
 
 AI options (Settings → AI): the shared AI is free and on by default, with a monthly quota for everyone. You can add your own Gemini API key instead.
 
-Jira (Settings → Jira): enter your Atlassian site, email, an API token (from id.atlassian.com → Security → API tokens), the project key and the statuses to pull. Tickets then appear as tasks and in / suggestions, refreshed once a day.
+Jira (Settings → Jira): enter your Atlassian site, email, an API token (from id.atlassian.com → Security → API tokens), the project key and the statuses to pull. Tickets then appear as projects (no task needed) and in / suggestions, refreshed once a day.
 
 Other: works on phones in the browser (no app to install). Light and dark theme via the toggle in the rail. The interface is in English; the chat understands any language.`;
 
