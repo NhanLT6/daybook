@@ -276,15 +276,19 @@ const todayRing: Plugin<'bar'> = {
     // Skip when the labels are tilted or thinned out (a narrow chart): no clean spot for the ring
     if (i < 0 || !scale || scale.labelRotation !== 0 || scale.ticks.length < daysInMonth.value.length) return;
     const { ctx } = chart;
-    // Centred on the day number as Chart.js laid it out (top-aligned text under the axis)
+    // Centred on the digits' ink, measured the way Chart.js draws the label (the line box's middle sits
+    // below the digits, which have no descenders)
     const label = scale.getLabelItems()[i];
     if (!label) return;
     const [x, top] = (label.options.translation as [number, number] | undefined) ?? [
       scale.getPixelForValue(i),
       scale.top,
     ];
-    const y = top + Number(label.font.lineHeight) / 2;
     ctx.save();
+    ctx.font = label.font.string;
+    ctx.textBaseline = (label.options.textBaseline as CanvasTextBaseline | undefined) ?? 'top';
+    const ink = ctx.measureText(String(label.label));
+    const y = top + label.textOffset + (ink.actualBoundingBoxDescent - ink.actualBoundingBoxAscent) / 2;
     ctx.strokeStyle = chartColors.value.todayRing;
     ctx.lineWidth = 2;
     ctx.beginPath();
