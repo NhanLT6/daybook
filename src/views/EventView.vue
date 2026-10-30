@@ -74,7 +74,7 @@ const onSelectEvent = (id: string) => {
 <style scoped>
 .event-page {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* Calendar + day card keep their natural height instead of the page's full-height panel rule */

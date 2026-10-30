@@ -42,7 +42,12 @@ const editorEmpty = ref(false);
 // Wide screens read like a mail client: the card grid in a left column, the open note beside it. Narrow
 // screens (and a page with no notes yet) keep the editor over the whole page.
 const { mdAndUp } = useDisplay();
-const split = computed(() => mdAndUp.value && notes.value.length > 0);
+
+// Whether there are notes to show in the grid column, frozen while a note is open (and while the trash eats
+// one): saving the first note mid-typing would otherwise re-lay the page under the cursor. The grid column
+// shows once the user goes back.
+const hasNotes = ref(false);
+const split = computed(() => mdAndUp.value && hasNotes.value);
 
 // Sanitized once per notes change rather than re-running DOMPurify on every render.
 const sanitizedPreviews = computed(
@@ -310,7 +315,9 @@ const onOverlayLeave = (el: Element, done: () => void) => {
   closingToTrash = false;
   // Deleted: the crumpling copy already covers the editor, so the overlay just goes.
   if (toTrash || prefersReducedMotion()) return done();
-  if (split.value) return slideOut(el, done);
+  // The overlay's own mode, not split's: the first note opens full-page and, once closed, shrinks into its
+  // card in the grid column that appears beside it
+  if (el.classList.contains('notes-editor-overlay--side')) return slideOut(el, done);
   const editorCard = editorCardOf(el);
   // Tiptap clears its content on unmount, so fade the editor out first rather than let the body
   // vanish while the header lingers — what shrinks is a blank card shape.
@@ -345,12 +352,21 @@ const trashHold = ref(false);
 const trashEating = ref(false);
 const lidOpen = computed(() => trashHover.value || trashEating.value);
 
+watch(
+  [() => notes.value.length > 0, () => !!editing.value || trashHold.value],
+  ([has, frozen]) => {
+    if (!frozen) hasNotes.value = has;
+  },
+  { immediate: true },
+);
+
 // Final resting center (panel coordinates) — computed, not measured, because the trash may still be
 // mid slide-in transition when an animation targets it.
 const trashCenter = () => {
   const p = panelEl.value!;
-  // Side by side the bin sits under the card grid, not the whole page
-  const width = split.value ? (bodyEl.value?.offsetWidth ?? p.clientWidth) : p.clientWidth;
+  // Wide screens keep the bin under the card grid's column (even while the editor covers the page), away from
+  // the notifications rising from the bottom centre. Mirrors --notes-list-width.
+  const width = mdAndUp.value ? Math.min(560, Math.max(400, p.clientWidth * 0.34)) : p.clientWidth;
   return { x: width / 2, y: p.clientHeight - TRASH_BOTTOM - TRASH_SIZE / 2 };
 };
 
@@ -584,7 +600,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="panelEl" class="notes-panel" :class="{ 'notes-panel--split': split }">
+  <div ref="panelEl" class="notes-panel" :class="{ 'notes-panel--wide': mdAndUp, 'notes-panel--split': split }">
     <!-- Toolbar + grid. While a note is open over them (narrow screens) they fade out and go inert, so nothing
          shows through the editor card's gutter or is reachable by Tab behind it. Side by side they stay. -->
     <div
@@ -713,7 +729,7 @@ onBeforeUnmount(() => {
     <!-- Editor: a padded card over the whole tab; grows out of the clicked card / + button and
          shrinks back into the note's card (or into the trash on delete). Side by side it fills the right column. -->
     <Transition :css="false" @enter="onOverlayEnter" @leave="onOverlayLeave">
-      <div v-if="editing" class="notes-editor-overlay">
+      <div v-if="editing" class="notes-editor-overlay" :class="{ 'notes-editor-overlay--side': split }">
         <div class="notes-editor-card rounded-lg" :class="editing.color ? `bg-note-${editing.color}` : 'bg-surface'">
           <NoteEditor
             :key="editing.id"
@@ -751,8 +767,11 @@ onBeforeUnmount(() => {
 }
 
 /* Side by side: the grid takes a third (two card columns on most screens), the open note the rest */
+.notes-panel--wide {
+  --notes-list-width: clamp(400px, 34%, 560px); /* mirrored in trashCenter() */
+}
+
 .notes-panel--split {
-  --notes-list-width: clamp(400px, 34%, 560px);
   flex-direction: row;
 }
 
@@ -782,15 +801,17 @@ onBeforeUnmount(() => {
   }
 }
 
-.notes-panel--split .notes-editor-overlay {
+/* On the overlay itself, not via the panel: a leaving overlay keeps the layout it was opened with */
+.notes-editor-overlay--side {
   left: var(--notes-list-width);
 }
 
-.notes-panel--split .notes-editor-card {
+.notes-editor-overlay--side .notes-editor-card {
   left: 0;
 }
 
-.notes-panel--split .notes-trash-zone {
+/* The bin always sits under the grid's column on wide screens, also for a delete from a full-page editor */
+.notes-panel--wide .notes-trash-zone {
   right: auto;
   width: var(--notes-list-width);
 }

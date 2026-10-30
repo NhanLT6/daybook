@@ -174,7 +174,8 @@ the rule is untouched.
   today. `EventView` keeps that day in its own `pickedDay`, so selecting an event (which clears the calendar's
   day) doesn't jump the card back to today. Each item shows its time or "All day", plus the full span for a
   multi-day range. Clicking an item selects the event, the same as clicking its row. An empty day shows
-  "Nothing on" and the next event day (`nextEventDay`), "in N days" for today or "N days later" for a picked day.
+  "Nothing on". Under it a **Next** section (labelled like the day header) lists the next 3 events after the
+  day, each at its first occurrence (`nextEventDay`), "in N days" for today or "N days later" for a picked day.
 - **Today line on Home** (`TodayEvents`, top of the Form tab): today's events as small text chips with their dot
   colour and start time. Hidden when nothing is on. Kept quiet on purpose: a glance, not a notification.
 - **Which day an event is on**: use `occurrenceOn(event, day)`, not `getOccurrences(event, day, day)`. The

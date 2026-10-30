@@ -68,9 +68,14 @@ grid take a left column (`--notes-list-width: clamp(400px, 34%, 560px)`, two car
 the rest, and its card gets a primary ring (`NoteCard` `selected`). The grid stays live while a note is open:
 clicking another card saves (or drops, if empty) the current one first (`finishEditing`). The editor slides in
 from the grid's side there (and again, shorter, when switching notes) instead of growing from the card (the
-clip-path grow can't reach outside its column), the trash
-sits under the grid column, and with nothing open the right column shows a dashed "Pick a note" placeholder.
-Narrow screens, and a page with no notes yet, keep the full-page editor overlay described below.
+clip-path grow can't reach outside its column), and with nothing open the right column shows a dashed "Pick a
+note" placeholder. Narrow screens, and a page with no notes yet, keep the full-page editor overlay described below.
+- `split` reads `hasNotes`, which is frozen while a note is open (and while the trash eats one): the first note
+  is saved mid-typing, and splitting then would re-lay the page under the cursor. The grid column appears once
+  the user goes back. The overlay carries its own mode (`notes-editor-overlay--side`) so a leaving overlay keeps
+  the layout it opened with: the first note's full-page editor shrinks into its new card in the grid.
+- The trash sits under the grid column on every md+ screen (`notes-panel--wide`), also for a delete from the
+  full-page editor, so it never lands under the notifications rising from the bottom centre.
 
 ## Search
 
