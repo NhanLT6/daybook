@@ -41,59 +41,73 @@ interface DayItem {
   sortKey: string; // all-day first, then by start time
 }
 
+// Soonest first; on the same day, all-day events before timed ones
+const bySortKey = (a: DayItem, b: DayItem) => a.sortKey.localeCompare(b.sortKey) || a.title.localeCompare(b.title);
+
 // What the day shows for one occurrence: its time (or "All day"), plus the full span when it runs over several days
 const describeOn = (event: AppEvent, occurrence: string): string => {
   const shown = atOccurrence(event, occurrence);
   const time = shown.startTime ? `${shown.startTime} – ${shown.endTime}` : 'All day';
   if (!shown.endDate || shown.endDate === shown.date) return time;
+
   const span = formatEventDate({ ...shown, startTime: undefined, endTime: undefined });
   return shown.startTime ? `${span}, ${time}` : span;
 };
 
+// How far a later date is from the shown day: "tomorrow" / "in 4 days" for today, "4 days later" for a picked day
+const describeGap = (on: string): string => {
+  const gap = dayjs(on).diff(dayjs(day), 'day');
+  if (day !== today.value) return `${gap} ${gap === 1 ? 'day' : 'days'} later`;
+  return gap === 1 ? 'tomorrow' : `in ${gap} days`;
+};
+
+// The events on the shown day
 const dayItems = computed<DayItem[]>(() =>
   events.value
     .flatMap((event) => {
       const occurrence = occurrenceOn(event, day, workCalendar.value);
       if (!occurrence) return [];
-      return [
-        {
-          id: event.id,
-          title: atOccurrence(event, occurrence).title,
-          type: event.type,
-          when: describeOn(event, occurrence),
-          sortKey: event.startTime ?? '',
-        },
-      ];
+
+      return {
+        id: event.id,
+        title: atOccurrence(event, occurrence).title,
+        type: event.type,
+        when: describeOn(event, occurrence),
+        sortKey: event.startTime ?? '',
+      };
     })
-    .sort((a, b) => a.sortKey.localeCompare(b.sortKey) || a.title.localeCompare(b.title)),
+    .sort(bySortKey),
 );
 
-// What comes after the day: the next few events, each at its first occurrence after it, soonest first
+// The next few events after the shown day, each at its first occurrence after it
 const UPCOMING_COUNT = 3;
+
 const upcoming = computed<DayItem[]>(() => {
   const from = dayjs(day).add(1, 'day').format(isoDateFormat);
+
   return events.value
     .flatMap((event) => {
       const on = nextEventDay(event, from, workCalendar.value);
       if (!on) return [];
+
       const occurrence = getNextOccurrence(event, from, workCalendar.value) ?? on;
-      // Count days from the shown day: "in 4 days" for today, "4 days later" for a picked day
-      const gap = dayjs(on).diff(dayjs(day), 'day');
-      const relative =
-        day === today.value ? (gap === 1 ? 'tomorrow' : `in ${gap} days`) : `${gap} ${gap === 1 ? 'day' : 'days'} later`;
-      return [
-        {
-          id: event.id,
-          title: atOccurrence(event, occurrence).title,
-          type: event.type,
-          when: `${dayjs(on).format('ddd, MMM D')} · ${relative}`,
-          sortKey: `${on} ${event.startTime ?? ''}`,
-        },
-      ];
+      return {
+        id: event.id,
+        title: atOccurrence(event, occurrence).title,
+        type: event.type,
+        when: `${dayjs(on).format('ddd, MMM D')} · ${describeGap(on)}`,
+        sortKey: `${on} ${event.startTime ?? ''}`,
+      };
     })
-    .sort((a, b) => a.sortKey.localeCompare(b.sortKey) || a.title.localeCompare(b.title))
+    .sort(bySortKey)
     .slice(0, UPCOMING_COUNT);
 });
+
+// The card's two sections, drawn the same way: the shown day, then what comes next
+const sections = computed(() => [
+  { key: 'day', heading: heading.value, date: dateLabel.value, items: dayItems.value, empty: 'Nothing on' },
+  { key: 'next', heading: 'Next', date: '', items: upcoming.value, empty: 'No upcoming events' },
+]);
 
 // Same dot colours as the calendar: accent = holiday, info = your own event
 const dotColor = (type: AppEvent['type']) => (type === 'holiday' ? 'accent' : 'info');
@@ -101,49 +115,33 @@ const dotColor = (type: AppEvent['type']) => (type === 'holiday' ? 'accent' : 'i
 
 <template>
   <VCard variant="text" class="event-day-card pb-2">
-    <!-- Section 1: the shown day (today or the picked day) and its events -->
-    <div class="d-flex align-baseline justify-space-between ga-2 px-4 pt-3">
-      <span class="text-subtitle-1 font-weight-medium">{{ heading }}</span>
-      <span class="text-caption text-medium-emphasis">{{ dateLabel }}</span>
-    </div>
-    <VList v-if="dayItems.length" density="compact" bg-color="transparent" class="py-1">
-      <VListItem
-        v-for="item in dayItems"
-        :key="item.id"
-        :title="item.title"
-        :subtitle="item.when"
-        :active="item.id === selectedEventId"
-        color="primary"
-        rounded="lg"
-        class="mx-2"
-        @click="emit('selectEvent', item.id)"
-      >
-        <template #prepend>
-          <VIcon icon="mdi-circle" size="10" :color="dotColor(item.type)" class="me-n4" />
-        </template>
-      </VListItem>
-    </VList>
-    <div v-else class="text-body-2 text-medium-emphasis px-4 pt-1 pb-2">Nothing on</div>
+    <section v-for="section in sections" :key="section.key">
+      <!-- Label (Today / weekday / Next), with the date on the right for the day section -->
+      <div class="d-flex align-baseline justify-space-between ga-2 px-4 pt-3">
+        <span class="text-subtitle-1 font-weight-medium">{{ section.heading }}</span>
+        <span class="text-caption text-medium-emphasis">{{ section.date }}</span>
+      </div>
 
-    <!-- Section 2: what comes next, labelled like the day above; clicking one selects it like a row in the list -->
-    <div class="text-subtitle-1 font-weight-medium px-4 pt-2">Next</div>
-    <VList v-if="upcoming.length" density="compact" bg-color="transparent" class="py-1">
-      <VListItem
-        v-for="item in upcoming"
-        :key="item.id"
-        :title="item.title"
-        :subtitle="item.when"
-        :active="item.id === selectedEventId"
-        color="primary"
-        rounded="lg"
-        class="mx-2"
-        @click="emit('selectEvent', item.id)"
-      >
-        <template #prepend>
-          <VIcon icon="mdi-circle" size="10" :color="dotColor(item.type)" class="me-n4" />
-        </template>
-      </VListItem>
-    </VList>
-    <div v-else class="text-body-2 text-medium-emphasis px-4 pt-1">No upcoming events</div>
+      <!-- Its events; clicking one selects it like a row in the list -->
+      <VList v-if="section.items.length" density="compact" bg-color="transparent" class="py-1">
+        <VListItem
+          v-for="item in section.items"
+          :key="item.id"
+          :title="item.title"
+          :subtitle="item.when"
+          :active="item.id === selectedEventId"
+          color="primary"
+          rounded="lg"
+          class="mx-2"
+          @click="emit('selectEvent', item.id)"
+        >
+          <template #prepend>
+            <VIcon icon="mdi-circle" size="10" :color="dotColor(item.type)" class="me-n4" />
+          </template>
+        </VListItem>
+      </VList>
+
+      <div v-else class="text-body-2 text-medium-emphasis px-4 pt-1">{{ section.empty }}</div>
+    </section>
   </VCard>
 </template>

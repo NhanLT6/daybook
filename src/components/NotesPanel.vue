@@ -103,8 +103,10 @@ let closingToTrash = false;
 
 const openNote = (note: Note, el: HTMLElement) => {
   if (editing.value?.id === note.id) return;
+
   // Side by side, another note can be open already: save (or drop, if empty) it first
   if (editing.value) finishEditing();
+
   originEl = el;
   editing.value = { ...note };
   editorEmpty.value = false;
@@ -114,6 +116,7 @@ const addNote = (e: MouseEvent) => {
   // A new note starts empty and would be hidden by an active query once saved
   searchText.value = '';
   if (editing.value) finishEditing();
+
   originEl = e.currentTarget as HTMLElement;
   const now = Date.now();
   // Not persisted yet — only saved once the user actually types something (see persist()).
@@ -210,21 +213,26 @@ const deleteFromEditor = () => {
   persist.cancel();
   if (!editing.value) return;
   closingId = null;
+
+  // Nothing written: just drop it, no trash animation
   if (editorEmpty.value) {
     if (notes.value.some((n) => n.id === editing.value!.id)) removeNote(editing.value.id);
     editing.value = null;
     return;
   }
+
+  // Snapshot the editor card before it unmounts (Tiptap clears its DOM), then crumple the copy into the trash,
+  // the same bin a dragged card drops into
   const note = { ...editing.value };
-  // Snapshot the editor card before it unmounts (Tiptap clears its DOM), then crumple the copy into the trash.
   const editorCard = panelEl.value?.querySelector<HTMLElement>('.notes-editor-card');
   if (editorCard && !prefersReducedMotion()) {
-    const p = panelEl.value!.getBoundingClientRect();
-    const r = editorCard.getBoundingClientRect();
-    swallow(crumpleIntoTrash(editorCard, { left: r.left - p.left, top: r.top - p.top }));
+    const panel = panelEl.value!.getBoundingClientRect();
+    const card = editorCard.getBoundingClientRect();
+    swallow(crumpleIntoTrash(editorCard, { left: card.left - panel.left, top: card.top - panel.top }));
   } else {
     swallow(Promise.resolve());
   }
+
   closingToTrash = true;
   editing.value = null;
   deleteWithUndo(note);
@@ -313,18 +321,23 @@ const onOverlayLeave = (el: Element, done: () => void) => {
   const toTrash = closingToTrash;
   closingId = null;
   closingToTrash = false;
+
   // Deleted: the crumpling copy already covers the editor, so the overlay just goes.
   if (toTrash || prefersReducedMotion()) return done();
+
   // The overlay's own mode, not split's: the first note opens full-page and, once closed, shrinks into its
   // card in the grid column that appears beside it
   if (el.classList.contains('notes-editor-overlay--side')) return slideOut(el, done);
+
   const editorCard = editorCardOf(el);
+
   // Tiptap clears its content on unmount, so fade the editor out first rather than let the body
   // vanish while the header lingers — what shrinks is a blank card shape.
   (editorCard.firstElementChild as HTMLElement | null)?.animate([{ opacity: 1 }, { opacity: 0 }], {
     duration: 100,
     fill: 'forwards',
   });
+
   // Shrink back into the note's card, then fade so the card underneath takes over; discarded notes
   // have no card left, so those just fade.
   const frames = card
@@ -352,6 +365,8 @@ const trashHold = ref(false);
 const trashEating = ref(false);
 const lidOpen = computed(() => trashHover.value || trashEating.value);
 
+// Keeps hasNotes (see split) in step with the notes, except while a note is open or the trash is eating one.
+// Declared here, after trashHold, because it reads it.
 watch(
   [() => notes.value.length > 0, () => !!editing.value || trashHold.value],
   ([has, frozen]) => {
@@ -360,15 +375,14 @@ watch(
   { immediate: true },
 );
 
-// Final resting center (panel coordinates) — computed, not measured, because the trash may still be
-// mid slide-in transition when an animation targets it.
-const trashCenter = () => {
-  const p = panelEl.value!;
-  // Wide screens keep the bin under the card grid's column (even while the editor covers the page), away from
-  // the notifications rising from the bottom centre. Mirrors --notes-list-width.
-  const width = mdAndUp.value ? Math.min(560, Math.max(400, p.clientWidth * 0.34)) : p.clientWidth;
-  return { x: width / 2, y: p.clientHeight - TRASH_BOTTOM - TRASH_SIZE / 2 };
-};
+// The one bin, centred in its zone (the grid's column on wide screens, the whole page on narrow ones). Its
+// resting point is computed from the zone, not measured on the bin, which may still be sliding in.
+const trashZoneEl = ref<HTMLElement | null>(null);
+
+const trashCenter = () => ({
+  x: trashZoneEl.value!.offsetWidth / 2,
+  y: panelEl.value!.clientHeight - TRASH_BOTTOM - TRASH_SIZE / 2,
+});
 
 // Lid stays open while something falls in, then closes with a small squash, then the trash slides away.
 const swallow = async (falling: Promise<unknown>) => {
@@ -376,6 +390,7 @@ const swallow = async (falling: Promise<unknown>) => {
   trashEating.value = true;
   await falling.catch(() => {});
   trashEating.value = false;
+
   if (!prefersReducedMotion()) {
     await trashEl.value
       ?.animate(
@@ -389,6 +404,7 @@ const swallow = async (falling: Promise<unknown>) => {
       )
       .finished.catch(() => {});
   }
+
   trashHold.value = false;
 };
 
@@ -546,14 +562,17 @@ const startDrag = (note: Note) => {
 
 const endDrag = async () => {
   TRACK_EVENTS.forEach((t) => document.removeEventListener(t, trackPoint, { capture: true }));
+
   const id = dragNoteId.value;
   const overTrash = trashHover.value && !!lastPoint;
   dragNoteId.value = null;
   trashHover.value = false;
   const note = notes.value.find((n) => n.id === id);
 
+  // Dropped on the trash: crumple the card from where it was let go
   if (overTrash && note && lastPoint) {
     draftIds.value = null;
+
     const card = panelEl.value?.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note.id)}"]`);
     const p = panelEl.value!.getBoundingClientRect();
     const from = { left: lastPoint.x - grabOffset.x - p.left, top: lastPoint.y - grabOffset.y - p.top };
@@ -562,7 +581,9 @@ const endDrag = async () => {
     return;
   }
 
+  // Dropped elsewhere: store the new order
   if (!draftIds.value) return;
+
   // Pinned notes always stay first: a drop across the boundary snaps back to its own group.
   const ids = pinnedFirst(displayNotes.value).map((n) => n.id);
   // Keep the draft on screen until the new order is stored, so cards don't flash back.
@@ -649,76 +670,83 @@ onBeforeUnmount(() => {
           </VBtn>
         </template>
 
-      <!-- Scrollable card grid (pinned notes first) -->
-      <div class="notes-scroll" :class="{ 'notes-scroll--empty': !notes.length }">
-        <!-- No notes: fills the tab like the Chat panel, with the add action right there -->
-        <VCard v-if="!notes.length" variant="text" class="notes-empty">
-          <div class="d-flex flex-column align-center justify-center text-center pa-6 h-100">
-            <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
-            <p class="text-body-2 text-medium-emphasis mb-1">Jot down what you need to remember today</p>
-            <p class="text-caption text-disabled mb-5">e.g. "Ask Bob about the T-123 deploy in standup"</p>
-            <VBtn color="primary" variant="tonal" prepend-icon="mdi-plus" aria-label="New note" @click="addNote">
-              New note
-            </VBtn>
-            <VBtn
-              v-if="isDev"
-              size="small"
-              variant="text"
-              prepend-icon="mdi-flask-outline"
-              class="mt-2"
-              aria-label="Add 20 sample notes"
-              @click="addSampleNotes"
-            >
-              Sample notes
-            </VBtn>
+        <!-- Scrollable card grid (pinned notes first) -->
+        <div class="notes-scroll" :class="{ 'notes-scroll--empty': !notes.length }">
+          <!-- No notes: fills the tab like the Chat panel, with the add action right there -->
+          <VCard v-if="!notes.length" variant="text" class="notes-empty">
+            <div class="d-flex flex-column align-center justify-center text-center pa-6 h-100">
+              <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
+              <p class="text-body-2 text-medium-emphasis mb-1">Jot down what you need to remember today</p>
+              <p class="text-caption text-disabled mb-5">e.g. "Ask Bob about the T-123 deploy in standup"</p>
+              <VBtn color="primary" variant="tonal" prepend-icon="mdi-plus" aria-label="New note" @click="addNote">
+                New note
+              </VBtn>
+              <VBtn
+                v-if="isDev"
+                size="small"
+                variant="text"
+                prepend-icon="mdi-flask-outline"
+                class="mt-2"
+                aria-label="Add 20 sample notes"
+                @click="addSampleNotes"
+              >
+                Sample notes
+              </VBtn>
+            </div>
+          </VCard>
+
+          <!-- Search with no hits -->
+          <div
+            v-else-if="!filteredNotes.length"
+            class="notes-no-match d-flex flex-column align-center text-center pt-10"
+          >
+            <VIcon icon="mdi-magnify-close" size="36" class="mb-3 text-disabled" />
+            <p class="text-body-2 text-medium-emphasis">No matching notes</p>
           </div>
-        </VCard>
 
-        <!-- Search with no hits -->
-        <div v-else-if="!filteredNotes.length" class="notes-no-match d-flex flex-column align-center text-center pt-10">
-          <VIcon icon="mdi-magnify-close" size="36" class="mb-3 text-disabled" />
-          <p class="text-body-2 text-medium-emphasis">No matching notes</p>
+          <div ref="gridEl" class="notes-grid" @pointerdown.capture="onGridPointerDown">
+            <VScaleTransition group leave-absolute>
+              <NoteCard
+                v-for="note in displayNotes"
+                :key="note.id"
+                :note="note"
+                :preview-html="sanitizedPreviews.get(note.id) ?? ''"
+                :selected="split && note.id === editing?.id"
+                @click="onCardClick(note, $event)"
+              />
+            </VScaleTransition>
+          </div>
         </div>
-
-        <div ref="gridEl" class="notes-grid" @pointerdown.capture="onGridPointerDown">
-          <VScaleTransition group leave-absolute>
-            <NoteCard
-              v-for="note in displayNotes"
-              :key="note.id"
-              :note="note"
-              :preview-html="sanitizedPreviews.get(note.id) ?? ''"
-              :selected="split && note.id === editing?.id"
-              @click="onCardClick(note, $event)"
-            />
-          </VScaleTransition>
-        </div>
-      </div>
       </ListPanel>
     </div>
 
-    <!-- Trash drop zone: slides up while a note is dragged (or deleted from the editor) and overlays the
-         grid, so no layout shift. The lid opens on hover and while something falls in. -->
-    <VSlideYReverseTransition>
-      <div v-if="dragNoteId || trashHold" class="notes-trash-zone">
-        <div
-          ref="trashEl"
-          class="notes-trash"
-          :class="{ 'notes-trash--hover': trashHover, 'notes-trash--open': lidOpen }"
-          aria-label="Drop here to delete"
-          @dragover.prevent
-          @drop.prevent
-        >
-          <svg class="notes-trash__icon" viewBox="0 0 24 24" aria-hidden="true">
-            <g class="notes-trash__lid">
-              <path d="M3.5 6.5h17" />
-              <path d="M9 6.5V4.8c0-.7.6-1.3 1.3-1.3h3.4c.7 0 1.3.6 1.3 1.3v1.7" />
-            </g>
-            <path d="M5.8 9.5l.9 10c.1 1 .9 1.7 1.9 1.7h6.8c1 0 1.8-.7 1.9-1.7l.9-10" />
-            <path d="M10 12.5v5M14 12.5v5" />
-          </svg>
+    <!-- Trash: one bin for both drag-to-trash and the editor's delete button. Its zone is always there (empty,
+         click-through) so the bin's spot can be computed; the bin slides up while a note is dragged or deleted,
+         overlaying the grid with no layout shift. The lid opens on hover and while something falls in. -->
+    <div ref="trashZoneEl" class="notes-trash-zone">
+      <!-- The slide's transform goes on this wrapper, the bin's own hover scale on the bin -->
+      <VSlideYReverseTransition>
+        <div v-if="dragNoteId || trashHold">
+          <div
+            ref="trashEl"
+            class="notes-trash"
+            :class="{ 'notes-trash--hover': trashHover, 'notes-trash--open': lidOpen }"
+            aria-label="Drop here to delete"
+            @dragover.prevent
+            @drop.prevent
+          >
+            <svg class="notes-trash__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <g class="notes-trash__lid">
+                <path d="M3.5 6.5h17" />
+                <path d="M9 6.5V4.8c0-.7.6-1.3 1.3-1.3h3.4c.7 0 1.3.6 1.3 1.3v1.7" />
+              </g>
+              <path d="M5.8 9.5l.9 10c.1 1 .9 1.7 1.9 1.7h6.8c1 0 1.8-.7 1.9-1.7l.9-10" />
+              <path d="M10 12.5v5M14 12.5v5" />
+            </svg>
+          </div>
         </div>
-      </div>
-    </VSlideYReverseTransition>
+      </VSlideYReverseTransition>
+    </div>
 
     <!-- Side by side with no note open: the reading column says what goes there -->
     <div v-if="split && !editing" class="notes-detail-empty text-center">
@@ -768,7 +796,7 @@ onBeforeUnmount(() => {
 
 /* Side by side: the grid takes a third (two card columns on most screens), the open note the rest */
 .notes-panel--wide {
-  --notes-list-width: clamp(400px, 34%, 560px); /* mirrored in trashCenter() */
+  --notes-list-width: clamp(400px, 34%, 560px);
 }
 
 .notes-panel--split {
