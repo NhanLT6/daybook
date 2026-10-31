@@ -40,14 +40,16 @@ const editing = ref<Note | null>(null);
 const editorEmpty = ref(false);
 
 // Wide screens read like a mail client: the card grid in a left column, the open note beside it. Narrow
-// screens (and a page with no notes yet) keep the editor over the whole page.
+// screens keep the editor over the whole page.
 const { mdAndUp } = useDisplay();
 
-// Whether there are notes to show in the grid column, frozen while a note is open (and while the trash eats
-// one): saving the first note mid-typing would otherwise re-lay the page under the cursor. The grid column
-// shows once the user goes back.
-const hasNotes = ref(false);
-const split = computed(() => mdAndUp.value && hasNotes.value);
+// Side by side whenever there is a note to show or one is open, also the very first new one: it opens on the
+// right like any note, and once saved its card just appears in the grid, so nothing moves under the cursor.
+// Held while the trash eats the last note, so the page doesn't change under the animation.
+const split = computed(() => mdAndUp.value && (notes.value.length > 0 || !!editing.value || trashHold.value));
+
+// The "Jot down…" empty state: no notes and none being written
+const showEmptyState = computed(() => !notes.value.length && !editing.value);
 
 // Sanitized once per notes change rather than re-running DOMPurify on every render.
 const sanitizedPreviews = computed(
@@ -365,16 +367,6 @@ const trashHold = ref(false);
 const trashEating = ref(false);
 const lidOpen = computed(() => trashHover.value || trashEating.value);
 
-// Keeps hasNotes (see split) in step with the notes, except while a note is open or the trash is eating one.
-// Declared here, after trashHold, because it reads it.
-watch(
-  [() => notes.value.length > 0, () => !!editing.value || trashHold.value],
-  ([has, frozen]) => {
-    if (!frozen) hasNotes.value = has;
-  },
-  { immediate: true },
-);
-
 // The one bin, centred in its zone (the grid's column on wide screens, the whole page on narrow ones). Its
 // resting point is computed from the zone, not measured on the bin, which may still be sliding in.
 const trashZoneEl = ref<HTMLElement | null>(null);
@@ -635,12 +627,12 @@ onBeforeUnmount(() => {
       <ListPanel
         v-model:search="searchText"
         class="notes-list"
-        :class="{ 'notes-list--empty': !notes.length }"
+        :class="{ 'notes-list--empty': showEmptyState }"
         title="Notes"
         :count="filteredNotes.length"
         search-placeholder="Search notes"
       >
-        <template v-if="notes.length" #actions>
+        <template v-if="!showEmptyState" #actions>
           <VBtn
             v-if="isDev"
             variant="text"
@@ -671,9 +663,9 @@ onBeforeUnmount(() => {
         </template>
 
         <!-- Scrollable card grid (pinned notes first) -->
-        <div class="notes-scroll" :class="{ 'notes-scroll--empty': !notes.length }">
+        <div class="notes-scroll" :class="{ 'notes-scroll--empty': showEmptyState }">
           <!-- No notes: fills the tab like the Chat panel, with the add action right there -->
-          <VCard v-if="!notes.length" variant="text" class="notes-empty">
+          <VCard v-if="showEmptyState" variant="text" class="notes-empty">
             <div class="d-flex flex-column align-center justify-center text-center pa-6 h-100">
               <VIcon icon="mdi-note-text-outline" size="36" class="mb-3 text-disabled" />
               <p class="text-body-2 text-medium-emphasis mb-1">Jot down what you need to remember today</p>
@@ -697,7 +689,7 @@ onBeforeUnmount(() => {
 
           <!-- Search with no hits -->
           <div
-            v-else-if="!filteredNotes.length"
+            v-else-if="searchQuery && !filteredNotes.length"
             class="notes-no-match d-flex flex-column align-center text-center pt-10"
           >
             <VIcon icon="mdi-magnify-close" size="36" class="mb-3 text-disabled" />
@@ -794,7 +786,8 @@ onBeforeUnmount(() => {
   transition: opacity 0.2s ease;
 }
 
-/* Side by side: the grid takes a third (two card columns on most screens), the open note the rest */
+/* Side by side: the grid takes a third (two card columns on most screens), the open note the rest. Set on every
+   wide screen, not just while split, so a side overlay still leaving after the split ends keeps its place. */
 .notes-panel--wide {
   --notes-list-width: clamp(400px, 34%, 560px);
 }
@@ -829,8 +822,9 @@ onBeforeUnmount(() => {
   }
 }
 
-/* On the overlay itself, not via the panel: a leaving overlay keeps the layout it was opened with */
-.notes-editor-overlay--side {
+/* On the overlay itself, not via the panel: a leaving overlay keeps the layout it was opened with. Both classes,
+   to outrank the base .notes-editor-overlay rule further down. */
+.notes-editor-overlay.notes-editor-overlay--side {
   left: var(--notes-list-width);
 }
 
@@ -838,8 +832,8 @@ onBeforeUnmount(() => {
   left: 0;
 }
 
-/* The bin always sits under the grid's column on wide screens, also for a delete from a full-page editor */
-.notes-panel--wide .notes-trash-zone {
+/* Side by side the bin sits under the grid's column, away from the notifications rising from the bottom centre */
+.notes-panel--split .notes-trash-zone {
   right: auto;
   width: var(--notes-list-width);
 }

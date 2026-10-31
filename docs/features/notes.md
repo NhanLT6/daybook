@@ -69,13 +69,13 @@ the rest, and its card gets a primary ring (`NoteCard` `selected`). The grid sta
 clicking another card saves (or drops, if empty) the current one first (`finishEditing`). The editor slides in
 from the grid's side there (and again, shorter, when switching notes) instead of growing from the card (the
 clip-path grow can't reach outside its column), and with nothing open the right column shows a dashed "Pick a
-note" placeholder. Narrow screens, and a page with no notes yet, keep the full-page editor overlay described below.
-- `split` reads `hasNotes`, which is frozen while a note is open (and while the trash eats one): the first note
-  is saved mid-typing, and splitting then would re-lay the page under the cursor. The grid column appears once
-  the user goes back. The overlay carries its own mode (`notes-editor-overlay--side`) so a leaving overlay keeps
-  the layout it opened with: the first note's full-page editor shrinks into its new card in the grid.
-- The trash sits under the grid column on every md+ screen (`notes-panel--wide`), also for a delete from the
-  full-page editor, so it never lands under the notifications rising from the bottom centre.
+note" placeholder. Narrow screens keep the full-page editor overlay described below.
+- `split` also holds while a note is open, so on md+ even the very first new note opens on the right with an
+  empty grid column on the left (toolbar shown, no "Jot down" empty state); once saved its card simply appears
+  in the grid, and nothing moves under the cursor. It also holds while the trash eats the last note.
+- The overlay carries its own mode (`notes-editor-overlay--side`, both classes in the selector to outrank the
+  base rule) so a leaving overlay keeps the layout it opened with, e.g. closing an empty first note.
+- Side by side the trash sits under the grid column, away from the notifications rising from the bottom centre.
 
 ## Search
 
