@@ -436,14 +436,15 @@ const goToToday = async () => {
   max-width: 100%;
 }
 
-/* Weekend day text color — only weekday-N rules matching a has-weekend-N class fire */
-:deep(.has-weekend-1 .vc-day.weekday-1 .vc-day-content),
-:deep(.has-weekend-2 .vc-day.weekday-2 .vc-day-content),
-:deep(.has-weekend-3 .vc-day.weekday-3 .vc-day-content),
-:deep(.has-weekend-4 .vc-day.weekday-4 .vc-day-content),
-:deep(.has-weekend-5 .vc-day.weekday-5 .vc-day-content),
-:deep(.has-weekend-6 .vc-day.weekday-6 .vc-day-content),
-:deep(.has-weekend-7 .vc-day.weekday-7 .vc-day-content) {
+/* Weekend day text color — only weekday-N rules matching a has-weekend-N class fire. A selected (solid green)
+   day keeps v-calendar's white text, or green on green can't be read. */
+:deep(.has-weekend-1 .vc-day.weekday-1 .vc-day-content:not(.vc-highlight-content-solid)),
+:deep(.has-weekend-2 .vc-day.weekday-2 .vc-day-content:not(.vc-highlight-content-solid)),
+:deep(.has-weekend-3 .vc-day.weekday-3 .vc-day-content:not(.vc-highlight-content-solid)),
+:deep(.has-weekend-4 .vc-day.weekday-4 .vc-day-content:not(.vc-highlight-content-solid)),
+:deep(.has-weekend-5 .vc-day.weekday-5 .vc-day-content:not(.vc-highlight-content-solid)),
+:deep(.has-weekend-6 .vc-day.weekday-6 .vc-day-content:not(.vc-highlight-content-solid)),
+:deep(.has-weekend-7 .vc-day.weekday-7 .vc-day-content:not(.vc-highlight-content-solid)) {
   color: rgb(var(--v-theme-primary));
 }
 
