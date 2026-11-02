@@ -526,8 +526,8 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
       </div>
     </div>
 
-    <!-- Garden: pinned under the stats, desktop only for now -->
-    <div v-if="mdAndUp" class="flex-shrink-0 px-2 pb-2">
+    <!-- Garden: pinned under the stats, desktop only for now; Settings can hide it -->
+    <div v-if="mdAndUp && settingsStore.showGarden" class="flex-shrink-0 px-2 pb-2">
       <GardenPanel />
     </div>
   </VCard>

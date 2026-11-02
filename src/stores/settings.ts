@@ -99,6 +99,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const useCategories = useStorage('useCategories', false);
 
   const rememberLastSelectedDate = useStorage('rememberLastSelectedDate', false);
+  // Hiding the garden only stops rendering it; plants and drops stay in their own storage
+  const showGarden = useStorage('showGarden', true);
   const lastSelectedDate = useStorage<RememberedDate | null>('lastSelectedDate', null, undefined, {
     serializer: StorageSerializers.object,
   });
@@ -166,6 +168,7 @@ export const useSettingsStore = defineStore('settings', () => {
     useDefaultTasks,
     useCategories,
     rememberLastSelectedDate,
+    showGarden,
     lastSelectedDate,
     backgroundUrl,
     backgroundImageMode,

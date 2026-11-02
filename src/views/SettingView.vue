@@ -541,6 +541,18 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
             />
           </VCardText>
         </VCard>
+
+        <!-- Garden island: the switch only shows or hides it; plants and drops are kept -->
+        <VCard class="glass-acrylic">
+          <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
+            <span>Garden</span>
+            <VSwitch v-model="settingsStore.showGarden" color="primary" hide-details density="compact" />
+          </VCardTitle>
+          <VCardText class="text-body-2 text-medium-emphasis">
+            A small shelf of plants at the bottom of Insights, watered by your new logs. Turning it off only hides it:
+            your plants and drops stay as they are and come back when you turn it on.
+          </VCardText>
+        </VCard>
       </div>
 
       <!-- Jira Integration: single island -->
