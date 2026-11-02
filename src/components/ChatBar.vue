@@ -14,6 +14,7 @@ import { fetchCatchUpItems } from '@/composables/useCatchUpSummary';
 import { type ChatConversation, useChatHistory } from '@/composables/useChatHistory';
 import { useChatMentions } from '@/composables/useChatMentions';
 import { useDailyTarget } from '@/composables/useDailyTarget';
+import { useGarden } from '@/composables/useGarden';
 import { useJira } from '@/composables/useJira';
 import { useCategories } from '@/composables/useCategories';
 import { useTimeLogs } from '@/composables/useTimeLogs';
@@ -54,6 +55,7 @@ type BarState = 'hidden' | 'bar' | 'open';
 type Shape = 'peek' | 'toast' | 'bar' | 'open';
 
 const { logs: savedLogs, addMany: addLogs, remove: removeLog } = useTimeLogs();
+const { earnDrops } = useGarden();
 const { addProjects, addTasks, allTasks, myProjects, teamWorkTasks } = useWorkspace();
 const { myJiraProjects, teamJiraProjects } = useJira();
 const settingsStore = useSettingsStore();
@@ -594,6 +596,8 @@ const saveLogs = async (messageId: string, extracted: ChatLog[]) => {
       }) as TimeLog & { id: string },
   );
   await addLogs(toSave);
+  // Logs saved from chat water the garden like logs from the form
+  earnDrops(toSave.filter((l) => l.type === 'log').length);
   lastSavedLogIds.value = toSave.map((l) => l.id);
 
   // New projects (with the category the card showed) and tasks join the stored lists. Only new ones: writing a

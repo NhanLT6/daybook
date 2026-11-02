@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import { useGarden } from '@/composables/useGarden';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { computeDateBounds, filterTimeLogs } from '@/composables/useLogFilters';
 import { getRememberedDate, REMEMBER_DATE_EXPIRY_MS } from '@/composables/useRememberDate';
@@ -32,6 +33,7 @@ import { uniqBy } from 'lodash';
 import { nanoid } from 'nanoid';
 
 const { logs, forMonth, save, remove: removeLog, addMany: addLogs } = useTimeLogs();
+const { earnDrops } = useGarden();
 const { addProjects, addTasks } = useWorkspace();
 
 const now = useNow({ interval: 60_000 });
@@ -146,11 +148,18 @@ const saveBulkLogs = async (incoming: TimeLog[]) => {
   const existingIds = new Set(logs.value.map((l) => l.id));
 
   // Handle both create and update based on log ID
+  let newLogItems = 0;
   for (const log of incoming) {
     if (existingIds.has(log.id)) updatedCount += 1;
-    else addedCount += 1;
+    else {
+      addedCount += 1;
+      if (log.type === 'log') newLogItems += 1;
+    }
     await save({ ...log, date: dayjs(log.date, [isoDateFormat, 'MM/DD/YYYY']).format(isoDateFormat) });
   }
+
+  // Each new log item waters the garden (plan entries don't)
+  earnDrops(newLogItems);
 
   if (updatedCount) {
     notificationCenter.success(updatedCount === 1 ? 'Log updated' : `${updatedCount} logs updated`);

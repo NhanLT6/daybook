@@ -18,6 +18,7 @@ export const storageKeys = {
   catchUp: {
     summaries: 'catchupSummaries',
   },
+  garden: 'garden',
   notifications: {
     greetingFirstSeenAt: 'notificationGreetingFirstSeenAt',
     greetingLastShownAt: 'notificationGreetingLastShownAt',

@@ -3,7 +3,11 @@ import { computed, ref } from 'vue';
 
 import { useProjectColors } from '@/composables/useProjectColors';
 
+import GardenPanel from '@/components/garden/GardenPanel.vue';
+
 import type { TimeLog } from '@/interfaces/TimeLog';
+
+import { useDisplay } from 'vuetify';
 
 import { useNow } from '@vueuse/core';
 
@@ -38,6 +42,7 @@ const { getProjectColor, getTaskColors } = useProjectColors();
 const workCalendar = useWorkCalendar();
 const now = useNow({ interval: 60_000 });
 const settingsStore = useSettingsStore();
+const { mdAndUp } = useDisplay();
 // Range reads reach past the viewed month, which `timeLogs` holds, for last week / last month
 const { inRange } = useTimeLogs();
 
@@ -519,6 +524,11 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
           </div>
         </VCard>
       </div>
+    </div>
+
+    <!-- Garden: pinned under the stats, desktop only for now -->
+    <div v-if="mdAndUp" class="flex-shrink-0 px-2 pb-2">
+      <GardenPanel />
     </div>
   </VCard>
 </template>
