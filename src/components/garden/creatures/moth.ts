@@ -13,13 +13,11 @@ interface MothKind {
   body: (c: Ctx) => void;
   // Wings folded into a tent at rest (they open only to fly)
   tent: boolean;
-  size: number;
 }
 
 // Luna moth: pale green, long tails on the hind wings, eyespots, plum leading edge
 const luna: MothKind = {
   tent: false,
-  size: 0.78,
   wing(c) {
     const hind = new Path2D();
     hind.moveTo(0.8, 0.6);
@@ -150,7 +148,6 @@ const luna: MothKind = {
 // Rosy maple moth: fluffy, pink and butter-yellow, wings folded into a tent
 const rosyMaple: MothKind = {
   tent: true,
-  size: 0.85,
   wing(c) {
     const wing = new Path2D();
     wing.moveTo(0.6, -2.4);
@@ -239,7 +236,6 @@ const rosyMaple: MothKind = {
 // White ermine: snow-white tent with black dots, woolly collar, yellow belly showing at the tail
 const ermine: MothKind = {
   tent: true,
-  size: 0.82,
   wing(c) {
     const wing = new Path2D();
     wing.moveTo(0.5, -2.6);
@@ -327,7 +323,6 @@ const ermine: MothKind = {
 // Elephant hawk-moth: swept-back wings like a little jet, olive with rose bands
 const hawkMoth: MothKind = {
   tent: false,
-  size: 0.8,
   wing(c) {
     const hind = new Path2D();
     hind.moveTo(0.8, 1.4);
@@ -573,7 +568,7 @@ export const moth: Creature = {
     c.save();
     c.translate(moth.x, moth.y);
     c.rotate(moth.angle);
-    c.scale(moth.scale * kind.size, moth.scale * kind.size);
+    c.scale(moth.scale, moth.scale);
     // Tent wings open out to fly; open wings beat as they are
     const spread = moth.mode === 'perch' ? moth.wings : kind.tent ? 0.6 + moth.wings * 0.9 : moth.wings;
     paintMoth(c, moth.kind, spread);

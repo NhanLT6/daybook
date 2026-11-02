@@ -11,6 +11,8 @@ const FEMALE = 0;
 // Brightness over one flash: quick rise, short hold, slower fade
 // Longer than the half-second of the common firefly, so a flash is easy to catch on a small shelf
 const FLASH = 0.9;
+// Body size against the drawing: a little smaller than the bee
+const BODY = 0.85;
 function flashLevel(age: number, length = FLASH) {
   if (age < 0 || age > length) return 0;
   const rise = 0.12;
@@ -23,7 +25,7 @@ let lastMaleFlash = -100;
 // Body, lantern lit by `glow` (0-1). Feet on y = 0; about the size of the bee.
 function paintFirefly(c: Ctx, glow: number) {
   c.save();
-  c.scale(0.68, 0.68);
+  c.scale(BODY, BODY);
   c.strokeStyle = '#2A2622';
   c.lineWidth = 0.35;
   c.lineCap = 'round';
@@ -234,9 +236,9 @@ export const firefly: Creature = {
   // The glow sits over the night tint, so the flash stays a true yellow-green
   paintLight(c, fly) {
     if (fly.glow <= 0.01) return;
-    const x = fly.x - 2.8 * fly.facing * fly.scale,
-      y = fly.y - 1.2 * fly.scale;
-    const radius = 9 * fly.scale;
+    const x = fly.x - 4.1 * BODY * fly.facing * fly.scale,
+      y = fly.y - 1.3 * BODY * fly.scale;
+    const radius = 13 * BODY * fly.scale;
     c.save();
     c.globalCompositeOperation = 'lighter';
     const halo = c.createRadialGradient(x, y, 0, x, y, radius);
@@ -250,7 +252,7 @@ export const firefly: Creature = {
     // The lantern itself, almost white at the peak
     c.fillStyle = `rgba(245,255,200,${fly.glow})`;
     c.beginPath();
-    c.arc(x, y, 1.3 * fly.scale, 0, TAU);
+    c.arc(x, y, 1.9 * BODY * fly.scale, 0, TAU);
     c.fill();
     c.restore();
   },
