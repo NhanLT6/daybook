@@ -1,8 +1,21 @@
 // Garden scene, ported from the Talksum garden mock: a two-tier wooden shelf against a plain wall, nine pots,
 // plants and insects all painted with Canvas 2D. The drawing code stays close to the mock on purpose; game
-// rules (drops, which plant grows) live in useGarden.ts and the scene only reads that state.
+// rules (drops, which plant grows) live in useGarden.ts and the scene only reads that state. Insects and other
+// creatures each live in their own file under ./creatures.
 
-export type Ctx = CanvasRenderingContext2D;
+import { CREATURES } from './creatures';
+import {
+  type Actor,
+  type Ctx,
+  type GardenWorld,
+  type Goal,
+  type Spot,
+  type Spots,
+  TAU,
+  between,
+  clamp,
+  glossyBall,
+} from './creatures/kit';
 
 export const SPECIES = {
   trauba: { name: 'Pothos', done: 'trails long vines' },
@@ -31,32 +44,6 @@ interface Tone {
   mid: string;
   dark: string;
 }
-interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
-interface LadybirdPose {
-  open: number;
-  wings: number;
-  buzz: boolean;
-  stride: number;
-  legsDown: boolean;
-  time: number;
-}
-interface ButterflyPose {
-  mode: string;
-  yaw: number;
-  theta: number;
-  x: number;
-  y: number;
-  z: number;
-  vx?: number;
-  vy?: number;
-  vz?: number;
-  bob: number;
-  scale: number;
-}
 interface Pot {
   width: number;
   height: number;
@@ -69,12 +56,6 @@ interface Pot {
 type PotType = 'terracotta' | 'white' | 'ceramic' | 'concrete';
 
 const LIGHT = { x: -0.6, y: -0.8 };
-const TAU = Math.PI * 2;
-const pick = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
-const between = (low: number, high: number) => low + Math.random() * (high - low);
-const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
-const approach = (value: number, goal: number, rate: number, dt: number) =>
-  value + (goal - value) * Math.min(1, rate * dt);
 
 export function newSeed() {
   return 1 + Math.floor(Math.random() * 2147483646);
@@ -184,20 +165,6 @@ function stem(
   c.stroke();
 }
 
-function glossyBall(c: Ctx, x: number, y: number, radius: number, light: string, mid: string, dark: string) {
-  const body = c.createRadialGradient(x - radius * 0.35, y - radius * 0.4, radius * 0.1, x, y, radius);
-  body.addColorStop(0, light);
-  body.addColorStop(0.55, mid);
-  body.addColorStop(1, dark);
-  c.fillStyle = body;
-  c.beginPath();
-  c.arc(x, y, radius, 0, Math.PI * 2);
-  c.fill();
-  c.fillStyle = 'rgba(255,255,255,.75)';
-  c.beginPath();
-  c.ellipse(x - radius * 0.38, y - radius * 0.42, radius * 0.22, radius * 0.14, -0.6, 0, Math.PI * 2);
-  c.fill();
-}
 
 function plantTag(c: Ctx) {
   c.fillStyle = '#C9A77A';
@@ -794,437 +761,6 @@ function paintWateringCan(c: Ctx, x: number, baseY: number, withShadow = true) {
   c.fill();
 }
 
-// Bee in profile facing +x, standing on y = 0.
-function paintBee(c: Ctx, flying: boolean, loaded: boolean) {
-  c.translate(0, flying ? -3.5 : -2.6);
-  const wing = (angle: number, alpha: number) => {
-    c.save();
-    c.translate(0.6, -1.6);
-    c.rotate(angle);
-    c.fillStyle = `rgba(232,240,248,${alpha})`;
-    c.strokeStyle = `rgba(150,160,175,${alpha * 0.8})`;
-    c.lineWidth = 0.25;
-    c.beginPath();
-    c.ellipse(-3.2, 0, 3.6, 1.35, 0, 0, TAU);
-    c.fill();
-    c.stroke();
-    c.restore();
-  };
-  if (flying) {
-    // At 230 strokes a second the eye sees the two ends of the stroke as faint fans.
-    const flicker = 0.18 + Math.random() * 0.14;
-    wing(-0.95, flicker);
-    wing(-0.2, flicker * 0.8);
-    wing(-0.55, flicker * 0.5);
-  }
-
-  c.strokeStyle = '#3A2A1C';
-  c.lineWidth = 0.45;
-  c.lineCap = 'round';
-  const legs = flying
-    ? [
-        [0.6, 4.6, -0.8],
-        [-0.2, 4.4, -1.6],
-        [-1.2, 4.8, -2.8],
-      ]
-    : [
-        [1.6, 2.6, 2.4],
-        [0.2, 2.6, 0.4],
-        [-1.4, 2.6, -2],
-      ];
-  for (const [startX, reach, endX] of legs) {
-    c.beginPath();
-    c.moveTo(startX, 1);
-    c.quadraticCurveTo(startX + 0.4, reach * 0.6, endX, reach);
-    c.stroke();
-  }
-  if (loaded && flying) glossyBall(c, -2.6, 4.2, 0.9, '#FFE08A', '#F2B233', '#B97A12');
-
-  c.save();
-  c.rotate(0.14);
-  const abdomen = new Path2D();
-  abdomen.ellipse(-3.1, 0.6, 3.6, 2.4, 0, 0, TAU);
-  const amber = c.createLinearGradient(0, -2, 0, 3.2);
-  amber.addColorStop(0, '#F4C25A');
-  amber.addColorStop(0.55, '#D98E2B');
-  amber.addColorStop(1, '#7A4A16');
-  c.fillStyle = amber;
-  c.fill(abdomen);
-  c.save();
-  c.clip(abdomen);
-  c.fillStyle = 'rgba(40,24,12,.88)';
-  for (const bandX of [-2.2, -4.0, -5.7]) {
-    c.beginPath();
-    c.ellipse(bandX, 0.6, 0.55, 3, 0.1, 0, TAU);
-    c.fill();
-  }
-  c.restore();
-  c.restore();
-
-  const thorax = c.createRadialGradient(0.2, -1, 0.2, 0.6, 0, 2.3);
-  thorax.addColorStop(0, '#E2BF82');
-  thorax.addColorStop(0.6, '#9A7442');
-  thorax.addColorStop(1, '#4E3720');
-  c.fillStyle = thorax;
-  c.beginPath();
-  c.arc(0.6, -0.1, 2.1, 0, TAU);
-  c.fill();
-  c.strokeStyle = 'rgba(240,215,160,.6)';
-  c.lineWidth = 0.25;
-  for (let hair = 0; hair < 7; hair++) {
-    const angle = -2.8 + hair * 0.42;
-    c.beginPath();
-    c.moveTo(0.6 + Math.cos(angle) * 1.9, -0.1 + Math.sin(angle) * 1.9);
-    c.lineTo(0.6 + Math.cos(angle) * 2.5, -0.1 + Math.sin(angle) * 2.5);
-    c.stroke();
-  }
-
-  c.fillStyle = '#2A1F17';
-  c.beginPath();
-  c.ellipse(3, 0.5, 1.35, 1.6, 0.2, 0, TAU);
-  c.fill();
-  c.fillStyle = 'rgba(255,255,255,.55)';
-  c.beginPath();
-  c.arc(3.2, -0.1, 0.4, 0, TAU);
-  c.fill();
-  c.strokeStyle = '#2A1F17';
-  c.lineWidth = 0.35;
-  c.beginPath();
-  c.moveTo(3.5, -0.8);
-  c.lineTo(4.4, -2.5);
-  c.lineTo(5.4, -2.1);
-  c.stroke();
-  if (!flying) wing(0.08, 0.45);
-}
-
-// Ladybird in profile facing +x, feet on y = 0. open: elytra lifted; wings: hind wings unfolded.
-function paintLadybird(c: Ctx, { open, wings, buzz, stride, legsDown, time }: LadybirdPose) {
-  c.translate(0, -1.4);
-  c.strokeStyle = '#151515';
-  c.lineWidth = 0.4;
-  c.lineCap = 'round';
-  for (const [index, legX] of [-1.4, 0, 1.3].entries()) {
-    const swing = legsDown ? Math.sin(stride * 2.2 + index * 2.1) * 0.6 : 0;
-    c.beginPath();
-    c.moveTo(legX, 0.2);
-    c.lineTo(legX + swing + (legsDown ? 0.3 : -0.8), legsDown ? 1.4 : 1.7);
-    c.stroke();
-  }
-
-  if (wings > 0) {
-    // Hind wings unfold from under the shell; in the air they blur.
-    const pivotX = 0.6,
-      pivotY = -2.2,
-      length = 2 + 6 * wings;
-    const strokes = buzz ? [1.15 + Math.random() * 0.3, 0.3 + Math.random() * 0.2] : [0.5];
-    for (const angle of strokes) {
-      c.save();
-      c.translate(pivotX, pivotY);
-      c.rotate(angle);
-      c.fillStyle = `rgba(205,180,150,${buzz ? 0.22 : 0.5})`;
-      c.strokeStyle = `rgba(110,85,60,${buzz ? 0.25 : 0.5})`;
-      c.lineWidth = 0.2;
-      c.beginPath();
-      c.ellipse(-length / 2, 0, length / 2, 1.1 * wings + 0.3, 0, 0, TAU);
-      c.fill();
-      c.stroke();
-      c.restore();
-    }
-  }
-
-  const dome = new Path2D();
-  dome.ellipse(0, 0, 3.3, 2.7, 0, Math.PI, TAU);
-  dome.closePath();
-  const shell = (shade: boolean) => {
-    const red = c.createRadialGradient(-0.8, -2, 0.2, 0, -0.6, 3.6);
-    red.addColorStop(0, shade ? '#E8564A' : '#FF7A62');
-    red.addColorStop(0.45, shade ? '#B91F1D' : '#E0302A');
-    red.addColorStop(1, '#7A0E10');
-    c.fillStyle = red;
-    c.fill(dome);
-    c.save();
-    c.clip(dome);
-    c.fillStyle = '#141010';
-    for (const [spotX, spotY, radius] of [
-      [-1.7, -1.1, 0.7],
-      [0.4, -1.9, 0.75],
-      [1.6, -0.7, 0.55],
-      [-0.6, -0.3, 0.5],
-    ]) {
-      c.beginPath();
-      c.arc(spotX, spotY, radius, 0, TAU);
-      c.fill();
-    }
-    c.restore();
-    c.fillStyle = 'rgba(255,255,255,.7)';
-    c.beginPath();
-    c.ellipse(-0.6, -2.1, 0.9, 0.35, -0.25, 0, TAU);
-    c.fill();
-  };
-  const lift = open * 0.62;
-  if (open > 0) {
-    c.save();
-    c.translate(1.4, -2.3);
-    c.rotate(lift * 0.8);
-    c.translate(-1.4 - 0.5, 2.3 - 0.4);
-    shell(true);
-    c.restore();
-  }
-  c.fillStyle = '#1C1414';
-  c.beginPath();
-  c.ellipse(0, 0.05, 3.1, 0.7, 0, 0, TAU);
-  c.fill();
-  c.save();
-  c.translate(1.4, -2.3);
-  c.rotate(lift);
-  c.translate(-1.4, 2.3);
-  shell(false);
-  c.restore();
-
-  c.fillStyle = '#151111';
-  c.beginPath();
-  c.ellipse(3.1, -0.7, 1.35, 1.25, 0, 0, TAU);
-  c.fill();
-  c.fillStyle = '#F4EFE6';
-  c.beginPath();
-  c.ellipse(3.2, -1.2, 0.5, 0.35, 0.3, 0, TAU);
-  c.fill();
-  c.beginPath();
-  c.arc(4.1, -0.4, 0.25, 0, TAU);
-  c.fill();
-  const flick = Math.sin(time * 3) > 0.92 ? -0.5 : 0;
-  c.strokeStyle = '#151111';
-  c.lineWidth = 0.25;
-  c.beginPath();
-  c.moveTo(4.1, -0.9);
-  c.lineTo(5, -1.4 + flick);
-  c.stroke();
-}
-
-// Butterfly in true 3D: each wing is a flat plane hinged on the body, projected by a camera looking slightly down.
-const CAMERA_TILT = 0.38;
-const project = (vector: Vec3) => ({
-  x: vector.x,
-  y: -(vector.y * Math.cos(CAMERA_TILT) - vector.z * Math.sin(CAMERA_TILT)),
-});
-const towardCamera = { x: 0, y: Math.sin(CAMERA_TILT), z: Math.cos(CAMERA_TILT) };
-const cross = (a: Vec3, b: Vec3): Vec3 => ({
-  x: a.y * b.z - a.z * b.y,
-  y: a.z * b.x - a.x * b.z,
-  z: a.x * b.y - a.y * b.x,
-});
-const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
-const unit = (vector: Vec3): Vec3 => {
-  const length = Math.hypot(vector.x, vector.y, vector.z) || 1;
-  return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
-};
-const sum = (...parts: [Vec3, number][]): Vec3 =>
-  parts.reduce<Vec3>(
-    (total, [vector, amount]) => ({
-      x: total.x + vector.x * amount,
-      y: total.y + vector.y * amount,
-      z: total.z + vector.z * amount,
-    }),
-    { x: 0, y: 0, z: 0 },
-  );
-
-const FOREWING = [
-  [1.2, 0.3],
-  [4.6, 4],
-  [5.2, 9.2],
-  [3.6, 11.8],
-  [2.2, 12.6],
-  [-0.6, 11.6],
-  [-1.9, 9.6],
-  [-2.3, 6],
-  [-1.2, 2],
-  [-0.6, 0.6],
-];
-const HINDWING = [
-  [-0.3, 0.6],
-  [0.6, 4],
-  [0.2, 7.6],
-  [-1.6, 8.8],
-  [-3.6, 9.4],
-  [-6.4, 8.4],
-  [-7.8, 6],
-  [-7.6, 3.6],
-  [-4.4, 0.7],
-  [-1.2, 0.3],
-];
-function smoothShape(c: Ctx, points: number[][]) {
-  c.beginPath();
-  const mid = (a: number[], b: number[]) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  const start = mid(points[points.length - 1], points[0]);
-  c.moveTo(start[0], start[1]);
-  points.forEach((point, index) => {
-    const next = mid(point, points[(index + 1) % points.length]);
-    c.quadraticCurveTo(point[0], point[1], next[0], next[1]);
-  });
-  c.closePath();
-}
-
-function butterflyFrame(fly: ButterflyPose) {
-  let forward: Vec3;
-  if (fly.mode === 'perch') forward = unit({ x: Math.cos(fly.yaw), y: 0.12, z: Math.sin(fly.yaw) * 0.9 });
-  else {
-    forward = unit({ x: fly.vx ?? 0, y: -(fly.vy ?? 0) * 0.5, z: (fly.vz ?? 0) * 30 + 0.001 });
-    forward = unit({ x: forward.x, y: clamp(forward.y, -0.45, 0.6), z: forward.z });
-  }
-  const right = unit(cross(forward, { x: 0, y: 1, z: 0 }));
-  return { forward, right, up: cross(right, forward) };
-}
-
-function paintButterfly(c: Ctx, fly: ButterflyPose) {
-  const { forward, right, up } = butterflyFrame(fly);
-  const size = fly.scale * (1 + fly.z * 0.12) * 0.95;
-  c.save();
-  c.translate(fly.x, fly.y + fly.bob - (fly.mode === 'perch' ? 1.5 * size : 0));
-  c.scale(size, size);
-
-  const wings = [1, -1]
-    .map((side) => {
-      const span = sum([right, side * Math.cos(fly.theta)], [up, Math.sin(fly.theta)]);
-      const normal = cross(span, forward);
-      const upper = side * dot(normal, towardCamera) > 0;
-      return { side, span, upper, depth: dot(span, towardCamera) };
-    })
-    .sort((a, b) => a.depth - b.depth);
-
-  const paintWing = ({ span, upper }: { span: Vec3; upper: boolean }) => {
-    const along = project(forward),
-      out = project(span);
-    c.save();
-    c.transform(along.x, along.y, out.x, out.y, 0, 0);
-    paintWingSurface(c, HINDWING, upper, true);
-    paintWingSurface(c, FOREWING, upper, false);
-    c.restore();
-  };
-  paintWing(wings[0]);
-  paintButterflyBody(c, forward, up);
-  paintWing(wings[1]);
-  c.restore();
-}
-
-// Wing pattern after the common tiger, frequent in Vietnamese gardens: orange cells, black veins and border, white spots.
-function paintWingSurface(c: Ctx, points: number[][], upper: boolean, hind: boolean) {
-  smoothShape(c, points);
-  c.save();
-  const base = c.createLinearGradient(0, 0, 0, hind ? 9 : 12.5);
-  if (upper) {
-    base.addColorStop(0, '#C8551A');
-    base.addColorStop(0.5, '#EE8A2E');
-    base.addColorStop(1, '#F5A443');
-  } else {
-    base.addColorStop(0, '#C9762E');
-    base.addColorStop(0.6, '#E8B26A');
-    base.addColorStop(1, '#F0C487');
-  }
-  c.fillStyle = base;
-  c.fill();
-  c.clip();
-  c.strokeStyle = upper ? 'rgba(25,15,10,.7)' : 'rgba(60,35,20,.5)';
-  c.lineWidth = 0.3;
-  const veins = hind
-    ? [
-        [-1, 8.6],
-        [-3, 9],
-        [-5.4, 8],
-        [-7, 5.6],
-        [0, 7],
-      ]
-    : [
-        [4.6, 9.5],
-        [3.2, 11.8],
-        [1, 12.3],
-        [-1, 11],
-        [-2, 8],
-      ];
-  for (const [veinX, veinY] of veins) {
-    c.beginPath();
-    c.moveTo(-0.4, 0.8);
-    c.quadraticCurveTo(veinX * 0.4, veinY * 0.55, veinX, veinY);
-    c.stroke();
-  }
-  if (!hind) {
-    // Dark apex with a row of white spots, the tiger's signature.
-    c.fillStyle = upper ? '#1C130E' : '#3C2A1E';
-    c.beginPath();
-    c.ellipse(4, 11, 4.2, 3.4, 0.4, 0, TAU);
-    c.fill();
-    c.fillStyle = '#FBF5EA';
-    for (const [spotX, spotY, radius] of [
-      [4.4, 9.8, 0.75],
-      [3, 10.8, 0.65],
-      [1.6, 11.3, 0.55],
-      [5, 8.4, 0.5],
-      [2.6, 12.2, 0.4],
-    ]) {
-      c.beginPath();
-      c.arc(spotX, spotY, radius, 0, TAU);
-      c.fill();
-    }
-  }
-  c.lineWidth = 1.5;
-  c.strokeStyle = upper ? '#1C130E' : '#3C2A1E';
-  smoothShape(c, points);
-  c.stroke();
-  c.fillStyle = 'rgba(251,245,234,.9)';
-  const dots = hind
-    ? [
-        [-1.6, 8.3],
-        [-3.6, 8.8],
-        [-5.6, 7.8],
-        [-7, 5.8],
-      ]
-    : [
-        [-0.2, 11.2],
-        [-1.4, 9.8],
-      ];
-  for (const [dotX, dotY] of dots) {
-    c.beginPath();
-    c.arc(dotX, dotY, 0.32, 0, TAU);
-    c.fill();
-  }
-  c.restore();
-}
-
-function paintButterflyBody(c: Ctx, forward: Vec3, up: Vec3) {
-  const point = (along: number, lift: number) => project(sum([forward, along], [up, lift]));
-  c.lineCap = 'round';
-  // Head, thorax, then an abdomen that tapers and droops slightly.
-  for (let step = 0; step <= 18; step++) {
-    const t = step / 18,
-      along = 3.4 - t * 9.6,
-      lift = -0.9 * t * t;
-    const radius = t < 0.12 ? 1.05 : t < 0.35 ? 1.35 - (t - 0.12) * 0.6 : 1.2 * (1 - (t - 0.35) / 0.65) + 0.35;
-    const at = point(along, lift);
-    c.fillStyle = t < 0.1 ? '#2A1E18' : '#36271E';
-    c.beginPath();
-    c.arc(at.x, at.y, radius, 0, TAU);
-    c.fill();
-  }
-  const shine = point(0.8, 0.6);
-  c.fillStyle = 'rgba(255,255,255,.28)';
-  c.beginPath();
-  c.arc(shine.x, shine.y, 0.5, 0, TAU);
-  c.fill();
-  c.strokeStyle = '#1E1612';
-  c.lineWidth = 0.3;
-  for (const side of [-0.7, 0.7]) {
-    const from = point(3.8, 0.5),
-      tip = project(sum([forward, 9], [up, 3.2], [cross(up, forward), side * 2.4]));
-    c.beginPath();
-    c.moveTo(from.x, from.y);
-    c.lineTo(tip.x, tip.y);
-    c.stroke();
-    c.fillStyle = '#1E1612';
-    c.beginPath();
-    c.arc(tip.x, tip.y, 0.5, 0, TAU);
-    c.fill();
-  }
-}
-
 // Garden trowel standing on its blade tip (0, 0), handle up: wooden grip, steel blade lit from the left
 function paintShovelShape(c: Ctx) {
   const wood = c.createLinearGradient(-2, 0, 2, 0);
@@ -1262,63 +798,9 @@ function paintShovelShape(c: Ctx) {
 
 // ── Scene ───────────────────────────────────────────────────────────────────────
 
-interface Spot {
-  dx: number;
-  dy: number;
-  rim?: boolean;
-}
-interface Spots {
-  tops: Spot[];
-  flowers: Spot[];
-  inside: Spot[];
-}
-interface Perch {
-  index: number;
-  spot: Spot;
-}
-interface Goal {
-  x: number;
-  y: number;
-  exit?: boolean;
-  perch?: Perch;
-}
 interface Layer {
   canvas: HTMLCanvasElement;
   context: Ctx;
-}
-
-// One shape for the bee, butterfly and ladybird: each uses the fields its own state machine needs
-interface Actor {
-  mode: string;
-  timer: number;
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  vz: number;
-  facing: number;
-  scale: number;
-  visits: number;
-  loaded: boolean;
-  perch: Perch;
-  goal: Goal;
-  goalSpot: Spot;
-  phase: number;
-  theta: number;
-  beats: number;
-  glide: number;
-  bob: number;
-  stops: number;
-  bask: number;
-  yaw: number;
-  open: number;
-  wings: number;
-  stride: number;
-  angle: number;
-  behind: boolean;
-  rounds: number;
-  next: string | null;
 }
 
 export interface GardenSceneOptions {
@@ -1356,41 +838,6 @@ type Row = keyof typeof ROWS;
 const ROW_OF_SLOT: Row[] = ['middle', 'middle', 'middle', 'floor', 'floor', 'floor', 'top', 'top', 'top'];
 const ROW_SCALE = { top: 0.9, middle: 1, floor: 1.12 };
 
-function makeActor(fields: Partial<Actor>): Actor {
-  return {
-    mode: 'away',
-    timer: 1,
-    x: 0,
-    y: 0,
-    z: 0,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    facing: 1,
-    scale: 1,
-    visits: 0,
-    loaded: false,
-    perch: { index: 0, spot: { dx: 0, dy: 0 } },
-    goal: { x: 0, y: 0 },
-    goalSpot: { dx: 0, dy: 0 },
-    phase: 0,
-    theta: 1,
-    beats: 0,
-    glide: 0,
-    bob: 0,
-    stops: 0,
-    bask: 0,
-    yaw: 0,
-    open: 0,
-    wings: 0,
-    stride: 0,
-    angle: 0,
-    behind: false,
-    rounds: 0,
-    next: null,
-    ...fields,
-  };
-}
 
 export function createGardenScene(canvas: HTMLCanvasElement, options: GardenSceneOptions): GardenScene {
   const ctx = canvas.getContext('2d')!;
@@ -1418,12 +865,11 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     },
   };
 
-  const insectActors = {
-    ong: makeActor({ timer: 1 }),
-    buom: makeActor({ timer: 2.5 }),
-    borua: makeActor({ timer: 7 }),
-  };
-  let lastInsectTime = 0;
+  // Each creature in its own file (./creatures); the scene only runs the ones that fit the theme
+  const freshActors = () =>
+    CREATURES.map((creature) => Array.from({ length: creature.count }, (_, slot) => creature.create(slot)));
+  let actors: Actor[][] = freshActors();
+  let lastCreatureTime = 0;
 
   const pixelRatio = () => window.devicePixelRatio || 1;
   const shownStage = (index: number) => shownOverride.get(index) ?? state.plants[index]?.stage ?? 0;
@@ -1512,7 +958,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
         paintPotBack(c, POT_TYPES[index]);
         c.restore();
         if (!state.plants[index]) continue;
-        paintInsects(c, time, index);
+        paintCreatures(c, time, index);
 
         const pulse = pulses.get(index) || 0;
         const grow = 1 + Math.sin(pulse * Math.PI) * 0.12;
@@ -1531,10 +977,11 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
 
     paintCan(c, now);
     paintShovel(c, now);
-    updateInsects(time);
-    paintInsects(c, time);
+    updateCreatures(time);
+    paintCreatures(c, time);
     if (dark) nightTint(c);
     ctx.drawImage(foreground.canvas, 0, 0, width, height);
+    paintCreatureLight(time);
     paintWater();
     paintDropBadge();
   }
@@ -1761,446 +1208,50 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   function exitPoint(): Goal {
     return { x: Math.random() < 0.5 ? -40 : width + 40, y: between(0.05, 0.55) * height };
   }
+  const world: GardenWorld = {
+    get width() {
+      return width;
+    },
+    height,
+    plantSpots,
+    plantedIndices,
+    flowerSlots,
+    spotWorld,
+    rimSpot,
+    potWidth: (index) => POTS[POT_TYPES[index]].width,
+    airPoint,
+    exitPoint,
+  };
 
-  function moveToward(actor: Actor, goal: { x: number; y: number }, speed: number, turn: number, dt: number) {
-    const dx = goal.x - actor.x,
-      dy = goal.y - actor.y,
-      distance = Math.hypot(dx, dy) || 1;
-    const want = Math.min(speed, distance * 2.4);
-    actor.vx = approach(actor.vx, (dx / distance) * want, turn, dt);
-    actor.vy = approach(actor.vy, (dy / distance) * want, turn, dt);
-    actor.x += actor.vx * dt;
-    actor.y += actor.vy * dt;
-    return distance;
-  }
-
-  // Bee: strokes near 230 Hz read as a haze; it darts in a zigzag, hovers, lands on a flower, hops on, then leaves for a while.
-  function updateBee(bee: Actor, dt: number, time: number) {
-    bee.timer -= dt;
-    if (bee.mode === 'away') {
-      if (bee.timer > 0) return;
-      const start = exitPoint();
-      Object.assign(bee, { x: start.x, y: start.y, vx: 0, vy: 0, visits: Math.floor(between(3, 7)), loaded: false });
-      beeNextFlower(bee, null);
-      return;
-    }
-    if (bee.mode === 'leave') {
-      const distance = moveToward(bee, bee.goal, 150, 3, dt);
-      bee.x += Math.sin(time * 9) * 18 * dt;
-      if (distance < 8) {
-        bee.mode = 'away';
-        bee.timer = between(6, 14);
-      }
-      return;
-    }
-
-    const goal = spotWorld(bee.perch.index, bee.perch.spot, time);
-    bee.scale = approach(bee.scale, goal.scale, 2, dt);
-    if (bee.mode === 'fly') {
-      const hoverAt = { x: goal.x - bee.facing * 7 * goal.scale, y: goal.y - 7 * goal.scale };
-      const distance = moveToward(bee, hoverAt, 130, 4, dt);
-      // Sideways zigzag, the way a forager scans for scent.
-      const across = Math.sin(time * 8.5 + bee.visits) * 26;
-      bee.x += (-bee.vy / (Math.hypot(bee.vx, bee.vy) + 1)) * across * dt;
-      bee.y += (bee.vx / (Math.hypot(bee.vx, bee.vy) + 1)) * across * dt;
-      if (Math.abs(bee.vx) > 10) bee.facing = Math.sign(bee.vx);
-      if (distance < 3) {
-        bee.mode = 'hover';
-        bee.timer = between(0.4, 1.1);
-      }
-    } else if (bee.mode === 'hover') {
-      bee.facing = Math.sign(goal.x - bee.x) || bee.facing;
-      const jitter = {
-        x: goal.x - bee.facing * 7 * goal.scale + Math.sin(time * 5.3) * 2.2 + Math.sin(time * 11.7) * 0.8,
-        y: goal.y - 7 * goal.scale + Math.sin(time * 6.1) * 1.8,
-      };
-      moveToward(bee, jitter, 60, 8, dt);
-      if (bee.timer <= 0) {
-        bee.mode = 'land';
-      }
-    } else if (bee.mode === 'land') {
-      if (moveToward(bee, goal, 30, 10, dt) < 0.8) {
-        bee.mode = 'visit';
-        bee.timer = between(1.2, 3);
-      }
-    } else if (bee.mode === 'visit') {
-      bee.x = goal.x + Math.sin(time * 1.7) * 1.2 * goal.scale;
-      bee.y = goal.y;
-      bee.vx = 0;
-      bee.vy = 0;
-      bee.loaded = true;
-      if (bee.timer <= 0) {
-        bee.visits -= 1;
-        if (bee.visits <= 0) {
-          bee.mode = 'leave';
-          bee.goal = exitPoint();
-          bee.vy = -40;
-        } else beeNextFlower(bee, bee.perch.index);
-      }
-    }
-  }
-
-  function beeNextFlower(bee: Actor, current: number | null) {
-    const slots = flowerSlots();
-    if (!slots.length) {
-      // No flowers yet: it checks a leaf briefly and moves on.
-      const planted = plantedIndices();
-      if (!planted.length) {
-        bee.mode = 'away';
-        bee.timer = 8;
-        return;
-      }
-      const index = pick(planted),
-        tops = plantSpots(index).tops;
-      bee.perch = { index, spot: pick(tops.slice(0, Math.max(1, tops.length / 4))) };
-      bee.visits = Math.min(bee.visits, 1);
-    } else {
-      const index = current !== null && slots.includes(current) && Math.random() < 0.55 ? current : pick(slots);
-      bee.perch = { index, spot: pick(plantSpots(index).flowers) };
-    }
-    bee.mode = 'fly';
-    bee.vy -= 25;
-  }
-
-  // Butterfly: 7 Hz strokes, each downstroke lifts the body and kicks its course, in bursts with short glides.
-  function updateButterfly(fly: Actor, dt: number, time: number) {
-    fly.timer -= dt;
-    if (fly.mode === 'away') {
-      if (fly.timer > 0) return;
-      const start = exitPoint();
-      Object.assign(fly, {
-        x: start.x,
-        y: start.y,
-        z: between(-0.5, 0.5),
-        vx: 0,
-        vy: 0,
-        vz: 0,
-        stops: Math.floor(between(1, 4)),
-      });
-      butterflyNextGoal(fly);
-      fly.mode = 'fly';
-      return;
-    }
-
-    if (fly.mode === 'perch') {
-      const spot = spotWorld(fly.perch.index, fly.perch.spot, time);
-      fly.x = spot.x;
-      fly.y = spot.y;
-      fly.bob = 0;
-      // Wings rest closed above the back; now and then they open slowly to bask.
-      fly.bask -= dt;
-      if (fly.bask < 0) fly.bask = between(2.5, 5);
-      const open = fly.bask > 1.8 && fly.bask < 3.2;
-      fly.theta = approach(fly.theta, open ? 0.25 : 1.5, open ? 2.2 : 3, dt);
-      if (fly.timer <= 0) {
-        fly.mode = 'fly';
-        fly.vy = -55;
-        fly.beats = 6;
-        fly.glide = 0;
-        butterflyNextGoal(fly);
-      }
-      return;
-    }
-
-    const perchAt = fly.goal.perch ? spotWorld(fly.goal.perch.index, fly.goal.perch.spot, time) : null;
-    if (perchAt) fly.scale = approach(fly.scale, perchAt.scale, 1.5, dt);
-    const target = perchAt ?? fly.goal;
-    const distance = Math.hypot(target.x - fly.x, target.y - fly.y);
-    const landing = fly.goal.perch && distance < 30;
-
-    if (fly.glide > 0 && !landing) {
-      fly.glide -= dt;
-      fly.theta = approach(fly.theta, 0.22, 6, dt);
-      fly.vy += 22 * dt;
-      fly.bob = approach(fly.bob, 0, 4, dt);
-    } else {
-      const before = Math.floor(fly.phase);
-      fly.phase += (landing ? 6.5 : 5) * dt;
-      if (Math.floor(fly.phase) !== before) {
-        // Every stroke shoves the body a little: the zigzag is the stroke, not noise added on top.
-        fly.vx += between(-16, 16);
-        fly.vy += between(-18, 10);
-        fly.vz = clamp(fly.vz + between(-0.6, 0.6), -0.8, 0.8);
-        fly.beats -= 1;
-        if (fly.beats <= 0) {
-          fly.beats = Math.floor(between(3, 8));
-          if (Math.random() < 0.55) fly.glide = between(0.25, 0.6);
-        }
-      }
-      const stroke = Math.cos(fly.phase * TAU);
-      fly.theta = 0.52 + 0.96 * stroke;
-      fly.bob = 2.4 * stroke;
-    }
-
-    const want = landing ? 22 : 48;
-    const dx = target.x - fly.x,
-      dy = target.y - fly.y,
-      length = Math.hypot(dx, dy) || 1;
-    fly.vx = approach(fly.vx, (dx / length) * Math.min(want, length * 2), 1.6, dt);
-    fly.vy = approach(fly.vy, (dy / length) * Math.min(want, length * 2), 1.6, dt);
-    fly.x += fly.vx * dt;
-    fly.y += fly.vy * dt;
-    fly.z = clamp(fly.z + fly.vz * dt, -1, 1);
-    if (Math.abs(fly.z) > 0.95) fly.vz *= -0.5;
-
-    if (fly.goal.perch && distance < 2.2) {
-      fly.mode = 'perch';
-      fly.perch = fly.goal.perch;
-      fly.timer = between(4, 9);
-      fly.bask = between(0.5, 2);
-      fly.yaw = (Math.random() < 0.5 ? 0 : Math.PI) + between(-0.6, 0.6);
-    } else if (!fly.goal.perch && distance < 14) {
-      if (fly.goal.exit) {
-        fly.mode = 'away';
-        fly.timer = between(8, 18);
-      } else butterflyNextGoal(fly);
-    }
-  }
-
-  function butterflyNextGoal(fly: Actor) {
-    fly.stops -= 1;
-    if (fly.stops < 0) {
-      fly.goal = { ...exitPoint(), exit: true };
-      return;
-    }
-    const slots = flowerSlots().length ? flowerSlots() : plantedIndices();
-    if (!slots.length || Math.random() < 0.35) {
-      fly.goal = airPoint();
-      return;
-    }
-    const index = pick(slots),
-      spots = plantSpots(index);
-    const choices = spots.flowers.length > 2 ? spots.flowers : spots.tops.slice(0, Math.max(1, spots.tops.length / 3));
-    fly.goal = { x: 0, y: 0, perch: { index, spot: pick(choices) } };
-  }
-
-  // Ladybird: flies in, folds its wings, walks and pauses, then slips under a leaf or climbs high to take off.
-  function updateLadybird(bug: Actor, dt: number, time: number) {
-    bug.timer -= dt;
-    const walkSpeed = 4.5 * bug.scale;
-    const at = () => spotWorld(bug.perch.index, bug.perch.spot, time);
-
-    switch (bug.mode) {
-      case 'away': {
-        if (bug.timer > 0) return;
-        const planted = plantedIndices();
-        if (!planted.length) {
-          bug.timer = 10;
-          return;
-        }
-        const index = pick(planted),
-          tops = plantSpots(index).tops;
-        const spot =
-          Math.random() < 0.5 || !tops.length ? rimSpot(index) : pick(tops.slice(0, Math.max(1, tops.length / 2)));
-        const start = exitPoint();
-        Object.assign(bug, {
-          mode: 'flyIn',
-          x: start.x,
-          y: Math.min(start.y, height * 0.3),
-          vx: 0,
-          vy: 0,
-          perch: { index, spot },
-          open: 1,
-          wings: 1,
-          behind: false,
-          rounds: Math.floor(between(1, 4)),
-        });
-        return;
-      }
-      case 'flyIn': {
-        const goal = at();
-        bug.scale = approach(bug.scale, goal.scale, 2, dt);
-        if (Math.abs(bug.vx) > 5) bug.facing = Math.sign(bug.vx);
-        bug.angle = approach(bug.angle, -0.55, 4, dt);
-        if (moveToward(bug, goal, 70, 2.2, dt) < 0.8) {
-          bug.mode = 'settle';
-          bug.timer = 1.1;
-          bug.angle = 0;
-        }
-        return;
-      }
-      case 'settle': {
-        Object.assign(bug, at());
-        // Hind wings fold away first, then the elytra close over them.
-        bug.wings = clamp((bug.timer - 0.4) / 0.7, 0, 1);
-        bug.open = clamp(bug.timer / 0.4, 0, 1);
-        if (bug.timer <= 0) ladybirdWalk(bug);
-        return;
-      }
-      case 'walk': {
-        const goal = spotWorld(bug.perch.index, bug.goalSpot, time);
-        const before = { x: bug.x, y: bug.y };
-        const distance = moveToward(bug, goal, walkSpeed, 12, dt);
-        bug.stride += Math.hypot(bug.x - before.x, bug.y - before.y);
-        if (Math.abs(goal.x - bug.x) > 0.3) bug.facing = Math.sign(goal.x - bug.x);
-        // On foliage it climbs along the leaf, so the body turns with the path.
-        bug.angle = bug.perch.spot.rim
-          ? 0
-          : approach(bug.angle, clamp(Math.atan2(goal.y - bug.y, Math.abs(goal.x - bug.x) + 0.01), -1.3, 1.3), 4, dt);
-        if (distance < 0.5) {
-          bug.perch.spot = bug.goalSpot;
-          if (bug.next === 'hidden') {
-            bug.mode = 'hidden';
-            bug.timer = between(7, 14);
-          } else if (bug.next === 'surface') {
-            bug.behind = false;
-            bug.mode = 'pause';
-            bug.timer = between(1, 2);
-            bug.next = 'climb';
-          } else if (bug.next === 'prepare') {
-            bug.mode = 'prepare';
-            bug.timer = 1.6;
-            bug.angle = 0;
-          } else {
-            bug.mode = 'pause';
-            bug.timer = between(1, 2.6);
-          }
-        }
-        return;
-      }
-      case 'pause': {
-        Object.assign(bug, at());
-        if (bug.timer > 0) return;
-        if (bug.next === 'climb') {
-          ladybirdClimb(bug);
-          return;
-        }
-        bug.rounds -= 1;
-        if (bug.rounds > 0) {
-          ladybirdWalk(bug);
-          return;
-        }
-        const inside = plantSpots(bug.perch.index).inside;
-        if (inside.length && Math.random() < 0.55) {
-          bug.behind = true;
-          bug.next = 'hidden';
-          bug.mode = 'walk';
-          bug.goalSpot = nearest(inside, bug.perch.spot);
-        } else ladybirdClimb(bug);
-        return;
-      }
-      case 'hidden': {
-        Object.assign(bug, at());
-        if (bug.timer > 0) return;
-        const tops = plantSpots(bug.perch.index).tops;
-        bug.mode = 'walk';
-        bug.next = 'surface';
-        bug.goalSpot = nearest(tops, bug.perch.spot);
-        return;
-      }
-      case 'prepare': {
-        Object.assign(bug, at());
-        bug.open = clamp((1.6 - bug.timer) / 0.35, 0, 1);
-        bug.wings = clamp((1.6 - bug.timer - 0.35) / 0.6, 0, 1);
-        if (bug.timer <= 0) {
-          bug.mode = 'flyOut';
-          bug.goal = exitPoint();
-          bug.goal.y = between(0, height * 0.25);
-          bug.vy = -30;
-        }
-        return;
-      }
-      case 'flyOut': {
-        bug.angle = approach(bug.angle, -0.55, 5, dt);
-        if (Math.abs(bug.vx) > 5) bug.facing = Math.sign(bug.vx);
-        if (moveToward(bug, bug.goal, 75, 1.8, dt) < 10) {
-          bug.mode = 'away';
-          bug.timer = between(30, 60);
-          bug.open = 0;
-          bug.wings = 0;
-        }
-      }
-    }
-  }
-
-  function nearest(spots: Spot[], from: Spot) {
-    return spots.reduce(
-      (best, spot) =>
-        Math.hypot(spot.dx - from.dx, spot.dy - from.dy) < Math.hypot(best.dx - from.dx, best.dy - from.dy)
-          ? spot
-          : best,
-      spots[0],
-    );
-  }
-  function ladybirdWalk(bug: Actor) {
-    const from = bug.perch.spot;
-    let goalSpot: Spot;
-    if (from.rim) {
-      const reach = POTS[POT_TYPES[bug.perch.index]].width * 0.34;
-      goalSpot = { dx: clamp(from.dx + between(-14, 14), -reach, reach), dy: from.dy, rim: true };
-    } else {
-      const near = plantSpots(bug.perch.index).tops.filter(
-        (spot) => Math.hypot(spot.dx - from.dx, spot.dy - from.dy) < 10,
-      );
-      goalSpot = near.length ? pick(near) : from;
-    }
-    bug.mode = 'walk';
-    bug.next = null;
-    bug.goalSpot = goalSpot;
-  }
-  // Before take-off a ladybird walks up to the highest point it can reach.
-  function ladybirdClimb(bug: Actor) {
-    const tops = plantSpots(bug.perch.index).tops;
-    const highest = tops.length
-      ? tops
-          .slice(0, Math.max(1, Math.floor(tops.length / 10)))
-          .reduce((best, spot) =>
-            Math.abs(spot.dx - bug.perch.spot.dx) < Math.abs(best.dx - bug.perch.spot.dx) ? spot : best,
-          )
-      : bug.perch.spot;
-    if (bug.perch.spot.rim) bug.perch.spot = { ...bug.perch.spot, rim: false };
-    bug.mode = 'walk';
-    bug.next = 'prepare';
-    bug.goalSpot = highest;
-  }
-
-  function updateInsects(time: number) {
-    const dt = Math.min(0.05, time - lastInsectTime || 0.016);
-    lastInsectTime = time;
-    if (dark) return;
-    updateBee(insectActors.ong, dt, time);
-    updateButterfly(insectActors.buom, dt, time);
-    updateLadybird(insectActors.borua, dt, time);
-  }
-
-  function paintInsects(c: Ctx, time: number, behindIndex: number | null = null) {
-    if (dark) return;
-    const bug = insectActors.borua;
-    if (behindIndex !== null) {
-      if (bug.behind && bug.perch?.index === behindIndex && bug.mode !== 'away') paintLadybirdAt(c, bug, time);
-      return;
-    }
-    if (!bug.behind && bug.mode !== 'away') paintLadybirdAt(c, bug, time);
-    const bee = insectActors.ong;
-    if (bee.mode !== 'away') {
-      c.save();
-      c.translate(bee.x, bee.y);
-      c.scale(bee.scale * bee.facing, bee.scale);
-      const flying = bee.mode !== 'visit';
-      c.rotate(flying ? (bee.mode === 'hover' ? -0.42 : -0.18) : -0.08);
-      paintBee(c, flying, bee.loaded);
-      c.restore();
-    }
-    const fly = insectActors.buom;
-    if (fly.mode !== 'away') paintButterfly(c, fly);
-  }
-
-  function paintLadybirdAt(c: Ctx, bug: Actor, time: number) {
-    c.save();
-    c.translate(bug.x, bug.y);
-    c.scale(bug.scale * bug.facing, bug.scale);
-    c.rotate(bug.angle);
-    const flying = bug.mode === 'flyIn' || bug.mode === 'flyOut';
-    paintLadybird(c, {
-      open: bug.open,
-      wings: bug.wings,
-      buzz: flying || (bug.mode === 'prepare' && bug.wings >= 1),
-      stride: bug.stride,
-      legsDown: !flying,
-      time,
+  // Run every creature that belongs to the current theme
+  function eachActive(visit: (creature: (typeof CREATURES)[number], actor: Actor) => void) {
+    CREATURES.forEach((creature, index) => {
+      if (creature.night !== dark) return;
+      actors[index].forEach((actor) => visit(creature, actor));
     });
-    c.restore();
   }
+
+  function updateCreatures(time: number) {
+    const dt = Math.min(0.05, time - lastCreatureTime || 0.016);
+    lastCreatureTime = time;
+    eachActive((creature, actor) => creature.update(actor, world, dt, time));
+  }
+
+  // With behindIndex, paints only the creatures tucked behind that plant; without, everything in front
+  function paintCreatures(c: Ctx, time: number, behindIndex: number | null = null) {
+    eachActive((creature, actor) => {
+      if (actor.mode === 'away') return;
+      if ((creature.behindSlot?.(actor) ?? null) === behindIndex) creature.paint(c, actor, time);
+    });
+  }
+
+  function paintCreatureLight(time: number) {
+    eachActive((creature, actor) => {
+      if (actor.mode !== 'away') creature.paintLight?.(ctx, actor, time);
+    });
+  }
+
+
 
   const CAN_SCALE = 1.3;
   function floorCanPosition() {
@@ -2437,6 +1488,11 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   return {
     resize,
     setTheme(theme) {
+      // Day and night creatures start over when the theme flips
+      if (theme.dark !== dark) {
+        CREATURES.forEach((creature) => creature.reset?.());
+        actors = freshActors();
+      }
       dark = theme.dark;
       badge = { primary: theme.primary, onPrimary: theme.onPrimary };
       plantBitmaps.clear();
