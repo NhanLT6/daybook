@@ -1225,6 +1225,41 @@ function paintButterflyBody(c: Ctx, forward: Vec3, up: Vec3) {
   }
 }
 
+// Garden trowel standing on its blade tip (0, 0), handle up: wooden grip, steel blade lit from the left
+function paintShovelShape(c: Ctx) {
+  const wood = c.createLinearGradient(-2, 0, 2, 0);
+  wood.addColorStop(0, '#D9A872');
+  wood.addColorStop(1, '#8E5E33');
+  c.fillStyle = wood;
+  c.beginPath();
+  c.roundRect(-1.6, -44, 3.2, 26, 1.6);
+  c.fill();
+  c.fillStyle = '#6F7475';
+  c.fillRect(-1.2, -20, 2.4, 5);
+
+  const steel = c.createLinearGradient(-6, 0, 6, 0);
+  steel.addColorStop(0, '#E4E7E8');
+  steel.addColorStop(0.45, '#B9BEC0');
+  steel.addColorStop(1, '#7C8285');
+  c.fillStyle = steel;
+  c.beginPath();
+  c.moveTo(-5.5, -16);
+  c.lineTo(5.5, -16);
+  c.quadraticCurveTo(6.5, -6, 0, 0);
+  c.quadraticCurveTo(-6.5, -6, -5.5, -16);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = 'rgba(40,45,50,.35)';
+  c.lineWidth = 0.6;
+  c.stroke();
+  c.strokeStyle = 'rgba(255,255,255,.5)';
+  c.lineWidth = 0.8;
+  c.beginPath();
+  c.moveTo(-3, -14);
+  c.quadraticCurveTo(-3.6, -8, -1, -3);
+  c.stroke();
+}
+
 // ── Scene ───────────────────────────────────────────────────────────────────────
 
 interface Spot {
@@ -1301,6 +1336,7 @@ export interface GardenScene {
   pulse: (index: number) => void;
   pour: (index: number, fromStage: number) => void;
   isPouring: () => boolean;
+  dig: (index: number, onDone: () => void) => void;
   destroy: () => void;
 }
 
@@ -1368,7 +1404,9 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   const drops: { x: number; y: number; vy: number; delay: number; groundY: number }[] = [];
   const sparkles: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
   const ripples: { x: number; y: number; life: number }[] = [];
-  const pours: { toX: number; toY: number; life: number }[] = [];
+  // Pours run on the clock, not frame count, so a slow frame rate never leaves the can stuck mid-pour
+  const POUR_MS = 1400;
+  const pours: { toX: number; toY: number; start: number }[] = [];
   const pulses = new Map<number, number>();
   const plantBitmaps = new Map<string, HTMLCanvasElement>();
   // While a pour plays, the plant keeps showing its old stage until the water lands
@@ -1425,15 +1463,12 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     return { x, shelfY, soilY: shelfY - pot.height * scale, scale, row };
   }
 
+  // The shelf is the only fixed layer: painted once per size and theme, then copied every frame
   function buildBackdrop() {
     const surface = layer();
+    paintShelf(surface.context);
+    if (dark) nightTint(surface.context);
     backdrop = surface.canvas;
-    const furniture = layer();
-    paintShelf(furniture.context);
-    paintPlainRoom(surface.context);
-    paintShelfOnWall(surface.context, furniture);
-    if (dark) nightTint(furniture.context);
-    surface.context.drawImage(furniture.canvas, 0, 0, width, height);
   }
 
   function plantBitmap(index: number): HTMLCanvasElement {
@@ -1458,6 +1493,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     frameId = requestAnimationFrame(frame);
     if (!width || !backdrop) return;
     const time = now / 1000;
+    // No wall: the shelf stands straight on the Insights glass
+    ctx.clearRect(0, 0, width, height);
     ctx.drawImage(backdrop, 0, 0, width, height);
     if (!foreground || foreground.canvas.width !== canvas.width) foreground = layer();
     const c = foreground.context;
@@ -1479,8 +1516,11 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
 
         const pulse = pulses.get(index) || 0;
         const grow = 1 + Math.sin(pulse * Math.PI) * 0.12;
+        const lift = digLift(index, now);
         c.save();
-        c.translate(x, shelfY - pot.height * scale + 0.5);
+        c.globalAlpha = lift.alpha;
+        c.translate(x + lift.x, shelfY - pot.height * scale + 0.5 - lift.y);
+        c.rotate(lift.tilt);
         c.rotate(Math.sin(time * 1.1 + index) * 0.018);
         c.scale(scale * grow, scale * grow);
         c.drawImage(plantBitmap(index), -100, -130, 200, 180);
@@ -1489,108 +1529,14 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       }
     }
 
-    paintCan(c);
+    paintCan(c, now);
+    paintShovel(c, now);
     updateInsects(time);
     paintInsects(c, time);
     if (dark) nightTint(c);
     ctx.drawImage(foreground.canvas, 0, 0, width, height);
     paintWater();
     paintDropBadge();
-  }
-
-  // Plain room: the shelf stands against a bare wall, window light falls in from the upper left.
-  const ROOM = {
-    light: {
-      wall: ['#ECE7E0', '#DED7CE'],
-      floor: ['#E4DDD3', '#CFC6BA'],
-      patch: 'rgba(255,252,244,',
-      leaf: 'rgba(150,138,122,',
-      shadow: 'rgba(70,55,40,',
-    },
-    dark: {
-      wall: ['#2C3142', '#232736'],
-      floor: ['#2A2D3A', '#1D202B'],
-      patch: 'rgba(255,214,150,',
-      leaf: 'rgba(20,22,32,',
-      shadow: 'rgba(5,6,12,',
-    },
-  };
-  const WALL_BASE = 0.8;
-
-  function paintPlainRoom(c: Ctx) {
-    const room = dark ? ROOM.dark : ROOM.light,
-      baseY = height * WALL_BASE;
-    const wall = c.createLinearGradient(0, 0, 0, baseY);
-    wall.addColorStop(0, room.wall[0]);
-    wall.addColorStop(1, room.wall[1]);
-    c.fillStyle = wall;
-    c.fillRect(0, 0, width, baseY);
-    const floor = c.createLinearGradient(0, baseY, 0, height);
-    floor.addColorStop(0, room.floor[0]);
-    floor.addColorStop(1, room.floor[1]);
-    c.fillStyle = floor;
-    c.fillRect(0, baseY, width, height - baseY);
-
-    // Window light: a soft slanted patch, warmer at night like a street lamp.
-    const patch = new Path2D();
-    patch.moveTo(-width * 0.1, height * 0.02);
-    patch.lineTo(width * 0.5, -height * 0.05);
-    patch.lineTo(width * 1.05, height * 0.66);
-    patch.lineTo(width * 0.35, height * 0.78);
-    patch.closePath();
-    c.save();
-    c.filter = 'blur(22px)';
-    if (dark) {
-      c.globalCompositeOperation = 'soft-light';
-      c.fillStyle = 'rgba(255,190,110,.3)';
-    } else c.fillStyle = `${room.patch}0.75)`;
-    c.fill(patch);
-    c.restore();
-    // Leaves outside break the light into soft dapples.
-    c.save();
-    c.clip(patch);
-    c.filter = 'blur(9px)';
-    const random = seeded(7);
-    for (let index = 0; index < 34; index++) {
-      const t = random(),
-        across = random();
-      const x = width * (0.05 + t * 0.85 + (across - 0.5) * 0.35),
-        y = height * (0.04 + t * 0.62 + (across - 0.5) * 0.12);
-      c.fillStyle = `${room.leaf}${dark ? 0.12 : 0.08})`;
-      c.beginPath();
-      c.ellipse(x, y, 10 + random() * 16, 4 + random() * 6, 0.75 + (random() - 0.5) * 0.6, 0, Math.PI * 2);
-      c.fill();
-    }
-    c.restore();
-    // Where the light spills onto the floor, and a soft line where wall meets floor.
-    c.save();
-    c.filter = 'blur(10px)';
-    if (dark) {
-      c.globalCompositeOperation = 'soft-light';
-      c.fillStyle = 'rgba(255,190,110,.25)';
-    } else c.fillStyle = `${room.patch}0.45)`;
-    c.beginPath();
-    c.ellipse(width * 0.62, baseY + 22, width * 0.42, 16, 0, 0, Math.PI * 2);
-    c.fill();
-    c.restore();
-    const seam = c.createLinearGradient(0, baseY - 6, 0, baseY + 10);
-    seam.addColorStop(0, `${room.shadow}0)`);
-    seam.addColorStop(0.45, `${room.shadow}${dark ? 0.35 : 0.12})`);
-    seam.addColorStop(1, `${room.shadow}0)`);
-    c.fillStyle = seam;
-    c.fillRect(0, baseY - 6, width, 16);
-  }
-
-  // The shelf casts a soft shadow onto the wall, down and to the right of the light.
-  function paintShelfOnWall(c: Ctx, furniture: Layer) {
-    c.save();
-    c.globalAlpha = 0.16;
-    c.filter = `blur(${dark ? 9 : 5}px) brightness(0)`;
-    c.beginPath();
-    c.rect(0, 0, width, height * WALL_BASE + 4);
-    c.clip();
-    c.drawImage(furniture.canvas, 16, 12, width, height);
-    c.restore();
   }
 
   // Night: tint only what is already painted, so lamps and windows can stay bright.
@@ -2261,7 +2207,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     return { x: width * 0.87, y: height * ROWS.floor + 2 };
   }
 
-  function paintCan(c: Ctx) {
+  function paintCan(c: Ctx, now: number) {
     const home = floorCanPosition();
     const pouring = pours[0];
     if (!pouring) {
@@ -2273,7 +2219,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       return;
     }
 
-    const progress = 1 - pouring.life;
+    const progress = Math.min(1, (now - pouring.start) / POUR_MS);
     const ease = (value: number) => value * value * (3 - 2 * value);
     let x = pouring.toX,
       y = pouring.toY,
@@ -2296,8 +2242,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     c.scale(CAN_SCALE, CAN_SCALE);
     paintWateringCan(c, 0, 0, false);
     c.restore();
-    pouring.life -= 0.012;
-    if (pouring.life <= 0) pours.shift();
+    if (progress >= 1) pours.shift();
   }
 
   function paintWater() {
@@ -2385,7 +2330,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     const { x, soilY, scale } = slotPosition(index);
     // Tilted 0.7 rad, the spout tip sits 29px left and 5px above the can's base (times its scale).
     const spoutY = soilY - 40 * scale - 5 * CAN_SCALE;
-    pours.push({ toX: x + 29 * CAN_SCALE, toY: spoutY + 5 * CAN_SCALE, life: 1 });
+    pours.push({ toX: x + 29 * CAN_SCALE, toY: spoutY + 5 * CAN_SCALE, start: performance.now() });
     for (let count = 0; count < 12; count++) {
       drops.push({
         x: x + (Math.random() - 0.5) * 5,
@@ -2405,6 +2350,85 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       }
     }, 950);
     timers.add(timer);
+  }
+
+  // ── Shovel: a double-click on a grown plant digs it out of its pot ──
+  const DIG_MS = 1400;
+  const digs = new Map<number, { start: number; onDone: () => void }>();
+  const clods: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
+  const easeInOut = (value: number) => value * value * (3 - 2 * value);
+
+  function dig(index: number, onDone: () => void) {
+    if (!state.plants[index] || digs.has(index)) return;
+    digs.set(index, { start: performance.now(), onDone });
+  }
+
+  // How far the plant has come out of the soil: it rises once the shovel levers up, then fades away
+  function digLift(index: number, now: number) {
+    const job = digs.get(index);
+    if (!job) return { x: 0, y: 0, tilt: 0, alpha: 1 };
+    const progress = clamp((now - job.start) / DIG_MS, 0, 1);
+    const out = easeInOut(clamp((progress - 0.5) / 0.5, 0, 1));
+    return { x: out * 10, y: out * 46, tilt: out * 0.25, alpha: 1 - clamp((progress - 0.75) / 0.25, 0, 1) };
+  }
+
+  function paintShovel(c: Ctx, now: number) {
+    for (const [index, job] of digs) {
+      const progress = (now - job.start) / DIG_MS;
+      if (progress >= 1) {
+        digs.delete(index);
+        job.onDone();
+        continue;
+      }
+      const { x, soilY, scale } = slotPosition(index);
+      // Swoops in from the upper right, pushes into the soil, then levers the plant up and leaves
+      const tipX = x + 12 * scale;
+      const tipY = soilY + 4 * scale;
+      let px = tipX;
+      let py = tipY;
+      let angle = 0.5;
+      let alpha = 1;
+      if (progress < 0.3) {
+        const move = easeInOut(progress / 0.3);
+        px = tipX + (1 - move) * 60;
+        py = tipY - (1 - move) * 70 - 8;
+        angle = 0.5 + (1 - move) * 0.4;
+      } else if (progress < 0.5) {
+        py = tipY - 8 + easeInOut((progress - 0.3) / 0.2) * 8;
+        if (Math.random() < 0.5) {
+          clods.push({ x: tipX + between(-6, 6), y: soilY, vx: between(-0.9, 0.9), vy: between(-2.4, -1.2), life: 1 });
+        }
+      } else {
+        const lever = easeInOut((progress - 0.5) / 0.5);
+        angle = 0.5 - lever * 0.7;
+        py = tipY - lever * 40;
+        px = tipX + lever * 18;
+        alpha = 1 - clamp((progress - 0.8) / 0.2, 0, 1);
+      }
+      c.save();
+      c.globalAlpha = alpha;
+      c.translate(px, py);
+      c.rotate(angle);
+      c.scale(scale, scale);
+      paintShovelShape(c);
+      c.restore();
+    }
+
+    // Bits of soil thrown up by the blade
+    for (let index = clods.length - 1; index >= 0; index--) {
+      const clod = clods[index];
+      clod.vy += 0.18;
+      clod.x += clod.vx;
+      clod.y += clod.vy;
+      clod.life -= 0.03;
+      c.globalAlpha = Math.max(0, clod.life);
+      c.fillStyle = '#4A3528';
+      c.beginPath();
+      c.arc(clod.x, clod.y, 1.3, 0, TAU);
+      c.fill();
+      c.globalAlpha = 1;
+      if (clod.life <= 0) clods.splice(index, 1);
+    }
   }
 
   resize();
@@ -2427,7 +2451,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       pulses.set(index, 0.5);
     },
     pour,
-    isPouring: () => pours.length > 0,
+    isPouring: () => pours.length > 0 || digs.size > 0,
+    dig,
     destroy() {
       cancelAnimationFrame(frameId);
       timers.forEach(clearTimeout);

@@ -13,7 +13,7 @@ import { createGardenScene, MAX_STAGE, paintPlantPreview, SPECIES } from './gard
 
 const SCENE_HEIGHT = 340;
 
-const { plants, drops, plant, water } = useGarden();
+const { plants, drops, plant, clear, water } = useGarden();
 const theme = useTheme();
 
 const wrap = ref<HTMLDivElement>();
@@ -95,7 +95,12 @@ const onClick = (event: MouseEvent) => {
 const onDoubleClick = (event: MouseEvent) => {
   const index = slotFromEvent(event);
   const target = index >= 0 ? plants.value[index] : null;
-  if (target && target.stage >= MAX_STAGE) openPicker(index);
+  if (!target || target.stage < MAX_STAGE || !scene.value) return;
+  // The trowel digs the grown plant out, then the empty pot asks for a new one
+  scene.value.dig(index, () => {
+    clear(index);
+    openPicker(index);
+  });
 };
 
 // ── Scene lifecycle and theme ──

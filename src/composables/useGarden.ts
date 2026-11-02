@@ -51,6 +51,10 @@ export function useGarden() {
     state.value.plants[index] = { species, stage: 0, seed: newSeed() };
   };
 
+  const clear = (index: number) => {
+    state.value.plants[index] = null;
+  };
+
   // One drop grows the plant one stage. Returns the stage it had before, or null when nothing was poured
   const water = (index: number): number | null => {
     const target = state.value.plants[index];
@@ -61,5 +65,5 @@ export function useGarden() {
     return fromStage;
   };
 
-  return { plants, drops, earnDrops, plant, water };
+  return { plants, drops, earnDrops, plant, clear, water };
 }
