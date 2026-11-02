@@ -358,6 +358,7 @@ function butterflyNextGoal(world: GardenWorld, fly: Actor) {
 }
 
 export const butterfly: Creature = {
+  name: 'butterfly',
   night: false,
   count: 1,
   create: () => makeActor({ timer: 2.5 }),

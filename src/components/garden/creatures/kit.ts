@@ -150,10 +150,14 @@ export interface GardenWorld {
   rimSpot: (index: number) => Spot;
   potWidth: (index: number) => number;
   airPoint: () => Goal;
+  // How many of the named creature are on screen now
+  onScreen: (name: string) => number;
   exitPoint: () => Goal;
 }
 
 export interface Creature {
+  // Lets other creatures ask how many of this one are on screen
+  name: string;
   // true: shown in dark mode only; false: in light mode only
   night: boolean;
   // How many of it can be on screen at once

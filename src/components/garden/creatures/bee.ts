@@ -194,6 +194,7 @@ function beeNextFlower(world: GardenWorld, bee: Actor, current: number | null) {
 }
 
 export const bee: Creature = {
+  name: 'bee',
   night: false,
   count: 1,
   create: () => makeActor({ timer: 1 }),

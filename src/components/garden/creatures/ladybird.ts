@@ -311,6 +311,7 @@ function paintLadybirdAt(c: Ctx, bug: Actor, time: number) {
 }
 
 export const ladybird: Creature = {
+  name: 'ladybird',
   night: false,
   count: 1,
   create: () => makeActor({ timer: 7 }),

@@ -1221,6 +1221,10 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     potWidth: (index) => POTS[POT_TYPES[index]].width,
     airPoint,
     exitPoint,
+    onScreen: (name) => {
+      const index = CREATURES.findIndex((creature) => creature.name === name);
+      return index < 0 ? 0 : actors[index].filter((actor) => actor.mode !== 'away').length;
+    },
   };
 
   // Run every creature that belongs to the current theme

@@ -486,9 +486,15 @@ function nextGoal(moth: Actor, world: GardenWorld) {
 
 function updateMoth(moth: Actor, world: GardenWorld, dt: number, time: number) {
   moth.timer -= dt;
+  // Fireflies come first: with four or more about, moths stay away and any moth here leaves
+  const crowded = world.onScreen('firefly') >= 4;
   if (moth.mode === 'away') {
-    if (moth.timer <= 0) enter(moth, world);
+    if (moth.timer <= 0 && !crowded) enter(moth, world);
     return;
+  }
+  if (crowded && !moth.goal.exit) {
+    moth.stops = 0;
+    nextGoal(moth, world);
   }
 
   // Wing beat: fast flutter in flight, still at rest with a rare shiver
@@ -556,6 +562,7 @@ function updateMoth(moth: Actor, world: GardenWorld, dt: number, time: number) {
 }
 
 export const moth: Creature = {
+  name: 'moth',
   night: true,
   count: 2,
   // The second moth comes later, so most of the time there is only one

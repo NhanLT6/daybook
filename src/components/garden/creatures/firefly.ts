@@ -9,7 +9,8 @@ import { linear, radial } from './paint';
 
 const FEMALE = 0;
 // Brightness over one flash: quick rise, short hold, slower fade
-const FLASH = 0.55;
+// Longer than the half-second of the common firefly, so a flash is easy to catch on a small shelf
+const FLASH = 0.9;
 function flashLevel(age: number, length = FLASH) {
   if (age < 0 || age > length) return 0;
   const rise = 0.12;
@@ -135,7 +136,7 @@ function appear(fly: Actor, world: GardenWorld, female: boolean) {
     y: between(0.5, 0.9) * world.height,
     vx: 0,
     vy: 0,
-    timer: between(25, 50),
+    timer: between(20, 45),
     next: null,
     bob: between(1, 3),
     goal: { x: 0, y: 0 },
@@ -167,7 +168,7 @@ function updateFirefly(fly: Actor, world: GardenWorld, dt: number, time: number)
     // Answer a male's flash after a fixed delay, if one flashed recently and she is not mid-flash
     const since = time - lastMaleFlash;
     if (since > 1.9 && since < 2.1 && time - fly.phase > 3) fly.phase = time;
-    fly.glow = 0.75 * flashLevel(time - fly.phase, 0.35);
+    fly.glow = 0.75 * flashLevel(time - fly.phase, 0.6);
     if (fly.timer <= 0) {
       fly.mode = 'away';
       fly.timer = between(15, 30);
@@ -205,16 +206,20 @@ function updateFirefly(fly: Actor, world: GardenWorld, dt: number, time: number)
   // Leaves quietly: it simply stops flashing once its time is up
   if (fly.timer <= 0 && age > FLASH) {
     fly.mode = 'away';
-    fly.timer = between(8, 25);
+    fly.timer = between(15, 40);
   }
 }
 
 export const firefly: Creature = {
+  name: 'firefly',
   night: true,
-  count: 3,
-  // Slot 0 is the female on a leaf; the males turn up one by one
+  count: 5,
+  // Slot 0 is the female on a leaf; the males turn up one by one and come and go, so all five are rare
   create: (slot) =>
-    makeActor({ kind: slot, timer: slot === FEMALE ? between(4, 8) : slot === 1 ? between(0.5, 2) : between(8, 14) }),
+    makeActor({
+      kind: slot,
+      timer: slot === FEMALE ? between(4, 8) : slot === 1 ? between(0.5, 2) : between(6, 30) * (slot - 1),
+    }),
   update: updateFirefly,
   paint(c, fly) {
     c.save();
