@@ -12,7 +12,8 @@ import { isoDateFormat } from '@/common/DateFormat';
 import { storageKeys } from '@/common/storageKeys';
 
 // Each new log item gives one drop. The can holds at most 5, and at most 5 come in per day, so logging extra
-// entries never buys growth. Nothing wilts and skipped days cost nothing.
+// entries never buys growth. Nothing wilts and skipped days cost nothing. A day that starts before any log
+// gets one free drop (part of the day's 5), so a morning visit can water before the evening's logging.
 export const DROP_CAP = 5;
 const DAILY_DROPS = 5;
 
@@ -35,16 +36,26 @@ export function useGarden() {
   const plants = computed(() => state.value.plants);
   const drops = computed(() => state.value.drops);
 
+  // Starts the day's count on the first drop of a new day. Returns whether a new day began
+  const startDay = () => {
+    const today = dayjs().format(isoDateFormat);
+    if (state.value.earnedDay === today) return false;
+    state.value.earnedDay = today;
+    state.value.earnedToday = 0;
+    return true;
+  };
+
   // New logs (form, bulk form or chat) earn drops; a CSV import does not
   const earnDrops = (count: number) => {
-    const today = dayjs().format(isoDateFormat);
-    if (state.value.earnedDay !== today) {
-      state.value.earnedDay = today;
-      state.value.earnedToday = 0;
-    }
+    startDay();
     const earned = Math.max(0, Math.min(count, DAILY_DROPS - state.value.earnedToday, DROP_CAP - state.value.drops));
     state.value.drops += earned;
     state.value.earnedToday += earned;
+  };
+
+  // The garden opening on a day nothing has been logged yet gives that day's free drop
+  const claimDailyDrop = () => {
+    if (startDay()) earnDrops(1);
   };
 
   const plant = (index: number, species: SpeciesKey) => {
@@ -65,5 +76,5 @@ export function useGarden() {
     return fromStage;
   };
 
-  return { plants, drops, earnDrops, plant, clear, water };
+  return { plants, drops, earnDrops, claimDailyDrop, plant, clear, water };
 }

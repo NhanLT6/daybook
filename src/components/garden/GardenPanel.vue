@@ -7,13 +7,17 @@ import type { GardenScene, SpeciesKey } from './gardenScene';
 
 import { useTheme } from 'vuetify';
 
-import { useResizeObserver } from '@vueuse/core';
+import { useNow, useResizeObserver } from '@vueuse/core';
 
 import { createGardenScene, MAX_STAGE, paintPlantPreview, SPECIES } from './gardenScene';
 
 const SCENE_HEIGHT = 340;
 
-const { plants, drops, plant, clear, water } = useGarden();
+const { plants, drops, claimDailyDrop, plant, clear, water } = useGarden();
+
+// The day's free drop: on opening, and at midnight for a page left open overnight
+const now = useNow({ interval: 60_000 });
+watch(() => now.value.toDateString(), claimDailyDrop, { immediate: true });
 const theme = useTheme();
 
 const wrap = ref<HTMLDivElement>();
