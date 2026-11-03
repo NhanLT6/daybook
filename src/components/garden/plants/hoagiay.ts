@@ -9,10 +9,32 @@ const LEAF = { light: '#8FC06A', mid: '#4D8A3B', dark: '#2B5A29' };
 
 const BARK = { dark: '#4A3828', mid: '#7A5F48', light: '#A88D72', crack: '#2E2118', rough: 0.9 };
 
+// Bract colours: back (inside of the cup) and front, each base → middle → tip, plus vein and rim lines.
+// A plant carries both: grafted bougainvillea often shows two colours on one bush.
+interface BractColors {
+  back: [string, string, string];
+  front: [string, string, string];
+  vein: string;
+  rim: string;
+}
+const MAGENTA: BractColors = {
+  back: ['#9A1462', '#C0237E', '#DB4597'],
+  front: ['#A1175F', '#DD2E8C', '#F57FBE'],
+  vein: 'rgba(255,190,225,.4)',
+  rim: 'rgba(110,10,60,.35)',
+};
+// White bracts keep a faint green-cream at the base, as the real ones do
+const WHITE: BractColors = {
+  back: ['#C9D1B2', '#E4E3D8', '#F1EFE8'],
+  front: ['#D2D9BC', '#F3F2EC', '#FFFFFF'],
+  vein: 'rgba(190,195,165,.5)',
+  rim: 'rgba(110,115,90,.35)',
+};
+
 // One bougainvillea "flower" seen from the side: three papery bracts cupped around a tiny cream flower,
 // one behind and two in front, darker at the base and inside the cup, so it reads as a little lantern
-function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, shade: number) {
-  const bract = (angle: number, dx: number, colors: [string, string, string]) => {
+function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, shade: number, colors: BractColors) {
+  const bract = (angle: number, dx: number, stops: [string, string, string]) => {
     c.save();
     c.translate(dx, size * 0.15);
     c.rotate(angle);
@@ -23,13 +45,13 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, sh
     path.bezierCurveTo(-width, -height * 0.2, -width * 0.95, -height * 0.85, 0, -height);
     path.bezierCurveTo(width * 0.95, -height * 0.85, width, -height * 0.2, 0, 0);
     c.fillStyle = linear(c, 0, 0, 0, -height, [
-      [0, colors[0]],
-      [0.55, colors[1]],
-      [1, colors[2]],
+      [0, stops[0]],
+      [0.55, stops[1]],
+      [1, stops[2]],
     ]);
     c.fill(path);
     // Papery vein net: a midrib and a few side veins
-    c.strokeStyle = 'rgba(255,190,225,.4)';
+    c.strokeStyle = colors.vein;
     c.lineWidth = 0.18;
     c.beginPath();
     c.moveTo(0, -height * 0.05);
@@ -41,7 +63,7 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, sh
       c.lineTo(width * 0.6, -height * (at + 0.12));
     }
     c.stroke();
-    c.strokeStyle = 'rgba(110,10,60,.35)';
+    c.strokeStyle = colors.rim;
     c.lineWidth = 0.2;
     c.stroke(path);
     c.restore();
@@ -50,7 +72,7 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, sh
   c.translate(x, y);
   c.rotate(turn);
   // Back bract is the inside of the cup: deeper and darker
-  bract(0, 0, ['#9A1462', '#C0237E', '#DB4597']);
+  bract(0, 0, colors.back);
   // The flower tube peeking out of the cup, with its little white star
   c.strokeStyle = '#F2E6C8';
   c.lineWidth = size * 0.12;
@@ -64,8 +86,8 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, sh
   c.arc(0, -size * 0.6, size * 0.1, 0, TAU);
   c.fill();
   // Two front bracts lean out to the sides and overlap in the middle
-  bract(-0.5, -size * 0.12, ['#A1175F', '#DD2E8C', '#F57FBE']);
-  bract(0.5, size * 0.12, ['#A1175F', '#E0348F', '#F98AC4']);
+  bract(-0.5, -size * 0.12, colors.front);
+  bract(0.5, size * 0.12, colors.front);
   if (shade > 0) {
     // Blooms deeper in the cluster sit in shadow
     c.globalCompositeOperation = 'source-atop';
@@ -76,7 +98,8 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, sh
   c.restore();
 }
 
-// Bougainvillea bonsai: a gnarled trunk full of small side twigs, leafy pads and rounded clusters of bracts
+// Bougainvillea bonsai: a gnarled trunk full of small side twigs, leafy pads and rounded clusters of bracts,
+// some magenta and some white on the same bush
 export const hoagiay: Plant = {
   name: 'Bougainvillea',
   done: 'is covered in blooms',
@@ -205,9 +228,12 @@ export const hoagiay: Plant = {
         for (const cluster of pad.clusters.slice(0, stage === 4 ? 3 : 1)) {
           const cx = centre.x + cluster.dx * radius,
             cy = centre.y + cluster.dy * radius;
+          // Each cluster is one colour, picked from a value the plant already drew, so existing plants keep
+          // their shape and a cluster never changes colour as it grows
+          const colors = (cluster.blooms[0].depth * 1000) % 1 < 0.5 ? WHITE : MAGENTA;
           const blooms = cluster.blooms.slice(0, stage === 4 ? 4 : 2).sort((a, b) => b.depth - a.depth);
           for (const bloom of blooms) {
-            paintBloom(c, cx + bloom.dx * 4.6, cy + bloom.dy * 3.4, 5.4, bloom.turn, bloom.depth * 0.2);
+            paintBloom(c, cx + bloom.dx * 4.6, cy + bloom.dy * 3.4, 5.4, bloom.turn, bloom.depth * 0.2, colors);
           }
         }
       }
