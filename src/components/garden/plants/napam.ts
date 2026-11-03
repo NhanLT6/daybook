@@ -243,23 +243,29 @@ function pitcher(c: Ctx, height: number, look: PitcherLook, depth: number, rando
   lip(c, height, width, look, 'front');
 }
 
-// Tendril from the leaf tip down to the pitcher's base, with a little curl on the long ones
-function tendril(c: Ctx, fromX: number, fromY: number, toX: number, toY: number, curl: boolean) {
-  c.strokeStyle = '#7E9A45';
-  c.lineWidth = 0.8;
+// Tendril: the leaf's midrib running on past the tip. It carries on in the leaf's direction, droops in a U and
+// turns up into the pitcher's base, so the pitcher stands up out of the end of the curve like on a real vine.
+function tendril(c: Ctx, tip: { x: number; y: number }, along: number, base: { x: number; y: number }, sag: number) {
+  const outward = Math.sign(base.x - tip.x || 1);
+  c.strokeStyle = '#86A24C';
+  c.lineWidth = 0.9;
   c.lineCap = 'round';
   c.beginPath();
-  c.moveTo(fromX, fromY);
-  const midX = (fromX + toX) / 2 + (toX - fromX) * 0.4,
-    midY = Math.max(fromY, toY) + 4;
-  if (curl) {
-    c.quadraticCurveTo(midX, fromY + (midY - fromY) * 0.5, midX, midY - 2);
-    c.arc(midX + 1.6, midY - 2, 1.6, Math.PI, Math.PI * 2.6);
-    c.quadraticCurveTo(midX + 2, toY + 4, toX, toY);
-  } else {
-    c.quadraticCurveTo(midX, midY, toX, toY);
-  }
+  c.moveTo(tip.x, tip.y);
+  c.bezierCurveTo(
+    tip.x + Math.cos(along) * 5,
+    tip.y + Math.sin(along) * 5 + sag * 0.5,
+    base.x - outward * 1.5,
+    base.y + sag,
+    base.x,
+    base.y,
+  );
   c.stroke();
+  // Where the tendril joins, the pitcher's foot swells a little
+  c.fillStyle = '#7E9A45';
+  c.beginPath();
+  c.ellipse(base.x, base.y + 0.3, 1.3, 0.9, 0, 0, TAU);
+  c.fill();
 }
 
 interface NepenthesLeaf {
@@ -290,16 +296,19 @@ export const napam: Plant = {
       };
     });
     const looks = Array.from({ length: 6 }, () => LOOKS[random() < 0.65 ? 0 : 1]);
-    // Low leaves hang their pitchers over the rim; higher ones hold them beside the foliage
+    // Pitchers grow on the low, spreading leaves, whose tips reach past the rim: two hang down the side of
+    // the pot, the rest stand up beside the leaf tip
     const pitchered: [number, boolean][] = [
-      [5, false],
-      [2, true],
-      [6, false],
+      [1, false],
+      [0, true],
+      [2, false],
       [3, true],
-      [8, false],
+      [5, false],
     ];
     pitchered.forEach(([index, hang], order) => {
-      leaves[index].pitcher = { height: 15 + random() * 5, hang, drop: 6 + random() * 6, look: looks[order] };
+      // The last one is young and smaller, so the five never read as a uniform row
+      const height = (15 + random() * 5) * (order === 4 ? 0.7 : 1);
+      leaves[index].pitcher = { height, hang, drop: 3 + random() * 4, look: looks[order] };
     });
 
     const grow = 0.5 + stage * 0.125;
@@ -343,15 +352,18 @@ export const napam: Plant = {
       const hanging = leaf.pitcher;
       if (!hanging || !withPitcher.has(index)) continue;
       const height = hanging.height * pitcherScale;
-      // Hanging pitchers drop below the soil line as far as the room allows; the rest sit just under the tip
       const outward = Math.sign(tipX || 1);
-      const baseX = tipX + outward * (hanging.hang ? 6 : 5);
-      const bottom = hanging.hang && stage === 4 ? Math.min(room * 0.8, height + 10) : tipY + hanging.drop + height;
-      tendril(c, tipX, tipY, baseX, bottom, hanging.hang);
+      const hangs = hanging.hang && stage === 4;
+      // Standing pitchers: base a little below and beyond the tip, so the pitcher rises next to the leaf.
+      // Hanging ones: down the side of the pot as far as the room below allows.
+      const base = hangs
+        ? { x: tipX - outward * 3, y: Math.min(room * 0.85, tipY + height + 22) }
+        : { x: tipX + outward * 6, y: tipY + hanging.drop };
+      tendril(c, { x: tipX, y: tipY }, look.angle, base, hangs ? 4 : 5);
       c.save();
-      c.translate(baseX, bottom);
-      // Tipped slightly outward, the way a pitcher's weight pulls it
-      c.rotate(outward * (hanging.hang ? 0.12 : 0.18));
+      c.translate(base.x, base.y);
+      // Leaning a touch outward, away from the leaf that holds it
+      c.rotate(outward * (hangs ? 0.08 : 0.14));
       pitcher(c, height, hanging.look, look.shade * 0.6, random);
       c.restore();
     }
