@@ -88,48 +88,63 @@ function paintMonsteraLeaf(
   c.restore();
 }
 
-// Monstera: a few big split leaves on long stalks, a fresh unsplit leaf unfurling in the middle
+// Monstera: straight stalks rising close together from the soil, each a different length so the leaves
+// spread evenly; the blade folds sharply down where it meets the stalk, like an anthurium
 export const monstera: Plant = {
   name: 'Monstera',
   done: 'has split leaves',
   paint(c, stage, random) {
-    // Leaves alternate left and right; back ones stand more upright, front ones arch far out
-    const leaves = [];
-    for (let index = 0; index < 6; index++) {
-      const side = index % 2 ? 1 : -1;
-      leaves.push({
-        side,
-        out: 0.35 + random() * 0.6,
-        reach: 24 + random() * 12,
-        size: 30 + random() * 8,
-        droop: 0.25 + random() * 0.45,
+    const order = [3, 0, 6, 1, 5, 2, 4];
+    const leaves = order.map((slot) => {
+      // Slot 0 leans far left .. 6 far right; middle stalks stand tallest
+      const lean = (slot / 6 - 0.5) * 1.3 + (random() - 0.5) * 0.15;
+      const side = lean === 0 ? 1 : Math.sign(lean);
+      return {
+        foot: (random() - 0.5) * 4,
+        lean,
+        length: 46 - Math.abs(lean) * 22 + (random() - 0.5) * 12,
+        // How far the blade folds down past horizontal at the joint
+        fold: 0.2 + random() * 0.55,
+        side: Math.abs(lean) < 0.15 && random() < 0.5 ? -side : side,
+        size: 22 + random() * 6,
         depth: random(),
-      });
-    }
+      };
+    });
     const grow = 0.5 + stage * 0.125;
-    const slits = stage >= 3 ? 4 : stage === 2 ? 2 : 0;
-    const visible = leaves.slice(0, [0, 2, 3, 5, 6][stage]).sort((a, b) => b.depth - a.depth);
+    const slits = stage >= 3 ? 3 : 0;
+    const visible = leaves.slice(0, [0, 3, 4, 6, 7][stage]).sort((a, b) => b.depth - a.depth);
     for (const leaf of visible) {
-      const reach = leaf.reach * grow;
-      // The stalk rises, then bows outward under the leaf's weight
-      const lift = { x: leaf.side * reach * leaf.out * 0.35, y: -reach * (1.05 - leaf.depth * 0.15) };
-      const end = { x: leaf.side * reach * (0.45 + leaf.out * 0.6), y: -reach * (0.75 - leaf.droop * 0.3) };
-      stem(c, 0, 0, lift.x, lift.y, end.x, end.y, 1.5, '#4F7F3A');
-      // The blade carries on from the stalk's direction and droops further, so it hangs out to the side
-      const along = Math.atan2(end.y - lift.y, end.x - lift.x);
-      const angle = along + leaf.side * leaf.droop * 0.8;
-      paintMonsteraLeaf(c, end.x, end.y, angle, leaf.size * grow, LEAF, slits, leaf.depth * 0.6);
+      const length = leaf.length * grow;
+      const end = { x: leaf.foot + Math.sin(leaf.lean) * length, y: -Math.cos(leaf.lean) * length };
+      // Stalk: straight and a little thicker at the base, where it wraps the others
+      c.lineCap = 'round';
+      c.strokeStyle = '#4F7F3A';
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.moveTo(leaf.foot * 0.5, 0);
+      c.lineTo(end.x, end.y);
+      c.stroke();
+      c.strokeStyle = 'rgba(200,235,150,.35)';
+      c.lineWidth = 0.5;
+      c.beginPath();
+      c.moveTo(leaf.foot * 0.5 - 0.4, 0);
+      c.lineTo(end.x - 0.4, end.y);
+      c.stroke();
+      // Blade hangs out and down from the joint; ones facing us look shorter
+      const angle = leaf.side > 0 ? leaf.fold : Math.PI - leaf.fold;
+      const facing = 0.8 + Math.min(1, Math.abs(leaf.lean) * 2) * 0.2;
+      paintMonsteraLeaf(c, end.x, end.y, angle, leaf.size * grow * facing, LEAF, slits, leaf.depth * 0.6);
     }
     if (stage === 4) {
       // A new leaf still rolled into a pale spike
-      stem(c, 0, 0, 2, -20, 3, -30, 1.2, '#5F8F42');
+      stem(c, 0, 0, 1, -18, 2, -30, 1.2, '#5F8F42');
       c.fillStyle = YOUNG.mid;
       c.beginPath();
-      c.ellipse(4, -35, 1.8, 6, 0.15, 0, Math.PI * 2);
+      c.ellipse(2.6, -35, 1.8, 6, 0.1, 0, Math.PI * 2);
       c.fill();
       c.fillStyle = 'rgba(255,255,255,.3)';
       c.beginPath();
-      c.ellipse(3.4, -36, 0.6, 4.2, 0.15, 0, Math.PI * 2);
+      c.ellipse(2, -36, 0.6, 4.2, 0.1, 0, Math.PI * 2);
       c.fill();
     }
   },
