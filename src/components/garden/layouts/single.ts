@@ -18,6 +18,6 @@ export function singleLayout(index: number, potKey: PotKey = 'terracotta'): Gard
     },
     paintBackdrop: () => {},
     canHome: (width, height) => ({ x: width * 0.86, y: height - 6 }),
-    canScale: 1,
+    canScale: 1.3,
   };
 }

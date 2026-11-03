@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useId, watch } from 'vue';
 
 import { useGarden } from '@/composables/useGarden';
+import { useGardenPip } from '@/composables/useGardenPip';
 
 import type { GardenScene, SpeciesKey } from './gardenScene';
 
@@ -9,7 +10,7 @@ import { useTheme } from 'vuetify';
 
 import { useNow, useResizeObserver } from '@vueuse/core';
 
-import { createGardenScene, MAX_STAGE, paintPlantPreview, SPECIES } from './gardenScene';
+import { createGardenScene, MAX_STAGE, NIGHT_MATRIX, paintPlantPreview, SPECIES } from './gardenScene';
 
 const SCENE_HEIGHT = 340;
 
@@ -73,6 +74,16 @@ const onClick = (event: MouseEvent) => {
   const index = slotFromEvent(event);
   if (index < 0 || !scene.value) return;
   const target = plants.value[index];
+  if (choosingPip.value) {
+    if (!target) {
+      say('Pick a pot with a plant in it.');
+      return;
+    }
+    choosingPip.value = false;
+    // Still inside the click, so the browser lets the floating window open
+    void pip.open(index, pipTheme);
+    return;
+  }
   if (!target) {
     openPicker(index);
     return;
@@ -114,6 +125,29 @@ const sceneTheme = computed(() => ({
   onPrimary: theme.current.value.dark ? theme.current.value.colors.background : '#FFFFFF',
 }));
 
+// ── Floating window: one plant taken out of the shelf into a picture-in-picture window ──
+const pip = useGardenPip();
+const choosingPip = ref(false);
+// A plain getter, not a computed: the window can outlive this panel, and a computed stops with it
+const pipTheme = () => {
+  const current = theme.current.value;
+  return {
+    dark: current.dark,
+    primary: current.colors.primary,
+    onPrimary: current.dark ? current.colors.background : '#FFFFFF',
+    background: current.colors.background,
+    onBackground: current.colors['on-background'],
+  };
+};
+const onPipButton = () => {
+  if (pip.pipSlot.value !== null) {
+    pip.close();
+    return;
+  }
+  choosingPip.value = !choosingPip.value;
+  if (choosingPip.value) say('Tap a plant to take it out into its own window.');
+};
+
 onMounted(() => {
   if (!canvas.value) return;
   scene.value = createGardenScene(canvas.value, {
@@ -144,7 +178,7 @@ const ariaLabel = computed(
     <!-- Night tint for plants and shelf, used by the scene through ctx.filter -->
     <svg width="0" height="0" class="position-absolute" aria-hidden="true">
       <filter :id="nightFilterId" color-interpolation-filters="sRGB">
-        <feColorMatrix type="matrix" values="0.80 0 0 0 0  0 0.78 0 0 0  0 0 0.91 0 0  0 0 0 1 0" />
+        <feColorMatrix type="matrix" :values="NIGHT_MATRIX" />
       </filter>
     </svg>
 
@@ -155,6 +189,23 @@ const ariaLabel = computed(
       :aria-label="ariaLabel"
       @click="onClick"
       @dblclick="onDoubleClick"
+    />
+
+    <!-- Take one plant out into a floating window (browsers with Document Picture-in-Picture only) -->
+    <VBtn
+      v-if="pip.supported"
+      class="garden-pip-btn"
+      :icon="
+        pip.pipSlot.value !== null
+          ? 'mdi-picture-in-picture-bottom-right'
+          : 'mdi-picture-in-picture-bottom-right-outline'
+      "
+      :color="choosingPip ? 'primary' : undefined"
+      :variant="choosingPip ? 'tonal' : 'text'"
+      size="small"
+      density="comfortable"
+      :title="pip.pipSlot.value !== null ? 'Close the floating plant' : 'Take a plant out into its own window'"
+      @click="onPipButton"
     />
 
     <!-- Latest message, over the wall -->
@@ -194,6 +245,12 @@ const ariaLabel = computed(
   display: block;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+.garden-pip-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
 }
 
 .garden-status {

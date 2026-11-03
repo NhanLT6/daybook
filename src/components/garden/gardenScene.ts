@@ -40,8 +40,12 @@ interface Layer {
   context: Ctx;
 }
 
+// Night tint colour matrix, shared by every garden (each document needs its own <filter> element with it)
+export const NIGHT_MATRIX = '0.80 0 0 0 0  0 0.78 0 0 0  0 0 0.91 0 0  0 0 0 1 0';
+
 export interface GardenSceneOptions {
-  height: number;
+  // Fixed, or read on every resize for a canvas that fills a resizable window
+  height: number | (() => number);
   nightFilterId: string;
   getPlants: () => (GardenPlant | null)[];
   getDrops: () => number;
@@ -71,7 +75,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   const view = options.view ?? window;
   const layout = options.layout ?? shelfLayout;
   let width = 0;
-  const height = options.height;
+  let height = 0;
   // Recomputed on resize: the layout's slots in paint order, and the same slots by plant index
   let slots: LayoutSlot[] = [];
   const slotByIndex = new Map<number, LayoutSlot>();
@@ -119,7 +123,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   function resize() {
     const ratio = pixelRatio();
     width = canvas.parentElement?.clientWidth ?? 0;
-    if (!width) return;
+    height = typeof options.height === 'function' ? options.height() : options.height;
+    if (!width || !height) return;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     canvas.width = width * ratio;
@@ -150,7 +155,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     const key = `${index}-${plant.species}-${stage}-${plant.seed}`;
     const cached = plantBitmaps.get(key);
     if (cached) return cached;
-    const ratio = pixelRatio();
+    // Painted at the size it is shown, so a plant scaled up in a large layout stays sharp
+    const ratio = pixelRatio() * Math.max(1, slotOf(index).scale);
     const bitmap = document.createElement('canvas');
     bitmap.width = 200 * ratio;
     bitmap.height = PLANT_BITMAP_HEIGHT * ratio;
@@ -328,7 +334,9 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     get width() {
       return width;
     },
-    height,
+    get height() {
+      return height;
+    },
     plantSpots,
     plantedIndices,
     flowerSlots,
