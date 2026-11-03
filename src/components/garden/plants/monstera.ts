@@ -22,7 +22,8 @@ function paintMonsteraLeaf(
   c.rotate(angle);
   const width = length * 0.46;
   // Half-width of the outline at t (0 base .. 1 tip): heart lobes at the base, a rounded point at the tip
-  const half = (t: number) => width * Math.sin(Math.PI * Math.pow(t, 0.8)) * (1 + 0.25 * (1 - t));
+  // Heart-shaped base (already wide where the stalk joins), widest before the middle, rounded point at the tip
+  const half = (t: number) => width * Math.pow(Math.sin(Math.PI * (0.14 + 0.86 * t)), 0.65);
   const midrib = (t: number) => length * t;
   const upperLit = LIGHT.x * Math.sin(angle) - LIGHT.y * Math.cos(angle) > 0;
 
@@ -92,22 +93,32 @@ export const monstera: Plant = {
   name: 'Monstera',
   done: 'has split leaves',
   paint(c, stage, random) {
+    // Leaves alternate left and right; back ones stand more upright, front ones arch far out
     const leaves = [];
     for (let index = 0; index < 6; index++) {
-      const spread = (index / 5 - 0.5) * 2 + (random() - 0.5) * 0.3;
-      leaves.push({ spread, reach: 26 + random() * 16, size: 30 + random() * 8, depth: random() });
+      const side = index % 2 ? 1 : -1;
+      leaves.push({
+        side,
+        out: 0.35 + random() * 0.6,
+        reach: 24 + random() * 12,
+        size: 30 + random() * 8,
+        droop: 0.25 + random() * 0.45,
+        depth: random(),
+      });
     }
     const grow = 0.5 + stage * 0.125;
+    const slits = stage >= 3 ? 4 : stage === 2 ? 2 : 0;
     const visible = leaves.slice(0, [0, 2, 3, 5, 6][stage]).sort((a, b) => b.depth - a.depth);
     for (const leaf of visible) {
       const reach = leaf.reach * grow;
-      const endX = Math.sin(leaf.spread) * reach,
-        endY = -Math.cos(leaf.spread) * reach * 0.85;
-      stem(c, 0, 0, endX * 0.25, endY * 0.9, endX, endY, 1.4, '#4F7F3A');
-      // Leaves angle out and down from the stalk; young plants have whole leaves, grown ones split
-      const out = endX >= 0 ? 0.35 + leaf.spread * 0.25 : Math.PI - 0.35 + leaf.spread * 0.25;
-      const slits = stage >= 3 ? 4 : stage === 2 ? 2 : 0;
-      paintMonsteraLeaf(c, endX, endY, out, leaf.size * grow, LEAF, slits, leaf.depth * 0.6);
+      // The stalk rises, then bows outward under the leaf's weight
+      const lift = { x: leaf.side * reach * leaf.out * 0.35, y: -reach * (1.05 - leaf.depth * 0.15) };
+      const end = { x: leaf.side * reach * (0.45 + leaf.out * 0.6), y: -reach * (0.75 - leaf.droop * 0.3) };
+      stem(c, 0, 0, lift.x, lift.y, end.x, end.y, 1.5, '#4F7F3A');
+      // The blade carries on from the stalk's direction and droops further, so it hangs out to the side
+      const along = Math.atan2(end.y - lift.y, end.x - lift.x);
+      const angle = along + leaf.side * leaf.droop * 0.8;
+      paintMonsteraLeaf(c, end.x, end.y, angle, leaf.size * grow, LEAF, slits, leaf.depth * 0.6);
     }
     if (stage === 4) {
       // A new leaf still rolled into a pale spike

@@ -192,31 +192,38 @@ export function arrowLeaf(
 
 export interface Strand {
   x: number;
+  hang: number;
   drift: number;
   length: number;
   depth: number;
 }
 
-// Strands start on the soil near the rim, arch over it and hang down the outside of the pot.
+// Strands start on the soil, arch over the rim and hang down beside the pot or over its front. Where each one
+// falls, its sway and its length are all random, so the vines read as a loose curtain, not two neat columns.
 // length is 0-1 of the room below the soil line, so a plant on the top shelf trails much further.
 export function makeStrands(random: () => number, count: number): Strand[] {
-  return Array.from({ length: count }, (_, index) => ({
-    x: ((index + 0.5) / count - 0.5) * 34 + (random() - 0.5) * 4,
-    drift: (random() - 0.5) * 12,
-    // A mix of long trails and short ones that only just clear the rim
-    length: index % 3 === 1 ? 0.25 + random() * 0.2 : 0.6 + random() * 0.4,
-    depth: random(),
-  }));
+  return Array.from({ length: count }, (_, index) => {
+    // Mostly alternating sides, but now and then two land on the same side
+    const side = (index % 2 ? 1 : -1) * (random() < 0.25 ? -1 : 1);
+    return {
+      x: side * (3 + random() * 14),
+      // Where it hangs: a few spill over the front of the pot, the rest down its sides at varied distances
+      hang: random() < 0.25 ? (random() - 0.5) * 22 : side * (15 + Math.pow(random(), 1.4) * 10),
+      drift: (random() - 0.5) * 14,
+      // About a third only just clear the rim, the rest trail a long way
+      length: random() < 0.35 ? 0.18 + random() * 0.25 : 0.5 + random() * 0.5,
+      depth: random(),
+    };
+  });
 }
 
 export function strandAt(strand: Strand, reach: number, t: number) {
-  const out = Math.sign(strand.x || 1);
-  const edge = Math.max(Math.abs(strand.x), 13);
-  // Over the rim, then hanging close to the pot's side, swaying a little as it falls
+  const { hang, drift } = strand;
+  // Up over the rim, then down where it hangs, swaying a little as it falls
   const p0 = { x: strand.x * 0.5, y: -2 },
-    p1 = { x: out * (edge + 4), y: -7 },
-    p2 = { x: out * (edge + 6) + strand.drift * 0.6, y: reach * 0.35 },
-    p3 = { x: out * (edge + 1) - strand.drift, y: reach };
+    p1 = { x: strand.x * 0.2 + hang * 0.9, y: -7 },
+    p2 = { x: hang * 1.1 + drift * 0.6, y: reach * 0.4 },
+    p3 = { x: hang - drift, y: reach };
   const u = 1 - t;
   return {
     x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,

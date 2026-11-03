@@ -2,9 +2,11 @@ import type { Ctx, Plant } from './kit';
 
 import { linear, radial } from '../creatures/paint';
 import { paintLeaf, TAU } from './kit';
+import { paintLimb, seeded } from './wood';
 
 const LEAF = { light: '#93C46F', mid: '#4C8A3E', dark: '#2A5A2C' };
-const BARK = ['#C9B49A', '#9C8468', '#6E5A45'];
+const SKIN = ['#D6C4A8', '#A8907A', '#73604D'];
+const BARK = { dark: '#7A6551', mid: '#A48C74', light: '#CDB89C', crack: '#5A4636', rough: 0.15 };
 
 // Desert-rose flower facing us: five rounded petals, rose at the rim fading to white at a pink-veined throat
 function paintFlower(c: Ctx, x: number, y: number, size: number, turn: number) {
@@ -47,36 +49,80 @@ function paintFlower(c: Ctx, x: number, y: number, size: number, turn: number) {
   c.restore();
 }
 
-// Fat bottle-shaped trunk (caudex), lit from the left, with a few bark creases
+// Fat bottle-shaped trunk (caudex) with root flares at the soil, lit from the upper left. The skin is smooth
+// but folded: soft horizontal creases that follow the swelling, a few pale lenticels and a glossy sheen.
 function paintCaudex(c: Ctx, width: number, height: number) {
+  const random = seeded(0.58);
   const trunk = new Path2D();
-  trunk.moveTo(-width, 0);
-  trunk.bezierCurveTo(-width * 1.25, -height * 0.45, -width * 0.55, -height * 0.8, -width * 0.32, -height);
-  trunk.lineTo(width * 0.32, -height);
-  trunk.bezierCurveTo(width * 0.55, -height * 0.8, width * 1.25, -height * 0.45, width, 0);
+  trunk.moveTo(-width * 1.25, 1);
+  // Left root flare, then up the swollen side to the neck
+  trunk.quadraticCurveTo(-width * 1.05, -height * 0.05, -width * 1.08, -height * 0.25);
+  trunk.bezierCurveTo(-width * 1.2, -height * 0.55, -width * 0.6, -height * 0.82, -width * 0.34, -height);
+  trunk.lineTo(width * 0.3, -height);
+  trunk.bezierCurveTo(width * 0.62, -height * 0.8, width * 1.15, -height * 0.5, width * 1.02, -height * 0.22);
+  trunk.quadraticCurveTo(width * 1.0, -height * 0.04, width * 1.3, 1);
+  // A third flare toward the front
+  trunk.quadraticCurveTo(width * 0.4, -height * 0.02, width * 0.15, 1.5);
+  trunk.quadraticCurveTo(-width * 0.3, -height * 0.02, -width * 1.25, 1);
   trunk.closePath();
-  c.fillStyle = linear(c, -width, 0, width, 0, [
-    [0, BARK[0]],
-    [0.5, BARK[1]],
-    [1, BARK[2]],
+  c.fillStyle = radial(c, -width * 0.35, -height * 0.55, width * 0.1, width * 1.5, [
+    [0, SKIN[0]],
+    [0.55, SKIN[1]],
+    [1, SKIN[2]],
   ]);
   c.fill(trunk);
+
   c.save();
   c.clip(trunk);
-  c.strokeStyle = 'rgba(80,60,40,.3)';
-  c.lineWidth = 0.4;
-  for (const [x, y, r] of [
-    [-width * 0.4, -height * 0.3, 2.4],
-    [width * 0.3, -height * 0.55, 2],
-    [-width * 0.1, -height * 0.75, 1.6],
-  ]) {
+  // Darker toward the soil and under the neck
+  c.fillStyle = linear(c, 0, -height, 0, 2, [
+    [0, 'rgba(70,52,38,.3)'],
+    [0.2, 'rgba(70,52,38,0)'],
+    [0.75, 'rgba(70,52,38,0)'],
+    [1, 'rgba(70,52,38,.4)'],
+  ]);
+  c.fill(trunk);
+  // Folds: each a dark crease with a lit lip just above it, bowed down like rings around a ball
+  c.lineCap = 'round';
+  for (let index = 0; index < 11; index++) {
+    const y = -height * (0.1 + random() * 0.8);
+    const span = width * (0.25 + random() * 0.45);
+    const x = (random() - 0.55) * width * 1.2;
+    const sag = span * 0.25;
+    c.strokeStyle = 'rgba(85,62,44,.45)';
+    c.lineWidth = 0.35;
     c.beginPath();
-    c.arc(x, y, r, Math.PI * 0.1, Math.PI * 0.9);
+    c.moveTo(x - span / 2, y);
+    c.quadraticCurveTo(x, y + sag, x + span / 2, y);
+    c.stroke();
+    c.strokeStyle = 'rgba(255,246,228,.35)';
+    c.lineWidth = 0.3;
+    c.beginPath();
+    c.moveTo(x - span / 2.4, y - 0.5);
+    c.quadraticCurveTo(x, y + sag - 0.5, x + span / 2.4, y - 0.5);
     c.stroke();
   }
-  c.fillStyle = 'rgba(255,245,225,.25)';
+  // Faint vertical streaks where the skin stretched as the trunk swelled
+  c.strokeStyle = 'rgba(95,72,54,.18)';
+  c.lineWidth = 0.3;
+  for (let index = 0; index < 6; index++) {
+    const x = (random() - 0.5) * width * 1.6;
+    c.beginPath();
+    c.moveTo(x, -height * (0.15 + random() * 0.2));
+    c.quadraticCurveTo(x * 1.1, -height * 0.5, x * 0.6, -height * (0.7 + random() * 0.25));
+    c.stroke();
+  }
+  // Lenticels
+  c.fillStyle = 'rgba(245,236,215,.6)';
+  for (let index = 0; index < 12; index++) {
+    c.beginPath();
+    c.ellipse((random() - 0.5) * width * 1.7, -height * random() * 0.9, 0.45, 0.2, 0, 0, TAU);
+    c.fill();
+  }
+  // Soft sheen on the lit shoulder
+  c.fillStyle = 'rgba(255,248,232,.28)';
   c.beginPath();
-  c.ellipse(-width * 0.55, -height * 0.4, width * 0.2, height * 0.3, 0.2, 0, TAU);
+  c.ellipse(-width * 0.5, -height * 0.45, width * 0.18, height * 0.28, 0.25, 0, TAU);
   c.fill();
   c.restore();
 }
@@ -105,31 +151,25 @@ export const suthai: Plant = {
     const caudexHeight = 16 * grow;
     paintCaudex(c, 11 * grow, caudexHeight);
 
-    for (const branch of branches.slice(0, [0, 1, 2, 3, 3][stage])) {
+    branches.slice(0, [0, 1, 2, 3, 3][stage]).forEach((branch, index) => {
       const baseY = -caudexHeight + 1;
       const tipX = Math.sin(branch.angle) * branch.length * grow,
         tipY = baseY - Math.cos(branch.angle) * branch.length * grow;
-      // Thick, smooth branch that tapers toward the tip
-      c.strokeStyle = linear(c, tipX - 3, 0, tipX + 3, 0, [
-        [0, BARK[0]],
-        [1, BARK[2]],
-      ]);
-      c.lineCap = 'round';
-      for (const [width, t] of [
-        [4.2 * grow, 0.55],
-        [3 * grow, 1],
-      ]) {
-        c.lineWidth = width;
-        c.beginPath();
-        c.moveTo(branch.angle * 3, baseY);
-        c.quadraticCurveTo(
-          tipX * 0.3,
-          baseY + (tipY - baseY) * 0.6,
-          tipX * t + branch.angle * 3 * (1 - t),
-          baseY + (tipY - baseY) * t,
-        );
-        c.stroke();
-      }
+      // Thick, smooth branch that tapers toward the tip, bending a little outward
+      paintLimb(
+        c,
+        [
+          { x: branch.angle * 3, y: baseY + 1 },
+          { x: branch.angle * 4, y: baseY + (tipY - baseY) * 0.35 },
+          { x: tipX * 0.7, y: baseY + (tipY - baseY) * 0.7 },
+          { x: tipX, y: tipY },
+        ],
+        5 * grow,
+        2.4 * grow,
+        BARK,
+        0.2 + index * 0.3,
+        0.06,
+      );
       // Leaves cluster only at the branch tip, pointing up and out
       for (const leaf of branch.leaves.slice().sort((a, b) => b.depth - a.depth)) {
         paintLeaf(
@@ -147,6 +187,6 @@ export const suthai: Plant = {
       if (stage === 4) {
         for (const flower of branch.flowers) paintFlower(c, tipX + flower.dx, tipY - 3 + flower.dy, 4.6, flower.turn);
       }
-    }
+    });
   },
 };

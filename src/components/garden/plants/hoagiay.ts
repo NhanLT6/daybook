@@ -1,57 +1,13 @@
 import type { Ctx, Plant } from './kit';
+import type { Point } from './wood';
 
 import { radial } from '../creatures/paint';
 import { paintLeaf, TAU } from './kit';
+import { paintLimb } from './wood';
 
 const LEAF = { light: '#8FC06A', mid: '#4D8A3B', dark: '#2B5A29' };
 
-type Point = { x: number; y: number };
-const bezier = (a: Point, b: Point, c: Point, d: Point, t: number): Point => {
-  const u = 1 - t;
-  return {
-    x: u * u * u * a.x + 3 * u * u * t * b.x + 3 * u * t * t * c.x + t * t * t * d.x,
-    y: u * u * u * a.y + 3 * u * u * t * b.y + 3 * u * t * t * c.y + t * t * t * d.y,
-  };
-};
-
-// Woody limb along a cubic curve, tapering from `from` to `to` thickness: a dark body, a lit left flank and
-// a few bark ridges, drawn as short overlapping segments so the width can change along it
-function paintLimb(c: Ctx, points: [Point, Point, Point, Point], from: number, to: number) {
-  const steps = 18;
-  c.lineCap = 'round';
-  const layers: [string, number, number][] = [
-    ['#5B4331', 1, 0],
-    ['#8A6A4F', 0.62, -0.18],
-    ['#B4977A', 0.22, -0.32],
-  ];
-  for (const [color, share, shift] of layers) {
-    c.strokeStyle = color;
-    for (let index = 0; index < steps; index++) {
-      const t0 = index / steps,
-        t1 = (index + 1) / steps;
-      const width = from + (to - from) * t0;
-      const p0 = bezier(...points, t0),
-        p1 = bezier(...points, t1);
-      c.lineWidth = width * share;
-      c.beginPath();
-      c.moveTo(p0.x + shift * width, p0.y);
-      c.lineTo(p1.x + shift * width, p1.y);
-      c.stroke();
-    }
-  }
-  // Bark ridges: short dark streaks along the limb
-  c.strokeStyle = 'rgba(60,40,28,.45)';
-  c.lineWidth = 0.3;
-  for (let t = 0.1; t < 0.9; t += 0.16) {
-    const p = bezier(...points, t),
-      q = bezier(...points, t + 0.06);
-    const width = from + (to - from) * t;
-    c.beginPath();
-    c.moveTo(p.x + width * 0.15, p.y);
-    c.lineTo(q.x + width * 0.12, q.y);
-    c.stroke();
-  }
-}
+const BARK = { dark: '#4A3828', mid: '#7A5F48', light: '#A88D72', crack: '#2E2118', rough: 0.9 };
 
 // Three papery magenta bracts around a tiny white flower: what reads as the bougainvillea "bloom"
 function paintBracts(c: Ctx, x: number, y: number, size: number, turn: number) {
@@ -124,24 +80,41 @@ export const hoagiay: Plant = {
     const grow = 0.5 + stage * 0.125;
     const at = (point: Point) => ({ x: point.x * grow, y: point.y * grow });
 
+    // Surface roots gripping the soil, as on an old bonsai
+    for (const side of [-1, 1]) {
+      paintLimb(
+        c,
+        [at({ x: side * 1, y: -3 }), at({ x: side * 4, y: -2 }), at({ x: side * 8, y: 0 }), at({ x: side * 12, y: 1 })],
+        3.4 * grow,
+        0.8 * grow,
+        BARK,
+        side > 0 ? 0.31 : 0.67,
+        0,
+      );
+    }
     // Trunk: an S-bend, thick at the soil; branches split off toward each pad
     const trunkTop = at({ x: lean * 2, y: -34 });
     paintLimb(
       c,
-      [{ x: 0, y: 0 }, at({ x: lean * 12, y: -10 }), at({ x: lean * -10, y: -22 }), trunkTop],
-      7 * grow,
-      3.6 * grow,
+      [{ x: 0, y: 1 }, at({ x: lean * 12, y: -10 }), at({ x: lean * -10, y: -22 }), trunkTop],
+      8 * grow,
+      3.8 * grow,
+      BARK,
+      0.42,
     );
     const shown = pads.slice(0, [0, 1, 2, 3, 3][stage]);
-    for (const pad of shown) {
+    shown.forEach((pad, index) => {
       const end = at(pad);
       paintLimb(
         c,
         [trunkTop, { x: (trunkTop.x + end.x) / 2, y: trunkTop.y - 3 }, { x: end.x * 0.9, y: end.y + 5 }, end],
-        3 * grow,
+        3.4 * grow,
         1.2 * grow,
+        BARK,
+        0.13 + index * 0.27,
+        0.08,
       );
-    }
+    });
 
     // Leaf pads: small oval leaves, back ones shaded, front ones lit
     for (const pad of shown) {

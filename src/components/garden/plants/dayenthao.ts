@@ -56,12 +56,12 @@ export const dayenthao: Plant = {
       reach: 6 + random() * 10,
       depth: random(),
     }));
-    const strands = makeStrands(random, 7);
+    const strands = makeStrands(random, 12);
     const leavesOn = strands.map(() =>
-      Array.from({ length: 14 }, (_, at) => ({ side: at % 2 ? 1 : -1, size: random() })),
+      Array.from({ length: 16 }, (_, at) => ({ side: at % 2 ? 1 : -1, size: random() })),
     );
     const bloomsOn = strands.map(() =>
-      Array.from({ length: 4 }, (_, at) => ({ t: 0.25 + at * 0.22 + random() * 0.1, turn: random() * TAU })),
+      Array.from({ length: 3 }, () => ({ t: 0.3 + random() * 0.7, turn: random() * TAU })),
     );
     const topBlooms = Array.from({ length: 4 }, () => ({
       x: (random() - 0.5) * 22,
@@ -76,8 +76,10 @@ export const dayenthao: Plant = {
       strands.forEach((strand, index) => {
         const reach = Math.min(room, 105) * strand.length * hang;
         paintStrand(c, strand, reach, '#5F8D3E');
-        leavesOn[index].forEach((leaf, at) => {
-          const t = (at + 1) / 15;
+        // Short strands carry fewer leaves, so leaves sit about as far apart on every strand
+        const leaves = leavesOn[index].slice(0, Math.round(5 + strand.length * 11));
+        leaves.forEach((leaf, at) => {
+          const t = (at + 1) / leaves.length;
           const p = strandAt(strand, reach, t),
             q = strandAt(strand, reach, t + 0.02);
           const along = Math.atan2(q.y - p.y, q.x - p.x);
@@ -94,9 +96,9 @@ export const dayenthao: Plant = {
           );
         });
         if (stage === 4) {
-          for (const bloom of bloomsOn[index]) {
+          for (const bloom of bloomsOn[index].slice(0, strand.length > 0.45 ? 3 : 1)) {
             const p = strandAt(strand, reach, bloom.t);
-            if (p.y < reach * 0.98 || bloom.t < 0.95) paintBloom(c, p.x, p.y, 5, bloom.turn);
+            paintBloom(c, p.x, p.y, 5, bloom.turn);
           }
         }
       });
