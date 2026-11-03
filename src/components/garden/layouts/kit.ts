@@ -24,4 +24,6 @@ export interface GardenLayout {
   // Where the watering can rests (its base), and how big it is
   canHome: (width: number, height: number) => { x: number; y: number };
   canScale: number;
+  // Most insects out at once; left out for no limit
+  maxVisitors?: number;
 }

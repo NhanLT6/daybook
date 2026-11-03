@@ -9,8 +9,13 @@ import { TAU } from './kit';
 
 export interface RosetteLook {
   tone: Tone;
-  // Colour along the leaf margin (red-edged echeveria), drawn heavier toward the tip
+  // Colour on the leaf margin (red-edged echeveria): strongest at the tip, fading out by about the middle of
+  // the leaf, and bleeding a little inward from the edge rather than drawn as a hard line
   edge?: string;
+  // Leaf width as a share of its length (default 0.4), and where along the leaf it is widest (default 0.72):
+  // lower both for long, slender leaves
+  leafWidth?: number;
+  widest?: number;
   // Flush on the leaf tips
   blush?: string;
   // Powdery bloom over the leaf, lighter toward the tip
@@ -30,12 +35,14 @@ interface RosetteLeaf {
   rise: number;
   baseY: number;
   cup: number;
+  widest: number;
 }
 
-// Half-width of the leaf from base (0) to tip (1): narrow at the base, widest past the middle, short point
-function halfWidth(u: number) {
-  if (u < 0.72) return 0.32 + 0.68 * Math.sin((u / 0.72) * (Math.PI / 2));
-  return Math.pow((1 - u) / 0.28, 0.75);
+// Half-width of the leaf from base (0) to tip (1): narrow at the base, widest at `widest`, then tapering to
+// the point (a long taper for slender leaves)
+function halfWidth(u: number, widest: number) {
+  if (u < widest) return 0.32 + 0.68 * Math.sin((u / widest) * (Math.PI / 2));
+  return Math.pow((1 - u) / (1 - widest), 0.75);
 }
 
 function leafPoint(leaf: RosetteLeaf, u: number, v: number): Point {
@@ -45,7 +52,7 @@ function leafPoint(leaf: RosetteLeaf, u: number, v: number): Point {
   // Along the leaf: outward and up by its rise; across: sideways, the edges curling up into a cup
   const out = reach * Math.cos(leaf.rise),
     upward = reach * Math.sin(leaf.rise) + v * v * leaf.cup * leaf.width;
-  const side = v * leaf.width * halfWidth(u);
+  const side = v * leaf.width * halfWidth(u, leaf.widest);
   return project(cosA * out - sinA * side, leaf.baseY + upward, sinA * out + cosA * side);
 }
 
@@ -122,22 +129,41 @@ function paintRosetteLeaf(c: Ctx, leaf: RosetteLeaf, look: RosetteLook) {
   c.lineWidth = 0.45;
   c.stroke(outline);
   if (look.edge) {
-    c.strokeStyle = linear(c, baseX, baseY, tipX, tipY, [
-      [0, 'rgba(0,0,0,0)'],
-      [0.35, look.edge],
-      [1, look.edge],
-    ]);
-    c.lineWidth = 0.42;
-    c.lineJoin = 'round';
-    c.beginPath();
-    [...left.slice(2), ...right.slice(2).reverse()].forEach(([x, y], index) =>
-      index ? c.lineTo(x, y) : c.moveTo(x, y),
+    // Only the outer part of the leaf: clear up to about the middle, full at the tip
+    const along = (alpha: number) =>
+      linear(c, baseX, baseY, tipX, tipY, [
+        [0, 'rgba(0,0,0,0)'],
+        [0.45, 'rgba(0,0,0,0)'],
+        [1, withAlpha(look.edge!, alpha)],
+      ]);
+    const margin = new Path2D();
+    [...left.slice(3), ...right.slice(3).reverse()].forEach(([x, y], index) =>
+      index ? margin.lineTo(x, y) : margin.moveTo(x, y),
     );
-    c.stroke();
+    // Clipped to the leaf, a wide soft stroke bleeds inward and a thin one marks the edge itself
+    c.save();
+    c.clip(outline);
+    c.lineJoin = 'round';
+    c.strokeStyle = along(0.28);
+    c.lineWidth = 2.2;
+    c.stroke(margin);
+    c.strokeStyle = along(0.45);
+    c.lineWidth = 1.1;
+    c.stroke(margin);
+    c.strokeStyle = along(0.9);
+    c.lineWidth = 0.45;
+    c.stroke(margin);
+    c.restore();
   }
 }
 
 // count leaves from the outside in; size is the outer leaf length in plant pixels
+// '#D8332A' → 'rgba(216,51,42,alpha)'
+function withAlpha(hex: string, alpha: number) {
+  const value = parseInt(hex.slice(1), 16);
+  return `rgba(${value >> 16},${(value >> 8) & 255},${value & 255},${alpha})`;
+}
+
 export function paintRosette(c: Ctx, random: () => number, count: number, size: number, look: RosetteLook) {
   const turn = random() * TAU;
   const leaves: RosetteLeaf[] = [];
@@ -147,10 +173,11 @@ export function paintRosette(c: Ctx, random: () => number, count: number, size: 
     leaves.push({
       around: turn + index * 2.39996,
       length,
-      width: length * 0.4,
+      width: length * (look.leafWidth ?? 0.4),
       rise: 0.22 + inward * 1.1,
       baseY: 1 + inward * 5,
       cup: 0.25 + inward * 0.35,
+      widest: look.widest ?? 0.72,
     });
   }
   // Painter's order: far leaves outer-first, near leaves inner-first, so near outer leaves end up on top

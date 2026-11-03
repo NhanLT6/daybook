@@ -67,6 +67,7 @@ export const seed: Creature = {
   name: 'seed',
   // Day and night alike: the wind does not care
   count: 3,
+  visitor: false,
   create: (slot) => makeActor({ timer: 4 + slot * between(3, 6) }),
   update(seed, world, dt, time) {
     if (seed.mode === 'away') {

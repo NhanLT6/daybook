@@ -33,5 +33,7 @@ export function rowLayout(count: 1 | 2 | 3): GardenLayout {
     paintBackdrop: () => {},
     canHome: (width, height) => ({ x: width * 0.88, y: height - 8 }),
     canScale: 1.3,
+    // A lone plant with a crowd of insects looks wrong: one visitor at a time, one more per extra pot
+    maxVisitors: count,
   };
 }

@@ -166,6 +166,8 @@ export interface Creature {
   night?: boolean;
   // How many of it can be on screen at once
   count: number;
+  // false for things that are not animals coming to visit (drifting seeds): a layout's maxVisitors skips them
+  visitor?: boolean;
   create: (slot: number) => Actor;
   update: (actor: Actor, world: GardenWorld, dt: number, time: number) => void;
   paint: (c: Ctx, actor: Actor, time: number) => void;

@@ -358,7 +358,19 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   function updateCreatures(time: number) {
     const dt = Math.min(0.05, time - lastCreatureTime || 0.016);
     lastCreatureTime = time;
-    eachActive((creature, actor) => creature.update(actor, world, dt, time));
+    // A layout can cap how many visitors are out at once (one plant alone gets one insect at a time): while
+    // the cap is reached, visitors still away stay away
+    const cap = layout.maxVisitors ?? Infinity;
+    let out = 0;
+    eachActive((creature, actor) => {
+      if (creature.visitor !== false && actor.mode !== 'away') out++;
+    });
+    eachActive((creature, actor) => {
+      if (creature.visitor !== false && actor.mode === 'away' && out >= cap) return;
+      const wasAway = actor.mode === 'away';
+      creature.update(actor, world, dt, time);
+      if (creature.visitor !== false && wasAway && actor.mode !== 'away') out++;
+    });
   }
 
   // With behindIndex, paints only the creatures tucked behind that plant; without, everything in front

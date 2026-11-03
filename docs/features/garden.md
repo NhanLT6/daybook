@@ -22,6 +22,14 @@ knows about a shelf; it asks its `layout` (default `shelfLayout`).
 - The user picks one in Settings → Garden (`settingsStore.gardenLayout`, default `one`). The choices live in
   `layouts/index.ts` (`GARDEN_LAYOUTS`: label, canvas height, factory); 2 or 3 plants is one more entry there.
   `GardenPanel` rebuilds the scene when the choice changes. Plants in slots the layout does not show are kept.
+- `maxVisitors` on a layout caps how many insects are out at once (the row: one per pot, so a lone plant gets one
+  visitor at a time). Creatures with `visitor: false` (drifting seeds) don't count.
+
+## Succulents
+`plants/rosette.ts` paints echeveria rosettes for every succulent: leaves on the golden angle, built in 3D and
+projected, each with a keel, dark rim and a small shadow. `RosetteLook` sets colours, tip blush, bloom, leaf
+width and where the leaf is widest; `edge` gives a red margin that is full at the tip, gone by the middle of
+the leaf and bleeds inward (red-edged echeveria).
 
 ## Seeds that drift
 Plants flagged `drifts` (dandelion) get `Spots.seeds` read from the near-white pixels of their seed heads. The
