@@ -5,8 +5,9 @@ import { LIGHT, stem } from './kit';
 const LEAF = { light: '#7DB86A', mid: '#3D7F45', dark: '#22502C' };
 const YOUNG = { light: '#B7DB86', mid: '#6FAA52', dark: '#3E7535' };
 
-// Monstera leaf along +x: a broad heart cut into lobes by deep slits from the edge toward the midrib.
-// Each lobe is its own shape, so the gaps show whatever is behind the leaf.
+// Monstera leaf along +x from the joint: a smooth heart (the base lobes curl back past the joint) with a
+// pointed tip. Slits are real holes (even-odd fill), so whatever is
+// behind shows through. `squash` shortens it along the midrib for a leaf pointing at or away from us.
 function paintMonsteraLeaf(
   c: Ctx,
   x: number,
@@ -16,124 +17,136 @@ function paintMonsteraLeaf(
   tone: Tone,
   slits: number,
   depth: number,
+  squash = 1,
 ) {
   c.save();
   c.translate(x, y);
   c.rotate(angle);
-  const width = length * 0.46;
-  // Half-width of the outline at t (0 base .. 1 tip): heart lobes at the base, a rounded point at the tip
-  // Heart-shaped base (already wide where the stalk joins), widest before the middle, rounded point at the tip
-  const half = (t: number) => width * Math.pow(Math.sin(Math.PI * (0.14 + 0.86 * t)), 0.65);
-  const midrib = (t: number) => length * t;
-  const upperLit = LIGHT.x * Math.sin(angle) - LIGHT.y * Math.cos(angle) > 0;
+  c.scale(squash, 1);
+  const L = length,
+    W = length * 0.44;
+  const outline = new Path2D();
+  outline.moveTo(0, 0);
+  outline.bezierCurveTo(-0.14 * L, -0.25 * W, -0.16 * L, -0.92 * W, 0.16 * L, -W);
+  outline.bezierCurveTo(0.5 * L, -1.06 * W, 0.86 * L, -0.55 * W, L, 0);
+  outline.bezierCurveTo(0.86 * L, 0.55 * W, 0.5 * L, 1.06 * W, 0.16 * L, W);
+  outline.bezierCurveTo(-0.16 * L, 0.92 * W, -0.14 * L, 0.25 * W, 0, 0);
+  outline.closePath();
 
+  // Leaf body minus the holes: a big rectangle with the slit wedges cut out, clipped to the outline
+  const body = new Path2D();
+  body.rect(-L, -2 * W, 3 * L, 4 * W);
   for (const side of [-1, 1]) {
-    // Lobe boundaries along the leaf; slits lean toward the tip like the real leaf
-    const cuts = [0];
-    for (let index = 1; index <= slits; index++) cuts.push(index / (slits + 1));
-    cuts.push(1);
-    for (let index = 0; index < cuts.length - 1; index++) {
-      const from = cuts[index],
-        to = cuts[index + 1];
-      const gap = slits ? 0.025 : 0;
-      const a = index === 0 ? from : from + gap,
-        b = index === cuts.length - 2 ? to : to - gap;
-      // Slits reach about 70% of the way in; the inner part of the leaf stays whole
-      const inner = 0.3;
+    for (let index = 0; index < slits; index++) {
+      const u = 0.22 + (index + 0.5) * (0.62 / slits);
+      // Each slit runs from the edge in toward the midrib, leaning toward the tip, widest at the edge
+      body.moveTo(L * (u + 0.13), side * W * 1.3);
+      body.quadraticCurveTo(L * (u + 0.06), side * W * 0.7, L * (u + 0.03), side * W * 0.4);
+      body.lineTo(L * (u + 0.0), side * W * 0.38);
+      body.quadraticCurveTo(L * (u + 0.02), side * W * 0.7, L * (u + 0.05), side * W * 1.3);
+      body.closePath();
+    }
+  }
+  c.clip(outline);
+  const upperLit = LIGHT.x * Math.sin(angle) - LIGHT.y * Math.cos(angle) > 0;
+  const across = c.createLinearGradient(0, -W, 0, W);
+  across.addColorStop(0, upperLit ? tone.light : tone.dark);
+  across.addColorStop(0.5, tone.mid);
+  across.addColorStop(1, upperLit ? tone.dark : tone.light);
+  c.fillStyle = across;
+  c.fill(body, 'evenodd');
+  // Darker where it meets the stalk, and in shade when it leans away from us
+  const base = c.createRadialGradient(0, 0, 0, 0, 0, L * 0.6);
+  base.addColorStop(0, 'rgba(12,40,22,.35)');
+  base.addColorStop(1, 'rgba(12,40,22,0)');
+  c.fillStyle = base;
+  c.fill(body, 'evenodd');
+  if (depth > 0) {
+    c.fillStyle = `rgba(28,46,62,${0.42 * depth})`;
+    c.fill(body, 'evenodd');
+  }
+  // Side veins fanning toward the edge between the slits, then the midrib
+  c.strokeStyle = 'rgba(230,248,190,.28)';
+  c.lineWidth = 0.35;
+  for (const side of [-1, 1]) {
+    for (let index = 0; index <= slits; index++) {
+      const u = 0.16 + index * (0.66 / Math.max(1, slits));
       c.beginPath();
-      c.moveTo(midrib(Math.max(0, a - 0.06)), 0);
-      c.lineTo(midrib(a) + width * 0.05, side * half(a) * inner);
-      for (let t = a; t <= b + 0.0001; t += (b - a) / 6) {
-        // The outer edge sits a little toward the tip of the inner point: the slit slants forward
-        const lean = length * 0.06;
-        c.lineTo(midrib(t) + lean, side * half(t));
-      }
-      c.lineTo(midrib(b) + width * 0.05, side * half(b) * inner);
-      c.lineTo(midrib(Math.min(1, b + 0.06)), 0);
-      c.closePath();
-      const lit = side < 0 === upperLit;
-      const across = c.createLinearGradient(0, 0, 0, side * width);
-      across.addColorStop(0, tone.mid);
-      across.addColorStop(1, lit ? tone.light : tone.dark);
-      c.fillStyle = across;
-      c.fill();
-      const base = c.createLinearGradient(0, 0, length, 0);
-      base.addColorStop(0, 'rgba(12,40,22,.35)');
-      base.addColorStop(0.5, 'rgba(12,40,22,0)');
-      c.fillStyle = base;
-      c.fill();
-      if (depth > 0) {
-        c.fillStyle = `rgba(28,46,62,${0.42 * depth})`;
-        c.fill();
-      }
-      c.strokeStyle = 'rgba(225,245,170,.22)';
-      c.lineWidth = 0.5;
-      c.stroke();
-      // Side vein down the middle of each lobe
-      const mid = (a + b) / 2;
-      c.strokeStyle = 'rgba(230,248,190,.3)';
-      c.lineWidth = 0.4;
-      c.beginPath();
-      c.moveTo(midrib(mid - 0.05), 0);
-      c.lineTo(midrib(mid) + length * 0.05, side * half(mid) * 0.9);
+      c.moveTo(L * u, 0);
+      c.quadraticCurveTo(L * (u + 0.05), side * W * 0.5, L * (u + 0.1), side * W * 0.9);
       c.stroke();
     }
   }
   c.strokeStyle = 'rgba(235,250,200,.55)';
-  c.lineWidth = 0.8;
+  c.lineWidth = 0.7;
   c.beginPath();
   c.moveTo(0, 0);
-  c.lineTo(length * 0.96, 0);
+  c.quadraticCurveTo(L * 0.5, -W * 0.04, L * 0.96, 0);
   c.stroke();
+  // Glossy sheen on the lit half
+  c.fillStyle = 'rgba(255,255,255,.12)';
+  c.beginPath();
+  c.ellipse(L * 0.45, (upperLit ? -1 : 1) * W * 0.45, L * 0.22, W * 0.18, 0, 0, Math.PI * 2);
+  c.fill();
   c.restore();
 }
 
-// Monstera: straight stalks rising close together from the soil, each a different length so the leaves
-// spread evenly; the blade folds sharply down where it meets the stalk, like an anthurium
+// Monstera: stalks rising close together from the soil, nearly straight with a gentle bow, each a different
+// length so the leaves spread evenly. Leaves face every way, not only left and right: ones leaning toward us
+// hang down and look short, ones leaning away tip back and sit in shade. The blade folds sharply at the joint.
 export const monstera: Plant = {
   name: 'Monstera',
   done: 'has split leaves',
   paint(c, stage, random) {
     const order = [3, 0, 6, 1, 5, 2, 4];
     const leaves = order.map((slot) => {
-      // Slot 0 leans far left .. 6 far right; middle stalks stand tallest
-      const lean = (slot / 6 - 0.5) * 1.3 + (random() - 0.5) * 0.15;
-      const side = lean === 0 ? 1 : Math.sign(lean);
+      // Around the pot: slot 0 far left .. 6 far right, and a random lean toward (+) or away (-) from us
+      const lean = (slot / 6 - 0.5) * 1.2 + (random() - 0.5) * 0.15;
+      const toward = (random() - 0.5) * 2;
       return {
         foot: (random() - 0.5) * 4,
         lean,
-        length: 46 - Math.abs(lean) * 22 + (random() - 0.5) * 12,
-        // How far the blade folds down past horizontal at the joint
-        fold: 0.2 + random() * 0.55,
-        side: Math.abs(lean) < 0.15 && random() < 0.5 ? -side : side,
+        toward,
+        length: 46 - Math.abs(lean) * 20 - Math.max(0, toward) * 8 + (random() - 0.5) * 10,
+        bow: (random() - 0.5) * 0.12,
+        fold: 0.2 + random() * 0.5,
         size: 22 + random() * 6,
-        depth: random(),
       };
     });
     const grow = 0.5 + stage * 0.125;
     const slits = stage >= 3 ? 3 : 0;
-    const visible = leaves.slice(0, [0, 3, 4, 6, 7][stage]).sort((a, b) => b.depth - a.depth);
+    // Back to front, so leaves leaning toward us cover the ones behind
+    const visible = leaves.slice(0, [0, 3, 4, 6, 7][stage]).sort((a, b) => a.toward - b.toward);
     for (const leaf of visible) {
       const length = leaf.length * grow;
+      const base = { x: leaf.foot * 0.5, y: leaf.toward * 0.8 };
       const end = { x: leaf.foot + Math.sin(leaf.lean) * length, y: -Math.cos(leaf.lean) * length };
-      // Stalk: straight and a little thicker at the base, where it wraps the others
+      // A gentle bow: the control point sits a little off the straight line
+      const bend = {
+        x: (base.x + end.x) / 2 - end.y * leaf.bow,
+        y: (base.y + end.y) / 2 + (end.x - base.x) * leaf.bow,
+      };
       c.lineCap = 'round';
       c.strokeStyle = '#4F7F3A';
       c.lineWidth = 1.6;
       c.beginPath();
-      c.moveTo(leaf.foot * 0.5, 0);
-      c.lineTo(end.x, end.y);
+      c.moveTo(base.x, base.y);
+      c.quadraticCurveTo(bend.x, bend.y, end.x, end.y);
       c.stroke();
       c.strokeStyle = 'rgba(200,235,150,.35)';
       c.lineWidth = 0.5;
       c.beginPath();
-      c.moveTo(leaf.foot * 0.5 - 0.4, 0);
-      c.lineTo(end.x - 0.4, end.y);
+      c.moveTo(base.x - 0.4, base.y);
+      c.quadraticCurveTo(bend.x - 0.4, bend.y, end.x - 0.4, end.y);
       c.stroke();
-      // Blade hangs out and down from the joint; ones facing us look shorter
-      const angle = leaf.side > 0 ? leaf.fold : Math.PI - leaf.fold;
-      const facing = 0.8 + Math.min(1, Math.abs(leaf.lean) * 2) * 0.2;
-      paintMonsteraLeaf(c, end.x, end.y, angle, leaf.size * grow * facing, LEAF, slits, leaf.depth * 0.6);
+      // Blade direction: out to its side and down, swinging toward straight down when it leans at us
+      // and up when it leans away; the more it points at or away from us, the shorter it looks
+      const side = leaf.lean >= 0 ? 1 : -1;
+      const out = side > 0 ? leaf.fold : Math.PI - leaf.fold;
+      const angle = out + side * leaf.toward * 0.9;
+      const squash = 1 - Math.abs(leaf.toward) * 0.4;
+      const shade = Math.max(0, -leaf.toward) * 0.55;
+      paintMonsteraLeaf(c, end.x, end.y, angle, leaf.size * grow, LEAF, slits, shade, squash);
     }
     if (stage === 4) {
       // A new leaf still rolled into a pale spike

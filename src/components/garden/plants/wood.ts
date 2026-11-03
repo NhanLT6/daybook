@@ -33,8 +33,18 @@ const STEPS = 28;
 
 // Woody limb along a cubic curve, tapering from `from` to `to` thickness. Built as a real outline (not
 // strokes), shaded across its width toward the light, then textured with fissures, knots and a few
-// lenticels. `seed` (0-1) fixes the bark pattern; `bulge` swells it a little here and there.
-export function paintLimb(c: Ctx, curve: Curve, from: number, to: number, bark: Bark, seed: number, bulge = 0.12) {
+// lenticels. `seed` (0-1) fixes the bark pattern; `bulge` swells it a little here and there; `gnarl` bends it
+// off its curve in small kinks and roughens its edges, for old twisted wood.
+export function paintLimb(
+  c: Ctx,
+  curve: Curve,
+  from: number,
+  to: number,
+  bark: Bark,
+  seed: number,
+  bulge = 0.12,
+  gnarl = 0,
+) {
   const random = seeded(seed);
   const phase = random() * TAU;
   const samples = Array.from({ length: STEPS + 1 }, (_, index) => {
@@ -46,7 +56,16 @@ export function paintLimb(c: Ctx, curve: Curve, from: number, to: number, bark: 
     const normal = { x: -(q.y - r.y) / length, y: (q.x - r.x) / length };
     // Taper with a slight swell near the base and soft lumps along the way, like a grown branch
     const width = (from + (to - from) * Math.pow(t, 0.8)) * (1 + bulge * Math.sin(t * 9 + phase) * (1 - t * 0.5));
-    return { t, p, normal, half: width / 2 };
+    // Kinks: the centre line wanders sideways, pinned at both ends; the outline gets small lumps
+    const wander =
+      gnarl *
+      from *
+      0.35 *
+      Math.sin(Math.PI * t) *
+      (Math.sin(t * 13 + phase) * 0.6 + Math.sin(t * 29 + phase * 2) * 0.4);
+    const lumpy = 1 + gnarl * 0.18 * Math.sin(t * 41 + phase * 3);
+    const centre = { x: p.x + normal.x * wander, y: p.y + normal.y * wander };
+    return { t, p: centre, normal, half: (width / 2) * lumpy };
   });
   // Which way the normals face the light, so the lit flank lands on the upper-left side
   const middle = samples[STEPS >> 1].normal;
