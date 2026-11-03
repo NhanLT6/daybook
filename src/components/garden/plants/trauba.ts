@@ -1,6 +1,6 @@
 import type { Plant } from './kit';
 
-import { paintLeaf, stem, TONES } from './kit';
+import { facing, paintLeaf, stem, TONES } from './kit';
 
 export const trauba: Plant = {
   name: 'Pothos',
@@ -22,16 +22,17 @@ export const trauba: Plant = {
       stem(c, 0, 0, endX * 0.5, Math.min(endY, 0) - (leaf.drape ? 14 : 8), endX, endY, 1.3);
       const size = leaf.size * (0.6 + stage * 0.12);
       const pointing = leaf.drape ? Math.PI / 2 + (endX > 0 ? -0.5 : 0.5) : leaf.angle + leaf.twist;
+      const look = facing(leaf.depth, pointing);
       paintLeaf(
         c,
         endX,
         endY,
-        pointing,
-        size * 1.6,
+        look.angle,
+        size * 1.6 * look.squash,
         size * 0.62,
         leaf.depth > 0.6 ? TONES.deep : TONES.fresh,
         'heart',
-        leaf.depth * 0.8,
+        look.shade + leaf.depth * 0.2,
       );
     }
     if (stage === 4) {

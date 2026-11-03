@@ -1,6 +1,6 @@
 import type { Plant } from './kit';
 
-import { glossyBall, paintLeaf, stem, TONES } from './kit';
+import { facing, glossyBall, paintLeaf, stem, TONES } from './kit';
 
 export const cachua: Plant = {
   name: 'Cherry tomato',
@@ -20,17 +20,17 @@ export const cachua: Plant = {
       leaves.push({ level: 0.2 + random() * 0.8, side: index % 2 ? 1 : -1, size: 8 + random() * 5, depth: random() });
     }
     for (const leaf of leaves.slice(0, [0, 3, 7, 12, 16][stage]).sort((a, b) => b.depth - a.depth)) {
-      const angle = leaf.side > 0 ? -0.5 - leaf.depth * 0.4 : Math.PI + 0.5 + leaf.depth * 0.4;
+      const look = facing(leaf.depth, leaf.side > 0 ? -0.5 : Math.PI + 0.5);
       paintLeaf(
         c,
         1,
         -height * leaf.level,
-        angle,
-        leaf.size * (0.6 + stage * 0.1),
+        look.angle,
+        leaf.size * (0.6 + stage * 0.1) * look.squash,
         leaf.size * 0.32,
         TONES.deep,
         'oval',
-        leaf.depth * 0.7,
+        look.shade + leaf.depth * 0.2,
       );
     }
     if (stage === 3)

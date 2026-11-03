@@ -1,7 +1,7 @@
 import type { Ctx, Plant } from './kit';
 
 import { linear } from '../creatures/paint';
-import { makeStrands, paintLeaf, paintStrand, strandAt } from './kit';
+import { facing, makeStrands, paintLeaf, paintStrand, strandAt } from './kit';
 
 const LEAF = { light: '#6FA35C', mid: '#2F6A37', dark: '#1B4224' };
 
@@ -83,7 +83,9 @@ export const moison: Plant = {
     }
 
     for (const leaf of crown.slice(0, [0, 4, 6, 8, 8][stage]).sort((a, b) => b.depth - a.depth)) {
-      paintLeaf(c, 0, -1, leaf.angle, (8 + leaf.size * 3) * grow, 2.5 * grow, LEAF, 'oval', leaf.depth * 0.5);
+      const look = facing(leaf.depth, leaf.angle);
+      const length = (8 + leaf.size * 3) * grow * look.squash;
+      paintLeaf(c, 0, -1, look.angle, length, 2.5 * grow, LEAF, 'oval', look.shade);
     }
   },
 };

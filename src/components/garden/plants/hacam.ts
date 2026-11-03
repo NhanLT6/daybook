@@ -1,6 +1,6 @@
 import type { Plant } from './kit';
 
-import { arrowLeaf, stem, TONES } from './kit';
+import { arrowLeaf, facing, stem, TONES } from './kit';
 
 export const hacam: Plant = {
   name: 'Bird of paradise',
@@ -24,17 +24,17 @@ export const hacam: Plant = {
         endY = -Math.cos(leaf.spread) * reach;
       stem(c, 0, 0, endX * 0.2, endY * 0.6, endX, endY, 1.6, leaf.depth > 0.5 ? '#C9802F' : '#E39A3B');
       // The blade continues from the petiole tip: upright in the middle, leaning outward at the sides.
-      const angle = -Math.PI / 2 + leaf.spread * (1 + leaf.droop);
+      const look = facing(leaf.depth, -Math.PI / 2 + leaf.spread * (1 + leaf.droop));
       const length = 40 * leaf.size * (0.5 + stage * 0.13);
       arrowLeaf(
         c,
         endX,
         endY,
-        angle,
-        length,
+        look.angle,
+        length * look.squash,
         length * 0.17,
         leaf.depth > 0.5 ? TONES.deep : TONES.fresh,
-        leaf.depth * 0.7,
+        look.shade + leaf.depth * 0.2,
       );
     }
   },

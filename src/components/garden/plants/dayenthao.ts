@@ -1,7 +1,7 @@
 import type { Ctx, Plant } from './kit';
 
 import { radial } from '../creatures/paint';
-import { makeStrands, paintLeaf, paintStrand, strandAt, TAU } from './kit';
+import { facing, makeStrands, paintLeaf, paintStrand, strandAt, TAU } from './kit';
 
 const LEAF = { light: '#A9D27E', mid: '#62A04A', dark: '#36672F' };
 
@@ -105,7 +105,8 @@ export const dayenthao: Plant = {
     }
 
     for (const leaf of mound.slice(0, [0, 6, 10, 13, 16][stage]).sort((a, b) => b.depth - a.depth)) {
-      paintLeaf(c, 0, -1, leaf.angle, leaf.reach * grow + 4, 3 * grow, LEAF, 'oval', leaf.depth * 0.5);
+      const look = facing(leaf.depth, leaf.angle);
+      paintLeaf(c, 0, -1, look.angle, (leaf.reach * grow + 4) * look.squash, 3 * grow, LEAF, 'oval', look.shade);
     }
     for (const bloom of topBlooms.slice(0, [0, 0, 1, 3, 8][stage]))
       paintBloom(c, bloom.x * grow, bloom.y * grow, 5.2, bloom.turn);

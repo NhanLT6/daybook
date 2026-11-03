@@ -1,6 +1,6 @@
 import type { Plant } from './kit';
 
-import { paintLeaf, TONES } from './kit';
+import { facing, paintLeaf, TONES } from './kit';
 
 export const duongxi: Plant = {
   name: 'Fern',
@@ -12,7 +12,8 @@ export const duongxi: Plant = {
     }
     const visible = fronds.slice(0, [0, 4, 8, 13, 20][stage]).sort((a, b) => b.depth - a.depth);
     for (const frond of visible) {
-      const length = frond.length * (0.5 + stage * 0.13);
+      // Fronds leaning toward or away from us look shorter
+      const length = frond.length * (0.5 + stage * 0.13) * facing(frond.depth, frond.angle).squash;
       const point = (t: number) => ({
         x: Math.cos(frond.angle) * length * t,
         y: Math.sin(frond.angle) * length * t + t * t * length * 0.18,

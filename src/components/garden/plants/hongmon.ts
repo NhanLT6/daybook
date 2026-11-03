@@ -1,7 +1,7 @@
 import type { Ctx, Plant } from './kit';
 
 import { linear } from '../creatures/paint';
-import { paintLeaf, stem, TAU } from './kit';
+import { facing, paintLeaf, stem, TAU } from './kit';
 
 const LEAF = { light: '#6FA463', mid: '#2F6B3A', dark: '#1C4527' };
 const SPATHE = { light: '#FF8A86', mid: '#D8222F', dark: '#7E0E19' };
@@ -82,8 +82,9 @@ export const hongmon: Plant = {
         endY = -Math.cos(leaf.spread) * reach * 0.9;
       stem(c, 0, 0, endX * 0.3, endY * 0.8, endX, endY, 1.1, '#3E6E35');
       // The blade hangs from the stalk tip, pointing out and a little down
-      const out = endX >= 0 ? 0.55 + leaf.spread * 0.2 : Math.PI - 0.55 + leaf.spread * 0.2;
-      paintLeaf(c, endX, endY, out, leaf.size * grow * 1.5, leaf.size * grow * 0.55, LEAF, 'heart', leaf.depth * 0.6);
+      const look = facing(leaf.depth, endX >= 0 ? 0.55 + leaf.spread * 0.2 : Math.PI - 0.55 + leaf.spread * 0.2);
+      const size = leaf.size * grow;
+      paintLeaf(c, endX, endY, look.angle, size * 1.5 * look.squash, size * 0.55, LEAF, 'heart', look.shade);
     }
 
     for (const bloom of blooms.slice(0, [0, 0, 0, 1, 3][stage])) {

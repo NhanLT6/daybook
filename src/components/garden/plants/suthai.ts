@@ -1,7 +1,7 @@
 import type { Ctx, Plant } from './kit';
 
 import { linear, radial } from '../creatures/paint';
-import { paintLeaf, TAU } from './kit';
+import { facing, paintLeaf, TAU } from './kit';
 import { paintLimb, seeded } from './wood';
 
 const LEAF = { light: '#93C46F', mid: '#4C8A3E', dark: '#2A5A2C' };
@@ -172,17 +172,8 @@ export const suthai: Plant = {
       );
       // Leaves cluster only at the branch tip, pointing up and out
       for (const leaf of branch.leaves.slice().sort((a, b) => b.depth - a.depth)) {
-        paintLeaf(
-          c,
-          tipX,
-          tipY,
-          -Math.PI / 2 + leaf.angle,
-          leaf.size * grow,
-          2.6 * grow,
-          LEAF,
-          'plump',
-          leaf.depth * 0.6,
-        );
+        const look = facing(leaf.depth, -Math.PI / 2 + leaf.angle);
+        paintLeaf(c, tipX, tipY, look.angle, leaf.size * grow * look.squash, 2.6 * grow, LEAF, 'plump', look.shade);
       }
       if (stage === 4) {
         for (const flower of branch.flowers) paintFlower(c, tipX + flower.dx, tipY - 3 + flower.dy, 4.6, flower.turn);

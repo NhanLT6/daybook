@@ -1,6 +1,6 @@
 import type { Plant } from './kit';
 
-import { glossyBall, paintLeaf, stem, TONES } from './kit';
+import { facing, glossyBall, paintLeaf, stem, TONES } from './kit';
 
 export const cuc: Plant = {
   name: 'Daisy',
@@ -11,7 +11,9 @@ export const cuc: Plant = {
     for (let index = 0; index < 16; index++)
       blades.push({ angle: -Math.PI / 2 + (random() - 0.5) * 1.6, size: 12 + random() * 8, depth: random() });
     for (const blade of blades.slice(0, [0, 5, 9, 13, 16][stage]).sort((a, b) => b.depth - a.depth)) {
-      paintLeaf(c, 0, 0, blade.angle, blade.size * (0.6 + stage * 0.12), 2.6, TONES.sage, 'oval', blade.depth * 0.7);
+      const look = facing(blade.depth, blade.angle);
+      const length = blade.size * (0.6 + stage * 0.12) * look.squash;
+      paintLeaf(c, 0, 0, look.angle, length, 2.6, TONES.sage, 'oval', look.shade + blade.depth * 0.2);
     }
     if (stage < 3) return;
     const heads = [

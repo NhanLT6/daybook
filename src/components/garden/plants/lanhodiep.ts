@@ -1,7 +1,7 @@
 import type { Ctx, Plant } from './kit';
 
 import { linear, radial } from '../creatures/paint';
-import { paintLeaf, TAU } from './kit';
+import { facing, paintLeaf, TAU } from './kit';
 
 // Thick, glossy orchid leaf: darker than most, a little purple underneath
 const ORCHID_LEAF = { light: '#7FB06A', mid: '#3F7A45', dark: '#24502E' };
@@ -176,7 +176,9 @@ export const lanhodiep: Plant = {
     // Leaves last, so they sit in front of the spike base and the roots
     const visible = leaves.slice(0, [0, 2, 3, 5, 6][stage]).sort((a, b) => b.depth - a.depth);
     for (const leaf of visible) {
-      paintLeaf(c, 0, -2, leaf.angle, leaf.length * grow, 6.5 * grow, ORCHID_LEAF, 'plump', leaf.depth * 0.6);
+      const look = facing(leaf.depth, leaf.angle);
+      const length = leaf.length * grow * look.squash;
+      paintLeaf(c, 0, -2, look.angle, length, 6.5 * grow, ORCHID_LEAF, 'plump', look.shade + leaf.depth * 0.15);
     }
   },
 };

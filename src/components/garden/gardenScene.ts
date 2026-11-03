@@ -445,7 +445,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
         c.globalAlpha = lift.alpha;
         c.translate(x + lift.x, shelfY - pot.height * scale + 0.5 - lift.y);
         c.rotate(lift.tilt);
-        c.rotate(Math.sin(time * 1.1 + index) * 0.018);
+        c.rotate(Math.sin(time * 1.1 + index) * 0.03);
         c.scale(scale * grow, scale * grow);
         c.drawImage(plantBitmap(index), -100, -130, 200, PLANT_BITMAP_HEIGHT);
         c.restore();
@@ -666,7 +666,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   // A perch moves with its plant's sway, so a landed insect rides the leaf.
   function spotWorld(index: number, spot: Spot, time: number) {
     const { x, soilY, scale } = slotPosition(index);
-    const sway = Math.sin(time * 1.1 + index) * 0.018;
+    const sway = Math.sin(time * 1.1 + index) * 0.03;
     const along = spot.dx * scale,
       down = spot.dy * scale;
     return {

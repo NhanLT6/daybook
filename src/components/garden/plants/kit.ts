@@ -190,6 +190,18 @@ export function arrowLeaf(
 
 // ── Trailing vines ──────────────────────────────────────────────────────────────
 
+// Leaves sit around the stem in depth too, not only left and right. `depth` is 0 front .. 1 back: front
+// leaves swing down toward us and back ones tip away; both look shorter (foreshortened) and back ones sit
+// in shade. Returns the adjusted angle, a length factor and the shade to pass to paintLeaf.
+export function facing(depth: number, angle: number) {
+  const toward = 1 - 2 * depth;
+  return {
+    angle: angle + Math.sign(Math.cos(angle) || 1) * toward * 0.45,
+    squash: 1 - Math.abs(toward) * 0.35,
+    shade: Math.max(0, -toward) * 0.6,
+  };
+}
+
 export interface Strand {
   x: number;
   hang: number;
