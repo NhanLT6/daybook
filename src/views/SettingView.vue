@@ -7,6 +7,12 @@ import { useCategories } from '@/composables/useCategories';
 import { useJira } from '@/composables/useJira';
 import { useServerSettings } from '@/composables/useServerSettings';
 
+import { GARDEN_LAYOUTS } from '@/components/garden/layouts';
+
+import { maskSecret, resolveAiMode } from '@/interfaces/ServerSettings';
+
+import type { AiMode } from '@/interfaces/ServerSettings';
+
 import { useField, useForm } from 'vee-validate';
 import * as yup from 'yup';
 
@@ -14,7 +20,6 @@ import dayjs from 'dayjs';
 
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
-import { maskSecret, resolveAiMode, type AiMode } from '@/interfaces/ServerSettings';
 
 const settingsStore = useSettingsStore();
 const notificationCenter = useNotificationCenterStore();
@@ -548,9 +553,25 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
             <span>Garden</span>
             <VSwitch v-model="settingsStore.showGarden" color="primary" hide-details density="compact" />
           </VCardTitle>
-          <VCardText class="text-body-2 text-medium-emphasis">
-            A small shelf of plants at the bottom of Insights, watered by your new logs. Turning it off only hides it:
-            your plants and drops stay as they are and come back when you turn it on.
+          <VCardText class="d-flex flex-column ga-3">
+            <div class="text-body-2 text-medium-emphasis">
+              Plants at the bottom of Insights, watered by your new logs. Turning it off only hides it: your plants and
+              drops stay as they are and come back when you turn it on.
+            </div>
+            <!-- Layout: switching keeps every plant in its slot; a layout with fewer pots just shows fewer -->
+            <VBtnToggle
+              v-model="settingsStore.gardenLayout"
+              mandatory
+              divided
+              color="primary"
+              variant="outlined"
+              density="comfortable"
+              :disabled="!settingsStore.showGarden"
+            >
+              <VBtn v-for="(option, key) in GARDEN_LAYOUTS" :key="key" :value="key" class="text-none">
+                {{ option.label }}
+              </VBtn>
+            </VBtnToggle>
           </VCardText>
         </VCard>
       </div>

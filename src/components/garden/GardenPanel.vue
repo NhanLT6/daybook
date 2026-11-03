@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useId, watch } from 'vue';
 
 import { useGarden } from '@/composables/useGarden';
-import { useGardenPip } from '@/composables/useGardenPip';
 
 import type { GardenScene, SpeciesKey } from './gardenScene';
 
@@ -10,9 +9,14 @@ import { useTheme } from 'vuetify';
 
 import { useNow, useResizeObserver } from '@vueuse/core';
 
-import { createGardenScene, MAX_STAGE, NIGHT_MATRIX, paintPlantPreview, SPECIES } from './gardenScene';
+import { useSettingsStore } from '@/stores/settings';
 
-const SCENE_HEIGHT = 340;
+import { createGardenScene, MAX_STAGE, NIGHT_MATRIX, paintPlantPreview, SPECIES } from './gardenScene';
+import { GARDEN_LAYOUTS } from './layouts';
+
+// The chosen layout (Settings → Garden): where the pots stand and how tall the canvas is
+const settingsStore = useSettingsStore();
+const layoutOption = computed(() => GARDEN_LAYOUTS[settingsStore.gardenLayout] ?? GARDEN_LAYOUTS.one);
 
 const { plants, drops, claimDailyDrop, plant, clear, water } = useGarden();
 
@@ -74,16 +78,6 @@ const onClick = (event: MouseEvent) => {
   const index = slotFromEvent(event);
   if (index < 0 || !scene.value) return;
   const target = plants.value[index];
-  if (choosingPip.value) {
-    if (!target) {
-      say('Pick a pot with a plant in it.');
-      return;
-    }
-    choosingPip.value = false;
-    // Still inside the click, so the browser lets the floating window open
-    void pip.open(index, pipTheme);
-    return;
-  }
   if (!target) {
     openPicker(index);
     return;
@@ -125,39 +119,23 @@ const sceneTheme = computed(() => ({
   onPrimary: theme.current.value.dark ? theme.current.value.colors.background : '#FFFFFF',
 }));
 
-// ── Floating window: one plant taken out of the shelf into a picture-in-picture window ──
-const pip = useGardenPip();
-const choosingPip = ref(false);
-// A plain getter, not a computed: the window can outlive this panel, and a computed stops with it
-const pipTheme = () => {
-  const current = theme.current.value;
-  return {
-    dark: current.dark,
-    primary: current.colors.primary,
-    onPrimary: current.dark ? current.colors.background : '#FFFFFF',
-    background: current.colors.background,
-    onBackground: current.colors['on-background'],
-  };
-};
-const onPipButton = () => {
-  if (pip.pipSlot.value !== null) {
-    pip.close();
-    return;
-  }
-  choosingPip.value = !choosingPip.value;
-  if (choosingPip.value) say('Tap a plant to take it out into its own window.');
-};
-
-onMounted(() => {
+// A new layout means a new scene: positions, canvas height and creatures all start over
+const mountScene = () => {
   if (!canvas.value) return;
+  scene.value?.destroy();
+  pickerOpen.value = false;
   scene.value = createGardenScene(canvas.value, {
-    height: SCENE_HEIGHT,
+    height: layoutOption.value.height,
     nightFilterId,
     getPlants: () => plants.value,
     getDrops: () => drops.value,
+    layout: layoutOption.value.create(),
   });
   scene.value.setTheme(sceneTheme.value);
-});
+};
+
+onMounted(mountScene);
+watch(layoutOption, mountScene);
 
 watch(sceneTheme, (value) => scene.value?.setTheme(value));
 useResizeObserver(wrap, () => scene.value?.resize());
@@ -168,8 +146,7 @@ onBeforeUnmount(() => {
 });
 
 const ariaLabel = computed(
-  () =>
-    `Garden shelf. ${drops.value} ${drops.value === 1 ? 'drop' : 'drops'} of water ready. Tap a pot to plant or water.`,
+  () => `Garden. ${drops.value} ${drops.value === 1 ? 'drop' : 'drops'} of water ready. Tap a pot to plant or water.`,
 );
 </script>
 
@@ -189,23 +166,6 @@ const ariaLabel = computed(
       :aria-label="ariaLabel"
       @click="onClick"
       @dblclick="onDoubleClick"
-    />
-
-    <!-- Take one plant out into a floating window (browsers with Document Picture-in-Picture only) -->
-    <VBtn
-      v-if="pip.supported"
-      class="garden-pip-btn"
-      :icon="
-        pip.pipSlot.value !== null
-          ? 'mdi-picture-in-picture-bottom-right'
-          : 'mdi-picture-in-picture-bottom-right-outline'
-      "
-      :color="choosingPip ? 'primary' : undefined"
-      :variant="choosingPip ? 'tonal' : 'text'"
-      size="small"
-      density="comfortable"
-      :title="pip.pipSlot.value !== null ? 'Close the floating plant' : 'Take a plant out into its own window'"
-      @click="onPipButton"
     />
 
     <!-- Latest message, over the wall -->
@@ -245,12 +205,6 @@ const ariaLabel = computed(
   display: block;
   cursor: pointer;
   touch-action: manipulation;
-}
-
-.garden-pip-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
 }
 
 .garden-status {

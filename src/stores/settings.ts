@@ -1,13 +1,14 @@
 import { computed, ref } from 'vue';
 
-import { storageKeys } from '@/common/storageKeys';
 import { DEFAULT_AI_CONFIG } from '@/interfaces/ServerSettings';
 
+import type { GardenLayoutKey } from '@/components/garden/layouts';
 import type { JiraConfig } from '@/interfaces/JiraConfig';
 import type { AiConfig } from '@/interfaces/ServerSettings';
 
 import { StorageSerializers, useStorage } from '@vueuse/core';
 
+import { storageKeys } from '@/common/storageKeys';
 import { defineStore } from 'pinia';
 
 export interface DateFormatOption {
@@ -102,6 +103,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const rememberLastSelectedDate = useStorage(storageKeys.settings.rememberLastSelectedDate, false);
   // Hiding the garden only stops rendering it; plants and drops stay in their own storage
   const showGarden = useStorage(storageKeys.settings.showGarden, true);
+  // Which arrangement the garden shows; plants keep their slots whichever is picked
+  const gardenLayout = useStorage<GardenLayoutKey>(storageKeys.settings.gardenLayout, 'one');
   const lastSelectedDate = useStorage<RememberedDate | null>(storageKeys.settings.lastSelectedDate, null, undefined, {
     serializer: StorageSerializers.object,
   });
@@ -170,6 +173,7 @@ export const useSettingsStore = defineStore('settings', () => {
     useCategories,
     rememberLastSelectedDate,
     showGarden,
+    gardenLayout,
     lastSelectedDate,
     backgroundUrl,
     backgroundImageMode,

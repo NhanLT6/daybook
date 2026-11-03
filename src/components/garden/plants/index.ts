@@ -13,6 +13,7 @@ import { moison } from './moison';
 import { monstera } from './monstera';
 import { napam } from './napam';
 import { senda } from './senda';
+import { senvienlua } from './senvienlua';
 import { suthai } from './suthai';
 import { tocien } from './tocien';
 import { trauba } from './trauba';
@@ -24,6 +25,7 @@ export const PLANTS = {
   duongxi,
   cuc,
   senda,
+  senvienlua,
   xuongrong,
   hacam,
   lanhodiep,

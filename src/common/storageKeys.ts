@@ -16,6 +16,7 @@ export const storageKeys = {
     useCategories: 'useCategories',
     rememberLastSelectedDate: 'rememberLastSelectedDate',
     showGarden: 'showGarden',
+    gardenLayout: 'gardenLayout',
     lastSelectedDate: 'lastSelectedDate',
     backgroundUrl: 'backgroundUrl',
     backgroundImageMode: 'backgroundImageMode',

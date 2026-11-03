@@ -17,22 +17,11 @@ knows about a shelf; it asks its `layout` (default `shelfLayout`).
 ## Layouts
 - A slot carries the **plant index** in the garden state, so the same plant shows in every layout that places
   that index (watering in one shows in all).
-- `shelf.ts`: two planks + floor, 9 slots. `single.ts`: one pot, centred, no scenery.
-- `view` option: the window that owns the canvas. Pass the picture-in-picture window, or its frames stop when
-  the Daybook tab goes to the background.
-
-## Floating plant (picture-in-picture)
-- Button in the garden's top-right corner (only where `documentPictureInPicture` exists: Chromium 116+,
-  Firefox 151+, no Safari). Click it, then tap a plant: `useGardenPip().open(index, theme)` opens a 220×280
-  window with a scene using `singleLayout(index)` and `view: pip`. The tap is the user gesture the API needs.
-- The window is built by hand (no app CSS there): its own `<style>`, its own night `<filter>`
-  (`NIGHT_MATRIX` from the scene) and a small status line. Canvas height follows the window (`height` option
-  takes a function).
-- Tap in the window waters, same rules as the shelf; replanting stays on the shelf. Digging the plant out on
-  the shelf closes the window.
-- State is module-level in `useGardenPip` (the browser allows one such window), so the window outlives the
-  panel: collapsing Insights or changing page keeps it. Theme is passed as a getter, not a computed, for the
-  same reason. The button closes it again.
+- `shelf.ts`: two planks + floor, 9 slots. `row.ts`: `rowLayout(count)`, 1–3 pots in a row on the surface, no
+  scenery; it uses the first `count` slots, so adding pots later keeps the plant already in pot 1.
+- The user picks one in Settings → Garden (`settingsStore.gardenLayout`, default `one`). The choices live in
+  `layouts/index.ts` (`GARDEN_LAYOUTS`: label, canvas height, factory); 2 or 3 plants is one more entry there.
+  `GardenPanel` rebuilds the scene when the choice changes. Plants in slots the layout does not show are kept.
 
 ## Seeds that drift
 Plants flagged `drifts` (dandelion) get `Spots.seeds` read from the near-white pixels of their seed heads. The
@@ -40,7 +29,10 @@ Plants flagged `drifts` (dandelion) get `Spots.seeds` read from the near-white p
 couple of gaps but never empties, so it does not look bare.
 
 ## Open
-- A single pot on its own (picture-in-picture, a corner widget) can look plain next to the full shelf. Decide
-  later: a bit of scenery in `single.ts` (sill, saucer, light), or more ambient life around one plant.
+- A single pot on its own can look plain next to the full shelf. Decide later: a bit of scenery in `row.ts`
+  (sill, saucer, light), or more ambient life around one plant.
+- Floating plant: Document Picture-in-Picture was tried and dropped (the browser keeps a title bar and an opaque
+  window). A transparent, frameless desktop plant needs a native shell (Tauri) plus garden state synced through
+  the API; planned later, not started.
 - Sound (idle / focus background): hook cues where the scene already has events — pour start, water landing,
   grown sparkle, dig — plus ambient per creature. Keep audio out of the paint code.

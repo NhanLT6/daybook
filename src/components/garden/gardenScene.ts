@@ -44,15 +44,12 @@ interface Layer {
 export const NIGHT_MATRIX = '0.80 0 0 0 0  0 0.78 0 0 0  0 0 0.91 0 0  0 0 0 1 0';
 
 export interface GardenSceneOptions {
-  // Fixed, or read on every resize for a canvas that fills a resizable window
-  height: number | (() => number);
+  height: number;
   nightFilterId: string;
   getPlants: () => (GardenPlant | null)[];
   getDrops: () => number;
   // Where the pots stand; the two-tier shelf when left out
   layout?: GardenLayout;
-  // Window that owns the canvas, for its frame clock and pixel ratio (a picture-in-picture window, say)
-  view?: Window;
 }
 
 export interface GardenScene {
@@ -72,10 +69,9 @@ const PLANT_BITMAP_HEIGHT = 300;
 
 export function createGardenScene(canvas: HTMLCanvasElement, options: GardenSceneOptions): GardenScene {
   const ctx = canvas.getContext('2d')!;
-  const view = options.view ?? window;
   const layout = options.layout ?? shelfLayout;
   let width = 0;
-  let height = 0;
+  const height = options.height;
   // Recomputed on resize: the layout's slots in paint order, and the same slots by plant index
   let slots: LayoutSlot[] = [];
   const slotByIndex = new Map<number, LayoutSlot>();
@@ -107,7 +103,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   let actors: Actor[][] = freshActors();
   let lastCreatureTime = 0;
 
-  const pixelRatio = () => view.devicePixelRatio || 1;
+  const pixelRatio = () => window.devicePixelRatio || 1;
   const shownStage = (index: number) => shownOverride.get(index) ?? state.plants[index]?.stage ?? 0;
 
   function layer(): Layer {
@@ -123,8 +119,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   function resize() {
     const ratio = pixelRatio();
     width = canvas.parentElement?.clientWidth ?? 0;
-    height = typeof options.height === 'function' ? options.height() : options.height;
-    if (!width || !height) return;
+    if (!width) return;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     canvas.width = width * ratio;
@@ -169,7 +164,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   }
 
   function frame(now: number) {
-    frameId = view.requestAnimationFrame(frame);
+    frameId = requestAnimationFrame(frame);
     if (!width || !backdrop) return;
     const time = now / 1000;
     // No wall: the scenery stands straight on whatever is behind the canvas
@@ -607,7 +602,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   }
 
   resize();
-  frameId = view.requestAnimationFrame(frame);
+  frameId = requestAnimationFrame(frame);
 
   return {
     resize,
@@ -634,7 +629,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     isPouring: () => pours.length > 0 || digs.size > 0,
     dig,
     destroy() {
-      view.cancelAnimationFrame(frameId);
+      cancelAnimationFrame(frameId);
       timers.forEach(clearTimeout);
     },
   };

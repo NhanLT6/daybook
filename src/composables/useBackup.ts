@@ -42,6 +42,7 @@ function backedUpSettings() {
     useCategories: refs.useCategories,
     rememberLastSelectedDate: refs.rememberLastSelectedDate,
     showGarden: refs.showGarden,
+    gardenLayout: refs.gardenLayout,
     backgroundUrl: refs.backgroundUrl,
     backgroundImageMode: refs.backgroundImageMode,
     backgroundBlur: refs.backgroundBlur,
