@@ -36,6 +36,8 @@ export interface Spots {
   tops: Spot[];
   flowers: Spot[];
   inside: Spot[];
+  // Seed fluff on plants whose seed heads let go in the wind
+  seeds: Spot[];
 }
 export interface Perch {
   index: number;
@@ -144,6 +146,8 @@ export interface GardenWorld {
   // Slots holding a plant big enough to land on
   plantedIndices: () => number[];
   flowerSlots: () => number[];
+  // Slots holding a plant with seed heads ready to drift away
+  seedSlots: () => number[];
   // A spot in scene pixels, riding the plant's sway, plus that row's scale
   spotWorld: (index: number, spot: Spot, time: number) => { x: number; y: number; scale: number };
   // A random spot on the pot rim, and the pot's width in plant pixels
@@ -158,8 +162,8 @@ export interface GardenWorld {
 export interface Creature {
   // Lets other creatures ask how many of this one are on screen
   name: string;
-  // true: shown in dark mode only; false: in light mode only
-  night: boolean;
+  // true: shown in dark mode only; false: in light mode only; left out: in both
+  night?: boolean;
   // How many of it can be on screen at once
   count: number;
   create: (slot: number) => Actor;

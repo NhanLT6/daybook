@@ -18,6 +18,8 @@ export interface Plant {
   done: string;
   // Has flowers that bees and butterflies visit
   flowering?: boolean;
+  // Has white seed heads that let a seed go now and then to drift on the wind
+  drifts?: boolean;
   // stage 1-4; room: plant pixels free below the soil line, for vines that hang over the shelf
   paint: (c: Ctx, stage: number, random: () => number, room: number) => void;
 }
