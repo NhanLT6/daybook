@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 
+import { storageKeys } from '@/common/storageKeys';
 import { DEFAULT_AI_CONFIG } from '@/interfaces/ServerSettings';
 
 import type { JiraConfig } from '@/interfaces/JiraConfig';
@@ -80,35 +81,35 @@ const DEFAULT_JIRA_CONFIG: JiraConfig = {
 export const useSettingsStore = defineStore('settings', () => {
   // ── Local preferences (stay in localStorage) ─────────────────────────
   // Date display format (for UI display only, not import/export)
-  const dateDisplayFormat = useStorage('dateDisplayFormat', 'MM/DD/YYYY');
+  const dateDisplayFormat = useStorage(storageKeys.settings.dateDisplayFormat, 'MM/DD/YYYY');
 
   // First day of week for calendar (0 = Sunday, 1 = Monday, etc.)
   // v-calendar uses 1-7 where 1=Sunday, so we need to convert
-  const firstDayOfWeek = useStorage('firstDayOfWeek', 1); // Default Monday
+  const firstDayOfWeek = useStorage(storageKeys.settings.firstDayOfWeek, 1); // Default Monday
 
   // Weekend days configuration (dayjs day values: 0=Sunday, 1=Monday, etc.)
-  const weekendDays = useStorage('weekendDays', [5, 6, 0]); // Default Fri, Sat, Sun
+  const weekendDays = useStorage(storageKeys.settings.weekendDays, [5, 6, 0]); // Default Fri, Sat, Sun
 
   // Daily target: the hours a workday should add up to (Remaining chip, chart, day colours, AI "rest of
   // the day"). Kept as an on/off flag plus the hours so turning it off ("no limit") keeps the last value.
-  const dailyTargetEnabled = useStorage('dailyTargetEnabled', true);
-  const dailyTargetHours = useStorage('dailyTargetHours', 8);
+  const dailyTargetEnabled = useStorage(storageKeys.settings.dailyTargetEnabled, true);
+  const dailyTargetHours = useStorage(storageKeys.settings.dailyTargetHours, 8);
 
-  const useDefaultTasks = useStorage('useDefaultTasks', true);
+  const useDefaultTasks = useStorage(storageKeys.settings.useDefaultTasks, true);
 
-  const useCategories = useStorage('useCategories', false);
+  const useCategories = useStorage(storageKeys.settings.useCategories, false);
 
-  const rememberLastSelectedDate = useStorage('rememberLastSelectedDate', false);
+  const rememberLastSelectedDate = useStorage(storageKeys.settings.rememberLastSelectedDate, false);
   // Hiding the garden only stops rendering it; plants and drops stay in their own storage
-  const showGarden = useStorage('showGarden', true);
-  const lastSelectedDate = useStorage<RememberedDate | null>('lastSelectedDate', null, undefined, {
+  const showGarden = useStorage(storageKeys.settings.showGarden, true);
+  const lastSelectedDate = useStorage<RememberedDate | null>(storageKeys.settings.lastSelectedDate, null, undefined, {
     serializer: StorageSerializers.object,
   });
 
-  const backgroundUrl = useStorage('backgroundUrl', '');
-  const backgroundImageMode = useStorage<BackgroundMode>('backgroundImageMode', 'cover');
+  const backgroundUrl = useStorage(storageKeys.settings.backgroundUrl, '');
+  const backgroundImageMode = useStorage<BackgroundMode>(storageKeys.settings.backgroundImageMode, 'cover');
   // 0–1 normalized; maps to 0–24 px in the glass backdrop-filter
-  const backgroundBlur = useStorage('backgroundBlur', 0.8);
+  const backgroundBlur = useStorage(storageKeys.settings.backgroundBlur, 0.8);
 
   const isBackgroundVideo = computed(() => {
     const url = backgroundUrl.value.toLowerCase();

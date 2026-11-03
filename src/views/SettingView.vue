@@ -514,8 +514,8 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
           <VCardTitle>Backup &amp; Restore</VCardTitle>
           <VCardText class="d-flex flex-column ga-2">
             <VAlert type="info" variant="tonal" density="compact" class="text-caption">
-              Export a full JSON snapshot of your data, or import one to replace everything currently stored in this
-              browser. This is a local safety net — no data leaves your device.
+              Export a full JSON snapshot of your data and preferences, or import one to replace everything currently
+              stored in this browser. This is a local safety net — no data leaves your device.
             </VAlert>
 
             <VBtn
@@ -536,7 +536,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
               prepend-inner-icon="mdi-upload-outline"
               :loading="isImportingBackup"
               persistent-hint
-              hint="Replaces all data currently stored in this browser."
+              hint="Replaces all data and preferences currently stored in this browser."
               @update:model-value="handleImportBackup"
             />
           </VCardText>

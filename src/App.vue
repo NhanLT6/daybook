@@ -18,6 +18,7 @@ import { useDisplay, useTheme } from 'vuetify';
 import { useStorage } from '@vueuse/core';
 
 import { fetchHolidays } from '@/apis/holidayApi';
+import { storageKeys } from '@/common/storageKeys';
 import { useNotificationCenterStore } from '@/stores/notificationCenter';
 import { useSettingsStore } from '@/stores/settings';
 import { RouterView, useRoute } from 'vue-router';
@@ -131,7 +132,7 @@ const { smAndDown } = useDisplay();
 
 // Theme toggle
 const theme = useTheme();
-const savedTheme = useStorage<'light' | 'dark'>('app-theme', 'light');
+const savedTheme = useStorage<'light' | 'dark'>(storageKeys.settings.theme, 'light');
 theme.change(savedTheme.value);
 
 const isDarkMode = computed(() => theme.global.name.value === 'dark');
@@ -142,6 +143,9 @@ const toggleTheme = () => {
   theme.change(newTheme);
   savedTheme.value = newTheme;
 };
+
+// An imported backup can change the saved theme from outside this component
+watch(savedTheme, (newTheme) => theme.change(newTheme));
 
 watch(
   () => theme.global.name.value,

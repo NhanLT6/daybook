@@ -4,7 +4,9 @@ import type { NoteImageRecord } from '@/db/noteImageStore';
 
 import { db, initDb } from '@/db';
 import { deleteNoteImages, getNoteImage, putNoteImages } from '@/db/noteImageStore';
+import { useSettingsStore } from '@/stores/settings';
 import { saveAs } from 'file-saver';
+import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
@@ -22,6 +24,7 @@ vi.mock('@/db/noteImageStore', () => {
 describe('useBackup', () => {
   beforeEach(async () => {
     localStorage.clear();
+    setActivePinia(createPinia());
     await initDb();
     await db.events.clear();
   });
@@ -55,6 +58,7 @@ const readBlob = (blob: Blob) =>
 describe('useBackup note images', () => {
   beforeEach(async () => {
     localStorage.clear();
+    setActivePinia(createPinia());
     await initDb();
   });
 
@@ -87,5 +91,90 @@ describe('useBackup note images', () => {
     };
     await useBackup().importBackup(new File([JSON.stringify(snap)], 'backup.json'));
     expect(await getNoteImage('bad id"')).toBeUndefined();
+  });
+});
+
+describe('useBackup settings', () => {
+  const emptySnapshot = {
+    schemaVersion: 2,
+    collections: { timeLogs: [], projects: [], tasks: [], pinnedProjects: [], categories: [], events: [] },
+  };
+  const importWith = (extra: object) =>
+    useBackup().importBackup(new File([JSON.stringify({ ...emptySnapshot, ...extra })], 'backup.json'));
+
+  beforeEach(async () => {
+    localStorage.clear();
+    setActivePinia(createPinia());
+    await initDb();
+  });
+
+  it('exports preferences but not the transient last selected date', async () => {
+    const store = useSettingsStore();
+    store.dailyTargetHours = 6;
+    store.weekendDays = [6, 0];
+    localStorage.setItem('app-theme', 'dark');
+
+    await useBackup().exportBackup();
+    const exported = vi.mocked(saveAs).mock.calls.at(-1)![0] as Blob;
+    const json = JSON.parse(new TextDecoder().decode(await readBlob(exported)));
+
+    expect(json.settings).toMatchObject({ dailyTargetHours: 6, weekendDays: [6, 0], showGarden: true, theme: 'dark' });
+    expect(json.settings).not.toHaveProperty('lastSelectedDate');
+    expect(json.settings).not.toHaveProperty('jiraConfig');
+  });
+
+  it('applies valid settings through the store and the theme ref', async () => {
+    const store = useSettingsStore();
+
+    await importWith({
+      settings: {
+        dailyTargetHours: 5,
+        showGarden: false,
+        weekendDays: [6],
+        backgroundImageMode: 'tile',
+        backgroundBlur: 0.2,
+        theme: 'dark',
+      },
+    });
+
+    expect(store.dailyTargetHours).toBe(5);
+    expect(store.showGarden).toBe(false);
+    expect(store.weekendDays).toEqual([6]);
+    expect(store.backgroundImageMode).toBe('tile');
+    expect(store.backgroundBlur).toBe(0.2);
+    expect(localStorage.getItem('app-theme')).toBe('dark');
+  });
+
+  it('ignores wrong-typed values and unknown keys', async () => {
+    const store = useSettingsStore();
+
+    await importWith({
+      settings: {
+        dailyTargetHours: '5',
+        showGarden: 'no',
+        weekendDays: [9],
+        backgroundImageMode: 'diagonal',
+        dateDisplayFormat: 3,
+        theme: 'blue',
+        somethingElse: 1,
+      },
+    });
+
+    expect(store.dailyTargetHours).toBe(8);
+    expect(store.showGarden).toBe(true);
+    expect(store.weekendDays).toEqual([5, 6, 0]);
+    expect(store.backgroundImageMode).toBe('cover');
+    expect(store.dateDisplayFormat).toBe('MM/DD/YYYY');
+    expect(localStorage.getItem('app-theme')).toBe('light');
+    expect(localStorage.getItem('somethingElse')).toBeNull();
+  });
+
+  it('imports an old backup without settings and keeps current preferences', async () => {
+    const store = useSettingsStore();
+    store.dailyTargetHours = 7;
+
+    await importWith({});
+
+    expect(store.dailyTargetHours).toBe(7);
   });
 });
