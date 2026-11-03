@@ -226,6 +226,20 @@ const removeDate = (dateToRemove: Date) => {
   selectedDates.value = selectedDates.value.filter((d) => fmt(d) !== fmt(dateToRemove));
 };
 
+// The calendar page holding a date. v-calendar works this out itself when given a Date, but its week
+// number is wrong when the month starts before the first day of the week (it uses the absolute
+// weekday difference): with Monday-first weeks, Nov 3 2026 lands in the week of Sunday Nov 1, so
+// "Today" opened the week before. So pass the page (year, month, week) instead of the date.
+const pageFor = (date: Date | string) => {
+  const day = dayjs(date);
+  const page = { year: day.year(), month: day.month() + 1 };
+  if (calendarView.value !== 'weekly') return page;
+
+  // Days of the month's first week that belong to the previous month (vCalendarFirstDay is 1 = Sunday)
+  const leadingDays = (day.startOf('month').day() + 1 - settingsStore.vCalendarFirstDay + 7) % 7;
+  return { ...page, week: Math.ceil((day.date() + leadingDays) / 7) };
+};
+
 // Handle calendar page navigation — emit month changes and track today's visibility
 const onPageChange = (pages: Page[]) => {
   const newMonth = pages[0].month;
@@ -260,7 +274,7 @@ watch(
     const { from, to } = visibleRange.value;
     if (focus >= from && focus <= to) return;
     try {
-      await calendar.value.move(dayjs(focus).toDate());
+      await calendar.value.move(pageFor(focus));
     } catch (error) {
       console.warn('Failed to navigate to the event:', error);
     }
@@ -275,7 +289,7 @@ watch(selectedDates, async (dates, previous) => {
   const added = dates.map((d) => dayjs(d).format(DATE_FORMAT)).find((d) => !known.has(d) && (d < from || d > to));
   if (!added || !calendar.value) return;
   try {
-    await calendar.value.move(dayjs(added).toDate());
+    await calendar.value.move(pageFor(added));
   } catch (error) {
     console.warn('Failed to navigate to the selected date:', error);
   }
@@ -285,7 +299,7 @@ watch(selectedDates, async (dates, previous) => {
 const goToToday = async () => {
   if (calendar.value) {
     try {
-      await calendar.value.move(new Date());
+      await calendar.value.move(pageFor(new Date()));
     } catch (error) {
       console.warn('Failed to navigate to today:', error);
     }
@@ -315,6 +329,7 @@ const goToToday = async () => {
       ref="calendar"
       :class="weekendClasses"
       :view="calendarView"
+      :initial-page="pageFor(new Date())"
       expanded
       title-position="left"
       color="primary"
