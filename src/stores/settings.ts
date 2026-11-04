@@ -102,9 +102,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const rememberLastSelectedDate = useStorage(storageKeys.settings.rememberLastSelectedDate, false);
   // Hiding the garden only stops rendering it; plants and drops stay in their own storage
-  const showGarden = useStorage(storageKeys.settings.showGarden, true);
+  const showGarden = useStorage(storageKeys.settings.showGarden, false);
   // Which arrangement the garden shows; plants keep their slots whichever is picked
-  const gardenLayout = useStorage<GardenLayoutKey>(storageKeys.settings.gardenLayout, 'one');
+  const gardenLayout = useStorage<GardenLayoutKey>(storageKeys.settings.gardenLayout, 'shelf');
+  // The previous courtyard study has been replaced by the balcony shelf.
+  if (!(gardenLayout.value === 'shelf' || gardenLayout.value === 'one')) gardenLayout.value = 'shelf';
   const lastSelectedDate = useStorage<RememberedDate | null>(storageKeys.settings.lastSelectedDate, null, undefined, {
     serializer: StorageSerializers.object,
   });

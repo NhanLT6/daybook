@@ -2,19 +2,19 @@
 // More pots in a row is one more entry: { label: '2 plants', height: …, create: () => rowLayout(2) }.
 import type { GardenLayout } from './kit';
 
+import { balconyLayout } from './balcony';
 import { rowLayout } from './row';
-import { shelfLayout } from './shelf';
 
 export interface GardenLayoutOption {
   label: string;
-  // Canvas height in the Insights column
+  // Fallback height when the canvas is not filling its page
   height: number;
   create: () => GardenLayout;
 }
 
 export const GARDEN_LAYOUTS = {
+  shelf: { label: 'Balcony shelf', height: 640, create: () => balconyLayout },
   one: { label: 'One plant', height: 240, create: () => rowLayout(1) },
-  shelf: { label: 'Shelf', height: 340, create: () => shelfLayout },
 } satisfies Record<string, GardenLayoutOption>;
 
 export type GardenLayoutKey = keyof typeof GARDEN_LAYOUTS;

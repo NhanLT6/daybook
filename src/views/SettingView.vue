@@ -551,13 +551,27 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
         <VCard class="glass-acrylic">
           <VCardTitle class="d-flex align-center justify-space-between" style="min-height: 64px">
             <span>Garden</span>
-            <VSwitch v-model="settingsStore.showGarden" color="primary" hide-details density="compact" />
+            <VSwitch
+              v-model="settingsStore.showGarden"
+              aria-label="Enable Garden"
+              color="primary"
+              hide-details
+              density="compact"
+            />
           </VCardTitle>
           <VCardText class="d-flex flex-column ga-3">
             <div class="text-body-2 text-medium-emphasis">
-              Plants at the bottom of Insights, watered by your new logs. Turning it off only hides it: your plants and
-              drops stay as they are and come back when you turn it on.
+              Your plant shelf on a balcony, watered by your new logs. Off by default. Turning it off only hides it:
+              your plants and drops stay as they are and come back when you turn it on.
             </div>
+            <VBtn
+              v-if="settingsStore.showGarden"
+              to="/garden"
+              variant="tonal"
+              prepend-icon="mdi-flower-tulip-outline"
+              class="align-self-start text-none"
+              >Open garden</VBtn
+            >
             <!-- Layout: switching keeps every plant in its slot; a layout with fewer pots just shows fewer -->
             <VBtnToggle
               v-model="settingsStore.gardenLayout"

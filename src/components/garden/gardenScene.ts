@@ -45,6 +45,7 @@ export const NIGHT_MATRIX = '0.80 0 0 0 0  0 0.78 0 0 0  0 0 0.91 0 0  0 0 0 1 0
 
 export interface GardenSceneOptions {
   height: number;
+  getHeight?: () => number;
   nightFilterId: string;
   getPlants: () => (GardenPlant | null)[];
   getDrops: () => number;
@@ -71,7 +72,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   const ctx = canvas.getContext('2d')!;
   const layout = options.layout ?? shelfLayout;
   let width = 0;
-  const height = options.height;
+  let height = options.height;
   // Recomputed on resize: the layout's slots in paint order, and the same slots by plant index
   let slots: LayoutSlot[] = [];
   const slotByIndex = new Map<number, LayoutSlot>();
@@ -118,6 +119,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
 
   function resize() {
     const ratio = pixelRatio();
+    height = options.getHeight?.() ?? options.height;
+    tintMask = null;
     width = canvas.parentElement?.clientWidth ?? 0;
     if (!width) return;
     canvas.style.width = `${width}px`;
@@ -387,7 +390,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     });
   }
 
-  const CAN_SCALE = layout.canScale;
+  const canScale = () => layout.canScale * (layout.toolScale?.(width, height) ?? 1);
   const floorCanPosition = () => layout.canHome(width, height);
 
   function paintCan(c: Ctx, now: number) {
@@ -396,7 +399,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     if (!pouring) {
       c.save();
       c.translate(home.x, home.y);
-      c.scale(CAN_SCALE, CAN_SCALE);
+      c.scale(canScale(), canScale());
       paintWateringCan(c, 0, 0);
       c.restore();
       return;
@@ -422,7 +425,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     c.save();
     c.translate(x, y);
     c.rotate(-tilt);
-    c.scale(CAN_SCALE, CAN_SCALE);
+    c.scale(canScale(), canScale());
     paintWateringCan(c, 0, 0, false);
     c.restore();
     if (progress >= 1) pours.shift();
@@ -475,7 +478,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   function paintDropBadge() {
     if (pours.length) return;
     const home = floorCanPosition();
-    const x = home.x + 7 * CAN_SCALE,
+    const x = home.x + 7 * canScale(),
       y = home.y - 2;
     const label = String(options.getDrops());
     ctx.save();
@@ -511,8 +514,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     shownOverride.set(index, fromStage);
     const { x, soilY, scale } = slotOf(index);
     // Tilted 0.7 rad, the spout tip sits 29px left and 5px above the can's base (times its scale).
-    const spoutY = soilY - 40 * scale - 5 * CAN_SCALE;
-    pours.push({ toX: x + 29 * CAN_SCALE, toY: spoutY + 5 * CAN_SCALE, start: performance.now() });
+    const spoutY = soilY - 40 * scale - 5 * canScale();
+    pours.push({ toX: x + 29 * canScale(), toY: spoutY + 5 * canScale(), start: performance.now() });
     for (let count = 0; count < 12; count++) {
       drops.push({
         x: x + (Math.random() - 0.5) * 5,

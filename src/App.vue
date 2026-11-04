@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import { useAuthDialog } from '@/composables/useAuthDialog';
 import { useEvents } from '@/composables/useEvents';
+import { useGardenFocus } from '@/composables/useGardenFocus';
 import { useGreetingNotifications } from '@/composables/useGreetingNotifications';
 import { useInsightsDrawer } from '@/composables/useInsightsDrawer';
 import { useJira } from '@/composables/useJira';
@@ -124,6 +125,8 @@ onUnmounted(() => {
 });
 
 const route = useRoute();
+const { gardenFocus } = useGardenFocus();
+const hideChrome = computed(() => route.name === 'garden' && settingsStore.showGarden && gardenFocus.value);
 
 // Small screens toggle Insights from the hamburger menu; on desktop the Home card header owns the toggle
 const { toggle: toggleInsights } = useInsightsDrawer();
@@ -155,21 +158,27 @@ watch(
 );
 
 // Desktop rail: the pages, each with an outline icon that fills in while it is the current page
-const railItems = [
+const railItems = computed(() => [
   { text: 'Home', to: '/', icon: 'mdi-home-outline', activeIcon: 'mdi-home' },
   { text: 'Notes', to: '/notes', icon: 'mdi-sticker-text-outline', activeIcon: 'mdi-sticker-text' },
   { text: 'Tasks', to: '/task', icon: 'mdi-format-list-checks', activeIcon: 'mdi-format-list-checks' },
   { text: 'Events', to: '/events', icon: 'mdi-calendar-month-outline', activeIcon: 'mdi-calendar-month' },
-];
+  ...(settingsStore.showGarden
+    ? [{ text: 'Garden', to: '/garden', icon: 'mdi-flower-tulip-outline', activeIcon: 'mdi-flower-tulip' }]
+    : []),
+]);
 
 // Mobile hamburger menu: same pages plus Settings, which the rail keeps at its foot
-const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'Settings', to: '/setting' }];
+const navItems = computed(() => [
+  ...railItems.value.map(({ text, to }) => ({ text, to })),
+  { text: 'Settings', to: '/setting' },
+]);
 </script>
 
 <template>
   <VApp :style="glassStyle">
     <!-- Desktop: floating glass nav rail on the left; there is no top bar at all -->
-    <VNavigationDrawer v-if="!smAndDown" permanent rail :rail-width="80" floating class="app-rail-shell">
+    <VNavigationDrawer v-if="!smAndDown && !hideChrome" permanent rail :rail-width="80" floating class="app-rail-shell">
       <nav class="app-rail glass-acrylic" aria-label="Main">
         <!-- App icon (same drawing as public/favicon.svg), inlined so it follows the app theme, not the OS -->
         <RouterLink to="/" class="rail-brand" aria-label="Daybook" title="Daybook">
@@ -241,7 +250,7 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
 
     <!-- Small screens: compact glass top bar with the brand and a hamburger menu.
          53px: sized for the dock row; see the geometry note at .dock-row below before changing it -->
-    <VAppBar v-else height="53" class="elevation-0" color="transparent">
+    <VAppBar v-if="smAndDown && !hideChrome" height="53" class="elevation-0" color="transparent">
       <div class="dock-row">
         <nav class="app-dock glass-acrylic">
           <RouterLink v-if="route.path !== '/'" to="/" class="dock-brand dock-brand--link">Daybook</RouterLink>
@@ -318,12 +327,12 @@ const navItems = [...railItems.map(({ text, to }) => ({ text, to })), { text: 'S
     <VMain style="overflow-y: auto">
       <RouterView />
       <!-- Touch screens keep the chat bar resting at the bottom: leave room so it covers no content -->
-      <div class="chat-bar-spacer" />
+      <div v-if="!hideChrome && route.name !== 'garden'" class="chat-bar-spacer" />
       <AppBackground />
     </VMain>
 
     <!-- Glass chat bar, docked bottom centre on every page -->
-    <ChatBar />
+    <ChatBar v-if="!hideChrome" />
   </VApp>
 </template>
 

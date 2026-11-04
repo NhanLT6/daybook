@@ -24,6 +24,8 @@ export interface GardenLayout {
   // Where the watering can rests (its base), and how big it is
   canHome: (width: number, height: number) => { x: number; y: number };
   canScale: number;
+  // Optional scene transform for tools when a layout embeds a scaled arrangement.
+  toolScale?: (width: number, height: number) => number;
   // Most insects out at once; left out for no limit
   maxVisitors?: number;
 }

@@ -14,9 +14,11 @@ import { useSettingsStore } from '@/stores/settings';
 import { createGardenScene, MAX_STAGE, NIGHT_MATRIX, paintPlantPreview, SPECIES } from './gardenScene';
 import { GARDEN_LAYOUTS } from './layouts';
 
+const props = defineProps<{ fill?: boolean }>();
+
 // The chosen layout (Settings → Garden): where the pots stand and how tall the canvas is
 const settingsStore = useSettingsStore();
-const layoutOption = computed(() => GARDEN_LAYOUTS[settingsStore.gardenLayout] ?? GARDEN_LAYOUTS.one);
+const layoutOption = computed(() => GARDEN_LAYOUTS[settingsStore.gardenLayout] ?? GARDEN_LAYOUTS.shelf);
 
 const { plants, drops, claimDailyDrop, plant, clear, water } = useGarden();
 
@@ -126,6 +128,7 @@ const mountScene = () => {
   pickerOpen.value = false;
   scene.value = createGardenScene(canvas.value, {
     height: layoutOption.value.height,
+    getHeight: props.fill ? () => wrap.value?.clientHeight || layoutOption.value.height : undefined,
     nightFilterId,
     getPlants: () => plants.value,
     getDrops: () => drops.value,
@@ -151,7 +154,7 @@ const ariaLabel = computed(
 </script>
 
 <template>
-  <div ref="wrap" class="garden">
+  <div ref="wrap" class="garden" :class="{ 'garden--fill': fill }">
     <!-- Night tint for plants and shelf, used by the scene through ctx.filter -->
     <svg width="0" height="0" class="position-absolute" aria-hidden="true">
       <filter :id="nightFilterId" color-interpolation-filters="sRGB">
@@ -199,6 +202,11 @@ const ariaLabel = computed(
   position: relative;
   border-radius: 12px;
   overflow: hidden;
+}
+
+.garden--fill {
+  height: 100%;
+  min-height: 0;
 }
 
 .garden-canvas {

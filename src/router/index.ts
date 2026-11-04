@@ -24,6 +24,11 @@ const router = createRouter({
       component: () => import('../views/EventView.vue'),
     },
     {
+      path: '/garden',
+      name: 'garden',
+      component: () => import('../views/GardenView.vue'),
+    },
+    {
       path: '/setting',
       name: 'setting',
       component: () => import('../views/SettingView.vue'),

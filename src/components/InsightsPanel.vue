@@ -2,12 +2,12 @@
 import { computed, ref } from 'vue';
 
 import { useProjectColors } from '@/composables/useProjectColors';
+import { computeTaskBreakdown } from '@/composables/useTaskBreakdown';
+import { useTimeLogs } from '@/composables/useTimeLogs';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 
-import GardenPanel from '@/components/garden/GardenPanel.vue';
-
+import type { TaskBreakdownItem } from '@/composables/useTaskBreakdown';
 import type { TimeLog } from '@/interfaces/TimeLog';
-
-import { useDisplay } from 'vuetify';
 
 import { useNow } from '@vueuse/core';
 
@@ -15,9 +15,6 @@ import dayjs from 'dayjs';
 
 import { isoDateFormat, yearAndMonthFormat } from '@/common/DateFormat';
 import { minutesToHourWithMinutes } from '@/common/DateHelpers';
-import { computeTaskBreakdown, type TaskBreakdownItem } from '@/composables/useTaskBreakdown';
-import { useTimeLogs } from '@/composables/useTimeLogs';
-import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { useSettingsStore } from '@/stores/settings';
 import { sumBy, uniqBy } from 'lodash';
 
@@ -42,7 +39,6 @@ const { getProjectColor, getTaskColors } = useProjectColors();
 const workCalendar = useWorkCalendar();
 const now = useNow({ interval: 60_000 });
 const settingsStore = useSettingsStore();
-const { mdAndUp } = useDisplay();
 // Range reads reach past the viewed month, which `timeLogs` holds, for last week / last month
 const { inRange } = useTimeLogs();
 
@@ -101,9 +97,7 @@ const workdays = computed(() => {
 });
 
 // Days with logged time — plan entries have no duration and don't count
-const loggedDates = computed(
-  () => new Set(props.timeLogs.filter((l) => (l.duration ?? 0) > 0).map((l) => l.date)),
-);
+const loggedDates = computed(() => new Set(props.timeLogs.filter((l) => (l.duration ?? 0) > 0).map((l) => l.date)));
 
 const daysLogged = computed(() => loggedDates.value.size);
 const daysProgress = computed(() =>
@@ -524,11 +518,6 @@ const truncate = (str: string, len = 16) => (str.length > len ? str.slice(0, len
           </div>
         </VCard>
       </div>
-    </div>
-
-    <!-- Garden: pinned under the stats, desktop only for now; Settings can hide it -->
-    <div v-if="mdAndUp && settingsStore.showGarden" class="flex-shrink-0 px-2 pb-2">
-      <GardenPanel />
     </div>
   </VCard>
 </template>

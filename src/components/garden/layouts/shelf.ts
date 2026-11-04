@@ -1,4 +1,4 @@
-// Two-tier wooden shelf with nine pots: three on each plank and three on the floor in front.
+// Three-tier wooden shelf with nine pots: three on each plank; saved plant indices stay unchanged.
 import type { Ctx } from '../creatures/kit';
 import type { PotKey } from '../pots';
 import type { GardenLayout, LayoutSlot } from './kit';
@@ -17,12 +17,13 @@ const POT_OF_SLOT: PotKey[] = [
   'terracotta',
   'concrete',
 ];
-const ROWS = { top: 0.33, middle: 0.62, floor: 0.925 };
+const ROWS = { top: 0.25, middle: 0.54, bottom: 0.83 };
+const FLOOR_Y = 0.925;
 type Row = keyof typeof ROWS;
-const ROW_OF_SLOT: Row[] = ['middle', 'middle', 'middle', 'floor', 'floor', 'floor', 'top', 'top', 'top'];
-const ROW_SCALE = { top: 0.9, middle: 1, floor: 1.12 };
+const ROW_OF_SLOT: Row[] = ['middle', 'middle', 'middle', 'bottom', 'bottom', 'bottom', 'top', 'top', 'top'];
+const ROW_SCALE = { top: 0.9, middle: 1, bottom: 1 };
 // Back to front, so lower rows paint over the vines hanging from higher ones
-const PAINT_ORDER: Row[] = ['top', 'middle', 'floor'];
+const PAINT_ORDER: Row[] = ['top', 'middle', 'bottom'];
 
 const PLANK_DEPTH = 15,
   PLANK_THICKNESS = 8,
@@ -124,13 +125,15 @@ function paintShelf(c: Ctx, width: number, height: number) {
   const left = width * 0.05,
     right = width * 0.95;
   const topY = height * ROWS.top,
-    floorY = height * ROWS.floor;
+    floorY = height * FLOOR_Y;
 
   // Back legs sit higher and darker, so the shelf reads as having depth.
   for (const x of [left + 14, right - 14 - LEG_WIDTH]) {
     const footX = leg(c, size, x, topY - 4, floorY - 9, LEG_WIDTH - 1, 0.22);
     footShadow(c, footX, floorY - 9, 12);
   }
+  // The third tier uses the same plank painter and the existing legs.
+  plank(c, height * ROWS.bottom, left - 3, right + 3);
   plank(c, height * ROWS.middle, left - 3, right + 3);
   for (const x of [left + 3, right - 3 - LEG_WIDTH]) {
     const footX = leg(c, size, x, topY + PLANK_THICKNESS - 2, floorY + 4, LEG_WIDTH, 0);
@@ -139,12 +142,11 @@ function paintShelf(c: Ctx, width: number, height: number) {
   plank(c, topY, left - 3, right + 3);
 }
 
-// How far a trailing vine may hang: from the top shelf past the plank toward the middle one, from the middle
-// shelf a little less, on the floor only down the pot
-function hangRoom(row: Row, potKey: PotKey) {
-  if (row === 'top') return 105;
-  if (row === 'middle') return 90;
-  return POTS[potKey].height;
+// A vine may hang over its own plank, but must stop above the next tier or the floor.
+function hangRoom(row: Row, potKey: PotKey, height: number, scale: number) {
+  const nextRow = row === 'top' ? ROWS.middle : row === 'middle' ? ROWS.bottom : FLOOR_Y;
+  const freeBelowSoil = ((nextRow - ROWS[row]) * height - PLANK_DEPTH) / scale + POTS[potKey].height;
+  return Math.max(POTS[potKey].height, freeBelowSoil);
 }
 
 export const shelfLayout: GardenLayout = {
@@ -156,20 +158,20 @@ export const shelfLayout: GardenLayout = {
         const pot = POTS[POT_OF_SLOT[index]];
         const scale = ROW_SCALE[row];
         // On a plank the pot stands mid-depth, not on the front edge
-        const shelfY = height * ROWS[row] - (row === 'floor' ? 0 : PLANK_DEPTH * 0.5);
+        const shelfY = height * ROWS[row] - PLANK_DEPTH * 0.5;
         slots.push({
           index,
           x: width * (0.29 + (index % 3) * 0.21),
           soilY: shelfY - pot.height * scale,
           scale,
           pot,
-          hangRoom: hangRoom(row, POT_OF_SLOT[index]),
+          hangRoom: hangRoom(row, POT_OF_SLOT[index], height, scale),
         });
       });
     }
     return slots;
   },
   paintBackdrop: paintShelf,
-  canHome: (width, height) => ({ x: width * 0.87, y: height * ROWS.floor + 2 }),
+  canHome: (width, height) => ({ x: width * 0.87, y: height * FLOOR_Y + 4 }),
   canScale: 1.3,
 };

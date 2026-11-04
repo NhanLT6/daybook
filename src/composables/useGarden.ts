@@ -24,7 +24,7 @@ interface GardenState {
   earnedDay: string; // the day earnedToday counts for
 }
 
-// One shared store for every garden on screen (Insights column and drawer) and the places that earn drops
+// One shared store for the garden page and the places that earn drops
 const state = useStorage<GardenState>(
   storageKeys.garden,
   { plants: Array(SLOT_COUNT).fill(null), drops: 0, earnedToday: 0, earnedDay: '' },
