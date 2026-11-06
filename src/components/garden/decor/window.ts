@@ -1,6 +1,7 @@
 // Big window behind the cabinet: sky, distant trees and rooftops, a painted frame with a sill, linen curtains.
 // Drawn in room units with (0, 0) at the top-left corner of the frame; the room picks the size to fit the scene.
 import type { Ctx } from '../creatures/kit';
+import type { Daylight } from '../layouts/daylight';
 
 import { TAU } from '../creatures/kit';
 import { seeded } from '../plants/wood';
@@ -24,7 +25,7 @@ export const glassOf = ({ width, height }: WindowSize) => ({
   h: height - FRAME * 2,
 });
 
-function view(c: Ctx, size: WindowSize, dark: boolean) {
+function view(c: Ctx, size: WindowSize, dark: boolean, light?: Daylight | null) {
   const { x, y, w, h } = glassOf(size);
   const random = seeded(dark ? 0.83 : 0.29);
   c.save();
@@ -33,9 +34,10 @@ function view(c: Ctx, size: WindowSize, dark: boolean) {
   c.clip();
 
   const sky = c.createLinearGradient(0, y, 0, y + h);
-  sky.addColorStop(0, dark ? '#16203A' : '#CFE2EC');
-  sky.addColorStop(0.75, dark ? '#2B3B5A' : '#E6F0F0');
-  sky.addColorStop(1, dark ? '#34466A' : '#F3F2E8');
+  const day = light?.sky ?? ['#CFE2EC', '#E6F0F0', '#F3F2E8'];
+  sky.addColorStop(0, dark ? '#16203A' : day[0]);
+  sky.addColorStop(0.75, dark ? '#2B3B5A' : day[1]);
+  sky.addColorStop(1, dark ? '#34466A' : day[2]);
   c.fillStyle = sky;
   c.fillRect(x, y, w, h);
 
@@ -60,7 +62,7 @@ function view(c: Ctx, size: WindowSize, dark: boolean) {
       const cx = x + random() * w,
         cy = y + h * (0.12 + random() * 0.3);
       for (let puff = 0; puff < 4; puff++) {
-        c.fillStyle = 'rgba(255,255,255,.55)';
+        c.fillStyle = light?.far.clouds ?? 'rgba(255,255,255,.55)';
         c.beginPath();
         c.ellipse(cx + puff * 12 - 18, cy + Math.sin(puff * 2) * 3, 16 - Math.abs(puff - 1.5) * 3, 7, 0, 0, TAU);
         c.fill();
@@ -76,7 +78,7 @@ function view(c: Ctx, size: WindowSize, dark: boolean) {
     [0.72, 0.58, 0.26],
   ];
   for (const [left, top, width] of roofs) {
-    c.fillStyle = dark ? '#243049' : '#D6DEDE';
+    c.fillStyle = dark ? '#243049' : (light?.far.roofs ?? '#D6DEDE');
     c.fillRect(x + w * left, y + h * top, w * width, h);
     if (!dark) continue;
     for (let i = 0; i < 4; i++) {
@@ -87,7 +89,7 @@ function view(c: Ctx, size: WindowSize, dark: boolean) {
   }
 
   // Tree canopies in front of the rooftops
-  const leaves = dark ? ['#1A2A2C', '#22363A'] : ['#AFC8B1', '#C2D6C1'];
+  const leaves = dark ? ['#1A2A2C', '#22363A'] : (light?.far.trees ?? ['#AFC8B1', '#C2D6C1']);
   for (let i = 0; i < 44; i++) {
     const tx = x + random() * w,
       ty = y + h * (0.72 + random() * 0.2);
@@ -176,6 +178,6 @@ export function paintWindowFrame(c: Ctx, size: WindowSize) {
   curtain(c, width - 30, 78, rodY + 2, height + 26);
 }
 
-export function paintWindowView(c: Ctx, size: WindowSize, dark: boolean) {
-  view(c, size, dark);
+export function paintWindowView(c: Ctx, size: WindowSize, dark: boolean, light?: Daylight | null) {
+  view(c, size, dark, light);
 }

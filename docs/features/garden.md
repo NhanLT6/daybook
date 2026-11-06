@@ -43,6 +43,14 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   lit from the upper left, so the scene mirrors pots and plants, and room.ts mirrors the shelf, stand and cabinet.
   A slanted sun patch falls from the window across the floor toward the shelf, furniture casts one soft shadow
   to the left, and the room falls off darker to the left. Decor on the cabinet is not mirrored.
+  Depth and time of day (`layouts/daylight.ts`): by day the room follows the viewer's clock in four parts
+  (morning 5–10, noon 10–15, golden 15–18:30, dusk after; preview one with localStorage `gardenDayPart`). Each
+  `Daylight` sets the window sky, the sun's colour, strength and reach (floor patch + beam; dusk has no sun),
+  plant shadows on the wall (`GardenLayout.castShadow` direction × the part's length and opacity), the rim on
+  leaves facing the window (`rimLight` in the scene, baked into the cached plant bitmap) and a multiply grade
+  over room and plants; dusk adds a warm soft-light lamp glow. The scene checks the clock once a minute and
+  repaints the backdrop when the part changes. Depth cues: haze over the window view, a wash over the cabinet,
+  dust drifting in the beam (`GardenLayout.lightShaft`). Dark mode keeps its own night and ignores daylight.
   Night: one multiply pass darkens the room toward slate, except the window glass; `Decor.lit` then draws what
   stays bright (monitor screen and its glow, the espresso machine's power light). `paintBackdrop` gets `dark`.
 - `shelf.ts`: three planks on the original legs, 9 slots (3 per tier), wood grain from `decor/materials.ts`. The former floor slots 3–5 move onto the bottom plank, preserving plant indices. Hanging room stops above the next tier or floor. `row.ts`: `rowLayout(count)`, 1–3 pots in a row on the surface, no

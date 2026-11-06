@@ -11,6 +11,9 @@ import { CREATURES } from './creatures';
 import { between, clamp, TAU } from './creatures/kit';
 import { shelfLayout } from './layouts/shelf';
 import { PLANTS } from './plants';
+import type { DayPart } from './layouts/daylight';
+
+import { DAYLIGHT, dayPartAt } from './layouts/daylight';
 import { paintPlant } from './plants/paint';
 import { POTS } from './pots';
 import { paintPot } from './pots/kit';
@@ -146,7 +149,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   // The layout's scenery is the only fixed layer: painted once per size and theme, then copied every frame
   function buildBackdrop() {
     const surface = layer();
-    layout.paintBackdrop(surface.context, width, height, dark);
+    layout.paintBackdrop(surface.context, width, height, dark, light());
     if (dark) nightTint(surface.context);
     backdrop = surface.canvas;
   }
@@ -154,7 +157,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   function plantBitmap(index: number): HTMLCanvasElement {
     const plant = state.plants[index]!;
     const stage = shownStage(index);
-    const key = `${index}-${plant.species}-${stage}-${plant.seed}`;
+    const key = `${index}-${plant.species}-${stage}-${plant.seed}-${dark ? 'night' : dayPart}`;
     const cached = plantBitmaps.get(key);
     if (cached) return cached;
     // Painted at the size it is shown, so a plant scaled up in a large layout stays sharp
@@ -166,8 +169,100 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     c.scale(ratio, ratio);
     c.translate(100, 130);
     paintPlant(c, plant.species, stage, plant.seed, slotOf(index).hangRoom);
+    if (!dark) rimLight(bitmap, ratio, DAYLIGHT[dayPart].rim);
     plantBitmaps.set(key, bitmap);
     return bitmap;
+  }
+
+  // Depth from light: a warm rim along the edges that face the light (upper left in the plant's own drawing,
+  // which is mirrored when the light is on the right). The rim is the plant minus itself nudged away from the light.
+  function rimLight(bitmap: HTMLCanvasElement, ratio: number, color: string) {
+    const rim = document.createElement('canvas');
+    rim.width = bitmap.width;
+    rim.height = bitmap.height;
+    const r = rim.getContext('2d')!;
+    const nudge = 0.7 * ratio;
+    r.drawImage(bitmap, 0, 0);
+    r.globalCompositeOperation = 'destination-out';
+    r.drawImage(bitmap, nudge, nudge);
+    r.globalCompositeOperation = 'source-in';
+    r.fillStyle = color;
+    r.fillRect(0, 0, rim.width, rim.height);
+    const c = bitmap.getContext('2d')!;
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(rim, 0, 0);
+    c.restore();
+  }
+
+  // A plant's shadow on the wall: its silhouette, soft and warm grey, cached per bitmap
+  const shadowBitmaps = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+  function shadowOf(bitmap: HTMLCanvasElement) {
+    const cached = shadowBitmaps.get(bitmap);
+    if (cached) return cached;
+    const shadow = document.createElement('canvas');
+    shadow.width = bitmap.width;
+    shadow.height = bitmap.height;
+    const s = shadow.getContext('2d')!;
+    s.filter = `blur(${bitmap.width / 160}px)`;
+    s.drawImage(bitmap, 0, 0);
+    s.filter = 'none';
+    s.globalCompositeOperation = 'source-in';
+    s.fillStyle = 'rgb(96,72,48)';
+    s.fillRect(0, 0, shadow.width, shadow.height);
+    shadowBitmaps.set(bitmap, shadow);
+    return shadow;
+  }
+
+  // Dust in the sunbeam: specks drifting slowly down and sideways, twinkling as they turn in the light
+  const motes = Array.from({ length: 46 }, () => ({
+    across: Math.random(),
+    along: Math.random(),
+    speed: 0.006 + Math.random() * 0.012,
+    wobble: Math.random() * Math.PI * 2,
+    size: 0.8 + Math.random() * 1.4,
+  }));
+  function paintDust(time: number, delta: number) {
+    const sun = light()?.sun;
+    const shaft = sun && layout.lightShaft?.(width, height, sun.reach);
+    if (!shaft) return;
+    const lerp = (a: { x: number; y: number }, b: { x: number; y: number }, t: number) => ({
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+    });
+    ctx.save();
+    for (const mote of motes) {
+      mote.along += mote.speed * delta;
+      if (mote.along > 1) {
+        mote.along = 0;
+        mote.across = Math.random();
+      }
+      const across = mote.across + Math.sin(time * 0.4 + mote.wobble) * 0.02;
+      const top = lerp(shaft.top[0], shaft.top[1], across),
+        bottom = lerp(shaft.bottom[0], shaft.bottom[1], across);
+      const p = lerp(top, bottom, mote.along);
+      // Brightest near the window, fading out toward the floor; each speck glints now and then
+      const glint = 0.5 + 0.5 * Math.sin(time * 1.7 + mote.wobble * 3);
+      ctx.fillStyle = `rgba(255,247,222,${(1 - mote.along) * (0.25 + glint * 0.5)})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, mote.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  let lastDustTime = 0;
+
+  // The part of the day follows the clock: checked once a minute, and the room is repainted when it changes
+  let dayPart: DayPart = dayPartAt(new Date());
+  let lastClockCheck = 0;
+  const light = () => (dark ? null : DAYLIGHT[dayPart]);
+  function followClock(now: number) {
+    if (now - lastClockCheck < 60000) return;
+    lastClockCheck = now;
+    const part = dayPartAt(new Date());
+    if (part === dayPart) return;
+    dayPart = part;
+    buildBackdrop();
   }
 
   function frame(now: number) {
@@ -180,6 +275,31 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     if (!foreground || foreground.canvas.width !== canvas.width) foreground = layer();
     const c = foreground.context;
     c.clearRect(0, 0, width, height);
+
+    // Plant shadows on the wall first, behind every pot and plant; they sway with their plant
+    const cast = layout.castShadow,
+      shadow = light()?.shadow;
+    if (cast && shadow) {
+      c.save();
+      c.globalAlpha = shadow.alpha;
+      for (const { index, x, soilY } of slots) {
+        if (!state.plants[index]) continue;
+        const lift = digLift(index, now);
+        c.save();
+        c.translate(x + lift.x, soilY + 0.5 - lift.y);
+        c.rotate(lift.tilt + Math.sin(time * 1.1 + index) * 0.03);
+        c.scale(plantScaleOf(index) * flip, plantScaleOf(index));
+        c.drawImage(
+          shadowOf(plantBitmap(index)),
+          -100 + cast.x * shadow.length,
+          -130 + cast.y * shadow.length,
+          200,
+          PLANT_BITMAP_HEIGHT,
+        );
+        c.restore();
+      }
+      c.restore();
+    }
 
     // Every slot has a pot; an empty one waits for a plant to be picked
     for (const { index, x, soilY, scale, pot } of slots) {
@@ -211,6 +331,30 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     paintCreatures(c, time);
     if (dark) nightTint(c);
     ctx.drawImage(foreground.canvas, 0, 0, width, height);
+    // The part of the day's colour over room and plants alike
+    const grade = light()?.grade;
+    if (grade) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = grade;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+    // After sunset a lamp somewhere above the plants warms them, the room further off stays cool
+    const lamp = light()?.lamp;
+    if (lamp) {
+      const glow = ctx.createRadialGradient(width * 0.32, -height * 0.1, 0, width * 0.32, -height * 0.1, height * 1.1);
+      glow.addColorStop(0, `rgba(${lamp},.32)`);
+      glow.addColorStop(1, `rgba(${lamp},0)`);
+      ctx.save();
+      ctx.globalCompositeOperation = 'soft-light';
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+    followClock(now);
+    paintDust(time, Math.min(0.1, time - (lastDustTime || time)));
+    lastDustTime = time;
     paintCreatureLight(time);
     paintWater();
     paintDropBadge();

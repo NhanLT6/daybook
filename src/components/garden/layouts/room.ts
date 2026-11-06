@@ -3,15 +3,16 @@
 // machine or monitor); plastered wall and oak floor. On narrow screens only the shelf stands, in the middle.
 import type { Ctx } from '../creatures/kit';
 import type { DecorKey } from '../decor';
+import type { Daylight } from './daylight';
 import type { GardenLayout, LayoutSlot } from './kit';
 
 import { DECOR } from '../decor';
 import { CABINET, paintCabinet } from '../decor/cabinet';
 import { plaster, woodGrain } from '../decor/materials';
 import { paintStand, STAND } from '../decor/stand';
+import { seeded } from '../plants/wood';
 import { glassOf, paintWindowFrame, paintWindowView, WINDOW_REACH } from '../decor/window';
 import { POTS } from '../pots';
-import { seeded } from '../plants/wood';
 import { HANGING_SLOTS } from './kit';
 import { shelfLayout } from './shelf';
 
@@ -206,22 +207,28 @@ function softFill(c: Ctx, color: string, blur: number, shape: (offset: number) =
 
 type Pane = ReturnType<typeof windowBox>;
 
+const DEFAULT_SUN = { rgb: '255,236,200', strength: 1, reach: 1 };
+
 // Sunlight from the window on the right: a soft shaft from the glass down to the floor, and the window's three
 // panes laid on the floor as a slanted patch running left toward the shelf. The cabinet, painted later, stands
 // in front of part of it.
-function paintSunlight(c: Ctx, p: Plan, pane: Pane, height: number) {
-  const { unit } = p;
+function sunGeometry(p: Plan, pane: Pane, height: number, reach = 1) {
   const glass = glassOf(pane.size);
   const gx = pane.x + glass.x * pane.scale,
     gy = pane.y + glass.y * pane.scale,
     gw = glass.w * pane.scale,
     gh = glass.h * pane.scale;
-
   // Floor patch: the far edge sits at the wall's foot, shifted left; the near edge further left and wider
-  const far = { y: p.wallFoot + 4 * unit, left: gx - gw * 0.8, width: gw };
-  const near = { y: height, left: gx - gw * 1.95, width: gw * 1.3 };
+  const far = { y: p.wallFoot + 4 * p.unit, left: gx - gw * 0.8, width: gw };
+  const near = { y: height, left: gx - gw * (0.8 + 1.15 * reach), width: gw * 1.3 };
+  return { gx, gy, gw, gh, far, near };
+}
+
+function paintSunlight(c: Ctx, p: Plan, pane: Pane, height: number, sun: NonNullable<Daylight['sun']>) {
+  const { unit } = p;
+  const { gx, gy, gw, gh, far, near } = sunGeometry(p, pane, height, sun.reach);
   const bar = 8 * unit;
-  softFill(c, 'rgba(255,224,165,.5)', 8 * unit, (offset) => {
+  softFill(c, `rgba(${sun.rgb},${(0.5 * sun.strength).toFixed(2)})`, 8 * unit, (offset) => {
     for (let column = 0; column < 3; column++) {
       const from = column / 3,
         to = (column + 1) / 3;
@@ -236,8 +243,14 @@ function paintSunlight(c: Ctx, p: Plan, pane: Pane, height: number) {
 
   // The shaft: a faint warm band from the glass to the patch
   const shaft = c.createLinearGradient(gx + gw / 2, gy, near.left + near.width / 2, near.y);
-  shaft.addColorStop(0, 'rgba(255,236,200,.24)');
-  shaft.addColorStop(1, 'rgba(255,236,200,0)');
+  shaft.addColorStop(0, `rgba(${sun.rgb},${(0.24 * sun.strength).toFixed(2)})`);
+  shaft.addColorStop(1, `rgba(${sun.rgb},0)`);
+  c.save();
+  // The beam is in the room, not on the view outside
+  c.beginPath();
+  c.rect(0, 0, c.canvas.width, c.canvas.height);
+  c.rect(gx, gy, gw, gh);
+  c.clip('evenodd');
   c.fillStyle = shaft;
   c.beginPath();
   c.moveTo(gx, gy);
@@ -246,6 +259,8 @@ function paintSunlight(c: Ctx, p: Plan, pane: Pane, height: number) {
   c.lineTo(near.left, near.y);
   c.closePath();
   c.fill();
+  c.restore();
+
 }
 
 // Light falls off away from the window: warm between the window and the shelf, a touch darker at the far left
@@ -270,7 +285,7 @@ function paintFalloff(c: Ctx, width: number, height: number) {
   c.fillRect(0, height * 0.75, width, height * 0.25);
 }
 
-function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, dark: boolean) {
+function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, dark: boolean, light?: Daylight | null) {
   const p = plan(width, height);
   const { unit } = p;
   const decor = DECOR[decorKey];
@@ -289,12 +304,18 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
     c.save();
     c.translate(pane.x, pane.y);
     c.scale(pane.scale, pane.scale);
-    paintWindowView(c, pane.size, dark);
+    paintWindowView(c, pane.size, dark, light);
+    // Depth: the view outside sits far back, so by day it is washed pale by haze
+    if (!dark) {
+      const glass = glassOf(pane.size);
+      c.fillStyle = 'rgba(248,244,234,.32)';
+      c.fillRect(glass.x, glass.y, glass.w, glass.h);
+    }
     c.restore();
   }
   paintSkirting(c, width, p.wallFoot, unit);
   paintFloor(c, width, height, p.wallFoot, unit);
-  if (!dark && pane) paintSunlight(c, p, pane, height);
+  if (!dark && pane && light?.sun !== null) paintSunlight(c, p, pane, height, light?.sun ?? DEFAULT_SUN);
 
   floorShadow(c, p.shelfX + (SHELF.width / 2) * unit, p.footY, SHELF.width * 0.62 * unit, unit);
   if (p.cabinet) {
@@ -358,11 +379,17 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
       t.restore();
       t.translate(0, -CABINET.height);
       decor.paint(t, dark);
+      // Depth: the cabinet stands further from us than the plants, so a little room air softens it
+      if (!dark) {
+        t.globalCompositeOperation = 'source-atop';
+        t.fillStyle = 'rgba(244,236,222,.16)';
+        t.fillRect(-CABINET.width / 2 - 10, -260, CABINET.width + 20, CABINET.height + 300);
+      }
       t.restore();
     }
   });
 
-  if (!dark) paintFalloff(c, width, height);
+  if (!dark && light?.sun !== null) paintFalloff(c, width, height);
 
   if (p.cabinet && decor.lit) {
     c.save();
@@ -407,7 +434,7 @@ export function roomLayout(decor: DecorKey): GardenLayout {
       }));
       return [...hangingSlots(p), ...shelf];
     },
-    paintBackdrop: (c, width, height, dark) => paintRoom(c, width, height, decor, dark),
+    paintBackdrop: (c, width, height, dark, light) => paintRoom(c, width, height, decor, dark, light),
     // On the floor right against the shelf's right foot; on a phone, just inside it
     canHome(width, height) {
       const p = plan(width, height);
@@ -418,6 +445,24 @@ export function roomLayout(decor: DecorKey): GardenLayout {
     canScale: 2.8,
     toolScale: (width, height) => plan(width, height).unit,
     lightFromRight: true,
+    // Sun from the upper right throws each plant's shadow onto the wall a little to the left and down
+    castShadow: { x: 24, y: 9 },
+    // The sunbeam from the window to the floor, where dust drifts by day
+    lightShaft(width, height, reach = 1) {
+      const p = plan(width, height);
+      if (!p.cabinet) return null;
+      const { gx, gy, gw, gh, near } = sunGeometry(p, windowBox(p, width, height), height, reach);
+      return {
+        top: [
+          { x: gx, y: gy },
+          { x: gx + gw, y: gy + gh * 0.3 },
+        ],
+        bottom: [
+          { x: near.left, y: near.y },
+          { x: near.left + near.width, y: near.y },
+        ],
+      };
+    },
     maxVisitors: 5,
   };
 }
