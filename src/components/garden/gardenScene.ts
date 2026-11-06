@@ -25,7 +25,7 @@ export type SpeciesKey = PlantKey;
 
 export const MAX_STAGE = 4;
 // Plant slots kept in the garden state; a layout shows some or all of them
-export const SLOT_COUNT = 9;
+export const SLOT_COUNT = 11;
 
 export interface GardenPlant {
   species: SpeciesKey;
@@ -66,7 +66,8 @@ export interface GardenScene {
 }
 
 // Plant bitmaps span 130 plant pixels above the soil and the rest below it, room for hanging vines
-const PLANT_BITMAP_HEIGHT = 300;
+// Room below the soil for long vines hanging from the stand
+const PLANT_BITMAP_HEIGHT = 400;
 
 export function createGardenScene(canvas: HTMLCanvasElement, options: GardenSceneOptions): GardenScene {
   const ctx = canvas.getContext('2d')!;
@@ -139,6 +140,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   // Only plant indices the layout places exist in this scene
   const slotOf = (index: number) => slotByIndex.get(index)!;
   const plantScaleOf = (index: number) => slotOf(index).plantScale ?? slotOf(index).scale;
+  // -1 mirrors pots and plants so their painted highlights face a light on the right
+  const flip = layout.lightFromRight ? -1 : 1;
 
   // The layout's scenery is the only fixed layer: painted once per size and theme, then copied every frame
   function buildBackdrop() {
@@ -182,7 +185,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     for (const { index, x, soilY, scale, pot } of slots) {
       c.save();
       c.translate(x, soilY);
-      c.scale(scale, scale);
+      c.scale(scale * flip, scale);
       paintPot(c, pot);
       c.restore();
       if (!state.plants[index]) continue;
@@ -196,7 +199,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       c.translate(x + lift.x, soilY + 0.5 - lift.y);
       c.rotate(lift.tilt);
       c.rotate(Math.sin(time * 1.1 + index) * 0.03);
-      c.scale(plantScaleOf(index) * grow, plantScaleOf(index) * grow);
+      c.scale(plantScaleOf(index) * grow * flip, plantScaleOf(index) * grow);
       c.drawImage(plantBitmap(index), -100, -130, 200, PLANT_BITMAP_HEIGHT);
       c.restore();
       if (pulse > 0) pulses.set(index, Math.max(0, pulse - 0.025));
@@ -313,7 +316,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     // Rim spots are in pot pixels, every other spot in plant pixels
     const scale = spot.rim ? slotOf(index).scale : plantScaleOf(index);
     const sway = Math.sin(time * 1.1 + index) * 0.03;
-    const along = spot.dx * scale,
+    const along = spot.dx * scale * flip,
       down = spot.dy * scale;
     return {
       x: x + along * Math.cos(sway) - down * Math.sin(sway),

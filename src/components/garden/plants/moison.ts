@@ -42,6 +42,7 @@ function paintLipstick(c: Ctx, x: number, y: number, angle: number, size: number
 // Lipstick plant: trailing stems with pairs of glossy dark leaves, scarlet tube flowers bunched at the tips
 export const moison: Plant = {
   name: 'Lipstick plant',
+  trails: true,
   done: 'trails scarlet flowers',
   flowering: true,
   paint(c, stage, random, room) {
@@ -59,7 +60,7 @@ export const moison: Plant = {
 
     if (hang > 0) {
       strands.forEach((strand, index) => {
-        const reach = Math.min(room, 105) * strand.length * hang;
+        const reach = Math.min(room, 230) * strand.length * hang;
         paintStrand(c, strand, reach, '#4A6B34');
         // Leaves come in opposite pairs along the stem
         // Short strands carry fewer pairs, so pairs sit about as far apart on every strand

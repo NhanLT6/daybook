@@ -3,7 +3,7 @@ import type { Ctx } from '../creatures/kit';
 import type { PotKey } from '../pots';
 import type { GardenLayout, LayoutSlot } from './kit';
 
-import { woodGrain } from '../decor/materials';
+import { SHELF_WOOD, woodGrain } from '../decor/materials';
 import { POTS } from '../pots';
 
 // Slot index → pot; slot order is the garden state's order, not the paint order
@@ -23,21 +23,18 @@ const FLOOR_Y = 0.925;
 type Row = keyof typeof ROWS;
 const ROW_OF_SLOT: Row[] = ['middle', 'middle', 'middle', 'bottom', 'bottom', 'bottom', 'top', 'top', 'top'];
 const ROW_SCALE = { top: 1.4, middle: 1.4, bottom: 1.4 };
-// Plants grow bigger than their pots: a grown plant may reach past the plank above, as on a real shelf
-const PLANT_GROW = 1.4;
+// Plants are drawn a little bigger than true to their pots (kept moderate so it doesn't look off); a grown plant
+// may reach past the plank above, as on a real shelf
+const PLANT_GROW = 1.15;
 // Back to front, so lower rows paint over the vines hanging from higher ones
 const PAINT_ORDER: Row[] = ['top', 'middle', 'bottom'];
 
+export const PLANK_THICKNESS = 8;
 const PLANK_DEPTH = 15,
-  PLANK_THICKNESS = 8,
   LEG_WIDTH = 12;
 
-// Shelf wood, lit from the upper left like the plants; night darkens it through the scene's tint.
-const WOOD = {
-  top: ['#E9C08F', '#D6A774'],
-  face: ['#DDAE79', '#C08A55', '#A8733F'],
-  leg: ['#D9A872', '#B27C48', '#8E5E33'],
-};
+// Shelf wood (shared with the tall hanging stand), lit from the upper left like the plants
+const WOOD = SHELF_WOOD;
 
 function plank(c: Ctx, y: number, left: number, right: number) {
   const depth = PLANK_DEPTH,
@@ -126,21 +123,23 @@ function footShadow(c: Ctx, x: number, y: number, spread: number) {
   c.restore();
 }
 
-function paintShelf(c: Ctx, width: number, height: number) {
-  const size = { width, height };
-  const left = width * 0.05,
-    right = width * 0.95;
-  const topY = height * ROWS.top,
-    floorY = height * FLOOR_Y;
-
-  // Back legs sit higher and darker, so the shelf reads as having depth.
+// A wooden frame: four slightly splayed legs, the back pair higher and darker so the frame reads as having
+// depth, carrying planks (top first, given by their front edge); the top plank rests on the front legs.
+// The plant shelf and the tall hanging stand are both built from it.
+export function paintFrame(
+  c: Ctx,
+  size: { width: number; height: number },
+  left: number,
+  right: number,
+  planks: number[],
+  floorY: number,
+) {
+  const [topY, ...lower] = planks;
   for (const x of [left + 14, right - 14 - LEG_WIDTH]) {
     const footX = leg(c, size, x, topY - 4, floorY - 9, LEG_WIDTH - 1, 0.22);
     footShadow(c, footX, floorY - 9, 12);
   }
-  // The third tier uses the same plank painter and the existing legs.
-  plank(c, height * ROWS.bottom, left - 3, right + 3);
-  plank(c, height * ROWS.middle, left - 3, right + 3);
+  for (const y of lower.reverse()) plank(c, y, left - 3, right + 3);
   for (const x of [left + 3, right - 3 - LEG_WIDTH]) {
     const footX = leg(c, size, x, topY + PLANK_THICKNESS - 2, floorY + 4, LEG_WIDTH, 0);
     footShadow(c, footX, floorY + 4, 15);
@@ -148,13 +147,22 @@ function paintShelf(c: Ctx, width: number, height: number) {
   plank(c, topY, left - 3, right + 3);
 }
 
+function paintShelf(c: Ctx, width: number, height: number) {
+  const planks = [ROWS.top, ROWS.middle, ROWS.bottom].map((row) => height * row);
+  paintFrame(c, { width, height }, width * 0.05, width * 0.95, planks, height * FLOOR_Y);
+}
+
+// Longest vine on a shelf, in plant pixels; the hanging pots on the tall stand allow much longer ones
+const SHELF_VINE = 105;
+
 // A vine may hang over its own plank, but must stop above the next tier or the floor.
 // In plant pixels, measured from the soil.
 function hangRoom(row: Row, potKey: PotKey, height: number, scale: number, plantScale: number) {
   const nextRow = row === 'top' ? ROWS.middle : row === 'middle' ? ROWS.bottom : FLOOR_Y;
   const potHeight = POTS[potKey].height * scale;
   const freeBelowSoil = ((nextRow - ROWS[row]) * height - PLANK_DEPTH + potHeight) / plantScale;
-  return Math.max(potHeight / plantScale, freeBelowSoil);
+  // On a shelf vines stay short enough not to curtain the plants on the tier below
+  return Math.max(potHeight / plantScale, Math.min(SHELF_VINE, freeBelowSoil));
 }
 
 export const shelfLayout: GardenLayout = {

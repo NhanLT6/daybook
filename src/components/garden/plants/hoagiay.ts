@@ -100,26 +100,36 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, sh
 
 // Bougainvillea bonsai: a gnarled trunk full of small side twigs, leafy pads and rounded clusters of bracts,
 // some magenta and some white on the same bush
+// How full a grown bush is: leafy pads (up to 5), leaves per pad, bloom clusters per pad, and size next to
+// other plants
+export const BOUGAINVILLEA = { pads: 5, padLeaves: 28, clusters: 3, size: 1.25 };
+
+const PADS = [
+  { x: -15, y: -40, r: 11 },
+  { x: 13, y: -52, r: 12 },
+  { x: 2, y: -67, r: 10 },
+  { x: -25, y: -58, r: 10 },
+  { x: 24, y: -37, r: 10 },
+];
+
 export const hoagiay: Plant = {
   name: 'Bougainvillea',
   done: 'is covered in blooms',
   flowering: true,
+  size: BOUGAINVILLEA.size,
   paint(c, stage, random) {
     const lean = random() > 0.5 ? 1 : -1;
-    const pads = [
-      { x: lean * -15, y: -40, r: 11 },
-      { x: lean * 13, y: -52, r: 12 },
-      { x: lean * 2, y: -67, r: 10 },
-    ].map((pad) => ({
+    const pads = PADS.slice(0, BOUGAINVILLEA.pads).map((pad) => ({
       ...pad,
-      leaves: Array.from({ length: 20 }, () => ({
+      x: pad.x * lean,
+      leaves: Array.from({ length: BOUGAINVILLEA.padLeaves }, () => ({
         dx: (random() - 0.5) * 2,
         dy: (random() - 0.5) * 1.2,
         angle: random() * TAU,
         depth: random(),
       })),
       // Rounded clusters of blooms sitting on the pad; each bloom has its own spot in the dome
-      clusters: Array.from({ length: 3 }, () => ({
+      clusters: Array.from({ length: BOUGAINVILLEA.clusters }, () => ({
         dx: (random() - 0.5) * 1.5,
         dy: -0.2 - random() * 0.6,
         blooms: Array.from({ length: 4 }, () => ({
@@ -186,7 +196,7 @@ export const hoagiay: Plant = {
       at({ x: lean * 2, y: -34 }),
     ];
     const trunkTop = trunk[3];
-    const shown = pads.slice(0, [0, 1, 2, 3, 3][stage]);
+    const shown = pads.slice(0, Math.ceil(BOUGAINVILLEA.pads * [0, 0.25, 0.5, 0.85, 1][stage]));
     if (stage >= 2)
       trunkTwigs.forEach((side, index) =>
         twig(bezier(trunk, side.t), side.angle, side.length, side.leaves, 0.5 + index * 0.1),
@@ -225,7 +235,7 @@ export const hoagiay: Plant = {
         );
       }
       if (stage >= 3) {
-        for (const cluster of pad.clusters.slice(0, stage === 4 ? 3 : 1)) {
+        for (const cluster of pad.clusters.slice(0, stage === 4 ? BOUGAINVILLEA.clusters : 1)) {
           const cx = centre.x + cluster.dx * radius,
             cy = centre.y + cluster.dy * radius;
           // Each cluster is one colour, picked from a value the plant already drew, so existing plants keep

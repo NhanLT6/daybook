@@ -32,6 +32,9 @@ const state = useStorage<GardenState>(
   { mergeDefaults: true },
 );
 
+// Gardens saved before the hanging stand have 9 slots: give them the new empty ones
+while (state.value.plants.length < SLOT_COUNT) state.value.plants.push(null);
+
 export function useGarden() {
   const plants = computed(() => state.value.plants);
   const drops = computed(() => state.value.drops);

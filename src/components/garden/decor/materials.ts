@@ -92,6 +92,13 @@ export function plaster(c: Ctx, x: number, y: number, w: number, h: number, seed
   c.restore();
 }
 
+// Light oak of the plant shelf and the tall hanging stand: plank tops, plank faces, legs (light → dark)
+export const SHELF_WOOD = {
+  top: ['#E9C08F', '#D6A774'],
+  face: ['#DDAE79', '#C08A55', '#A8733F'],
+  leg: ['#D9A872', '#B27C48', '#8E5E33'],
+};
+
 // Satin chrome across a box, lit from the left: espresso trim, monitor stand
 export function chrome(c: Ctx, x: number, w: number) {
   const metal = c.createLinearGradient(x, 0, x + w, 0);

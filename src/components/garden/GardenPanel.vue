@@ -13,6 +13,7 @@ import { useSettingsStore } from '@/stores/settings';
 
 import { createGardenScene, MAX_STAGE, NIGHT_MATRIX, paintPlantPreview, SPECIES } from './gardenScene';
 import { GARDEN_LAYOUTS } from './layouts';
+import { HANGING_SLOTS } from './layouts/kit';
 
 const props = defineProps<{ fill?: boolean }>();
 
@@ -47,6 +48,10 @@ const pickerOpen = ref(false);
 const pickerSlot = ref(-1);
 const pickerTarget = ref<[number, number]>([0, 0]);
 const speciesList = Object.entries(SPECIES) as [SpeciesKey, (typeof SPECIES)[SpeciesKey]][];
+// A hanging pot offers only trailing plants
+const pickerSpecies = computed(() =>
+  HANGING_SLOTS.includes(pickerSlot.value) ? speciesList.filter(([, info]) => info.trails) : speciesList,
+);
 
 const openPicker = (index: number) => {
   if (!scene.value || !canvas.value) return;
@@ -182,7 +187,7 @@ const ariaLabel = computed(
         <div class="text-caption text-medium-emphasis px-1 pb-1">Pick a plant</div>
         <div class="picker-grid">
           <button
-            v-for="[key, info] in speciesList"
+            v-for="[key, info] in pickerSpecies"
             :key="key"
             type="button"
             class="picker-item text-caption"

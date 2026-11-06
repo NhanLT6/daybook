@@ -33,6 +33,11 @@ export function paintPlant(c: Ctx, species: PlantKey, stage: number, seed: numbe
     plantTag(c);
     return;
   }
-  PLANTS[species].paint(c, stage, seeded(seed), room);
+  const plant = PLANTS[species];
+  const size = plant.size ?? 1;
+  c.save();
+  c.scale(size, size);
+  plant.paint(c, stage, seeded(seed), room / size);
+  c.restore();
   if (stage === 1) plantTag(c);
 }

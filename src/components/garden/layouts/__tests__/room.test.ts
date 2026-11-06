@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { HANGING_SLOTS } from '../kit';
 import { roomLayout } from '../room';
 import { shelfLayout } from '../shelf';
 
@@ -49,9 +50,19 @@ describe('room corner', () => {
   });
 
   it('shows the plants bigger on a big screen than on a phone', () => {
-    const desktop = layout.slots(1504, 884)[0]!.plantScale!;
-    const phone = layout.slots(374, 775)[0]!.plantScale!;
-    expect(desktop).toBeGreaterThan(2);
-    expect(desktop).toBeGreaterThan(phone);
+    const plantScale = (width: number, height: number) =>
+      layout.slots(width, height).find((slot) => slot.index === 0)!.plantScale!;
+    expect(plantScale(1504, 884)).toBeGreaterThan(1.5);
+    expect(plantScale(1504, 884)).toBeGreaterThan(plantScale(374, 775));
+  });
+
+  it('hangs two pots from the tall stand on wide screens only', () => {
+    const hanging = (width: number, height: number) =>
+      layout.slots(width, height).filter((slot) => HANGING_SLOTS.includes(slot.index));
+    expect(hanging(1504, 884)).toHaveLength(2);
+    expect(hanging(374, 775)).toHaveLength(0);
+    // Vines from the top pot stop above the lower pot
+    const [top, lower] = hanging(1504, 884);
+    expect(top!.soilY + top!.hangRoom * top!.plantScale!).toBeLessThan(lower!.soilY);
   });
 });

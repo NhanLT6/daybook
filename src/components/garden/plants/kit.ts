@@ -18,6 +18,10 @@ export interface Plant {
   done: string;
   // Has flowers that bees and butterflies visit
   flowering?: boolean;
+  // Drawn this much bigger than the other plants, for plants that grow big in real life (monstera, pothos)
+  size?: number;
+  // Trails long stems: offered for the hanging pots, where its vines may hang far down
+  trails?: boolean;
   // Has white seed heads that let a seed go now and then to drift on the wind
   drifts?: boolean;
   // stage 1-4; room: plant pixels free below the soil line, for vines that hang over the shelf

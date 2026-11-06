@@ -1,15 +1,18 @@
-// A corner of a room seen straight on: the three-tier plant shelf on the left, a low cabinet on the right
-// with a window above it and one item on top (espresso machine or monitor), plastered wall and oak floor.
-// On narrow screens there is no room for the cabinet, so the shelf stands alone in the middle.
+// A corner of a room seen straight on: a tall hanging stand with two trailing plants at the far left, the
+// three-tier plant shelf, and a low cabinet on the right with a window above it and one item on top (espresso
+// machine or monitor); plastered wall and oak floor. On narrow screens only the shelf stands, in the middle.
 import type { Ctx } from '../creatures/kit';
 import type { DecorKey } from '../decor';
-import type { GardenLayout } from './kit';
+import type { GardenLayout, LayoutSlot } from './kit';
 
 import { DECOR } from '../decor';
 import { CABINET, paintCabinet } from '../decor/cabinet';
 import { plaster, woodGrain } from '../decor/materials';
+import { paintStand, STAND } from '../decor/stand';
 import { glassOf, paintWindowFrame, paintWindowView, WINDOW_REACH } from '../decor/window';
+import { POTS } from '../pots';
 import { seeded } from '../plants/wood';
+import { HANGING_SLOTS } from './kit';
 import { shelfLayout } from './shelf';
 
 // Room units match the shelf drawing's own pixels (floor at 0.925 of its height)
@@ -18,11 +21,18 @@ const SHELF = { width: 420, height: 700, floor: 700 * 0.925 };
 const FURNITURE = 0.85;
 const MARGIN = 40,
   GAP = 170,
+  // Between the hanging stand and the shelf
+  STAND_GAP = 60,
   // Head room above the tallest top-tier plant
   TOP = 52,
   // How far the wall's foot sits behind the furniture's feet
   FLOOR_DEPTH = 90;
-const ROOM_WIDTH = MARGIN * 2 + SHELF.width + GAP + CABINET.width * FURNITURE;
+const ROOM_WIDTH = MARGIN * 2 + STAND.width + STAND_GAP + SHELF.width + GAP + CABINET.width * FURNITURE;
+
+// Hanging pots: the shelf's pot size and plant growth
+const HANG_POT = POTS.bowl,
+  HANG_SCALE = 1.4,
+  HANG_GROW = 1.15;
 
 // Day palette; night darkens it in one pass, keeping the window and screens bright
 const WALL = ['#F1EBDF', '#E7DECF'];
@@ -35,7 +45,8 @@ interface Plan {
   wallFoot: number;
   shelfX: number;
   shelfY: number;
-  // Centre of the cabinet's foot, when there is room for it
+  // Centres of the hanging stand's and the cabinet's feet, when there is room for them
+  stand?: { x: number; y: number };
   cabinet?: { x: number; y: number };
 }
 
@@ -46,14 +57,18 @@ function plan(width: number, height: number): Plan {
   const unit = withCabinet ? Math.min(byHeight, width / ROOM_WIDTH) : Math.min(byHeight, width / (SHELF.width + 30));
   const contentWidth = (withCabinet ? ROOM_WIDTH - MARGIN * 2 : SHELF.width) * unit;
   const left = (width - contentWidth) / 2;
+  const shelfX = withCabinet ? left + (STAND.width + STAND_GAP) * unit : left;
 
   return {
     unit,
     footY,
     wallFoot: footY - FLOOR_DEPTH * unit,
-    shelfX: left,
+    shelfX,
     shelfY: footY - SHELF.floor * unit,
-    cabinet: withCabinet ? { x: left + (SHELF.width + GAP + (CABINET.width * FURNITURE) / 2) * unit, y: footY } : undefined,
+    stand: withCabinet ? { x: left + (STAND.width / 2) * unit, y: footY } : undefined,
+    cabinet: withCabinet
+      ? { x: shelfX + (SHELF.width + GAP + (CABINET.width * FURNITURE) / 2) * unit, y: footY }
+      : undefined,
   };
 }
 
@@ -144,7 +159,7 @@ function windowBox(p: Plan, width: number, height: number) {
 }
 
 // Furniture, window frame and curtains are painted on their own layer, then laid on the room in one go:
-// by day with one soft shadow cast to the lower right (sun from the upper left), at night darkened only
+// by day with one soft shadow cast to the lower left (light from the window on the right), at night darkened only
 // where something was painted.
 function furniture(c: Ctx, dark: boolean, unit: number, paint: (target: Ctx) => void) {
   const layer = document.createElement('canvas');
@@ -166,7 +181,7 @@ function furniture(c: Ctx, dark: boolean, unit: number, paint: (target: Ctx) => 
   if (!dark) {
     c.shadowColor = 'rgba(80,55,30,.3)';
     c.shadowBlur = 10 * unit * ratio;
-    c.shadowOffsetX = 26 * unit * ratio;
+    c.shadowOffsetX = -26 * unit * ratio;
     c.shadowOffsetY = 8 * unit * ratio;
   }
   c.drawImage(layer, 0, 0);
@@ -189,61 +204,62 @@ function softFill(c: Ctx, color: string, blur: number, shape: (offset: number) =
   c.restore();
 }
 
-// Sunlight through a window off to the upper left: a slanted two-by-two pane patch on the wall behind the
-// shelf, and a longer one stretched across the floor in front of it. Makes the shelf the brightest place.
-function paintSunlight(c: Ctx, p: Plan, height: number) {
-  const { unit } = p;
-  const left = p.shelfX - 70 * unit,
-    patchWidth = (SHELF.width + 150) * unit;
-  const top = height * 0.1,
-    bottom = p.wallFoot;
-  const slant = (bottom - top) * 0.32;
-  const bar = 9 * unit;
+type Pane = ReturnType<typeof windowBox>;
 
-  softFill(c, 'rgba(255,224,165,.5)', 7 * unit, (offset) => {
-    for (const [col, row] of [
-      [0, 0],
-      [1, 0],
-      [0, 1],
-      [1, 1],
-    ]) {
-      const x0 = left + col * (patchWidth / 2 + bar / 2) + offset,
-        w = patchWidth / 2 - bar / 2;
-      const y0 = top + row * ((bottom - top) / 2 + bar / 2),
-        h = (bottom - top) / 2 - bar / 2;
-      // The patch leans: lower rows sit further right, as light falling from the upper left would
-      const shift = (y: number) => ((y - top) / (bottom - top)) * slant;
-      c.moveTo(x0 + shift(y0), y0);
-      c.lineTo(x0 + w + shift(y0), y0);
-      c.lineTo(x0 + w + shift(y0 + h), y0 + h);
-      c.lineTo(x0 + shift(y0 + h), y0 + h);
+// Sunlight from the window on the right: a soft shaft from the glass down to the floor, and the window's three
+// panes laid on the floor as a slanted patch running left toward the shelf. The cabinet, painted later, stands
+// in front of part of it.
+function paintSunlight(c: Ctx, p: Plan, pane: Pane, height: number) {
+  const { unit } = p;
+  const glass = glassOf(pane.size);
+  const gx = pane.x + glass.x * pane.scale,
+    gy = pane.y + glass.y * pane.scale,
+    gw = glass.w * pane.scale,
+    gh = glass.h * pane.scale;
+
+  // Floor patch: the far edge sits at the wall's foot, shifted left; the near edge further left and wider
+  const far = { y: p.wallFoot + 4 * unit, left: gx - gw * 0.8, width: gw };
+  const near = { y: height, left: gx - gw * 1.95, width: gw * 1.3 };
+  const bar = 8 * unit;
+  softFill(c, 'rgba(255,224,165,.5)', 8 * unit, (offset) => {
+    for (let column = 0; column < 3; column++) {
+      const from = column / 3,
+        to = (column + 1) / 3;
+      const edge = (row: typeof far, at: number, gap: number) => row.left + row.width * at + gap + offset;
+      c.moveTo(edge(far, from, column ? bar / 2 : 0), far.y);
+      c.lineTo(edge(far, to, column < 2 ? -bar / 2 : 0), far.y);
+      c.lineTo(edge(near, to, column < 2 ? -bar / 2 : 0), near.y);
+      c.lineTo(edge(near, from, column ? bar / 2 : 0), near.y);
       c.closePath();
     }
   });
 
-  // On the floor the same light lies flatter and longer, toward the viewer
-  softFill(c, 'rgba(255,224,165,.32)', 10 * unit, (offset) => {
-    const y0 = p.wallFoot + 4 * unit,
-      y1 = height;
-    c.moveTo(left + slant + offset, y0);
-    c.lineTo(left + slant + patchWidth + offset, y0);
-    c.lineTo(left + slant + patchWidth * 1.35 + offset, y1);
-    c.lineTo(left + slant + patchWidth * 0.2 + offset, y1);
-    c.closePath();
-  });
+  // The shaft: a faint warm band from the glass to the patch
+  const shaft = c.createLinearGradient(gx + gw / 2, gy, near.left + near.width / 2, near.y);
+  shaft.addColorStop(0, 'rgba(255,236,200,.24)');
+  shaft.addColorStop(1, 'rgba(255,236,200,0)');
+  c.fillStyle = shaft;
+  c.beginPath();
+  c.moveTo(gx, gy);
+  c.lineTo(gx + gw, gy + gh * 0.3);
+  c.lineTo(near.left + near.width, near.y);
+  c.lineTo(near.left, near.y);
+  c.closePath();
+  c.fill();
 }
 
-// Light falls off away from the sunny corner: warm at the upper left, a touch darker at the right and the bottom
+// Light falls off away from the window: warm between the window and the shelf, a touch darker at the far left
+// and the bottom
 function paintFalloff(c: Ctx, width: number, height: number) {
-  const warm = c.createRadialGradient(width * 0.2, height * 0.15, 0, width * 0.2, height * 0.15, width * 0.6);
-  warm.addColorStop(0, 'rgba(255,238,205,.28)');
+  const warm = c.createRadialGradient(width * 0.62, height * 0.35, 0, width * 0.62, height * 0.35, width * 0.55);
+  warm.addColorStop(0, 'rgba(255,238,205,.22)');
   warm.addColorStop(1, 'rgba(255,238,205,0)');
   c.fillStyle = warm;
   c.fillRect(0, 0, width, height);
 
-  const fade = c.createLinearGradient(width * 0.45, 0, width, 0);
+  const fade = c.createLinearGradient(width * 0.4, 0, 0, 0);
   fade.addColorStop(0, 'rgba(70,50,30,0)');
-  fade.addColorStop(1, 'rgba(70,50,30,.16)');
+  fade.addColorStop(1, 'rgba(70,50,30,.14)');
   c.fillStyle = fade;
   c.fillRect(0, 0, width, height);
 
@@ -278,7 +294,7 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
   }
   paintSkirting(c, width, p.wallFoot, unit);
   paintFloor(c, width, height, p.wallFoot, unit);
-  if (!dark) paintSunlight(c, p, height);
+  if (!dark && pane) paintSunlight(c, p, pane, height);
 
   floorShadow(c, p.shelfX + (SHELF.width / 2) * unit, p.footY, SHELF.width * 0.62 * unit, unit);
   if (p.cabinet) {
@@ -317,9 +333,18 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
       t.restore();
     }
 
+    if (p.stand) {
+      t.save();
+      t.translate(p.stand.x, p.stand.y);
+      t.scale(-unit, unit);
+      paintStand(t, (HANG_POT.width / 2) * HANG_POT.top * HANG_SCALE * 0.92);
+      t.restore();
+    }
+
+    // Shelf, stand and cabinet are painted lit from the left: mirrored, so they're lit from the window
     t.save();
-    t.translate(p.shelfX, p.shelfY);
-    t.scale(unit, unit);
+    t.translate(p.shelfX + SHELF.width * unit, p.shelfY);
+    t.scale(-unit, unit);
     shelfLayout.paintBackdrop(t, SHELF.width, SHELF.height, dark);
     t.restore();
 
@@ -327,7 +352,10 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
       t.save();
       t.translate(p.cabinet.x, p.cabinet.y);
       t.scale(unit * FURNITURE, unit * FURNITURE);
+      t.save();
+      t.scale(-1, 1);
       paintCabinet(t);
+      t.restore();
       t.translate(0, -CABINET.height);
       decor.paint(t, dark);
       t.restore();
@@ -345,28 +373,51 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
   }
 }
 
+// The two pots hanging from the stand's beams; a vine may hang until just above the next pot's ring, or the floor
+function hangingSlots(p: Plan): LayoutSlot[] {
+  if (!p.stand) return [];
+  const { unit } = p;
+  const scale = HANG_SCALE * unit,
+    plantScale = scale * HANG_GROW;
+  return STAND.beams.map((beamHeight, row) => {
+    const soilY = p.footY - (beamHeight - STAND.drop) * unit;
+    const stopAt = row === 0 ? p.footY - (STAND.beams[1] - 20) * unit : p.footY - 12 * unit;
+    return {
+      index: HANGING_SLOTS[row],
+      x: p.stand!.x,
+      soilY,
+      scale,
+      plantScale,
+      pot: HANG_POT,
+      hangRoom: (stopAt - soilY) / plantScale,
+    };
+  });
+}
+
 export function roomLayout(decor: DecorKey): GardenLayout {
   return {
     slots(width, height) {
       const p = plan(width, height);
-      return shelfLayout.slots(SHELF.width, SHELF.height).map((slot) => ({
+      const shelf = shelfLayout.slots(SHELF.width, SHELF.height).map((slot) => ({
         ...slot,
         x: p.shelfX + slot.x * p.unit,
         soilY: p.shelfY + slot.soilY * p.unit,
         scale: slot.scale * p.unit,
         plantScale: (slot.plantScale ?? slot.scale) * p.unit,
       }));
+      return [...hangingSlots(p), ...shelf];
     },
     paintBackdrop: (c, width, height, dark) => paintRoom(c, width, height, decor, dark),
+    // On the floor right against the shelf's right foot; on a phone, just inside it
     canHome(width, height) {
       const p = plan(width, height);
-      // On the floor between the shelf and the cabinet; alone, inside the shelf's lower tier
-      if (p.cabinet) return { x: p.shelfX + (SHELF.width + GAP * 0.45) * p.unit, y: p.footY + 2 * p.unit };
-      const point = shelfLayout.canHome(SHELF.width, SHELF.height);
-      return { x: p.shelfX + point.x * p.unit, y: p.shelfY + point.y * p.unit };
+      const besideFoot = p.cabinet ? SHELF.width * 0.95 + 26 : SHELF.width * 0.84;
+      return { x: p.shelfX + besideFoot * p.unit, y: p.footY + 3 * p.unit };
     },
-    canScale: shelfLayout.canScale,
+    // A real can stands about twice as tall as these pots
+    canScale: 2.8,
     toolScale: (width, height) => plan(width, height).unit,
+    lightFromRight: true,
     maxVisitors: 5,
   };
 }

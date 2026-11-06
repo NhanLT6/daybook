@@ -223,12 +223,18 @@ function paintMonsteraLeaf(
 // Monstera: stalks rising close together from the soil, nearly straight with a gentle bow, each a different
 // length so the leaves spread evenly. Leaves face every way, not only left and right: ones leaning toward us
 // hang down and look short, ones leaning away tip back and sit in shade. The blade folds sharply at the joint.
+// How full a grown plant is: leaf count (the first 7 keep their old places), and size next to other plants
+export const MONSTERA = { leaves: 11, size: 1.3 };
+
+// Where each leaf stands around the pot, 0 far left .. 6 far right; leaves past the first 7 fill the gaps
+const SLOTS = [3, 0, 6, 1, 5, 2, 4, 1.5, 4.5, 0.5, 5.5, 2.5, 3.5];
+
 export const monstera: Plant = {
   name: 'Monstera',
   done: 'has split leaves',
+  size: MONSTERA.size,
   paint(c, stage, random) {
-    const order = [3, 0, 6, 1, 5, 2, 4];
-    const leaves = order.map((slot) => {
+    const leaves = SLOTS.slice(0, MONSTERA.leaves).map((slot) => {
       // Around the pot: slot 0 far left .. 6 far right, and a random lean toward (+) or away (-) from us
       const lean = (slot / 6 - 0.5) * 1.2 + (random() - 0.5) * 0.15;
       const toward = (random() - 0.5) * 2;
@@ -247,7 +253,8 @@ export const monstera: Plant = {
     const cuts = [0, 0, 0, 3, 5][stage];
     const windows = stage === 4;
     // Back to front, so leaves leaning toward us cover the ones behind
-    const visible = leaves.slice(0, [0, 3, 4, 6, 7][stage]).sort((a, b) => a.toward - b.toward);
+    const shown = Math.round(MONSTERA.leaves * [0, 0.43, 0.57, 0.86, 1][stage]);
+    const visible = leaves.slice(0, shown).sort((a, b) => a.toward - b.toward);
     for (const leaf of visible) {
       const length = leaf.length * grow;
       const base = { x: leaf.foot * 0.5, y: leaf.toward * 0.8 };

@@ -8,6 +8,12 @@ export function paintWateringCan(c: Ctx, x: number, baseY: number, withShadow = 
     c.ellipse(x + 3, baseY, 13, 2.6, 0, 0, Math.PI * 2);
     c.fill();
   }
+  // Handle first, its ends tucked into the body so it reads as attached
+  c.strokeStyle = '#5E9890';
+  c.lineWidth = 2.2;
+  c.beginPath();
+  c.arc(x + 2, baseY - 15, 6, Math.PI, 0);
+  c.stroke();
   const metal = c.createLinearGradient(x - 9, 0, x + 9, 0);
   metal.addColorStop(0, '#9CC9C2');
   metal.addColorStop(0.3, '#CFEAE4');
@@ -21,9 +27,6 @@ export function paintWateringCan(c: Ctx, x: number, baseY: number, withShadow = 
   c.beginPath();
   c.moveTo(x - 8, baseY - 12);
   c.lineTo(x - 18, baseY - 22);
-  c.stroke();
-  c.beginPath();
-  c.arc(x + 2, baseY - 19, 6, Math.PI, 0);
   c.stroke();
   c.fillStyle = '#4F8A82';
   c.beginPath();

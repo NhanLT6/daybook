@@ -25,18 +25,22 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
 ## Layouts
 - A slot carries the **plant index** in the garden state, so the same plant shows in every layout that places
   that index (watering in one shows in all).
-- `room.ts`: `roomLayout(decor)`, a room corner seen straight on. The shelf (`shelfLayout` in a 370×700 frame)
-  stands on the left, a low sage cabinet (`decor/cabinet.ts`) on the right with one item on top (`DECOR`:
-  `espresso` or `monitor`) and a window above it; plastered wall, skirting, oak floor boards. Room units are the
-  shelf's own pixels; one `unit` (px per room unit) fits the whole room to the canvas, so plants grow with the
-  screen. The cabinet, its item and the window are drawn at 0.85 so the plants stay the main thing. The window's
-  sill sits just above the item (`Decor.height`); a tall window runs past the top as if cropped. Below about
-  0.6 of the height-limited width there is no cabinet: the shelf stands alone in the middle (phones).
-  Plants are drawn bigger than their pots (`LayoutSlot.plantScale`, shelf `PLANT_GROW`): a grown plant may reach
-  past the plank above, like on a real shelf (Nhan's call). Day light comes from a window off to the upper left: a
-  pane-shaped sun patch on the wall and floor behind the shelf, the furniture layer casts one soft shadow to the
-  lower right, and the room falls off darker toward the right, so the plants are the brightest spot. The espresso
-  machine stands small at the right end of the cabinet for the same reason.
+- `room.ts`: `roomLayout(decor)`, a room corner seen straight on. From the left: a tall narrow hanging stand
+  (`decor/stand.ts`, built on the shelf's own `paintFrame`, same oak) with two hanging bowls on brass hooks and
+  jute cords (slots 9 and 10, `HANGING_SLOTS`; only `trails` plants are offered there, and their vines may hang
+  to the next pot or the floor), the shelf (`shelfLayout`), then a low sage cabinet (`decor/cabinet.ts`) with one
+  item on top (`DECOR`: `espresso` or `monitor`) under a big window (`decor/window.ts`) that always shows whole.
+  Plastered wall, skirting, oak floor boards. Room units are the shelf's own pixels; one `unit` fits the whole
+  room to the canvas. The cabinet, its item and the window are drawn at 0.85 so the plants stay the main thing.
+  Narrow screens (phones) get the shelf alone, no stand or cabinet.
+  Plants are drawn bigger than their pots (`LayoutSlot.plantScale`, shelf `PLANT_GROW` 1.15, kept moderate): a
+  grown plant may reach past the plank above (Nhan's call). Plants that are big in real life (pothos, monstera,
+  bougainvillea) also set `Plant.size`, and their fullness is a parameter object at the top of their file
+  (`POTHOS`, `MONSTERA`, `BOUGAINVILLEA`: leaves, branches, flowers).
+  Light comes from the window on the right (`GardenLayout.lightFromRight`): plants, pots and helpers are painted
+  lit from the upper left, so the scene mirrors pots and plants, and room.ts mirrors the shelf, stand and cabinet.
+  A slanted sun patch falls from the window across the floor toward the shelf, furniture casts one soft shadow
+  to the left, and the room falls off darker to the left. Decor on the cabinet is not mirrored.
   Night: one multiply pass darkens the room toward slate, except the window glass; `Decor.lit` then draws what
   stays bright (monitor screen and its glow, the espresso machine's power light). `paintBackdrop` gets `dark`.
 - `shelf.ts`: three planks on the original legs, 9 slots (3 per tier), wood grain from `decor/materials.ts`. The former floor slots 3–5 move onto the bottom plank, preserving plant indices. Hanging room stops above the next tier or floor. `row.ts`: `rowLayout(count)`, 1–3 pots in a row on the surface, no

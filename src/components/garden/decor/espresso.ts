@@ -203,23 +203,44 @@ function machine(c: Ctx) {
   c.fillRect(-68, -150, 4, 120);
 }
 
-// Glass jar of coffee beans, cork lid
+// Glass jar packed with coffee beans, cork lid: a dark roast fill behind, then beans in staggered rows over it
 function beanJar(c: Ctx, x: number) {
   softShadow(c, x, 40);
+  const top = -76,
+    bottom = -3;
   c.fillStyle = 'rgba(225,235,235,.45)';
   c.beginPath();
   c.roundRect(x - 24, -78, 48, 78, 8);
   c.fill();
+
+  c.save();
+  c.beginPath();
+  c.roundRect(x - 21, top, 42, bottom - top, 6);
+  c.clip();
+  c.fillStyle = '#3E2416';
+  c.fillRect(x - 21, top, 42, bottom - top);
   const random = seeded(0.47);
-  for (let i = 0; i < 70; i++) {
-    const bx = x - 19 + random() * 38,
-      by = -6 - random() * 50;
-    c.fillStyle = random() < 0.5 ? '#5B3520' : '#6E4429';
-    c.beginPath();
-    c.ellipse(bx, by, 3.4, 2.3, random() * TAU, 0, TAU);
-    c.fill();
+  for (let y = bottom; y > top - 4; y -= 3.6) {
+    for (let bx = x - 22 + random() * 3; bx < x + 23; bx += 5.2) {
+      const tone = random();
+      c.fillStyle = tone < 0.4 ? '#5B3520' : tone < 0.8 ? '#6E4429' : '#7E5233';
+      const angle = random() * TAU;
+      c.beginPath();
+      c.ellipse(bx, y + random() * 1.5, 3.4, 2.3, angle, 0, TAU);
+      c.fill();
+      // The crease down each bean
+      c.strokeStyle = 'rgba(30,15,8,.6)';
+      c.lineWidth = 0.5;
+      c.beginPath();
+      c.moveTo(bx - Math.cos(angle) * 2.4, y - Math.sin(angle) * 2.4);
+      c.lineTo(bx + Math.cos(angle) * 2.4, y + Math.sin(angle) * 2.4);
+      c.stroke();
+    }
   }
-  c.fillStyle = 'rgba(255,255,255,.5)';
+  c.restore();
+
+  // Glass highlight over the beans
+  c.fillStyle = 'rgba(255,255,255,.4)';
   c.fillRect(x - 19, -72, 3, 62);
   const cork = c.createLinearGradient(x - 22, 0, x + 22, 0);
   cork.addColorStop(0, '#C9A579');

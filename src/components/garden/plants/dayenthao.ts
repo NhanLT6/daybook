@@ -48,6 +48,7 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number) {
 // Trailing petunia: a mound of soft leaves and violet trumpets that spills over the pot and hangs down
 export const dayenthao: Plant = {
   name: 'Trailing petunia',
+  trails: true,
   done: 'spills over in bloom',
   flowering: true,
   paint(c, stage, random, room) {
@@ -74,7 +75,7 @@ export const dayenthao: Plant = {
     // Hanging strands first, so the mound sits on top of where they leave the pot
     if (hang > 0) {
       strands.forEach((strand, index) => {
-        const reach = Math.min(room, 105) * strand.length * hang;
+        const reach = Math.min(room, 230) * strand.length * hang;
         paintStrand(c, strand, reach, '#5F8D3E');
         // Short strands carry fewer leaves, so leaves sit about as far apart on every strand
         const leaves = leavesOn[index].slice(0, Math.round(5 + strand.length * 11));

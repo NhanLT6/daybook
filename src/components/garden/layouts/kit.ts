@@ -4,6 +4,9 @@
 import type { Ctx } from '../creatures/kit';
 import type { Pot } from '../pots/kit';
 
+// Plant indices that hang from the tall stand: only trailing plants are offered there
+export const HANGING_SLOTS = [9, 10];
+
 export interface LayoutSlot {
   // Index into the garden state's plants: the same plant shows in every layout that places this index
   index: number;
@@ -29,6 +32,9 @@ export interface GardenLayout {
   canScale: number;
   // Optional scene transform for tools when a layout embeds a scaled arrangement.
   toolScale?: (width: number, height: number) => number;
+  // Light comes from the right (a window on that side): pots and plants, which are painted lit from the upper
+  // left, are drawn mirrored so their highlights face the light
+  lightFromRight?: boolean;
   // Most insects out at once; left out for no limit
   maxVisitors?: number;
 }
