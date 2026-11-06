@@ -146,12 +146,19 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   // -1 mirrors pots and plants so their painted highlights face a light on the right
   const flip = layout.lightFromRight ? -1 : 1;
 
+  let lightMap: HTMLCanvasElement | null = null;
+
   // The layout's scenery is the only fixed layer: painted once per size and theme, then copied every frame
   function buildBackdrop() {
     const surface = layer();
     layout.paintBackdrop(surface.context, width, height, dark, light());
     if (dark) nightTint(surface.context);
     backdrop = surface.canvas;
+    if (layout.paintLight) {
+      const map = layer();
+      layout.paintLight(map.context, width, height, dark, light());
+      lightMap = map.canvas;
+    } else lightMap = null;
   }
 
   function plantBitmap(index: number): HTMLCanvasElement {
@@ -224,7 +231,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   }));
   function paintDust(time: number, delta: number) {
     const sun = light()?.sun;
-    const shaft = sun && layout.lightShaft?.(width, height, sun.reach);
+    const shaft = sun && layout.lightShaft?.(width, height, sun.slant);
     if (!shaft) return;
     const lerp = (a: { x: number; y: number }, b: { x: number; y: number }, t: number) => ({
       x: a.x + (b.x - a.x) * t,
@@ -331,7 +338,13 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     paintCreatures(c, time);
     if (dark) nightTint(c);
     ctx.drawImage(foreground.canvas, 0, 0, width, height);
-    // The part of the day's colour over room and plants alike
+    // Light and shade over room and plants alike, then the part of the day's colour
+    if (lightMap) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.drawImage(lightMap, 0, 0, width, height);
+      ctx.restore();
+    }
     const grade = light()?.grade;
     if (grade) {
       ctx.save();

@@ -25,34 +25,28 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
 ## Layouts
 - A slot carries the **plant index** in the garden state, so the same plant shows in every layout that places
   that index (watering in one shows in all).
-- `room.ts`: `roomLayout(decor)`, a room corner seen straight on. From the left: a tall narrow hanging stand
-  (`decor/stand.ts`, built on the shelf's own `paintFrame`, same oak) with two hanging bowls on brass hooks and
-  jute cords (slots 9 and 10, `HANGING_SLOTS`; only `trails` plants are offered there, and their vines may hang
-  to the next pot or the floor), the shelf (`shelfLayout`), then a low sage cabinet (`decor/cabinet.ts`) with one
-  item on top (`DECOR`: `espresso` or `monitor`) under a big window (`decor/window.ts`) that always shows whole.
-  Plastered wall, skirting, oak floor boards. Room units are the shelf's own pixels; one `unit` fits the whole
-  room to the canvas. The cabinet, its item and the window are drawn at 0.85 so the plants stay the main thing.
-  Narrow screens (phones) get the shelf alone, no stand or cabinet.
-  Plants are drawn bigger than their pots (`LayoutSlot.plantScale`, shelf `PLANT_GROW` 1.15, kept moderate): a
-  grown plant may reach past the plank above (Nhan's call). Pothos' fullness is the `POTHOS` object at the top
-  of its file, as is monstera's leaf count (`MONSTERA`, 7). Nhan found bigger, lusher pothos, monstera and
-  bougainvillea too much, so no plant sets `Plant.size` now; the field stays for later use. The
-  bougainvillea bonsai gets its height from tiers instead: `TRUNK` pieces rising one above the other, each
-  sending branches to leafy `PADS`, which a young plant fills from the bottom up.
-  Light comes from the window on the right (`GardenLayout.lightFromRight`): plants, pots and helpers are painted
-  lit from the upper left, so the scene mirrors pots and plants, and room.ts mirrors the shelf, stand and cabinet.
-  A slanted sun patch falls from the window across the floor toward the shelf, furniture casts one soft shadow
-  to the left, and the room falls off darker to the left. Decor on the cabinet is not mirrored.
-  Depth and time of day (`layouts/daylight.ts`): by day the room follows the viewer's clock in four parts
-  (morning 5–10, noon 10–15, golden 15–18:30, dusk after; preview one with localStorage `gardenDayPart`). Each
-  `Daylight` sets the window sky, the sun's colour, strength and reach (floor patch + beam; dusk has no sun),
-  plant shadows on the wall (`GardenLayout.castShadow` direction × the part's length and opacity), the rim on
-  leaves facing the window (`rimLight` in the scene, baked into the cached plant bitmap) and a multiply grade
-  over room and plants; dusk adds a warm soft-light lamp glow. The scene checks the clock once a minute and
-  repaints the backdrop when the part changes. Depth cues: haze over the window view, a wash over the cabinet,
-  dust drifting in the beam (`GardenLayout.lightShaft`). Dark mode keeps its own night and ignores daylight.
-  Night: one multiply pass darkens the room toward slate, except the window glass; `Decor.lit` then draws what
-  stays bright (monitor screen and its glow, the espresso machine's power light). `paintBackdrop` gets `dark`.
+- `room.ts`: `roomLayout(decor)`, a plain white room seen straight on, open on the right to a courtyard (a light
+  well, about a third of the width): the same plaster wall out in the open, raked Japanese gravel, a stepping
+  stone, a timber sill and a dark post where the room's roof ends. No window, no sky. From the left: a low sage
+  cabinet (`decor/cabinet.ts`, 0.75 scale) with one item (`DECOR`: `espresso` or `monitor`), the shelf
+  (`shelfLayout`), then the tall hanging stand (`decor/stand.ts`, the shelf's own `paintFrame`) with two hanging
+  bowls (slots 9 and 10, `HANGING_SLOTS`, only `trails` plants). The can stands between shelf and stand. Floor
+  boards are all one length, each row's joints a third of a board on (a steady stagger). Narrow screens get the
+  shelf alone, still lit from the right.
+  Plants are drawn bigger than their pots (`LayoutSlot.plantScale`, shelf `PLANT_GROW` 1.15). Pothos' fullness is
+  `POTHOS`, monstera's leaf count `MONSTERA` (7); no plant sets `Plant.size` now (Nhan found bigger too much).
+  The bougainvillea gets height from bonsai tiers (`TRUNK` pieces, `PADS` per tier).
+  One light source, from above the courtyard (`lightFromRight`: pots, plants, shelf, stand, cabinet and decor are
+  painted lit from the upper left and mirrored). A point in the room is lit when its ray, traced back up at the
+  part of the day's slant, clears the room's edge; the courtyard is always lit. `paintLight` (the layout's light
+  map) is multiplied over everything each frame, plants included: white where lit, toward a shade colour away
+  from it, with a soft edge. Sun colour is laid on the lit side in the backdrop.
+  Time of day (`layouts/daylight.ts`): by day the room follows the viewer's clock (morning 5–10, noon 10–15,
+  golden 15–18:30, dusk after; preview with localStorage `gardenDayPart`). Each `Daylight` sets sun colour,
+  strength and slant, the room's shade, plant shadows on the wall (`castShadow` × length/opacity), the leaf rim
+  (`rimLight`, baked into cached plant bitmaps) and a grade; dusk has no sun and a warm soft-light lamp glow.
+  Dust drifts in the beam (`lightShaft`). The scene checks the clock once a minute. Dark mode is moonlight: the
+  same light map in cool slate, plus the night colour filter; `Decor.lit` keeps the espresso power light glowing.
 - `shelf.ts`: three planks on the original legs, 9 slots (3 per tier), wood grain from `decor/materials.ts`. The former floor slots 3–5 move onto the bottom plank, preserving plant indices. Hanging room stops above the next tier or floor. `row.ts`: `rowLayout(count)`, 1–3 pots in a row on the surface, no
   scenery; it uses the first `count` slots, so adding pots later keeps the plant already in pot 1.
 - The user picks one in Settings → Garden (`settingsStore.gardenLayout`, default `shelf`). The choices live in

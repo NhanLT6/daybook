@@ -38,6 +38,8 @@ export interface GardenLayout {
   // Fixed scenery behind the pots, painted once per size and theme
   // light: the part of the day by day (see ./daylight), null in dark mode
   paintBackdrop: (c: Ctx, width: number, height: number, dark: boolean, light?: Daylight | null) => void;
+  // Light and shade multiplied over everything, plants included: white where the light falls, darker away from it
+  paintLight?: (c: Ctx, width: number, height: number, dark: boolean, light?: Daylight | null) => void;
   // Where the watering can rests (its base), and how big it is
   canHome: (width: number, height: number) => { x: number; y: number };
   canScale: number;
@@ -50,7 +52,7 @@ export interface GardenLayout {
   // lets dust drift in it by day
   // Where a plant's shadow falls on the wall behind it, in plant pixels (before mirroring); none by night
   castShadow?: { x: number; y: number };
-  lightShaft?: (width: number, height: number, reach?: number) => LightShaft | null;
+  lightShaft?: (width: number, height: number, slant?: number) => LightShaft | null;
   // Most insects out at once; left out for no limit
   maxVisitors?: number;
 }
