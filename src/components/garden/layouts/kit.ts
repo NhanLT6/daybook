@@ -11,6 +11,9 @@ export interface LayoutSlot {
   x: number;
   soilY: number;
   scale: number;
+  // Plant pixels to scene pixels; left out, the plant matches its pot (scale). Bigger lets grown plants
+  // spill over the shelf like real ones do
+  plantScale?: number;
   pot: Pot;
   // Plant pixels a trailing vine may hang below the soil before it hits something
   hangRoom: number;

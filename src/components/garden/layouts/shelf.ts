@@ -22,7 +22,9 @@ const ROWS = { top: 0.25, middle: 0.54, bottom: 0.83 };
 const FLOOR_Y = 0.925;
 type Row = keyof typeof ROWS;
 const ROW_OF_SLOT: Row[] = ['middle', 'middle', 'middle', 'bottom', 'bottom', 'bottom', 'top', 'top', 'top'];
-const ROW_SCALE = { top: 1.05, middle: 1.1, bottom: 1.1 };
+const ROW_SCALE = { top: 1.4, middle: 1.4, bottom: 1.4 };
+// Plants grow bigger than their pots: a grown plant may reach past the plank above, as on a real shelf
+const PLANT_GROW = 1.4;
 // Back to front, so lower rows paint over the vines hanging from higher ones
 const PAINT_ORDER: Row[] = ['top', 'middle', 'bottom'];
 
@@ -147,10 +149,12 @@ function paintShelf(c: Ctx, width: number, height: number) {
 }
 
 // A vine may hang over its own plank, but must stop above the next tier or the floor.
-function hangRoom(row: Row, potKey: PotKey, height: number, scale: number) {
+// In plant pixels, measured from the soil.
+function hangRoom(row: Row, potKey: PotKey, height: number, scale: number, plantScale: number) {
   const nextRow = row === 'top' ? ROWS.middle : row === 'middle' ? ROWS.bottom : FLOOR_Y;
-  const freeBelowSoil = ((nextRow - ROWS[row]) * height - PLANK_DEPTH) / scale + POTS[potKey].height;
-  return Math.max(POTS[potKey].height, freeBelowSoil);
+  const potHeight = POTS[potKey].height * scale;
+  const freeBelowSoil = ((nextRow - ROWS[row]) * height - PLANK_DEPTH + potHeight) / plantScale;
+  return Math.max(potHeight / plantScale, freeBelowSoil);
 }
 
 export const shelfLayout: GardenLayout = {
@@ -161,6 +165,7 @@ export const shelfLayout: GardenLayout = {
         if (slotRow !== row) return;
         const pot = POTS[POT_OF_SLOT[index]];
         const scale = ROW_SCALE[row];
+        const plantScale = scale * PLANT_GROW;
         // On a plank the pot stands mid-depth, not on the front edge
         const shelfY = height * ROWS[row] - PLANK_DEPTH * 0.5;
         slots.push({
@@ -168,8 +173,9 @@ export const shelfLayout: GardenLayout = {
           x: width * (0.29 + (index % 3) * 0.21),
           soilY: shelfY - pot.height * scale,
           scale,
+          plantScale,
           pot,
-          hangRoom: hangRoom(row, POT_OF_SLOT[index], height, scale),
+          hangRoom: hangRoom(row, POT_OF_SLOT[index], height, scale, plantScale),
         });
       });
     }

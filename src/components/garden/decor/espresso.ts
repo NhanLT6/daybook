@@ -7,7 +7,9 @@ import { TAU } from '../creatures/kit';
 import { seeded } from '../plants/wood';
 import { chrome } from './materials';
 
-const MACHINE_X = 40;
+// Off to the right and a bit under true size: a quiet prop beside the plants, not a second centre of attention
+const MACHINE_X = 110,
+  MACHINE_SCALE = 0.78;
 const ENAMEL = ['#FBF5E8', '#EADFC8', '#CDBD9C'];
 
 function enamel(c: Ctx, x: number, w: number) {
@@ -30,8 +32,8 @@ function softShadow(c: Ctx, x: number, w: number) {
   c.restore();
 }
 
-// Small cup; `upsideDown` for the ones warming on top of the machine
-function cup(c: Ctx, x: number, base: number, upsideDown = false) {
+// Small cup on its saucer, with crema
+function cup(c: Ctx, x: number, base: number) {
   const top = base - 18;
   const china = c.createLinearGradient(x - 11, 0, x + 11, 0);
   china.addColorStop(0, '#E9E6E0');
@@ -39,21 +41,13 @@ function cup(c: Ctx, x: number, base: number, upsideDown = false) {
   china.addColorStop(1, '#C9C5BD');
   c.fillStyle = china;
   c.beginPath();
-  if (upsideDown) {
-    c.moveTo(x - 7, top);
-    c.lineTo(x + 7, top);
-    c.lineTo(x + 11, base);
-    c.lineTo(x - 11, base);
-  } else {
-    c.moveTo(x - 11, top);
-    c.lineTo(x + 11, top);
-    c.quadraticCurveTo(x + 10, base, x + 6, base);
-    c.lineTo(x - 6, base);
-    c.quadraticCurveTo(x - 10, base, x - 11, top);
-  }
+  c.moveTo(x - 11, top);
+  c.lineTo(x + 11, top);
+  c.quadraticCurveTo(x + 10, base, x + 6, base);
+  c.lineTo(x - 6, base);
+  c.quadraticCurveTo(x - 10, base, x - 11, top);
   c.closePath();
   c.fill();
-  if (upsideDown) return;
 
   // Handle, crema and saucer
   c.strokeStyle = '#D9D5CD';
@@ -194,7 +188,7 @@ function machine(c: Ctx) {
   c.roundRect(64, -122, 12, 10, 3);
   c.fill();
 
-  // Cup warmer rail and two cups resting upside down on top
+  // Cup warmer rail on top
   c.strokeStyle = chrome(c, -66, 132);
   c.lineWidth = 2;
   c.beginPath();
@@ -203,8 +197,6 @@ function machine(c: Ctx) {
   c.lineTo(66, -174);
   c.lineTo(66, -164);
   c.stroke();
-  cup(c, -28, -164, true);
-  cup(c, 0, -164, true);
 
   // Gloss along the enamel's left side
   c.fillStyle = 'rgba(255,255,255,.35)';
@@ -241,17 +233,18 @@ function beanJar(c: Ctx, x: number) {
 
 export const espresso: Decor = {
   paint(c) {
-    beanJar(c, -140);
     c.save();
     c.translate(MACHINE_X, 0);
+    c.scale(MACHINE_SCALE, MACHINE_SCALE);
+    beanJar(c, -140);
     machine(c);
     c.restore();
   },
   // The power light glows at night
   lit(c, dark) {
     if (!dark) return;
-    const x = MACHINE_X + 52,
-      y = -130;
+    const x = MACHINE_X + 52 * MACHINE_SCALE,
+      y = -130 * MACHINE_SCALE;
     const glow = c.createRadialGradient(x, y, 0, x, y, 14);
     glow.addColorStop(0, 'rgba(255,170,70,.9)');
     glow.addColorStop(0.25, 'rgba(255,150,60,.35)');

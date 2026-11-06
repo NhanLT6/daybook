@@ -13,13 +13,13 @@ import { seeded } from '../plants/wood';
 import { shelfLayout } from './shelf';
 
 // Room units match the shelf drawing's own pixels (floor at 0.925 of its height)
-const SHELF = { width: 370, height: 700, floor: 700 * 0.925 };
+const SHELF = { width: 420, height: 700, floor: 700 * 0.925 };
 // Cabinet, its item and the window are a bit smaller than true scale, so the plants stay the main thing
 const FURNITURE = 0.85;
 const MARGIN = 40,
   GAP = 170,
   // Head room above the tallest top-tier plant
-  TOP = 24,
+  TOP = 52,
   // How far the wall's foot sits behind the furniture's feet
   FLOOR_DEPTH = 90;
 const ROOM_WIDTH = MARGIN * 2 + SHELF.width + GAP + CABINET.width * FURNITURE;
@@ -143,9 +143,10 @@ function windowBox(p: Plan, width: number, height: number) {
   return { x: cabinet.x - halfWidth, y: top, scale, size };
 }
 
-// Night for furniture: painted on its own layer, then darkened only where something was painted
-function furniture(c: Ctx, dark: boolean, paint: (target: Ctx) => void) {
-  if (!dark) return paint(c);
+// Furniture, window frame and curtains are painted on their own layer, then laid on the room in one go:
+// by day with one soft shadow cast to the lower right (sun from the upper left), at night darkened only
+// where something was painted.
+function furniture(c: Ctx, dark: boolean, unit: number, paint: (target: Ctx) => void) {
   const layer = document.createElement('canvas');
   layer.width = c.canvas.width;
   layer.height = c.canvas.height;
@@ -153,13 +154,104 @@ function furniture(c: Ctx, dark: boolean, paint: (target: Ctx) => void) {
   target.setTransform(c.getTransform());
   paint(target);
   target.setTransform(1, 0, 0, 1, 0, 0);
-  target.globalCompositeOperation = 'source-atop';
-  target.fillStyle = 'rgba(30,36,48,.52)';
-  target.fillRect(0, 0, layer.width, layer.height);
+  if (dark) {
+    target.globalCompositeOperation = 'source-atop';
+    target.fillStyle = 'rgba(30,36,48,.52)';
+    target.fillRect(0, 0, layer.width, layer.height);
+  }
+
+  const ratio = c.getTransform().a;
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
+  if (!dark) {
+    c.shadowColor = 'rgba(80,55,30,.3)';
+    c.shadowBlur = 10 * unit * ratio;
+    c.shadowOffsetX = 26 * unit * ratio;
+    c.shadowOffsetY = 8 * unit * ratio;
+  }
   c.drawImage(layer, 0, 0);
   c.restore();
+}
+
+// Fill a shape with soft edges, on every browser: the shape is drawn far off to the left and only its blurred
+// shadow lands in place
+function softFill(c: Ctx, color: string, blur: number, shape: (offset: number) => void) {
+  const far = 20000;
+  const ratio = c.getTransform().a;
+  c.save();
+  c.shadowColor = color;
+  c.shadowBlur = blur * ratio;
+  c.shadowOffsetX = far * ratio;
+  c.fillStyle = '#000';
+  c.beginPath();
+  shape(-far);
+  c.fill();
+  c.restore();
+}
+
+// Sunlight through a window off to the upper left: a slanted two-by-two pane patch on the wall behind the
+// shelf, and a longer one stretched across the floor in front of it. Makes the shelf the brightest place.
+function paintSunlight(c: Ctx, p: Plan, height: number) {
+  const { unit } = p;
+  const left = p.shelfX - 70 * unit,
+    patchWidth = (SHELF.width + 150) * unit;
+  const top = height * 0.1,
+    bottom = p.wallFoot;
+  const slant = (bottom - top) * 0.32;
+  const bar = 9 * unit;
+
+  softFill(c, 'rgba(255,224,165,.5)', 7 * unit, (offset) => {
+    for (const [col, row] of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ]) {
+      const x0 = left + col * (patchWidth / 2 + bar / 2) + offset,
+        w = patchWidth / 2 - bar / 2;
+      const y0 = top + row * ((bottom - top) / 2 + bar / 2),
+        h = (bottom - top) / 2 - bar / 2;
+      // The patch leans: lower rows sit further right, as light falling from the upper left would
+      const shift = (y: number) => ((y - top) / (bottom - top)) * slant;
+      c.moveTo(x0 + shift(y0), y0);
+      c.lineTo(x0 + w + shift(y0), y0);
+      c.lineTo(x0 + w + shift(y0 + h), y0 + h);
+      c.lineTo(x0 + shift(y0 + h), y0 + h);
+      c.closePath();
+    }
+  });
+
+  // On the floor the same light lies flatter and longer, toward the viewer
+  softFill(c, 'rgba(255,224,165,.32)', 10 * unit, (offset) => {
+    const y0 = p.wallFoot + 4 * unit,
+      y1 = height;
+    c.moveTo(left + slant + offset, y0);
+    c.lineTo(left + slant + patchWidth + offset, y0);
+    c.lineTo(left + slant + patchWidth * 1.35 + offset, y1);
+    c.lineTo(left + slant + patchWidth * 0.2 + offset, y1);
+    c.closePath();
+  });
+}
+
+// Light falls off away from the sunny corner: warm at the upper left, a touch darker at the right and the bottom
+function paintFalloff(c: Ctx, width: number, height: number) {
+  const warm = c.createRadialGradient(width * 0.2, height * 0.15, 0, width * 0.2, height * 0.15, width * 0.6);
+  warm.addColorStop(0, 'rgba(255,238,205,.28)');
+  warm.addColorStop(1, 'rgba(255,238,205,0)');
+  c.fillStyle = warm;
+  c.fillRect(0, 0, width, height);
+
+  const fade = c.createLinearGradient(width * 0.45, 0, width, 0);
+  fade.addColorStop(0, 'rgba(70,50,30,0)');
+  fade.addColorStop(1, 'rgba(70,50,30,.16)');
+  c.fillStyle = fade;
+  c.fillRect(0, 0, width, height);
+
+  const floor = c.createLinearGradient(0, height * 0.75, 0, height);
+  floor.addColorStop(0, 'rgba(60,40,20,0)');
+  floor.addColorStop(1, 'rgba(60,40,20,.14)');
+  c.fillStyle = floor;
+  c.fillRect(0, height * 0.75, width, height * 0.25);
 }
 
 function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, dark: boolean) {
@@ -174,7 +266,7 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
     const cx = pane.x + (pane.size.width * pane.scale) / 2,
       cy = pane.y + (pane.size.height * pane.scale) / 2;
     const glow = c.createRadialGradient(cx, cy, 0, cx, cy, width * 0.45);
-    glow.addColorStop(0, 'rgba(255,250,232,.55)');
+    glow.addColorStop(0, 'rgba(255,250,232,.3)');
     glow.addColorStop(1, 'rgba(255,250,232,0)');
     c.fillStyle = glow;
     c.fillRect(0, 0, width, p.wallFoot);
@@ -186,6 +278,7 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
   }
   paintSkirting(c, width, p.wallFoot, unit);
   paintFloor(c, width, height, p.wallFoot, unit);
+  if (!dark) paintSunlight(c, p, height);
 
   floorShadow(c, p.shelfX + (SHELF.width / 2) * unit, p.footY, SHELF.width * 0.62 * unit, unit);
   if (p.cabinet) {
@@ -215,7 +308,7 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
   }
 
   // Frame, curtains and furniture darken as one layer at night, so only the glass stays bright
-  furniture(c, dark, (t) => {
+  furniture(c, dark, unit, (t) => {
     if (pane) {
       t.save();
       t.translate(pane.x, pane.y);
@@ -241,6 +334,8 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
     }
   });
 
+  if (!dark) paintFalloff(c, width, height);
+
   if (p.cabinet && decor.lit) {
     c.save();
     c.translate(p.cabinet.x, p.cabinet.y - CABINET.height * FURNITURE * unit);
@@ -259,6 +354,7 @@ export function roomLayout(decor: DecorKey): GardenLayout {
         x: p.shelfX + slot.x * p.unit,
         soilY: p.shelfY + slot.soilY * p.unit,
         scale: slot.scale * p.unit,
+        plantScale: (slot.plantScale ?? slot.scale) * p.unit,
       }));
     },
     paintBackdrop: (c, width, height, dark) => paintRoom(c, width, height, decor, dark),

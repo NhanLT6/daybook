@@ -32,6 +32,11 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   screen. The cabinet, its item and the window are drawn at 0.85 so the plants stay the main thing. The window's
   sill sits just above the item (`Decor.height`); a tall window runs past the top as if cropped. Below about
   0.6 of the height-limited width there is no cabinet: the shelf stands alone in the middle (phones).
+  Plants are drawn bigger than their pots (`LayoutSlot.plantScale`, shelf `PLANT_GROW`): a grown plant may reach
+  past the plank above, like on a real shelf (Nhan's call). Day light comes from a window off to the upper left: a
+  pane-shaped sun patch on the wall and floor behind the shelf, the furniture layer casts one soft shadow to the
+  lower right, and the room falls off darker toward the right, so the plants are the brightest spot. The espresso
+  machine stands small at the right end of the cabinet for the same reason.
   Night: one multiply pass darkens the room toward slate, except the window glass; `Decor.lit` then draws what
   stays bright (monitor screen and its glow, the espresso machine's power light). `paintBackdrop` gets `dark`.
 - `shelf.ts`: three planks on the original legs, 9 slots (3 per tier), wood grain from `decor/materials.ts`. The former floor slots 3–5 move onto the bottom plank, preserving plant indices. Hanging room stops above the next tier or floor. `row.ts`: `rowLayout(count)`, 1–3 pots in a row on the surface, no

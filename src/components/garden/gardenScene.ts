@@ -138,6 +138,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
 
   // Only plant indices the layout places exist in this scene
   const slotOf = (index: number) => slotByIndex.get(index)!;
+  const plantScaleOf = (index: number) => slotOf(index).plantScale ?? slotOf(index).scale;
 
   // The layout's scenery is the only fixed layer: painted once per size and theme, then copied every frame
   function buildBackdrop() {
@@ -154,7 +155,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     const cached = plantBitmaps.get(key);
     if (cached) return cached;
     // Painted at the size it is shown, so a plant scaled up in a large layout stays sharp
-    const ratio = pixelRatio() * Math.max(1, slotOf(index).scale);
+    const ratio = pixelRatio() * Math.max(1, plantScaleOf(index));
     const bitmap = document.createElement('canvas');
     bitmap.width = 200 * ratio;
     bitmap.height = PLANT_BITMAP_HEIGHT * ratio;
@@ -195,7 +196,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       c.translate(x + lift.x, soilY + 0.5 - lift.y);
       c.rotate(lift.tilt);
       c.rotate(Math.sin(time * 1.1 + index) * 0.03);
-      c.scale(scale * grow, scale * grow);
+      c.scale(plantScaleOf(index) * grow, plantScaleOf(index) * grow);
       c.drawImage(plantBitmap(index), -100, -130, 200, PLANT_BITMAP_HEIGHT);
       c.restore();
       if (pulse > 0) pulses.set(index, Math.max(0, pulse - 0.025));
@@ -308,7 +309,9 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
 
   // A perch moves with its plant's sway, so a landed insect rides the leaf.
   function spotWorld(index: number, spot: Spot, time: number) {
-    const { x, soilY, scale } = slotOf(index);
+    const { x, soilY } = slotOf(index);
+    // Rim spots are in pot pixels, every other spot in plant pixels
+    const scale = spot.rim ? slotOf(index).scale : plantScaleOf(index);
     const sway = Math.sin(time * 1.1 + index) * 0.03;
     const along = spot.dx * scale,
       down = spot.dy * scale;
