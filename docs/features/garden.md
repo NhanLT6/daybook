@@ -34,9 +34,9 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   room to the canvas. The cabinet, its item and the window are drawn at 0.85 so the plants stay the main thing.
   Narrow screens (phones) get the shelf alone, no stand or cabinet.
   Plants are drawn bigger than their pots (`LayoutSlot.plantScale`, shelf `PLANT_GROW` 1.15, kept moderate): a
-  grown plant may reach past the plank above (Nhan's call). Pothos (mostly in a hanging pot) sets `Plant.size`
-  1.3; its fullness is the `POTHOS` object at the top of its file, as is monstera's leaf count (`MONSTERA`, 7).
-  Nhan found a bigger, lusher monstera and bougainvillea too much, so they stay at the shelf's size. The
+  grown plant may reach past the plank above (Nhan's call). Pothos' fullness is the `POTHOS` object at the top
+  of its file, as is monstera's leaf count (`MONSTERA`, 7). Nhan found bigger, lusher pothos, monstera and
+  bougainvillea too much, so no plant sets `Plant.size` now; the field stays for later use. The
   bougainvillea bonsai gets its height from tiers instead: `TRUNK` pieces rising one above the other, each
   sending branches to leafy `PADS`, which a young plant fills from the bottom up.
   Light comes from the window on the right (`GardenLayout.lightFromRight`): plants, pots and helpers are painted

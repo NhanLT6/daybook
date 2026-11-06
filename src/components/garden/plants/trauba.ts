@@ -2,16 +2,15 @@ import type { Plant } from './kit';
 
 import { facing, makeStrands, paintLeaf, paintStrand, stem, strandAt, TONES } from './kit';
 
-// How full a grown plant is: leaves standing up out of the pot, short ones draping over its rim, long vines
-// (only where there is room below, as in a hanging pot), and size next to other plants
-export const POTHOS = { upright: 11, drapes: 6, vines: 6, size: 1.3 };
+// How full a grown plant is: leaves standing up out of the pot, short ones draping over its rim, and long vines
+// (only where there is room below, as in a hanging pot)
+export const POTHOS = { upright: 7, drapes: 4, vines: 6 };
 
 // Pothos: heart leaves on short stems from the pot, a few draping over the rim; with room below (hanging pot)
 // long vines trail down with leaves along them
 export const trauba: Plant = {
   name: 'Pothos',
   trails: true,
-  size: POTHOS.size,
   done: 'trails long vines',
   paint(c, stage, random, room) {
     const leaves = [];
@@ -24,7 +23,15 @@ export const trauba: Plant = {
       leaves.push({ angle, reach, drape, depth: random(), size: 9 + random() * 5, twist: (random() - 0.5) * 0.7 });
     }
     const strands = makeStrands(random, POTHOS.vines);
-    const leavesOn = strands.map(() => Array.from({ length: 12 }, () => random()));
+    // Each leaf on a vine has its own size, side, spread and depth, so the vines read as loose and random
+    const leavesOn = strands.map(() =>
+      Array.from({ length: 12 }, (_, at) => ({
+        size: random(),
+        side: (at % 2 ? 1 : -1) * (random() < 0.2 ? -1 : 1),
+        spread: 0.7 + random() * 0.8,
+        depth: random(),
+      })),
+    );
 
     // Long vines first, behind the leaves in the pot; they only grow once the plant is established
     const hang = [0, 0, 0.3, 0.65, 1][stage];
@@ -33,21 +40,24 @@ export const trauba: Plant = {
         const reach = Math.min(room, 230) * strand.length * hang;
         paintStrand(c, strand, reach, '#5E8F3F');
         const count = Math.round(3 + strand.length * 9);
-        leavesOn[index].slice(0, count).forEach((size, at) => {
+        leavesOn[index].slice(0, count).forEach((leaf, at) => {
           const t = (at + 1) / count;
-          const p = strandAt(strand, reach, t);
-          const side = at % 2 ? 1 : -1;
-          const length = (8 + size * 5) * (0.6 + stage * 0.1);
+          const p = strandAt(strand, reach, t),
+            q = strandAt(strand, reach, Math.min(1, t + 0.02));
+          // Leaves stand off the vine at their own angle, along its direction, not all pointing the same way
+          const along = Math.atan2(q.y - p.y, q.x - p.x);
+          const look = facing(leaf.depth, along + leaf.side * leaf.spread);
+          const length = (7 + leaf.size * 4) * (0.6 + stage * 0.1);
           paintLeaf(
             c,
             p.x,
             p.y,
-            Math.PI / 2 + side * 0.9,
-            length * 1.5,
-            length * 0.6,
-            size > 0.5 ? TONES.fresh : TONES.deep,
+            look.angle,
+            length * 1.4 * look.squash,
+            length * 0.55,
+            leaf.size > 0.5 ? TONES.fresh : TONES.deep,
             'heart',
-            strand.depth * 0.3,
+            look.shade + strand.depth * 0.2,
           );
         });
       });
