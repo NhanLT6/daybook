@@ -282,6 +282,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     if (!foreground || foreground.canvas.width !== canvas.width) foreground = layer();
     const c = foreground.context;
     c.clearRect(0, 0, width, height);
+    layout.paintBehind?.(c, width, height, time);
 
     // Plant shadows on the wall first, behind every pot and plant; they sway with their plant
     const cast = layout.castShadow,
