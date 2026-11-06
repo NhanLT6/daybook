@@ -10,6 +10,7 @@ import type { GardenLayout, LayoutSlot } from './kit';
 
 import { DECOR } from '../decor';
 import { CABINET, paintCabinet } from '../decor/cabinet';
+import { BENCH, paintBamboo, paintBench, paintLantern, paintMaple, paintMoss } from '../decor/courtyard';
 import { plaster, woodGrain } from '../decor/materials';
 import { paintStand, STAND } from '../decor/stand';
 import { seeded } from '../plants/wood';
@@ -45,6 +46,8 @@ const HANG_POT = POTS.bowl,
 const WALL = ['#F8F6F2', '#EFECE6'];
 const FLOOR = ['#CDA77E', '#C39C72', '#BA9268', '#C8A177'];
 const GRAVEL = '#D9D4CA';
+// The timber post where the room's roof ends, and the sill under it
+const POST = 14;
 
 interface Plan {
   // Pixels per room unit
@@ -85,6 +88,17 @@ function plan(width: number, height: number): Plan {
 // toward the viewer
 function edgeAt(p: Plan, width: number, y: number) {
   return p.courtX + ((y - p.wallFoot) / (p.footY - p.wallFoot)) * (p.courtX - width / 2) * 0.12;
+}
+
+// The open courtyard as a path: its wall right of the post, its floor right of the edge
+function courtShape(c: Ctx, p: Plan, width: number, height: number) {
+  c.beginPath();
+  c.moveTo(p.courtX, 0);
+  c.lineTo(width, 0);
+  c.lineTo(width, height);
+  c.lineTo(edgeAt(p, width, height), height);
+  c.lineTo(edgeAt(p, width, p.wallFoot), p.wallFoot);
+  c.closePath();
 }
 
 function paintWall(c: Ctx, width: number, wallFoot: number) {
@@ -145,6 +159,63 @@ function paintFloor(c: Ctx, p: Plan, width: number, height: number) {
   c.fillRect(0, wallFoot, width, depth);
 }
 
+// What fills the courtyard. Preview only for now: localStorage `gardenCourt` = maple | bamboo | bench
+type CourtStyle = 'maple' | 'bamboo' | 'bench';
+function courtStyle(): CourtStyle {
+  try {
+    const style = localStorage.getItem('gardenCourt');
+    if (style === 'bamboo' || style === 'bench') return style;
+  } catch {
+    // No storage
+  }
+  return 'maple';
+}
+
+// Courtyard pieces, back to front: a tree or bamboo against the back wall, moss, a stone lantern, and (bench
+// style) a low bench for potted plants
+function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number, glow: number) {
+  const { unit, wallFoot } = p;
+  const court = width - p.courtX;
+  const ground = (t: number) => wallFoot + (height - wallFoot) * t;
+  const place = (x: number, y: number, paint: () => void, scale = unit) => {
+    c.save();
+    c.translate(x, y);
+    c.scale(scale, scale);
+    paint();
+    c.restore();
+  };
+  const style = courtStyle();
+
+  const backY = ground(0.12);
+  if (style === 'bamboo') place(p.courtX + court * 0.7, backY, () => paintBamboo(c, (backY - height * 0.04) / unit));
+  else place(p.courtX + court * 0.66, backY, () => paintMaple(c, (backY - height * 0.04) / unit, style === 'maple'));
+
+  place(p.courtX + court * 0.28, ground(0.5), () => paintMoss(c, 60, 10, 0.12));
+  place(p.courtX + court * 0.7, ground(0.2), () => paintMoss(c, 70, 8, 0.27));
+  place(p.courtX + court * 0.24, ground(0.42), () => paintLantern(c, glow), unit * 0.95);
+  if (style === 'bench') place(p.courtX + court * 0.6, ground(0.62), () => paintBench(c));
+}
+
+// Slots on the courtyard bench (bench style only)
+const BENCH_SLOTS = [11, 12, 13];
+function benchSlots(p: Plan, width: number, height: number): LayoutSlot[] {
+  if (p.courtX >= width || courtStyle() !== 'bench') return [];
+  const court = width - p.courtX;
+  const benchX = p.courtX + court * 0.6,
+    benchTop = p.wallFoot + (height - p.wallFoot) * 0.62 - BENCH.height * p.unit;
+  const pot = POTS.ceramic,
+    scale = 1.4 * p.unit;
+  return BENCH_SLOTS.map((index, at) => ({
+    index,
+    x: benchX + (at - 1) * BENCH.width * 0.32 * p.unit,
+    soilY: benchTop - pot.height * scale,
+    scale,
+    plantScale: scale * 1.15,
+    pot,
+    hangRoom: 20,
+  }));
+}
+
 // The courtyard's back wall is out in the open: the high walls around the light well (off the picture) shade its
 // upper right in a soft diagonal, and a dark timber post marks where the room's roof ends
 function paintCourtWall(c: Ctx, p: Plan, width: number) {
@@ -156,7 +227,7 @@ function paintCourtWall(c: Ctx, p: Plan, width: number) {
   c.fillStyle = shade;
   c.fillRect(p.courtX, 0, width - p.courtX, wallFoot);
 
-  const post = 14 * unit;
+  const post = POST * unit;
   const wood = c.createLinearGradient(p.courtX - post, 0, p.courtX, 0);
   wood.addColorStop(0, '#5E4632');
   wood.addColorStop(0.6, '#7E6046');
@@ -225,22 +296,27 @@ function paintCourt(c: Ctx, p: Plan, width: number, height: number) {
   c.fill();
   c.restore();
 
-  // Timber sill where the room's floor ends, following the edge
-  const sill = 12 * unit;
+  // Timber sill where the room's floor ends: it starts right under the post and widens toward the viewer, its
+  // right edge running along the courtyard's edge
+  const post = POST * unit,
+    widen = 1.8;
+  const top = edgeAt(p, width, wallFoot),
+    bottom = edgeAt(p, width, height);
   c.fillStyle = '#7A5A3E';
   c.beginPath();
-  c.moveTo(edgeAt(p, width, wallFoot) - sill * 0.5, wallFoot);
-  c.lineTo(edgeAt(p, width, wallFoot) + sill * 0.5, wallFoot);
-  c.lineTo(edgeAt(p, width, height) + sill, height);
-  c.lineTo(edgeAt(p, width, height) - sill, height);
+  c.moveTo(top - post, wallFoot);
+  c.lineTo(top, wallFoot);
+  c.lineTo(bottom, height);
+  c.lineTo(bottom - post * widen, height);
   c.closePath();
   c.fill();
+  // Its lit face toward the courtyard
   c.fillStyle = 'rgba(255,230,200,.25)';
   c.beginPath();
-  c.moveTo(edgeAt(p, width, wallFoot) + sill * 0.2, wallFoot);
-  c.lineTo(edgeAt(p, width, wallFoot) + sill * 0.5, wallFoot);
-  c.lineTo(edgeAt(p, width, height) + sill, height);
-  c.lineTo(edgeAt(p, width, height) + sill * 0.4, height);
+  c.moveTo(top - post * 0.35, wallFoot);
+  c.lineTo(top, wallFoot);
+  c.lineTo(bottom, height);
+  c.lineTo(bottom - post * widen * 0.35, height);
   c.closePath();
   c.fill();
 }
@@ -308,7 +384,8 @@ function paintSun(c: Ctx, p: Plan, width: number, height: number, rgb: string, s
   c.fillRect(0, 0, width, height);
   if (p.courtX < width) {
     c.fillStyle = `rgba(${rgb},${(0.1 * strength).toFixed(2)})`;
-    c.fillRect(p.courtX, 0, width - p.courtX, height);
+    courtShape(c, p, width, height);
+    c.fill();
   }
 }
 
@@ -338,13 +415,7 @@ function paintLightMap(c: Ctx, width: number, height: number, dark: boolean, lig
   // The courtyard is open to the sky: all of it is lit
   if (p.courtX < width) {
     c.fillStyle = lit;
-    c.beginPath();
-    c.moveTo(p.courtX, 0);
-    c.lineTo(width, 0);
-    c.lineTo(width, height);
-    c.lineTo(edgeAt(p, width, height), height);
-    c.lineTo(edgeAt(p, width, p.wallFoot), p.wallFoot);
-    c.closePath();
+    courtShape(c, p, width, height);
     c.fill();
   }
 }
@@ -367,6 +438,7 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
   if (p.courtX < width) {
     paintCourtWall(c, p, width);
     paintCourt(c, p, width, height);
+    paintCourtPieces(c, p, width, height, dark ? 1 : light?.lamp ? 0.6 : 0);
   }
   if (dark) paintSun(c, p, width, height, '205,215,235', 0.5, 0.55);
   else if (light?.sun) paintSun(c, p, width, height, light.sun.rgb, light.sun.strength, light.sun.slant);
@@ -443,7 +515,7 @@ export function roomLayout(decor: DecorKey): GardenLayout {
         scale: slot.scale * p.unit,
         plantScale: (slot.plantScale ?? slot.scale) * p.unit,
       }));
-      return [...hangingSlots(p), ...shelf];
+      return [...hangingSlots(p), ...shelf, ...benchSlots(p, width, height)];
     },
     paintBackdrop: (c, width, height, dark, light) => paintRoom(c, width, height, decor, dark, light),
     paintLight: paintLightMap,

@@ -28,7 +28,7 @@ export type SpeciesKey = PlantKey;
 
 export const MAX_STAGE = 4;
 // Plant slots kept in the garden state; a layout shows some or all of them
-export const SLOT_COUNT = 11;
+export const SLOT_COUNT = 14;
 
 export interface GardenPlant {
   species: SpeciesKey;
