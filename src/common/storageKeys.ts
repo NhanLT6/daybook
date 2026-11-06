@@ -15,7 +15,8 @@ export const storageKeys = {
     useDefaultTasks: 'useDefaultTasks',
     useCategories: 'useCategories',
     rememberLastSelectedDate: 'rememberLastSelectedDate',
-    showGarden: 'showGarden',
+    // Renamed from 'showGarden' when the default became off: the old key holds an auto-written `true` for everyone
+    showGarden: 'gardenEnabled',
     gardenLayout: 'gardenLayout',
     lastSelectedDate: 'lastSelectedDate',
     backgroundUrl: 'backgroundUrl',

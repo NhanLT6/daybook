@@ -561,7 +561,7 @@ const handleImportBackup = async (selected: File | File[] | null): Promise<void>
           </VCardTitle>
           <VCardText class="d-flex flex-column ga-3">
             <div class="text-body-2 text-medium-emphasis">
-              Your plant shelf on a balcony, watered by your new logs. Off by default. Turning it off only hides it:
+              A plant shelf in a cosy room corner, watered by your new logs. Off by default. Turning it off only hides it:
               your plants and drops stay as they are and come back when you turn it on.
             </div>
             <VBtn

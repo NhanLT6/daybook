@@ -142,7 +142,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   // The layout's scenery is the only fixed layer: painted once per size and theme, then copied every frame
   function buildBackdrop() {
     const surface = layer();
-    layout.paintBackdrop(surface.context, width, height);
+    layout.paintBackdrop(surface.context, width, height, dark);
     if (dark) nightTint(surface.context);
     backdrop = surface.canvas;
   }

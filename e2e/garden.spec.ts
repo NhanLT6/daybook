@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 import { expect, test } from '@playwright/test';
 
-import { balconyLayout } from '../src/components/garden/layouts/balcony';
+import { roomLayout } from '../src/components/garden/layouts/room';
 
 test.use({ viewport: { width: 1440, height: 1000 }, headless: true });
 
@@ -33,8 +33,7 @@ test('Garden is opt-in, has its own page, and keeps plants when hidden', async (
   const fullscreen = (await page.getByRole('button', { name: 'Fullscreen', exact: true }).boundingBox())!;
   expect(fullscreen.y).toBe(box.y + 16);
   expect(fullscreen.x + fullscreen.width).toBe(box.x + box.width - 16);
-  // The middle tier keeps saved slot 0 after the extra plank is added.
-  const slot = balconyLayout.slots(box.width, box.height).find((slot) => slot.index === 0)!;
+  const slot = roomLayout('espresso').slots(box.width, box.height).find((slot) => slot.index === 0)!;
   await canvas.click({ position: { x: slot.x, y: slot.soilY - 14 * slot.scale } });
   await page.getByRole('button', { name: 'Monstera', exact: true }).click();
   await expectOnePlant(page);
@@ -74,11 +73,11 @@ test('Garden fits mobile, hides the top bar in fullscreen, and exits with its bu
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
-test('the previous garden preference opens the balcony and preserves grown plants', async ({ page }) => {
+test('the previous garden preference opens the room corner and preserves grown plants', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
-    localStorage.setItem('showGarden', 'true');
+    localStorage.setItem('gardenEnabled', 'true');
     localStorage.setItem('notificationGreetingLastShownAt', String(Date.now()));
     localStorage.setItem('gardenLayout', 'japanese');
     const species = ['monstera', 'lanhodiep', 'senda', 'luoiho', 'tocien', 'duongxi', 'hoagiay', 'hongmon', 'trauba'];
@@ -100,13 +99,13 @@ test('the previous garden preference opens the balcony and preserves grown plant
       JSON.parse(localStorage.getItem('garden')!).plants.every((p: { stage: number }) => p.stage === 4),
     ),
   ).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('balcony-grown-desktop.png') });
+  await page.screenshot({ path: test.info().outputPath('room-grown-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(async () => Math.round((await page.locator('.garden-canvas').boundingBox())!.width)).toBe(374);
-  await page.screenshot({ path: test.info().outputPath('balcony-grown-mobile.png') });
+  await page.screenshot({ path: test.info().outputPath('room-grown-mobile.png') });
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.getByRole('button', { name: 'Fullscreen', exact: true }).click();
   await expect.poll(async () => Math.round((await page.locator('.garden-canvas').boundingBox())!.width)).toBe(1920);
-  await page.screenshot({ path: test.info().outputPath('balcony-grown-fullscreen.png') });
+  await page.screenshot({ path: test.info().outputPath('room-grown-fullscreen.png') });
   expect(errors).toEqual([]);
 });

@@ -118,7 +118,7 @@ describe('useBackup settings', () => {
     const exported = vi.mocked(saveAs).mock.calls.at(-1)![0] as Blob;
     const json = JSON.parse(new TextDecoder().decode(await readBlob(exported)));
 
-    expect(json.settings).toMatchObject({ dailyTargetHours: 6, weekendDays: [6, 0], showGarden: true, theme: 'dark' });
+    expect(json.settings).toMatchObject({ dailyTargetHours: 6, weekendDays: [6, 0], showGarden: false, theme: 'dark' });
     expect(json.settings).not.toHaveProperty('lastSelectedDate');
     expect(json.settings).not.toHaveProperty('jiraConfig');
   });
@@ -161,7 +161,7 @@ describe('useBackup settings', () => {
     });
 
     expect(store.dailyTargetHours).toBe(8);
-    expect(store.showGarden).toBe(true);
+    expect(store.showGarden).toBe(false);
     expect(store.weekendDays).toEqual([5, 6, 0]);
     expect(store.backgroundImageMode).toBe('cover');
     expect(store.dateDisplayFormat).toBe('MM/DD/YYYY');

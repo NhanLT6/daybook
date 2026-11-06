@@ -1,8 +1,8 @@
-// Every layout the user can pick in Settings → Garden, in menu order: add or remove one here.
+// Garden layouts the user can pick in Settings → Garden. Plants keep their slot index in every layout.
 // More pots in a row is one more entry: { label: '2 plants', height: …, create: () => rowLayout(2) }.
 import type { GardenLayout } from './kit';
 
-import { balconyLayout } from './balcony';
+import { roomLayout } from './room';
 import { rowLayout } from './row';
 
 export interface GardenLayoutOption {
@@ -13,7 +13,8 @@ export interface GardenLayoutOption {
 }
 
 export const GARDEN_LAYOUTS = {
-  shelf: { label: 'Balcony shelf', height: 640, create: () => balconyLayout },
+  shelf: { label: 'Coffee corner', height: 640, create: () => roomLayout('espresso') },
+  desk: { label: 'Desk corner', height: 640, create: () => roomLayout('monitor') },
   one: { label: 'One plant', height: 240, create: () => rowLayout(1) },
 } satisfies Record<string, GardenLayoutOption>;
 

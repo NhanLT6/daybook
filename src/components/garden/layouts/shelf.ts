@@ -3,6 +3,7 @@ import type { Ctx } from '../creatures/kit';
 import type { PotKey } from '../pots';
 import type { GardenLayout, LayoutSlot } from './kit';
 
+import { woodGrain } from '../decor/materials';
 import { POTS } from '../pots';
 
 // Slot index → pot; slot order is the garden state's order, not the paint order
@@ -21,7 +22,7 @@ const ROWS = { top: 0.25, middle: 0.54, bottom: 0.83 };
 const FLOOR_Y = 0.925;
 type Row = keyof typeof ROWS;
 const ROW_OF_SLOT: Row[] = ['middle', 'middle', 'middle', 'bottom', 'bottom', 'bottom', 'top', 'top', 'top'];
-const ROW_SCALE = { top: 0.9, middle: 1, bottom: 1 };
+const ROW_SCALE = { top: 1.05, middle: 1.1, bottom: 1.1 };
 // Back to front, so lower rows paint over the vines hanging from higher ones
 const PAINT_ORDER: Row[] = ['top', 'middle', 'bottom'];
 
@@ -50,6 +51,7 @@ function plank(c: Ctx, y: number, left: number, right: number) {
   c.lineTo(left, y);
   c.closePath();
   c.fill();
+  woodGrain(c, left, y - depth, right - left, depth, y / 1000, { density: 4 });
   const face = c.createLinearGradient(0, y, 0, y + thickness);
   face.addColorStop(0, WOOD.face[0]);
   face.addColorStop(0.5, WOOD.face[1]);
@@ -58,6 +60,7 @@ function plank(c: Ctx, y: number, left: number, right: number) {
   c.beginPath();
   c.roundRect(left, y, right - left, thickness, [0, 0, 2.5, 2.5]);
   c.fill();
+  woodGrain(c, left, y, right - left, thickness, y / 997, { density: 5, knots: false });
   // Light falls from the left: the face fades darker toward the right end.
   const across = c.createLinearGradient(left, 0, right, 0);
   across.addColorStop(0, 'rgba(255,240,215,.12)');
@@ -98,6 +101,7 @@ function leg(
   c.beginPath();
   c.roundRect(x, top, legWidth, bottom - top, [0, 0, 1.5, 1.5]);
   c.fill();
+  woodGrain(c, x, top, legWidth, bottom - top, x / 977, { along: 'y', density: 5 });
   if (shadeBy) {
     c.fillStyle = `rgba(30,18,10,${shadeBy})`;
     c.fillRect(x, top, legWidth, bottom - top);

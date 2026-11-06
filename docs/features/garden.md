@@ -1,7 +1,8 @@
 # Garden
 
 Canvas 2D mini game on the dedicated `/garden` page, available on desktop and mobile.
-Garden is opt-in (`showGarden` defaults to `false`); Settings enables the page link in navigation.
+Garden is opt-in (`showGarden` defaults to `false`, stored under the `gardenEnabled` key: the old `showGarden` key
+held an auto-written `true` from when the default was on); Settings enables the page link in navigation.
 A direct visit while disabled shows a link to Settings and does not mount the scene.
 The garden card fills the available viewport with an 8px inset, without a title, stats or footer. An icon button floats in its upper-right corner. Fullscreen hides app navigation and chat without using the browser Fullscreen API.
 Exit fullscreen or Escape restores the UI; leaving the page resets this transient mode. Everything it paints lives in its own folder under
@@ -14,19 +15,31 @@ Exit fullscreen or Escape restores the UI; leaving the page resets this transien
 | `creatures/` | Insects, seeds | `Creature` + `GardenWorld` in `creatures/kit.ts` |
 | `tools/` | Watering can, trowel | plain paint functions |
 | `layouts/` | Where pots stand + scenery behind them | `GardenLayout` / `LayoutSlot` in `layouts/kit.ts` |
+| `decor/` | Room pieces: cabinet, window, items on the cabinet, wood/plaster textures | `Decor` in `decor/index.ts` |
 
 `gardenScene.ts` is the engine: frame loop, plant bitmaps, landing spots, water, digging, night tint. It never
 knows about a shelf; it asks its `layout` (default `shelfLayout`).
 
+A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
+
 ## Layouts
 - A slot carries the **plant index** in the garden state, so the same plant shows in every layout that places
   that index (watering in one shows in all).
-- `balcony.ts`: the original shelf centered against a balcony's back wall, with an open railing on the left and glass door on the right. It composes `shelfLayout` in a 340×620 frame (same plank/leg painters, taller legs and enough headroom for grown plants); shelf painting, pot indices, shapes and hanging room come from the existing shelf. The balcony uses a single perspective camera in metres (2m wide, 2.4m high, 1.8m deep; 1.05m railing; 2.15m glazing). The rack is about 95cm wide and 1.3m high, with its front feet and watering can on the same floor plane. Its scale follows its physical size at its depth rather than filling the screen. Rail members terminate at the back wall; door panes and reflections are inset in the same wall plane. Plants, tools and creatures use the regular scene renderer again. The background uses simple architectural planes, without material textures. Daylight enters at upper left, with a gentle sheltered shade at upper right. Rail shadows project along a shared sun direction onto the floor (clipped to that plane), with soft edges; lighting and shadows are cached with the backdrop on resize/theme changes.
-- `shelf.ts`: three planks on the original legs, 9 slots (3 per tier). The former floor slots 3–5 move onto the bottom plank, preserving plant indices. Hanging room stops above the next tier or floor. `row.ts`: `rowLayout(count)`, 1–3 pots in a row on the surface, no
+- `room.ts`: `roomLayout(decor)`, a room corner seen straight on. The shelf (`shelfLayout` in a 370×700 frame)
+  stands on the left, a low sage cabinet (`decor/cabinet.ts`) on the right with one item on top (`DECOR`:
+  `espresso` or `monitor`) and a window above it; plastered wall, skirting, oak floor boards. Room units are the
+  shelf's own pixels; one `unit` (px per room unit) fits the whole room to the canvas, so plants grow with the
+  screen. The cabinet, its item and the window are drawn at 0.85 so the plants stay the main thing. The window's
+  sill sits just above the item (`Decor.height`); a tall window runs past the top as if cropped. Below about
+  0.6 of the height-limited width there is no cabinet: the shelf stands alone in the middle (phones).
+  Night: one multiply pass darkens the room toward slate, except the window glass; `Decor.lit` then draws what
+  stays bright (monitor screen and its glow, the espresso machine's power light). `paintBackdrop` gets `dark`.
+- `shelf.ts`: three planks on the original legs, 9 slots (3 per tier), wood grain from `decor/materials.ts`. The former floor slots 3–5 move onto the bottom plank, preserving plant indices. Hanging room stops above the next tier or floor. `row.ts`: `rowLayout(count)`, 1–3 pots in a row on the surface, no
   scenery; it uses the first `count` slots, so adding pots later keeps the plant already in pot 1.
 - The user picks one in Settings → Garden (`settingsStore.gardenLayout`, default `shelf`). The choices live in
   `layouts/index.ts` (`GARDEN_LAYOUTS`: label, canvas height, factory); 2 or 3 plants is one more entry there.
-  The earlier `japanese` preference migrates to `shelf`, without changing saved plants or drops.
+  Options: `shelf` (Coffee corner, espresso), `desk` (Desk corner, monitor), `one`. Unknown older keys (`japanese`,
+  balcony) fall back to `shelf`, without changing saved plants or drops.
   `GardenPanel` rebuilds the scene when the choice changes. On the Garden page its canvas fills the available height (`getHeight`), resizing without resetting plant or watering state. Plants in slots the layout does not show are kept.
 - `maxVisitors` on a layout caps how many insects are out at once (the row: one per pot, so a lone plant gets one
   visitor at a time). Creatures with `visitor: false` (drifting seeds) don't count.

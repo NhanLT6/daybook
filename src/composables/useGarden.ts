@@ -58,8 +58,9 @@ export function useGarden() {
     if (startDay()) earnDrops(1);
   };
 
+  // A new plant starts as a seedling (stage 1): stage 0 is bare soil, which made planting look like nothing happened
   const plant = (index: number, species: SpeciesKey) => {
-    state.value.plants[index] = { species, stage: 0, seed: newSeed() };
+    state.value.plants[index] = { species, stage: 1, seed: newSeed() };
   };
 
   const clear = (index: number) => {

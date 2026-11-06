@@ -20,7 +20,7 @@ export interface GardenLayout {
   // Slots for a scene of this size, in paint order: back to front
   slots: (width: number, height: number) => LayoutSlot[];
   // Fixed scenery behind the pots, painted once per size and theme
-  paintBackdrop: (c: Ctx, width: number, height: number) => void;
+  paintBackdrop: (c: Ctx, width: number, height: number, dark: boolean) => void;
   // Where the watering can rests (its base), and how big it is
   canHome: (width: number, height: number) => { x: number; y: number };
   canScale: number;
