@@ -173,7 +173,12 @@ function machine(c: Ctx) {
   c.fillRect(-7, -70, 3, 5);
   c.fillRect(4, -70, 3, 5);
 
-  cup(c, 0, -24);
+  // Sized to a real espresso cup (~6.5 cm on a ~30 cm machine), so its rim sits just under the spouts
+  c.save();
+  c.translate(0, -24);
+  c.scale(1.5, 1.5);
+  cup(c, 0, 0);
+  c.restore();
 
   // Steam wand on the right, with its knob
   c.strokeStyle = chrome(c, 60, 16);
