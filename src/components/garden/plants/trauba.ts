@@ -35,7 +35,8 @@ export const trauba: Plant = {
 
     // Long vines first, behind the leaves in the pot; they only grow once the plant is established
     const hang = [0, 0, 0.3, 0.65, 1][stage];
-    if (room > 60 && hang > 0) {
+    const hanging = room > 60;
+    if (hanging && hang > 0) {
       strands.forEach((strand, index) => {
         const reach = Math.min(room, 230) * strand.length * hang;
         paintStrand(c, strand, reach, '#5E8F3F');
@@ -47,7 +48,8 @@ export const trauba: Plant = {
           // Leaves stand off the vine at their own angle, along its direction, not all pointing the same way
           const along = Math.atan2(q.y - p.y, q.x - p.x);
           const look = facing(leaf.depth, along + leaf.side * leaf.spread);
-          const length = (7 + leaf.size * 4) * (0.6 + stage * 0.1);
+          // Big near the pot like the leaves in it, smaller toward the young tip, so vines and pot read as one plant
+          const length = (7 + leaf.size * 4) * (0.6 + stage * 0.1) * (1.35 - t * 0.55);
           paintLeaf(
             c,
             p.x,
@@ -67,7 +69,8 @@ export const trauba: Plant = {
     const share = [0, 0.2, 0.4, 0.65, 1][stage];
     const visible = [
       ...leaves.filter((leaf) => !leaf.drape).slice(0, shown(share, POTHOS.upright)),
-      ...leaves.filter((leaf) => leaf.drape).slice(0, shown(stage >= 3 ? share : 0, POTHOS.drapes)),
+      // In a hanging pot the vines do the draping, so the short drapes (a second, different look) are left out
+      ...leaves.filter((leaf) => leaf.drape).slice(0, hanging ? 0 : shown(stage >= 3 ? share : 0, POTHOS.drapes)),
     ].sort((a, b) => b.depth - a.depth);
     for (const leaf of visible) {
       const endX = Math.cos(leaf.angle) * leaf.reach;
