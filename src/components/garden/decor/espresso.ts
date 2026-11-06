@@ -32,9 +32,16 @@ function softShadow(c: Ctx, x: number, w: number) {
   c.restore();
 }
 
-// Small cup on its saucer, with crema
+// Small espresso cup with crema, standing on the drip tray. The handle is drawn first and its ends run
+// into the cup, so the body covers them and it reads as one piece.
 function cup(c: Ctx, x: number, base: number) {
   const top = base - 18;
+  c.strokeStyle = '#D9D5CD';
+  c.lineWidth = 2.4;
+  c.beginPath();
+  c.arc(x + 10, top + 8, 5, -1.9, 1.9);
+  c.stroke();
+
   const china = c.createLinearGradient(x - 11, 0, x + 11, 0);
   china.addColorStop(0, '#E9E6E0');
   china.addColorStop(0.3, '#FFFFFF');
@@ -49,19 +56,9 @@ function cup(c: Ctx, x: number, base: number) {
   c.closePath();
   c.fill();
 
-  // Handle, crema and saucer
-  c.strokeStyle = '#D9D5CD';
-  c.lineWidth = 2.4;
-  c.beginPath();
-  c.arc(x + 12, top + 7, 4.5, -1.3, 1.3);
-  c.stroke();
   c.fillStyle = '#7A4A2A';
   c.beginPath();
   c.ellipse(x, top + 1, 10, 2.2, 0, 0, TAU);
-  c.fill();
-  c.fillStyle = '#F2EFE9';
-  c.beginPath();
-  c.ellipse(x, base + 1, 16, 2.6, 0, 0, TAU);
   c.fill();
 }
 
