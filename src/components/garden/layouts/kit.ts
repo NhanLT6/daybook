@@ -53,8 +53,9 @@ export interface GardenLayout {
   // A sunbeam as two edges, top (at the window) and bottom (on the floor), each left point then right; the scene
   // lets dust drift in it by day
   lightShaft?: (width: number, height: number, slant?: number) => LightShaft | null;
-  // Moving scenery painted every frame behind the pots and plants: a tree stirring in the wind
-  paintBehind?: (c: Ctx, width: number, height: number, time: number) => void;
+  // Moving scenery painted every frame behind the pots and plants: a tree stirring in the wind. `sun` is how
+  // strong the light is for its shadows (0 none)
+  paintBehind?: (c: Ctx, width: number, height: number, time: number, sun: number) => void;
   // Moving shade painted every frame by day, over the pots and plants but under the light map: leaf shadows
   // stirring on the courtyard floor. `strength` follows the sun's.
   paintShade?: (c: Ctx, width: number, height: number, time: number, strength: number) => void;

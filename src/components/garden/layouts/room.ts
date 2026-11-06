@@ -167,7 +167,7 @@ function paintFloor(c: Ctx, p: Plan, width: number, height: number) {
 function groveOf(p: Plan, width: number, height: number) {
   const court = width - p.courtX;
   const ground = p.wallFoot + (height - p.wallFoot) * 0.16;
-  return { x: p.courtX + court * 0.82, y: ground, tall: (ground * 1.3) / p.unit, reach: (court * 0.75) / p.unit };
+  return { x: p.courtX + court * 0.82, y: ground, tall: (ground * 1.3) / p.unit, reach: (court * 1.05) / p.unit };
 }
 
 // Courtyard pieces: a bed of pebbles round the trees' feet (the trees themselves move, see paintTrees)
@@ -196,8 +196,30 @@ function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number) {
 
 // The trees, painted every frame so their branches can stir: each trunk and each branch is a bitmap made once per
 // size, painted back to front (so branches of different trunks interleave), each branch turned a little about its
-// joint, the upper ones (thinner wood) a little more
-const groveCache = { key: '', pieces: [] as { canvas: HTMLCanvasElement; x: number; y: number; ox: number; oy: number; sway: number }[] };
+// joint, the upper ones (thinner wood) a little more. Each piece also has a soft dark silhouette, its shadow.
+interface TreePiece {
+  canvas: HTMLCanvasElement;
+  shadow: HTMLCanvasElement;
+  x: number;
+  y: number;
+  ox: number;
+  oy: number;
+  sway: number;
+}
+const groveCache = { key: '', pieces: [] as TreePiece[] };
+
+// A piece's shadow: its silhouette filled dark, kept at a quarter of the resolution so it comes out soft when drawn
+function silhouette(source: HTMLCanvasElement) {
+  const shadow = document.createElement('canvas');
+  shadow.width = Math.max(1, Math.ceil(source.width / 4));
+  shadow.height = Math.max(1, Math.ceil(source.height / 4));
+  const s = shadow.getContext('2d')!;
+  s.drawImage(source, 0, 0, shadow.width, shadow.height);
+  s.globalCompositeOperation = 'source-in';
+  s.fillStyle = 'rgb(30,34,40)';
+  s.fillRect(0, 0, shadow.width, shadow.height);
+  return shadow;
+}
 
 function grovePieces(p: Plan, width: number, height: number) {
   const ratio = window.devicePixelRatio || 1;
@@ -217,6 +239,7 @@ function grovePieces(p: Plan, width: number, height: number) {
     piece.paint(t);
     return {
       canvas,
+      shadow: silhouette(canvas),
       x: grove.x + piece.x * unit,
       y: grove.y + piece.y * unit,
       ox: left * unit,
@@ -227,22 +250,41 @@ function grovePieces(p: Plan, width: number, height: number) {
   return groveCache.pieces;
 }
 
-function paintTrees(c: Ctx, width: number, height: number, time: number) {
+// Where the trees may show: the courtyard, plus the room's wall above the floor, where branches reach in over the
+// room's edge (in front of its post)
+function treeArea(c: Ctx, p: Plan, width: number, height: number) {
+  courtShape(c, p, width, height);
+  c.rect(0, 0, p.courtX, p.wallFoot);
+}
+
+function paintTrees(c: Ctx, width: number, height: number, time: number, sun: number) {
   const p = plan(width, height);
   if (p.courtX >= width) return;
+  const { unit } = p;
   const ratio = window.devicePixelRatio || 1;
   const gust = 0.6 + 0.4 * Math.sin(time * 0.23);
-  c.save();
-  courtShape(c, p, width, height);
-  c.clip();
-  grovePieces(p, width, height).forEach((piece, index) => {
-    const sway = (Math.sin(time * 0.9 + index * 0.9) * 0.012 + Math.sin(time * 2.3 + index * 1.7) * 0.004) * gust * piece.sway;
+  const pieces = grovePieces(p, width, height);
+  const swayOf = (piece: TreePiece, index: number) =>
+    (Math.sin(time * 0.9 + index * 0.9) * 0.012 + Math.sin(time * 2.3 + index * 1.7) * 0.004) * gust * piece.sway;
+  const draw = (piece: TreePiece, index: number, image: HTMLCanvasElement, dx: number, dy: number) => {
     c.save();
-    c.translate(piece.x, piece.y);
-    c.rotate(sway);
-    c.drawImage(piece.canvas, -piece.ox, -piece.oy, piece.canvas.width / ratio, piece.canvas.height / ratio);
+    c.translate(piece.x + dx, piece.y + dy);
+    c.rotate(swayOf(piece, index));
+    c.drawImage(image, -piece.ox, -piece.oy, piece.canvas.width / ratio, piece.canvas.height / ratio);
     c.restore();
-  });
+  };
+
+  c.save();
+  treeArea(c, p, width, height);
+  c.clip();
+  // Shadows first, thrown down and to the left onto the courtyard's wall and gravel by the light from above right;
+  // the trunks' shadows reach the ground at their feet
+  if (sun > 0) {
+    c.globalAlpha = Math.min(0.3, 0.2 * sun);
+    pieces.forEach((piece, index) => draw(piece, index, piece.shadow, -34 * unit, 20 * unit));
+    c.globalAlpha = 1;
+  }
+  pieces.forEach((piece, index) => draw(piece, index, piece.canvas, 0, 0));
   c.restore();
 }
 

@@ -35,7 +35,9 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   a timber sill and a dark post where the room's roof ends. No window, no sky, no lantern, no moss. The clump is cut
   into pieces (each trunk, each branch with its leaves), each a bitmap made once per size; `paintBehind` paints
   them back to front every frame, so branches of different trunks interleave (further back = darker), and turns
-  each branch a little about its joint (wind, slow gusts).
+  each branch a little about its joint (wind, slow gusts). Each piece has a quarter-resolution dark silhouette drawn first,
+  offset down-left, as its shadow (strength from `paintBehind`'s `sun`). Branches may reach into the room above
+  the floor, in front of the room's post (`treeArea`); only the top of the picture cuts the crown.
   By day, soft leaf shade drifts on the courtyard floor (`paintShade`, drawn every frame under the light map).
   Woody plants' leaves (the courtyard trees, the bougainvillea) use `plants/foliage.ts` `paintFoliageLeaf`: a
   stalk, a blade folded along its midrib (lit half lighter), foreshortening, a soft contact shadow, a per-leaf
