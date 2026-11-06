@@ -98,28 +98,60 @@ function paintBloom(c: Ctx, x: number, y: number, size: number, turn: number, sh
   c.restore();
 }
 
-// Bougainvillea bonsai: a gnarled trunk full of small side twigs, leafy pads and rounded clusters of bracts,
-// some magenta and some white on the same bush
-// How full a grown bush is: leafy pads (up to 5), leaves per pad, bloom clusters per pad, and size next to
-// other plants
-export const BOUGAINVILLEA = { pads: 5, padLeaves: 28, clusters: 3, size: 1.25 };
+// Bougainvillea bonsai: a gnarled trunk that rises in tiers, like a trained bonsai. Each tier sends branches out
+// to leafy pads with rounded clusters of bracts, some magenta and some white on the same bush.
+// How full a grown bush is: leaves per pad and bloom clusters per pad
+export const BOUGAINVILLEA = { padLeaves: 20, clusters: 3 };
 
+// The trunk in three pieces, thinner as it rises: the old S-bend at the bottom, a second tier, then the apex.
+// x is flipped by the plant's lean.
+const TRUNK: { curve: Curve; width: [number, number] }[] = [
+  {
+    curve: [
+      { x: 0, y: 1 },
+      { x: 12, y: -10 },
+      { x: -10, y: -22 },
+      { x: 2, y: -34 },
+    ],
+    width: [8, 3.8],
+  },
+  {
+    curve: [
+      { x: 2, y: -34 },
+      { x: 9, y: -44 },
+      { x: -7, y: -54 },
+      { x: -1, y: -63 },
+    ],
+    width: [3.8, 2.4],
+  },
+  {
+    curve: [
+      { x: -1, y: -63 },
+      { x: -4, y: -71 },
+      { x: 4, y: -74 },
+      { x: 1, y: -79 },
+    ],
+    width: [2.4, 1.4],
+  },
+];
+
+// Leaf pads, lowest tier first so a young plant fills from the bottom up: which trunk piece the branch leaves
+// from and where along it, then the pad's centre and radius
 const PADS = [
-  { x: -15, y: -40, r: 11 },
-  { x: 13, y: -52, r: 12 },
-  { x: 2, y: -67, r: 10 },
-  { x: -25, y: -58, r: 10 },
-  { x: 24, y: -37, r: 10 },
+  { tier: 0, t: 1, x: -17, y: -38, r: 11 },
+  { tier: 0, t: 0.9, x: 16, y: -45, r: 10 },
+  { tier: 1, t: 0.85, x: -15, y: -66, r: 10 },
+  { tier: 1, t: 0.95, x: 15, y: -72, r: 9 },
+  { tier: 2, t: 1, x: 1, y: -84, r: 9 },
 ];
 
 export const hoagiay: Plant = {
   name: 'Bougainvillea',
   done: 'is covered in blooms',
   flowering: true,
-  size: BOUGAINVILLEA.size,
   paint(c, stage, random) {
     const lean = random() > 0.5 ? 1 : -1;
-    const pads = PADS.slice(0, BOUGAINVILLEA.pads).map((pad) => ({
+    const pads = PADS.map((pad) => ({
       ...pad,
       x: pad.x * lean,
       leaves: Array.from({ length: BOUGAINVILLEA.padLeaves }, () => ({
@@ -188,33 +220,30 @@ export const hoagiay: Plant = {
         0.6,
       );
     }
-    // Trunk: a gnarled S-bend, thick at the soil; branches split off toward each pad
-    const trunk: Curve = [
-      { x: 0, y: 1 },
-      at({ x: lean * 12, y: -10 }),
-      at({ x: lean * -10, y: -22 }),
-      at({ x: lean * 2, y: -34 }),
-    ];
-    const trunkTop = trunk[3];
-    const shown = pads.slice(0, Math.ceil(BOUGAINVILLEA.pads * [0, 0.25, 0.5, 0.85, 1][stage]));
+    // Trunk in tiers: a piece grows once a pad on it (or above it) shows
+    const shown = pads.slice(0, [0, 1, 2, 4, 5][stage]);
+    const tiers = Math.max(...shown.map((pad) => pad.tier)) + 1;
+    const trunk = TRUNK.slice(0, tiers).map(
+      (piece) => piece.curve.map((point) => at({ ...point, x: point.x * lean })) as Curve,
+    );
+    trunk[0][0] = { x: 0, y: 1 };
     if (stage >= 2)
       trunkTwigs.forEach((side, index) =>
-        twig(bezier(trunk, side.t), side.angle, side.length, side.leaves, 0.5 + index * 0.1),
+        twig(bezier(trunk[0], side.t), side.angle, side.length, side.leaves, 0.5 + index * 0.1),
       );
-    paintLimb(c, trunk, 8 * grow, 3.8 * grow, BARK, 0.42, 0.12, 1);
+    trunk.forEach((curve, index) => {
+      const [base, tip] = TRUNK[index].width;
+      paintLimb(c, curve, base * grow, tip * grow, BARK, 0.42 + index * 0.17, 0.12, 1);
+    });
     shown.forEach((pad, index) => {
-      const end = at(pad);
-      const branch: Curve = [
-        trunkTop,
-        { x: (trunkTop.x + end.x) / 2, y: trunkTop.y - 3 },
-        { x: end.x * 0.9, y: end.y + 5 },
-        end,
-      ];
+      const from = bezier(trunk[pad.tier], pad.t),
+        end = at(pad);
+      const branch: Curve = [from, { x: (from.x + end.x) / 2, y: from.y - 3 }, { x: end.x * 0.9, y: end.y + 5 }, end];
       if (stage >= 3)
         pad.twigs.forEach((side, at) =>
           twig(bezier(branch, side.t), side.angle, side.length, side.leaves, 0.2 + index * 0.2 + at * 0.05),
         );
-      paintLimb(c, branch, 3.4 * grow, 1.2 * grow, BARK, 0.13 + index * 0.27, 0.08, 0.8);
+      paintLimb(c, branch, (pad.tier ? 2.6 : 3.4) * grow, 1.2 * grow, BARK, 0.13 + index * 0.27, 0.08, 0.8);
     });
 
     // Leaf pads: small oval leaves, back ones shaded, front ones lit; bloom clusters on top
