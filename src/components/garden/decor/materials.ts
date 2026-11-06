@@ -76,7 +76,7 @@ export function plaster(c: Ctx, x: number, y: number, w: number, h: number, seed
       by = y + random() * h,
       radius = 80 + random() * 220;
     const blotch = c.createRadialGradient(bx, by, 0, bx, by, radius);
-    const tone = random() < 0.5 ? (dark ? '255,255,255' : '255,255,250') : dark ? '0,0,10' : '120,100,70';
+    const tone = random() < 0.5 ? (dark ? '255,255,255' : '255,255,250') : dark ? '0,0,10' : '90,90,92';
     blotch.addColorStop(0, `rgba(${tone},.05)`);
     blotch.addColorStop(1, `rgba(${tone},0)`);
     c.fillStyle = blotch;
@@ -86,17 +86,18 @@ export function plaster(c: Ctx, x: number, y: number, w: number, h: number, seed
   const specks = Math.round((w * h) / 90);
   for (let i = 0; i < specks; i++) {
     const shade = random() < 0.5;
-    c.fillStyle = shade ? 'rgba(90,70,50,.07)' : 'rgba(255,255,255,.16)';
+    c.fillStyle = shade ? 'rgba(70,70,70,.07)' : 'rgba(255,255,255,.16)';
     c.fillRect(x + random() * w, y + random() * h, 1, 1);
   }
   c.restore();
 }
 
-// Light oak of the plant shelf and the tall hanging stand: plank tops, plank faces, legs (light → dark)
+// One mid-brown wood for all the furniture (plant shelf, tall hanging stand, cabinet), a step darker than the
+// floor: plank tops, plank faces, legs (light → dark)
 export const SHELF_WOOD = {
-  top: ['#E9C08F', '#D6A774'],
-  face: ['#DDAE79', '#C08A55', '#A8733F'],
-  leg: ['#D9A872', '#B27C48', '#8E5E33'],
+  top: ['#B8977A', '#A4836A'],
+  face: ['#AA8869', '#8F6E53', '#76583F'],
+  leg: ['#A88566', '#8A6A4F', '#6A4F39'],
 };
 
 // Satin chrome across a box, lit from the left: espresso trim, monitor stand

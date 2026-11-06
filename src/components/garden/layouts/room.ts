@@ -10,7 +10,7 @@ import type { GardenLayout, LayoutSlot } from './kit';
 
 import { DECOR } from '../decor';
 import { CABINET, paintCabinet } from '../decor/cabinet';
-import { BENCH, paintBamboo, paintBench, paintLantern, paintMaple, paintMoss } from '../decor/courtyard';
+import { BENCH, paintBench, paintMapleGrove, paintMoss, paintPebbles } from '../decor/courtyard';
 import { plaster, woodGrain } from '../decor/materials';
 import { paintStand, STAND } from '../decor/stand';
 import { seeded } from '../plants/wood';
@@ -43,9 +43,11 @@ const HANG_POT = POTS.bowl,
   HANG_GROW = 1.15;
 
 // Nearly white plaster; light oak boards; pale grey gravel
-const WALL = ['#F8F6F2', '#EFECE6'];
-const FLOOR = ['#CDA77E', '#C39C72', '#BA9268', '#C8A177'];
-const GRAVEL = '#D9D4CA';
+// Pale cement-grey walls, light grey-washed oak boards, grey gravel: a cool, neutral room
+const WALL = ['#E4E3E0', '#DAD9D6'];
+const CEMENT = '#D2D1CD';
+const FLOOR = ['#DCD1C2', '#D4C8B8', '#CDC1B0', '#D8CCBD'];
+const GRAVEL = '#D3D2CE';
 // The timber post where the room's roof ends, and the sill under it
 const POST = 14;
 
@@ -113,11 +115,11 @@ function paintWall(c: Ctx, width: number, wallFoot: number) {
 // Skirting board along the room's wall, stopping at the courtyard
 function paintSkirting(c: Ctx, right: number, wallFoot: number, unit: number) {
   const height = 22 * unit;
-  c.fillStyle = '#F8F6F1';
+  c.fillStyle = '#ECEBE8';
   c.fillRect(0, wallFoot - height, right, height);
-  c.fillStyle = '#FFFFFF';
+  c.fillStyle = '#F6F6F4';
   c.fillRect(0, wallFoot - height, right, Math.max(1, 2 * unit));
-  c.fillStyle = 'rgba(90,75,55,.18)';
+  c.fillStyle = 'rgba(70,70,70,.18)';
   c.fillRect(0, wallFoot - Math.max(1, 1.5 * unit), right, Math.max(1, 1.5 * unit));
 }
 
@@ -139,12 +141,12 @@ function paintFloor(c: Ctx, p: Plan, width: number, height: number) {
       c.fillStyle = FLOOR[index % FLOOR.length];
       c.fillRect(x, y, board, rowHeight);
       woodGrain(c, x, y, board, rowHeight, random(), { density: 4 / Math.max(unit, 0.5), knots: false });
-      c.fillStyle = 'rgba(70,40,20,.35)';
+      c.fillStyle = 'rgba(80,65,50,.3)';
       c.fillRect(x, y, Math.max(1, unit), rowHeight);
       x += board;
       index += 3;
     }
-    c.fillStyle = 'rgba(70,40,20,.3)';
+    c.fillStyle = 'rgba(80,65,50,.26)';
     c.fillRect(0, y, width, Math.max(1, unit * 0.8));
     y += rowHeight;
     row++;
@@ -152,54 +154,58 @@ function paintFloor(c: Ctx, p: Plan, width: number, height: number) {
 
   // Darker where the floor meets the wall, a soft sheen nearer the viewer
   const depthShade = c.createLinearGradient(0, wallFoot, 0, height);
-  depthShade.addColorStop(0, 'rgba(60,40,20,.28)');
-  depthShade.addColorStop(0.35, 'rgba(60,40,20,.06)');
-  depthShade.addColorStop(1, 'rgba(255,240,220,.08)');
+  depthShade.addColorStop(0, 'rgba(50,45,40,.26)');
+  depthShade.addColorStop(0.35, 'rgba(50,45,40,.05)');
+  depthShade.addColorStop(1, 'rgba(255,252,248,.08)');
   c.fillStyle = depthShade;
   c.fillRect(0, wallFoot, width, depth);
 }
 
-// What fills the courtyard. Preview only for now: localStorage `gardenCourt` = maple | bamboo | bench
-type CourtStyle = 'maple' | 'bamboo' | 'bench';
-function courtStyle(): CourtStyle {
+// What fills the courtyard besides the maples. Preview only for now: localStorage `gardenCourt` = bench adds a
+// bench with three pots in front of the trees
+function hasBench() {
   try {
-    const style = localStorage.getItem('gardenCourt');
-    if (style === 'bamboo' || style === 'bench') return style;
+    return localStorage.getItem('gardenCourt') === 'bench';
   } catch {
-    // No storage
+    return false;
   }
-  return 'maple';
 }
 
-// Courtyard pieces, back to front: a tree or bamboo against the back wall, moss, a stone lantern, and (bench
-// style) a low bench for potted plants
-function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number, glow: number) {
+// Courtyard pieces, back to front: a bed of pebbles along the back wall, a grove of small maples growing out of it
+// from the right edge in, moss at the bed's edge, and (bench preview) a low bench for potted plants
+function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number) {
   const { unit, wallFoot } = p;
   const court = width - p.courtX;
   const ground = (t: number) => wallFoot + (height - wallFoot) * t;
-  const place = (x: number, y: number, paint: () => void, scale = unit) => {
+  const place = (x: number, y: number, paint: () => void) => {
     c.save();
     c.translate(x, y);
-    c.scale(scale, scale);
+    c.scale(unit, unit);
     paint();
     c.restore();
   };
-  const style = courtStyle();
 
-  const backY = ground(0.12);
-  if (style === 'bamboo') place(p.courtX + court * 0.7, backY, () => paintBamboo(c, (backY - height * 0.04) / unit));
-  else place(p.courtX + court * 0.66, backY, () => paintMaple(c, (backY - height * 0.04) / unit, style === 'maple'));
+  // The courtyard lies behind the room's edge: nothing out there may cross into the room
+  c.save();
+  courtShape(c, p, width, height);
+  c.clip();
 
-  place(p.courtX + court * 0.28, ground(0.5), () => paintMoss(c, 60, 10, 0.12));
-  place(p.courtX + court * 0.7, ground(0.2), () => paintMoss(c, 70, 8, 0.27));
-  place(p.courtX + court * 0.24, ground(0.42), () => paintLantern(c, glow), unit * 0.95);
-  if (style === 'bench') place(p.courtX + court * 0.6, ground(0.62), () => paintBench(c));
+  const bed = { left: p.courtX + court * 0.22, top: ground(0.01), depth: ground(0.3) - ground(0.01) };
+  place(bed.left, bed.top, () => paintPebbles(c, (width - bed.left) / unit + 20, bed.depth / unit, 0.29));
+
+  const room = (ground(0.12) - height * 0.04) / unit;
+  place(p.courtX, ground(0.14), () => paintMapleGrove(c, court / unit, room));
+
+  place(p.courtX + court * 0.3, ground(0.34), () => paintMoss(c, 50, 8, 0.12));
+  place(p.courtX + court * 0.72, ground(0.33), () => paintMoss(c, 70, 9, 0.27));
+  if (hasBench()) place(p.courtX + court * 0.6, ground(0.62), () => paintBench(c));
+  c.restore();
 }
 
 // Slots on the courtyard bench (bench style only)
 const BENCH_SLOTS = [11, 12, 13];
 function benchSlots(p: Plan, width: number, height: number): LayoutSlot[] {
-  if (p.courtX >= width || courtStyle() !== 'bench') return [];
+  if (p.courtX >= width || !hasBench()) return [];
   const court = width - p.courtX;
   const benchX = p.courtX + court * 0.6,
     benchTop = p.wallFoot + (height - p.wallFoot) * 0.62 - BENCH.height * p.unit;
@@ -216,14 +222,43 @@ function benchSlots(p: Plan, width: number, height: number): LayoutSlot[] {
   }));
 }
 
+// Bare cement: faint horizontal streaks left by the trowel and a fine grain of light and dark specks, like noise
+function paintCement(c: Ctx, x: number, y: number, w: number, h: number, unit: number) {
+  const random = seeded(0.91);
+  c.save();
+  c.beginPath();
+  c.rect(x, y, w, h);
+  c.clip();
+  c.fillStyle = CEMENT;
+  c.fillRect(x, y, w, h);
+
+  for (let i = 0; i < h / (3 * unit); i++) {
+    const sy = y + random() * h,
+      sx = x + (random() - 0.2) * w,
+      length = (60 + random() * 260) * unit;
+    c.fillStyle = random() < 0.5 ? 'rgba(255,255,255,.12)' : 'rgba(70,70,68,.07)';
+    c.fillRect(sx, sy, length, Math.max(1, (0.6 + random()) * unit));
+  }
+
+  const specks = Math.round((w * h) / (10 * Math.max(unit * unit, 0.3)));
+  for (let i = 0; i < specks; i++) {
+    c.fillStyle = random() < 0.5 ? 'rgba(60,60,58,.12)' : 'rgba(255,255,255,.2)';
+    const size = Math.max(1, unit * (0.6 + random() * 0.8));
+    c.fillRect(x + random() * w, y + random() * h, size, size);
+  }
+  c.restore();
+}
+
 // The courtyard's back wall is out in the open: the high walls around the light well (off the picture) shade its
 // upper right in a soft diagonal, and a dark timber post marks where the room's roof ends
 function paintCourtWall(c: Ctx, p: Plan, width: number) {
   const { unit, wallFoot } = p;
+  paintCement(c, p.courtX, 0, width - p.courtX, wallFoot, unit);
+
   const shade = c.createLinearGradient(width, 0, width - 260 * unit, 200 * unit);
-  shade.addColorStop(0, 'rgba(90,80,70,.3)');
-  shade.addColorStop(0.55, 'rgba(90,80,70,.18)');
-  shade.addColorStop(1, 'rgba(90,80,70,0)');
+  shade.addColorStop(0, 'rgba(70,70,72,.3)');
+  shade.addColorStop(0.55, 'rgba(70,70,72,.18)');
+  shade.addColorStop(1, 'rgba(70,70,72,0)');
   c.fillStyle = shade;
   c.fillRect(p.courtX, 0, width - p.courtX, wallFoot);
 
@@ -237,11 +272,138 @@ function paintCourtWall(c: Ctx, p: Plan, width: number) {
   woodGrain(c, p.courtX - post, 0, post, wallFoot, 0.71, { along: 'y', density: 3, knots: false });
 }
 
-// Courtyard floor: pale gravel raked into long parallel lines, a flat stepping stone, and a dark timber sill along
+// Loose gravel: stones of every size and tone lying every which way, smaller toward the back wall, each with a
+// soft shadow on its lower left and a lit upper right
+function paintGravel(c: Ctx, p: Plan, width: number, height: number) {
+  const { unit, wallFoot } = p;
+  const random = seeded(0.53);
+  const tones = ['#B9B8B3', '#C8C7C2', '#A9A8A3', '#D6D5D0', '#9C9B97', '#C2BCB2'];
+  const left = p.courtX - 40 * unit;
+  const count = Math.round(((width - left) * (height - wallFoot)) / (14 * Math.max(unit * unit, 0.2)));
+  const stones = Array.from({ length: count }, () => ({
+    x: left + random() * (width - left),
+    y: wallFoot + random() * (height - wallFoot),
+    size: 0.8 + random() * random() * 3.4,
+    turn: random() * Math.PI,
+    tone: tones[Math.floor(random() * tones.length)],
+  })).sort((a, b) => a.y - b.y);
+  for (const stone of stones) {
+    const near = (stone.y - wallFoot) / (height - wallFoot);
+    const r = stone.size * unit * (0.7 + near * 0.7);
+    c.fillStyle = 'rgba(60,60,58,.25)';
+    c.beginPath();
+    c.ellipse(stone.x - r * 0.25, stone.y + r * 0.3, r, r * 0.6, stone.turn, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = stone.tone;
+    c.beginPath();
+    c.ellipse(stone.x, stone.y, r, r * 0.6, stone.turn, 0, Math.PI * 2);
+    c.fill();
+    if (r > 1.6) {
+      c.fillStyle = 'rgba(255,255,255,.45)';
+      c.beginPath();
+      c.ellipse(stone.x + r * 0.3, stone.y - r * 0.2, r * 0.35, r * 0.2, stone.turn, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+}
+
+// Two long stone slabs laid end to end from near the back wall to the bottom of the picture, gravel showing to
+// their left and behind them. Their faces carry the stone's own grain: mottled tone, fine specks and a few veins.
+function paintSlabs(c: Ctx, p: Plan, width: number, height: number) {
+  const { unit, wallFoot } = p;
+  const court = width - p.courtX;
+  const ground = (t: number) => wallFoot + (height - wallFoot) * t;
+  // Left edge runs parallel to the courtyard's edge; the right edge leaves the picture
+  const leftAt = (y: number) => edgeAt(p, width, y) + court * 0.34;
+  const slabs = [
+    { top: ground(0.38), bottom: ground(0.64), seed: 0.13 },
+    { top: ground(0.68), bottom: height + 2, seed: 0.47 },
+  ];
+  for (const slab of slabs) {
+    const outline = () => {
+      c.beginPath();
+      c.moveTo(leftAt(slab.top), slab.top);
+      c.lineTo(width + 2, slab.top);
+      c.lineTo(width + 2, slab.bottom);
+      c.lineTo(leftAt(slab.bottom), slab.bottom);
+      c.closePath();
+    };
+    // Shadow on the gravel below and to the left, then the slab's thickness along its front
+    c.save();
+    c.translate(-3 * unit, 4 * unit);
+    outline();
+    c.fillStyle = 'rgba(55,55,52,.3)';
+    c.fill();
+    c.restore();
+    c.fillStyle = '#7E7C77';
+    c.fillRect(leftAt(slab.bottom), slab.bottom, width, 5 * unit);
+
+    c.save();
+    outline();
+    c.clip();
+    const face = c.createLinearGradient(leftAt(slab.top), slab.top, width, slab.bottom);
+    face.addColorStop(0, '#A19E97');
+    face.addColorStop(1, '#B3B0A9');
+    c.fillStyle = face;
+    c.fillRect(0, slab.top, width + 4, slab.bottom - slab.top);
+    stoneGrain(c, leftAt(slab.bottom) - 20 * unit, slab.top, width, slab.bottom - slab.top, unit, slab.seed);
+    c.restore();
+
+    // Lit back edge, shaded left edge
+    c.strokeStyle = 'rgba(255,255,255,.55)';
+    c.lineWidth = Math.max(1, 1.4 * unit);
+    c.beginPath();
+    c.moveTo(leftAt(slab.top), slab.top);
+    c.lineTo(width, slab.top);
+    c.stroke();
+    c.strokeStyle = 'rgba(70,70,66,.35)';
+    c.beginPath();
+    c.moveTo(leftAt(slab.top), slab.top);
+    c.lineTo(leftAt(slab.bottom), slab.bottom);
+    c.stroke();
+  }
+}
+
+// Mottled, speckled stone: soft blotches of lighter and darker grey, a fine grain of specks, and a few hairline veins
+function stoneGrain(c: Ctx, x: number, y: number, w: number, h: number, unit: number, seed: number) {
+  const random = seeded(seed);
+  for (let i = 0; i < 26; i++) {
+    const bx = x + random() * w,
+      by = y + random() * h,
+      radius = (30 + random() * 90) * unit;
+    const blotch = c.createRadialGradient(bx, by, 0, bx, by, radius);
+    const tone = random() < 0.5 ? '255,255,255' : '80,78,72';
+    blotch.addColorStop(0, `rgba(${tone},.12)`);
+    blotch.addColorStop(1, `rgba(${tone},0)`);
+    c.fillStyle = blotch;
+    c.fillRect(bx - radius, by - radius * 0.5, radius * 2, radius);
+  }
+  const specks = Math.round((w * h) / (9 * Math.max(unit * unit, 0.3)));
+  for (let i = 0; i < specks; i++) {
+    c.fillStyle = random() < 0.55 ? 'rgba(60,58,55,.16)' : 'rgba(255,255,255,.28)';
+    const size = Math.max(1, unit * (0.5 + random() * 1.2));
+    c.fillRect(x + random() * w, y + random() * h, size, size);
+  }
+  c.lineWidth = Math.max(0.6, 0.7 * unit);
+  for (let i = 0; i < 5; i++) {
+    let vx = x + random() * w,
+      vy = y + random() * h;
+    c.strokeStyle = 'rgba(85,82,76,.22)';
+    c.beginPath();
+    c.moveTo(vx, vy);
+    for (let step = 0; step < 6; step++) {
+      vx += (20 + random() * 40) * unit;
+      vy += (random() - 0.5) * 14 * unit;
+      c.lineTo(vx, vy);
+    }
+    c.stroke();
+  }
+}
+
+// Courtyard floor: loose grey gravel, two long stone slabs to step on, and a dark timber sill along
 // the room's edge. Its back wall is the same plaster, out in the open.
 function paintCourt(c: Ctx, p: Plan, width: number, height: number) {
   const { unit, wallFoot } = p;
-  const random = seeded(0.53);
   c.save();
   c.beginPath();
   c.moveTo(edgeAt(p, width, wallFoot), wallFoot);
@@ -253,47 +415,8 @@ function paintCourt(c: Ctx, p: Plan, width: number, height: number) {
 
   c.fillStyle = GRAVEL;
   c.fillRect(p.courtX - 100 * unit, wallFoot, width, height - wallFoot);
-  // Pebbles: tiny light and dark specks
-  const specks = Math.round(((width - p.courtX) * (height - wallFoot)) / (22 * Math.max(unit, 0.4)));
-  for (let i = 0; i < specks; i++) {
-    const x = p.courtX - 40 * unit + random() * (width - p.courtX + 40 * unit),
-      y = wallFoot + random() * (height - wallFoot);
-    c.fillStyle = random() < 0.5 ? 'rgba(120,110,95,.22)' : 'rgba(255,255,250,.45)';
-    c.beginPath();
-    c.ellipse(x, y, (0.8 + random()) * unit * 1.4, (0.5 + random() * 0.5) * unit * 1.4, 0, 0, Math.PI * 2);
-    c.fill();
-  }
-  // Raked lines, further apart toward the viewer, each a lit ridge over a shaded furrow
-  for (let y = wallFoot + 6 * unit, gap = 7 * unit; y < height; y += gap, gap *= 1.09) {
-    for (const [offset, color] of [
-      [0, 'rgba(110,98,82,.45)'],
-      [-1.6, 'rgba(255,255,250,.7)'],
-    ] as const) {
-      c.strokeStyle = color;
-      c.lineWidth = Math.max(0.6, 0.9 * unit * (gap / (7 * unit)) * 0.5);
-      c.beginPath();
-      for (let x = p.courtX - 40 * unit; x <= width; x += 8 * unit) {
-        const wave = Math.sin(x / (90 * unit)) * 0.6 * unit;
-        if (x === p.courtX - 40 * unit) c.moveTo(x, y + offset * unit + wave);
-        else c.lineTo(x, y + offset * unit + wave);
-      }
-      c.stroke();
-    }
-  }
-  // A flat stepping stone off the sill
-  const sx = p.courtX + (width - p.courtX) * 0.42,
-    sy = wallFoot + (height - wallFoot) * 0.62;
-  const stone = c.createRadialGradient(sx - 20 * unit, sy - 8 * unit, 0, sx, sy, 70 * unit);
-  stone.addColorStop(0, '#B9B4AB');
-  stone.addColorStop(1, '#8E8A83');
-  c.fillStyle = 'rgba(70,60,50,.25)';
-  c.beginPath();
-  c.ellipse(sx + 4 * unit, sy + 6 * unit, 64 * unit, 15 * unit, 0, 0, Math.PI * 2);
-  c.fill();
-  c.fillStyle = stone;
-  c.beginPath();
-  c.ellipse(sx, sy, 62 * unit, 14 * unit, -0.03, 0, Math.PI * 2);
-  c.fill();
+  paintGravel(c, p, width, height);
+  paintSlabs(c, p, width, height);
   c.restore();
 
   // Timber sill where the room's floor ends: it starts right under the post and widens toward the viewer, its
@@ -311,7 +434,7 @@ function paintCourt(c: Ctx, p: Plan, width: number, height: number) {
   c.closePath();
   c.fill();
   // Its lit face toward the courtyard
-  c.fillStyle = 'rgba(255,230,200,.25)';
+  c.fillStyle = 'rgba(255,245,235,.22)';
   c.beginPath();
   c.moveTo(top - post * 0.35, wallFoot);
   c.lineTo(top, wallFoot);
@@ -438,7 +561,7 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
   if (p.courtX < width) {
     paintCourtWall(c, p, width);
     paintCourt(c, p, width, height);
-    paintCourtPieces(c, p, width, height, dark ? 1 : light?.lamp ? 0.6 : 0);
+    paintCourtPieces(c, p, width, height);
   }
   if (dark) paintSun(c, p, width, height, '205,215,235', 0.5, 0.55);
   else if (light?.sun) paintSun(c, p, width, height, light.sun.rgb, light.sun.strength, light.sun.slant);
@@ -504,6 +627,51 @@ function hangingSlots(p: Plan): LayoutSlot[] {
   });
 }
 
+// Leaf shade on the courtyard floor: the maples overhead (off the picture, above the light well) break the sun into
+// soft patches that drift and flicker as the leaves stir. Patches come from one blurred sprite, so a frame stays cheap.
+let shadeSprite: HTMLCanvasElement | null = null;
+const SHADE_PATCHES = Array.from({ length: 34 }, (_, index) => {
+  const random = seeded(0.05 + index * 0.027);
+  return {
+    x: random(),
+    y: random(),
+    size: 0.5 + random(),
+    phase: random() * Math.PI * 2,
+    speed: 0.5 + random() * 0.6,
+  };
+});
+
+function paintLeafShade(c: Ctx, width: number, height: number, time: number, strength: number) {
+  const p = plan(width, height);
+  if (p.courtX >= width) return;
+  if (!shadeSprite) {
+    shadeSprite = document.createElement('canvas');
+    shadeSprite.width = shadeSprite.height = 64;
+    const s = shadeSprite.getContext('2d')!;
+    const blob = s.createRadialGradient(32, 32, 0, 32, 32, 32);
+    blob.addColorStop(0, 'rgba(40,42,48,1)');
+    blob.addColorStop(0.5, 'rgba(40,42,48,.6)');
+    blob.addColorStop(1, 'rgba(40,42,48,0)');
+    s.fillStyle = blob;
+    s.fillRect(0, 0, 64, 64);
+  }
+
+  const { unit, wallFoot } = p;
+  c.save();
+  courtShape(c, p, width, height);
+  c.clip();
+  for (const patch of SHADE_PATCHES) {
+    const stir = Math.sin(time * patch.speed + patch.phase);
+    const x = p.courtX + patch.x * (width - p.courtX) + (stir * 7 + Math.sin(time * 1.9 + patch.phase) * 2) * unit,
+      y = wallFoot + patch.y * (height - wallFoot);
+    const near = (y - wallFoot) / (height - wallFoot);
+    const w = 90 * patch.size * unit * (0.7 + near * 0.6);
+    c.globalAlpha = (0.13 + 0.05 * Math.sin(time * 1.3 + patch.phase * 2)) * strength;
+    c.drawImage(shadeSprite, x - w / 2, y - w * 0.18, w, w * 0.36);
+  }
+  c.restore();
+}
+
 export function roomLayout(decor: DecorKey): GardenLayout {
   return {
     slots(width, height) {
@@ -531,6 +699,7 @@ export function roomLayout(decor: DecorKey): GardenLayout {
     lightFromRight: true,
     // Light from above and to the right throws each plant's shadow onto the wall down and to the left
     castShadow: { x: 14, y: 14 },
+    paintShade: paintLeafShade,
     // The band of sunlight falling in from the courtyard's edge, where dust drifts by day
     lightShaft(width, height, slant = 0.5) {
       const p = plan(width, height);

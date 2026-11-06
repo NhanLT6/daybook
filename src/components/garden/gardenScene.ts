@@ -338,6 +338,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     paintCreatures(c, time);
     if (dark) nightTint(c);
     ctx.drawImage(foreground.canvas, 0, 0, width, height);
+    const sun = !dark && light()?.sun;
+    if (sun && layout.paintShade) layout.paintShade(ctx, width, height, time, sun.strength);
     // Light and shade over room and plants alike, then the part of the day's colour
     if (lightMap) {
       ctx.save();

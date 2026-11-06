@@ -48,11 +48,14 @@ export interface GardenLayout {
   // Light comes from the right (a window on that side): pots and plants, which are painted lit from the upper
   // left, are drawn mirrored so their highlights face the light
   lightFromRight?: boolean;
-  // A sunbeam as two edges, top (at the window) and bottom (on the floor), each left point then right; the scene
-  // lets dust drift in it by day
   // Where a plant's shadow falls on the wall behind it, in plant pixels (before mirroring); none by night
   castShadow?: { x: number; y: number };
+  // A sunbeam as two edges, top (at the window) and bottom (on the floor), each left point then right; the scene
+  // lets dust drift in it by day
   lightShaft?: (width: number, height: number, slant?: number) => LightShaft | null;
+  // Moving shade painted every frame by day, over the pots and plants but under the light map: leaf shadows
+  // stirring on the courtyard floor. `strength` follows the sun's.
+  paintShade?: (c: Ctx, width: number, height: number, time: number, strength: number) => void;
   // Most insects out at once; left out for no limit
   maxVisitors?: number;
 }

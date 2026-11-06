@@ -1,22 +1,21 @@
-// Low sideboard beside the plant shelf: sage-painted body, two drawers over two doors, oak top and legs.
+// Low sideboard beside the plant shelf, in the same wood as the shelf: two drawers over two doors.
 // Drawn in room units with (0, 0) at the floor under its centre; the top surface is at y = -CABINET.height.
 import type { Ctx } from '../creatures/kit';
 
 import { TAU } from '../creatures/kit';
-import { woodGrain } from './materials';
+import { SHELF_WOOD, woodGrain } from './materials';
 
 export const CABINET = { width: 440, height: 300 };
 
 const LEG = 44,
   SLAB = 16,
   DRAWER = 56;
-const PAINT = ['#B7C8B5', '#A5B8A3', '#8DA18C'];
-const OAK = ['#E3BC8C', '#CF9F6B', '#B07D4A'];
+const WOOD = SHELF_WOOD.leg;
 
 // Raised edge of a door or drawer front: light on the top and left, shade on the bottom and right
 function bevel(c: Ctx, x: number, y: number, w: number, h: number, inset = false) {
   const lit = 'rgba(255,255,250,.45)',
-    shade = 'rgba(40,55,40,.28)';
+    shade = 'rgba(40,25,15,.3)';
   c.lineWidth = 1.4;
   c.strokeStyle = inset ? shade : lit;
   c.beginPath();
@@ -49,9 +48,9 @@ function knob(c: Ctx, x: number, y: number, radius: number) {
 
 function oak(c: Ctx, x: number, w: number) {
   const wood = c.createLinearGradient(x, 0, x + w, 0);
-  wood.addColorStop(0, OAK[1]);
-  wood.addColorStop(0.3, OAK[0]);
-  wood.addColorStop(1, OAK[2]);
+  wood.addColorStop(0, WOOD[1]);
+  wood.addColorStop(0.3, WOOD[0]);
+  wood.addColorStop(1, WOOD[2]);
   return wood;
 }
 
@@ -76,17 +75,14 @@ export function paintCabinet(c: Ctx) {
     c.fill();
   }
 
-  // Painted body, lit from the left
-  const body = c.createLinearGradient(bodyLeft, 0, bodyLeft + bodyWidth, 0);
-  body.addColorStop(0, PAINT[1]);
-  body.addColorStop(0.2, PAINT[0]);
-  body.addColorStop(1, PAINT[2]);
-  c.fillStyle = body;
+  // Wooden body, lit from the left, its grain running across
+  c.fillStyle = oak(c, bodyLeft, bodyWidth);
   c.beginPath();
   c.roundRect(bodyLeft, bodyTop, bodyWidth, bodyBottom - bodyTop, [0, 0, 4, 4]);
   c.fill();
+  woodGrain(c, bodyLeft, bodyTop, bodyWidth, bodyBottom - bodyTop, 0.57, { density: 2.4, knots: false });
   // Plinth shade at the bottom edge
-  c.fillStyle = 'rgba(40,55,40,.22)';
+  c.fillStyle = 'rgba(40,25,15,.22)';
   c.fillRect(bodyLeft, bodyBottom - 6, bodyWidth, 6);
 
   // Two drawers over two doors, with a hairline gap between fronts
@@ -113,8 +109,8 @@ export function paintCabinet(c: Ctx) {
 
   // Shadow the top slab casts on the body
   const under = c.createLinearGradient(0, bodyTop, 0, bodyTop + 14);
-  under.addColorStop(0, 'rgba(30,40,30,.3)');
-  under.addColorStop(1, 'rgba(30,40,30,0)');
+  under.addColorStop(0, 'rgba(40,25,15,.3)');
+  under.addColorStop(1, 'rgba(40,25,15,0)');
   c.fillStyle = under;
   c.fillRect(bodyLeft, bodyTop, bodyWidth, 14);
 

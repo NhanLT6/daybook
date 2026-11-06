@@ -24,29 +24,29 @@ export const DAYLIGHT: Record<DayPart, Daylight> = {
   // Low, cool-white sun reaching far in; soft shadows
   morning: {
     part: 'morning',
-    sun: { rgb: '255,242,220', strength: 0.85, slant: 0.95 },
-    shade: '#A8A7A2',
+    sun: { rgb: '255,248,236', strength: 0.85, slant: 0.95 },
+    shade: '#A6A7A8',
     shadow: { alpha: 0.16, length: 0.9 },
-    rim: 'rgba(255,246,222,.45)',
+    rim: 'rgba(255,250,240,.45)',
     grade: null,
   },
   // Sun high: a steep, bright beam close to the courtyard, short shadows
   noon: {
     part: 'noon',
-    sun: { rgb: '255,240,212', strength: 1, slant: 0.45 },
-    shade: '#ACA296',
+    sun: { rgb: '255,250,242', strength: 1, slant: 0.45 },
+    shade: '#A9A8A6',
     shadow: { alpha: 0.22, length: 0.8 },
-    rim: 'rgba(255,240,200,.5)',
+    rim: 'rgba(255,248,232,.5)',
     grade: null,
   },
   // Late afternoon: warm amber sun slanting far across the room, long shadows
   golden: {
     part: 'golden',
-    sun: { rgb: '255,196,120', strength: 1.2, slant: 1.25 },
-    shade: '#9C8A72',
+    sun: { rgb: '255,208,150', strength: 1.1, slant: 1.25 },
+    shade: '#9C958C',
     shadow: { alpha: 0.26, length: 1.5 },
     rim: 'rgba(255,200,120,.6)',
-    grade: 'rgb(255,238,218)',
+    grade: 'rgb(255,244,232)',
   },
   // After sunset: no sun, the courtyard a cool blue, a warm lamp indoors
   dusk: {
