@@ -10,8 +10,8 @@ import type { GardenLayout, LayoutSlot } from './kit';
 
 import { DECOR } from '../decor';
 import { CABINET, paintCabinet } from '../decor/cabinet';
-import { bangTiers, paintBangTier, paintBangTrunk } from '../decor/bang';
-import { BENCH, paintBench, paintMoss, paintPebbles } from '../decor/courtyard';
+import { BENCH, paintBench, paintPebbles } from '../decor/courtyard';
+import { snowbellGrove } from '../decor/grove';
 import { plaster, woodGrain } from '../decor/materials';
 import { paintStand, STAND } from '../decor/stand';
 import { seeded } from '../plants/wood';
@@ -172,21 +172,15 @@ function hasBench() {
   }
 }
 
-// Where the courtyard's tree stands: its trunk near the right edge, its tiers reaching left into the open middle
-function treeOf(p: Plan, width: number, height: number) {
+// Where the courtyard's trees stand: a clump near the right edge, its crown reaching left into the open middle
+function groveOf(p: Plan, width: number, height: number) {
   const court = width - p.courtX;
   const ground = p.wallFoot + (height - p.wallFoot) * 0.16;
-  const tall = (ground - height * 0.02) / p.unit;
-  return {
-    x: p.courtX + court * 0.86,
-    y: ground,
-    tall,
-    tiers: bangTiers(tall, (court * 0.8) / p.unit),
-  };
+  return { x: p.courtX + court * 0.82, y: ground, tall: (ground - height * 0.03) / p.unit, reach: (court * 0.75) / p.unit };
 }
 
-// Courtyard pieces, back to front: a bed of pebbles round the tree's foot, the trunk (its leafy tiers move, see
-// paintTree), moss, and (bench preview) a low bench for potted plants
+// Courtyard pieces, back to front: a bed of pebbles round the trees' feet (the trees themselves move, see
+// paintTrees) and (bench preview) a low bench for potted plants
 function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number) {
   const { unit, wallFoot } = p;
   const court = width - p.courtX;
@@ -204,67 +198,60 @@ function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number) {
   courtShape(c, p, width, height);
   c.clip();
 
-  const bed = { left: p.courtX + court * 0.55, top: ground(0.01), depth: ground(0.3) - ground(0.01) };
+  const bed = { left: p.courtX + court * 0.5, top: ground(0.01), depth: ground(0.3) - ground(0.01) };
   place(bed.left, bed.top, () => paintPebbles(c, (width - bed.left) / unit + 20, bed.depth / unit, 0.29));
 
-  const tree = treeOf(p, width, height);
-  place(tree.x, tree.y, () => paintBangTrunk(c, tree.tall));
-
-  place(p.courtX + court * 0.6, ground(0.33), () => paintMoss(c, 50, 8, 0.12));
-  place(p.courtX + court * 0.9, ground(0.32), () => paintMoss(c, 60, 9, 0.27));
   if (hasBench()) place(p.courtX + court * 0.66, ground(0.62), () => paintBench(c));
   c.restore();
 }
 
-// The tree's leafy tiers, painted every frame so they can stir: each tier is a bitmap made once per size, turned
-// a little about where it leaves the trunk, the upper tiers (thinner wood, more sail) a little more
-const tierCache = { key: '', tiers: [] as { canvas: HTMLCanvasElement; x: number; y: number; ox: number; oy: number }[] };
+// The trees, painted every frame so their branches can stir: each trunk and each branch is a bitmap made once per
+// size, painted back to front (so branches of different trunks interleave), each branch turned a little about its
+// joint, the upper ones (thinner wood) a little more
+const groveCache = { key: '', pieces: [] as { canvas: HTMLCanvasElement; x: number; y: number; ox: number; oy: number; sway: number }[] };
 
-function treeTiers(p: Plan, width: number, height: number) {
+function grovePieces(p: Plan, width: number, height: number) {
   const ratio = window.devicePixelRatio || 1;
   const key = `${width}x${height}@${ratio}`;
-  if (tierCache.key === key) return tierCache.tiers;
-  const tree = treeOf(p, width, height);
+  if (groveCache.key === key) return groveCache.pieces;
+  const grove = groveOf(p, width, height);
   const { unit } = p;
-  tierCache.key = key;
-  tierCache.tiers = tree.tiers.map((tier) => {
-    // Room around the tier for its leaves, in room units
-    const box = { left: tier.left + 50, right: tier.right + 50, up: 70, down: 50 };
+  groveCache.key = key;
+  groveCache.pieces = snowbellGrove(grove.tall, grove.reach).map((piece) => {
+    const [left, right, up, down] = piece.box;
     const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil((box.left + box.right) * unit * ratio);
-    canvas.height = Math.ceil((box.up + box.down) * unit * ratio);
+    canvas.width = Math.ceil((left + right) * unit * ratio);
+    canvas.height = Math.ceil((up + down) * unit * ratio);
     const t = canvas.getContext('2d')!;
     t.scale(unit * ratio, unit * ratio);
-    t.translate(box.left, box.up);
-    paintBangTier(t, tier);
+    t.translate(left, up);
+    piece.paint(t);
     return {
       canvas,
-      x: tree.x,
-      y: tree.y + tier.y * unit,
-      ox: box.left * unit,
-      oy: box.up * unit,
+      x: grove.x + piece.x * unit,
+      y: grove.y + piece.y * unit,
+      ox: left * unit,
+      oy: up * unit,
+      sway: piece.sway,
     };
   });
-  return tierCache.tiers;
+  return groveCache.pieces;
 }
 
-function paintTree(c: Ctx, width: number, height: number, time: number) {
+function paintTrees(c: Ctx, width: number, height: number, time: number) {
   const p = plan(width, height);
   if (p.courtX >= width) return;
-  const tiers = treeTiers(p, width, height);
+  const ratio = window.devicePixelRatio || 1;
+  const gust = 0.6 + 0.4 * Math.sin(time * 0.23);
   c.save();
   courtShape(c, p, width, height);
   c.clip();
-  tiers.forEach((tier, index) => {
-    const gust = 0.5 + 0.5 * Math.sin(time * 0.23);
-    const sway =
-      (Math.sin(time * 0.9 + index * 0.6) * 0.008 + Math.sin(time * 2.1 + index * 1.7) * 0.003) *
-      (0.6 + gust * 0.8) *
-      (0.7 + index * 0.08);
+  grovePieces(p, width, height).forEach((piece, index) => {
+    const sway = (Math.sin(time * 0.9 + index * 0.9) * 0.012 + Math.sin(time * 2.3 + index * 1.7) * 0.004) * gust * piece.sway;
     c.save();
-    c.translate(tier.x, tier.y);
+    c.translate(piece.x, piece.y);
     c.rotate(sway);
-    c.drawImage(tier.canvas, -tier.ox, -tier.oy, tier.canvas.width / (window.devicePixelRatio || 1), tier.canvas.height / (window.devicePixelRatio || 1));
+    c.drawImage(piece.canvas, -piece.ox, -piece.oy, piece.canvas.width / ratio, piece.canvas.height / ratio);
     c.restore();
   });
   c.restore();
@@ -772,7 +759,7 @@ export function roomLayout(decor: DecorKey): GardenLayout {
     lightFromRight: true,
     // Light from above and to the right throws each plant's shadow onto the wall down and to the left
     castShadow: { x: 14, y: 14 },
-    paintBehind: paintTree,
+    paintBehind: paintTrees,
     paintShade: paintLeafShade,
     // The band of sunlight falling in from the courtyard's edge, where dust drifts by day
     lightShaft(width, height, slant = 0.5) {

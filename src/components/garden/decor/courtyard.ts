@@ -1,4 +1,4 @@
-// What lies in the open courtyard besides the tree (./bang.ts): a bed of loose pebbles under it, moss, and a low
+// What lies in the open courtyard besides the trees (./grove.ts): a bed of loose pebbles under it and a low
 // wooden bench for potted plants. Drawn in room units with (0, 0) on the gravel under
 // each piece's centre, lit from the upper right like the courtyard itself.
 import type { Ctx } from '../creatures/kit';
@@ -46,21 +46,6 @@ export function paintPebbles(c: Ctx, width: number, depth: number, seed: number)
     c.ellipse(stone.x, stone.y, stone.r, stone.r * squash, stone.turn, 0, TAU);
     c.fill();
   }
-}
-
-// A soft patch of moss on the gravel
-export function paintMoss(c: Ctx, w: number, h: number, seed: number) {
-  const random = seeded(seed);
-  for (let i = 0; i < 70; i++) {
-    const angle = random() * TAU,
-      reach = Math.sqrt(random());
-    c.fillStyle = ['#5E7A48', '#728F52', '#879F62'][Math.floor(random() * 3)];
-    c.globalAlpha = 0.75;
-    c.beginPath();
-    c.ellipse(Math.cos(angle) * w * reach, Math.sin(angle) * h * reach, 6, 3, 0, 0, TAU);
-    c.fill();
-  }
-  c.globalAlpha = 1;
 }
 
 export const BENCH = { width: 300, height: 60 };

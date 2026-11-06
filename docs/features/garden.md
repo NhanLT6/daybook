@@ -28,11 +28,13 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
 - `room.ts`: `roomLayout(decor)`, a cool grey room seen straight on (pale cement-grey walls, light grey-washed
   floor, all furniture in one mid-brown wood darker than the floor, `SHELF_WOOD`), open on the right to a courtyard
   (a light well, about a third of the width): a bare cement back wall (faint horizontal trowel streaks, speckle
-  noise), loose grey gravel of mixed sizes (no rake lines), a Japanese bàng (`decor/bang.ts`: straight trunk near
-  the right edge, flat tiers of leaf rosettes painted with the plants' own `paintLeaf`) on a bed of bigger pebbles,
-  two textured stone slabs beside the room's sill down to the bottom edge, a timber sill and a dark post where the
-  room's roof ends. No window, no sky, no lantern. The trunk is in the backdrop; each tier is its own bitmap that
-  `paintBehind` turns a little about the trunk every frame (wind, with slow gusts).
+  noise), loose grey gravel of mixed sizes (no rake lines), a clump of Japanese snowbell (`decor/grove.ts`: 4
+  wavering trunks rising close together near the right edge, branches of oval leaves drawn with the plants' own
+  `paintLeaf`) on a bed of bigger pebbles, two textured stone slabs beside the room's sill down to the bottom edge,
+  a timber sill and a dark post where the room's roof ends. No window, no sky, no lantern, no moss. The clump is cut
+  into pieces (each trunk, each branch with its leaves), each a bitmap made once per size; `paintBehind` paints
+  them back to front every frame, so branches of different trunks interleave (further back = darker), and turns
+  each branch a little about its joint (wind, slow gusts).
   By day, soft leaf shade drifts on the courtyard floor (`paintShade`, drawn every frame under the light map).
   Preview only: localStorage `gardenCourt=bench` adds a bench with 3 outdoor pots (slots 11–13). From the left: a
   low wooden cabinet (`decor/cabinet.ts`, 0.75 scale) with one item (`DECOR`: `espresso` or `monitor`), the shelf
