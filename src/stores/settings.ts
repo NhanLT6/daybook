@@ -105,8 +105,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const showGarden = useStorage(storageKeys.settings.showGarden, false);
   // Which arrangement the garden shows; plants keep their slots whichever is picked
   const gardenLayout = useStorage<GardenLayoutKey>(storageKeys.settings.gardenLayout, 'shelf');
-  // Older layout keys (balcony, courtyard) fall back to the shelf corner
-  if (!['shelf', 'desk', 'one'].includes(gardenLayout.value)) gardenLayout.value = 'shelf';
+  // Older layout keys (balcony, courtyard, desk) fall back to the shelf corner
+  if (!['shelf', 'one'].includes(gardenLayout.value)) gardenLayout.value = 'shelf';
   const lastSelectedDate = useStorage<RememberedDate | null>(storageKeys.settings.lastSelectedDate, null, undefined, {
     serializer: StorageSerializers.object,
   });

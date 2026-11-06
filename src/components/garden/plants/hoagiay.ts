@@ -2,7 +2,8 @@ import type { Ctx, Plant } from './kit';
 import type { Curve, Point } from './wood';
 
 import { linear } from '../creatures/paint';
-import { paintLeaf, TAU } from './kit';
+import { leafVariety, paintFoliageLeaf } from './foliage';
+import { TAU } from './kit';
 import { bezier, paintLimb } from './wood';
 
 const LEAF = { light: '#8FC06A', mid: '#4D8A3B', dark: '#2B5A29' };
@@ -203,7 +204,11 @@ export const hoagiay: Plant = {
         0.4,
       );
       if (stage >= 2) {
-        for (const leafAngle of leaves) paintLeaf(c, end.x, end.y, leafAngle, 6 * grow, 2.5 * grow, LEAF, 'oval', 0.2);
+        for (const leafAngle of leaves)
+          paintFoliageLeaf(c, end.x, end.y, leafAngle, 6.5 * grow, 2.4 * grow, LEAF, {
+            ...leafVariety(leafAngle),
+            shade: 0.2,
+          });
       }
     };
 
@@ -251,17 +256,10 @@ export const hoagiay: Plant = {
       const centre = at(pad),
         radius = pad.r * grow;
       for (const leaf of pad.leaves.slice().sort((a, b) => b.depth - a.depth)) {
-        paintLeaf(
-          c,
-          centre.x + leaf.dx * radius,
-          centre.y + leaf.dy * radius,
-          leaf.angle,
-          7 * grow,
-          2.8 * grow,
-          LEAF,
-          'oval',
-          leaf.depth * 0.6,
-        );
+        paintFoliageLeaf(c, centre.x + leaf.dx * radius, centre.y + leaf.dy * radius, leaf.angle, 7.5 * grow, 2.7 * grow, LEAF, {
+          ...leafVariety(leaf.depth),
+          shade: leaf.depth * 0.6,
+        });
       }
       if (stage >= 3) {
         for (const cluster of pad.clusters.slice(0, stage === 4 ? BOUGAINVILLEA.clusters : 1)) {

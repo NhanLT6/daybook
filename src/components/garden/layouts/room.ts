@@ -1,6 +1,6 @@
-// A plain white room seen straight on, open on the right to a small courtyard (a light well, open to the sky)
-// floored with raked Japanese gravel. From the left: a low cabinet with one item on top (espresso machine or
-// monitor), the three-tier plant shelf, and a tall hanging stand with two trailing plants next to the courtyard.
+// A cool grey room seen straight on, open on the right to a small courtyard (a light well, open to the sky) with
+// gravel, stone slabs and a clump of trees. From the left: a low cabinet with an espresso machine on top, the
+// three-tier plant shelf, and a tall hanging stand with two trailing plants next to the courtyard.
 // The only light falls in from above the courtyard: the room gets darker away from it. On narrow screens only the
 // shelf stands, in the middle, still lit from the right.
 import type { Ctx } from '../creatures/kit';
@@ -10,14 +10,14 @@ import type { GardenLayout, LayoutSlot } from './kit';
 
 import { DECOR } from '../decor';
 import { CABINET, paintCabinet } from '../decor/cabinet';
-import { BENCH, paintBench, paintPebbles } from '../decor/courtyard';
+import { paintPebbles } from '../decor/courtyard';
 import { snowbellGrove } from '../decor/grove';
 import { plaster, woodGrain } from '../decor/materials';
 import { paintStand, STAND } from '../decor/stand';
 import { seeded } from '../plants/wood';
 import { POTS } from '../pots';
 import { HANGING_SLOTS } from './kit';
-import { shelfLayout } from './shelf';
+import { canSpot, shelfLayout } from './shelf';
 
 // Room units match the shelf drawing's own pixels (floor at 0.925 of its height)
 const SHELF = { width: 420, height: 700, floor: 700 * 0.925 };
@@ -27,7 +27,7 @@ const CABINET_WIDTH = CABINET.width * FURNITURE;
 const MARGIN = 24,
   CABINET_GAP = 44,
   // Between the shelf and the hanging stand: the watering can stands here
-  STAND_GAP = 96,
+  STAND_GAP = 56,
   // Bare floor between the stand and the courtyard
   COURT_PAD = 36,
   // Head room above the tallest top-tier plant
@@ -162,25 +162,15 @@ function paintFloor(c: Ctx, p: Plan, width: number, height: number) {
   c.fillRect(0, wallFoot, width, depth);
 }
 
-// What fills the courtyard besides the maples. Preview only for now: localStorage `gardenCourt` = bench adds a
-// bench with three pots in front of the trees
-function hasBench() {
-  try {
-    return localStorage.getItem('gardenCourt') === 'bench';
-  } catch {
-    return false;
-  }
-}
-
-// Where the courtyard's trees stand: a clump near the right edge, its crown reaching left into the open middle
+// Where the courtyard's trees stand: a clump near the right edge, its crown reaching left into the open middle and
+// running off the top of the picture (cut there, like a real view through an opening)
 function groveOf(p: Plan, width: number, height: number) {
   const court = width - p.courtX;
   const ground = p.wallFoot + (height - p.wallFoot) * 0.16;
-  return { x: p.courtX + court * 0.82, y: ground, tall: (ground - height * 0.03) / p.unit, reach: (court * 0.75) / p.unit };
+  return { x: p.courtX + court * 0.82, y: ground, tall: (ground * 1.3) / p.unit, reach: (court * 0.75) / p.unit };
 }
 
-// Courtyard pieces, back to front: a bed of pebbles round the trees' feet (the trees themselves move, see
-// paintTrees) and (bench preview) a low bench for potted plants
+// Courtyard pieces: a bed of pebbles round the trees' feet (the trees themselves move, see paintTrees)
 function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number) {
   const { unit, wallFoot } = p;
   const court = width - p.courtX;
@@ -201,7 +191,6 @@ function paintCourtPieces(c: Ctx, p: Plan, width: number, height: number) {
   const bed = { left: p.courtX + court * 0.5, top: ground(0.01), depth: ground(0.3) - ground(0.01) };
   place(bed.left, bed.top, () => paintPebbles(c, (width - bed.left) / unit + 20, bed.depth / unit, 0.29));
 
-  if (hasBench()) place(p.courtX + court * 0.66, ground(0.62), () => paintBench(c));
   c.restore();
 }
 
@@ -255,26 +244,6 @@ function paintTrees(c: Ctx, width: number, height: number, time: number) {
     c.restore();
   });
   c.restore();
-}
-
-// Slots on the courtyard bench (bench style only)
-const BENCH_SLOTS = [11, 12, 13];
-function benchSlots(p: Plan, width: number, height: number): LayoutSlot[] {
-  if (p.courtX >= width || !hasBench()) return [];
-  const court = width - p.courtX;
-  const benchX = p.courtX + court * 0.66,
-    benchTop = p.wallFoot + (height - p.wallFoot) * 0.62 - BENCH.height * p.unit;
-  const pot = POTS.ceramic,
-    scale = 1.4 * p.unit;
-  return BENCH_SLOTS.map((index, at) => ({
-    index,
-    x: benchX + (at - 1) * BENCH.width * 0.32 * p.unit,
-    soilY: benchTop - pot.height * scale,
-    scale,
-    plantScale: scale * 1.15,
-    pot,
-    hangRoom: 20,
-  }));
 }
 
 // Bare cement: faint horizontal streaks left by the trowel and a fine grain of light and dark specks, like noise
@@ -743,15 +712,15 @@ export function roomLayout(decor: DecorKey): GardenLayout {
         scale: slot.scale * p.unit,
         plantScale: (slot.plantScale ?? slot.scale) * p.unit,
       }));
-      return [...hangingSlots(p), ...shelf, ...benchSlots(p, width, height)];
+      return [...hangingSlots(p), ...shelf];
     },
     paintBackdrop: (c, width, height, dark, light) => paintRoom(c, width, height, decor, dark, light),
     paintLight: paintLightMap,
-    // On the floor between the shelf and the hanging stand; on a phone, just inside the shelf's right foot
+    // On the shelf's bottom tier, in its fourth spot
     canHome(width, height) {
       const p = plan(width, height);
-      const besideFoot = p.stand ? SHELF.width + STAND_GAP * 0.45 : SHELF.width * 0.84;
-      return { x: p.shelfX + besideFoot * p.unit, y: p.footY + 3 * p.unit };
+      const spot = canSpot(SHELF.width, SHELF.height);
+      return { x: p.shelfX + spot.x * p.unit, y: p.shelfY + spot.y * p.unit };
     },
     // A real can stands about twice as tall as these pots
     canScale: 2.8,

@@ -14,7 +14,6 @@ export interface GardenLayoutOption {
 
 export const GARDEN_LAYOUTS = {
   shelf: { label: 'Coffee corner', height: 640, create: () => roomLayout('espresso') },
-  desk: { label: 'Desk corner', height: 640, create: () => roomLayout('monitor') },
   one: { label: 'One plant', height: 240, create: () => rowLayout(1) },
 } satisfies Record<string, GardenLayoutOption>;
 

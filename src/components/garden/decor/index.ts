@@ -2,7 +2,6 @@
 import type { Ctx } from '../creatures/kit';
 
 import { espresso } from './espresso';
-import { monitor } from './monitor';
 
 export interface Decor {
   // Drawn with the rest of the room; at night the room is darkened over it
@@ -11,6 +10,6 @@ export interface Decor {
   lit?: (c: Ctx, dark: boolean) => void;
 }
 
-export const DECOR = { espresso, monitor } satisfies Record<string, Decor>;
+export const DECOR = { espresso } satisfies Record<string, Decor>;
 
 export type DecorKey = keyof typeof DECOR;

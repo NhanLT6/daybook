@@ -29,17 +29,21 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   floor, all furniture in one mid-brown wood darker than the floor, `SHELF_WOOD`), open on the right to a courtyard
   (a light well, about a third of the width): a bare cement back wall (faint horizontal trowel streaks, speckle
   noise), loose grey gravel of mixed sizes (no rake lines), a clump of Japanese snowbell (`decor/grove.ts`: 4
-  wavering trunks rising close together near the right edge, branches of oval leaves drawn with the plants' own
-  `paintLeaf`) on a bed of bigger pebbles, two textured stone slabs beside the room's sill down to the bottom edge,
+  wavering trunks rising close together near the right edge and running off the top of the picture, branches of
+  oval leaves, a heap of pebbles over their feet; trunks are painted at 1/3 size in a 3x context so the bark
+  painter's detail reads at trunk scale) on a bed of bigger pebbles, two textured stone slabs beside the room's sill down to the bottom edge,
   a timber sill and a dark post where the room's roof ends. No window, no sky, no lantern, no moss. The clump is cut
   into pieces (each trunk, each branch with its leaves), each a bitmap made once per size; `paintBehind` paints
   them back to front every frame, so branches of different trunks interleave (further back = darker), and turns
   each branch a little about its joint (wind, slow gusts).
   By day, soft leaf shade drifts on the courtyard floor (`paintShade`, drawn every frame under the light map).
-  Preview only: localStorage `gardenCourt=bench` adds a bench with 3 outdoor pots (slots 11–13). From the left: a
-  low wooden cabinet (`decor/cabinet.ts`, 0.75 scale) with one item (`DECOR`: `espresso` or `monitor`), the shelf
+  Woody plants' leaves (the courtyard trees, the bougainvillea) use `plants/foliage.ts` `paintFoliageLeaf`: a
+  stalk, a blade folded along its midrib (lit half lighter), foreshortening, a soft contact shadow, a per-leaf
+  hue (`leafVariety`, derived from a number the plant already has so shapes stay the same), no bright outline.
+  Other plants keep `paintLeaf`. From the left: a
+  low wooden cabinet (`decor/cabinet.ts`, 0.75 scale) with an espresso machine (`DECOR`), the shelf
   (`shelfLayout`), then the tall hanging stand (`decor/stand.ts`, the shelf's own `paintFrame`) with two hanging
-  bowls (slots 9 and 10, `HANGING_SLOTS`, only `trails` plants). The can stands between shelf and stand. Floor
+  bowls (slots 9 and 10, `HANGING_SLOTS`, only `trails` plants). The galvanised can rests on the shelf's bottom tier, which has four spots: three pots and the can (`canSpot`). Floor
   boards are all one length, each row's joints a third of a board on (a steady stagger). Narrow screens get the
   shelf alone, still lit from the right.
   Plants are drawn bigger than their pots (`LayoutSlot.plantScale`, shelf `PLANT_GROW` 1.15). Pothos' fullness is
@@ -60,8 +64,7 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   scenery; it uses the first `count` slots, so adding pots later keeps the plant already in pot 1.
 - The user picks one in Settings → Garden (`settingsStore.gardenLayout`, default `shelf`). The choices live in
   `layouts/index.ts` (`GARDEN_LAYOUTS`: label, canvas height, factory); 2 or 3 plants is one more entry there.
-  Options: `shelf` (Coffee corner, espresso), `desk` (Desk corner, monitor), `one`. Unknown older keys (`japanese`,
-  balcony) fall back to `shelf`, without changing saved plants or drops.
+  Options: `shelf` (Coffee corner), `one`. Unknown older keys (`japanese`, balcony, `desk`) fall back to `shelf`, without changing saved plants or drops.
   `GardenPanel` rebuilds the scene when the choice changes. On the Garden page its canvas fills the available height (`getHeight`), resizing without resetting plant or watering state. Plants in slots the layout does not show are kept.
 - `maxVisitors` on a layout caps how many insects are out at once (the row: one per pot, so a lone plant gets one
   visitor at a time). Creatures with `visitor: false` (drifting seeds) don't count.

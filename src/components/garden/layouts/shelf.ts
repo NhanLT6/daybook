@@ -165,6 +165,16 @@ function hangRoom(row: Row, potKey: PotKey, height: number, scale: number, plant
   return Math.max(potHeight / plantScale, Math.min(SHELF_VINE, freeBelowSoil));
 }
 
+// Top and middle tiers hold three pots; the bottom tier has four spots, the last one for the watering can
+function slotX(row: Row, at: number) {
+  return row === 'bottom' ? 0.2 + at * 0.2 : 0.29 + at * 0.21;
+}
+
+// Where the can rests: the bottom tier's fourth spot
+export function canSpot(width: number, height: number) {
+  return { x: width * slotX('bottom', 3), y: height * ROWS.bottom - PLANK_DEPTH * 0.5 };
+}
+
 export const shelfLayout: GardenLayout = {
   slots(width, height) {
     const slots: LayoutSlot[] = [];
@@ -178,7 +188,7 @@ export const shelfLayout: GardenLayout = {
         const shelfY = height * ROWS[row] - PLANK_DEPTH * 0.5;
         slots.push({
           index,
-          x: width * (0.29 + (index % 3) * 0.21),
+          x: width * slotX(row, index % 3),
           soilY: shelfY - pot.height * scale,
           scale,
           plantScale,
@@ -190,6 +200,6 @@ export const shelfLayout: GardenLayout = {
     return slots;
   },
   paintBackdrop: paintShelf,
-  canHome: (width, height) => ({ x: width * 0.87, y: height * FLOOR_Y + 4 }),
+  canHome: canSpot,
   canScale: 1.3,
 };

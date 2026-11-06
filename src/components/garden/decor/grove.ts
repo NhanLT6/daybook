@@ -7,10 +7,11 @@
 import type { Ctx } from '../creatures/kit';
 import type { Curve, Point } from '../plants/wood';
 
-import { paintLeaf } from '../plants/kit';
+import { leafVariety, paintFoliageLeaf } from '../plants/foliage';
+import { paintPebbleHeap } from './courtyard';
 import { bezier, paintLimb, seeded } from '../plants/wood';
 
-const BARK = { dark: '#4E4A45', mid: '#6E6962', light: '#9A958C', crack: '#3A3632', rough: 0.3 };
+const BARK = { dark: '#4A4540', mid: '#6E6861', light: '#A39D93', crack: '#34302C', rough: 0.6 };
 // Softer than the shelf plants' greens: fresh, not glossy
 const LEAF = { light: '#B5D58C', mid: '#7BA95A', dark: '#4C7A3E' };
 
@@ -39,6 +40,17 @@ function trunkCurve(random: () => number, foot: number, lean: number, tall: numb
   ];
 }
 
+// A trunk is far thicker than the limbs the bark painter was made for, so it is painted at a third of its size in
+// a context scaled up three times: the fissures, ridges and lenticels come out three times bolder, true to scale
+function paintTrunk(c: Ctx, curve: Curve, width: number, seed: number) {
+  const k = 3;
+  c.save();
+  c.scale(k, k);
+  const small = curve.map((point) => ({ x: point.x / k, y: point.y / k })) as Curve;
+  paintLimb(c, small, width / k, (width * 0.3) / k, BARK, seed, 0.12, 0.9);
+  c.restore();
+}
+
 // One branch with its twigs and leaves, (0, 0) at its joint. `shade` darkens it the further back it sits.
 function paintBranch(c: Ctx, seed: number, angle: number, length: number, shade: number) {
   const random = seeded(seed);
@@ -55,7 +67,7 @@ function paintBranch(c: Ctx, seed: number, angle: number, length: number, shade:
 
   // Side twigs, each ending in a spray; plus the branch's own tip
   const sprays: { from: Point; angle: number; length: number }[] = [{ from: end, angle, length: length * 0.3 }];
-  for (let t = 0.25; t < 0.95; t += 0.12 + random() * 0.08) {
+  for (let t = 0.2; t < 0.95; t += 0.09 + random() * 0.06) {
     const from = bezier(curve, t);
     const side = random() < 0.5 ? -1 : 1;
     const twigAngle = angle + side * (0.5 + random() * 0.5);
@@ -71,28 +83,30 @@ function paintBranch(c: Ctx, seed: number, angle: number, length: number, shade:
     sprays.push({ from, angle: twigAngle, length: twigLength });
   }
 
-  // Leaves along each twig, alternate and drooping a little, the ones on the far side of the twig darker
+  // Leaves along each twig one at a time, alternating sides at uneven steps, crowding toward the tip where the
+  // new growth is; each hangs at its own angle (gravity pulls them down, the light turns them up), the ones on the
+  // far side of the twig darker
   const leaves: { x: number; y: number; angle: number; size: number; far: boolean }[] = [];
   for (const spray of sprays) {
-    for (let t = 0.15; t <= 1.05; t += 0.1) {
-      const x = spray.from.x + Math.cos(spray.angle) * spray.length * t,
-        y = spray.from.y + Math.sin(spray.angle) * spray.length * t;
-      for (const side of [-1, 1]) {
-        if (random() < 0.15) continue;
-        const droop = Math.cos(spray.angle) > 0 ? 0.25 : -0.25;
-        leaves.push({
-          x,
-          y,
-          angle: spray.angle + side * (0.6 + random() * 0.5) + droop,
-          size: 11 + random() * 5,
-          far: random() < 0.45,
-        });
+    let side = random() < 0.5 ? -1 : 1;
+    for (let t = 0.12 + random() * 0.1; t <= 1.08; t += (0.13 - t * 0.05) * (0.7 + random() * 0.6)) {
+      const x = spray.from.x + Math.cos(spray.angle) * spray.length * t + (random() - 0.5) * 2,
+        y = spray.from.y + Math.sin(spray.angle) * spray.length * t + (random() - 0.5) * 2;
+      const hang = Math.PI / 2 - spray.angle;
+      const toward = spray.angle + side * (0.5 + random() * 0.8) + Math.atan2(Math.sin(hang), Math.cos(hang)) * 0.25 * random();
+      leaves.push({ x, y, angle: toward, size: 12 + random() * 7 * (1 - t * 0.3), far: random() < 0.45 });
+      if (random() < 0.4) {
+        leaves.push({ x, y, angle: toward - side * (0.4 + random() * 0.4), size: 9 + random() * 4, far: random() < 0.6 });
       }
+      side = -side;
     }
   }
   leaves.sort((a, b) => Number(b.far) - Number(a.far));
   for (const leaf of leaves) {
-    paintLeaf(c, leaf.x, leaf.y, leaf.angle, leaf.size, leaf.size * 0.42, LEAF, 'oval', shade + (leaf.far ? 0.22 : 0));
+    paintFoliageLeaf(c, leaf.x, leaf.y, leaf.angle, leaf.size, leaf.size * 0.4, LEAF, {
+      ...leafVariety(leaf.x * 0.013 + leaf.y * 0.007),
+      shade: shade + (leaf.far ? 0.22 : 0),
+    });
   }
 }
 
@@ -100,10 +114,10 @@ function paintBranch(c: Ctx, seed: number, angle: number, length: number, shade:
 export function snowbellGrove(tall: number, reach: number): GrovePiece[] {
   const random = seeded(0.73);
   const trunks = [
-    { foot: -22, lean: -0.42, tall: 0.92, width: 15 },
-    { foot: -6, lean: -0.1, tall: 1, width: 17 },
-    { foot: 10, lean: 0.12, tall: 0.86, width: 13 },
-    { foot: 24, lean: -0.25, tall: 0.74, width: 12 },
+    { foot: -24, lean: -0.42, tall: 0.92, width: 21 },
+    { foot: -6, lean: -0.1, tall: 1, width: 24 },
+    { foot: 12, lean: 0.12, tall: 0.86, width: 18 },
+    { foot: 27, lean: -0.25, tall: 0.74, width: 16 },
   ];
   const pieces: GrovePiece[] = [];
 
@@ -118,7 +132,7 @@ export function snowbellGrove(tall: number, reach: number): GrovePiece[] {
       depth: index % 2 ? 0.1 : -0.1,
       box: [-Math.min(...xs) + 40, Math.max(...xs) + 40, height + 20, 20],
       sway: 0,
-      paint: (c) => paintLimb(c, curve, trunk.width, trunk.width * 0.3, BARK, seed, 0.12, 0.9),
+      paint: (c) => paintTrunk(c, curve, trunk.width, seed),
     });
 
     // Branches up the top half of the trunk, leaving it to either side and at different depths; the lower ones
@@ -141,6 +155,12 @@ export function snowbellGrove(tall: number, reach: number): GrovePiece[] {
         paint: (c) => paintBranch(c, branchSeed, angle, length, shade),
       });
     }
+  });
+  // Pebbles heaped over the feet, in front of everything
+  pieces.push({ x: 0, y: 0, depth: 2, box: [80, 80, 30, 30], sway: 0, paint: (c) => {
+      c.translate(0, -6);
+      paintPebbleHeap(c, 150, 40, 0.61);
+    },
   });
   return pieces.sort((a, b) => a.depth - b.depth);
 }
