@@ -15,7 +15,7 @@ Exit fullscreen or Escape restores the UI; leaving the page resets this transien
 | `creatures/` | Insects, seeds | `Creature` + `GardenWorld` in `creatures/kit.ts` |
 | `tools/` | Watering can, trowel | plain paint functions |
 | `layouts/` | Where pots stand + scenery behind them | `GardenLayout` / `LayoutSlot` in `layouts/kit.ts` |
-| `decor/` | Room pieces: cabinet, window, items on the cabinet, wood/plaster textures | `Decor` in `decor/index.ts` |
+| `decor/` | Room pieces: cabinet, hanging stand, items on the cabinet, wood/plaster textures | `Decor` in `decor/index.ts` |
 
 `gardenScene.ts` is the engine: frame loop, plant bitmaps, landing spots, water, digging, night tint. It never
 knows about a shelf; it asks its `layout` (default `shelfLayout`).
