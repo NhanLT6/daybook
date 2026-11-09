@@ -68,6 +68,7 @@ Detailed docs for non-trivial features live in `docs/features/`. Read the releva
 - `docs/features/chat.md` — Chat tools (extractLogs, searchNotes, addNote, addEvent; which run in the browser), slash commands and how they narrow the model's tools, `/` mentions of projects/tasks/Jira tickets
 - `docs/features/garden.md` — Garden folders and contracts (plants, pots, creatures, tools, layouts), layout slots and the `view` option, drifting seeds, layout setting, open items (single-pot look, desktop widget, sound)
 - `docs/features/events.md` — Event/RepeatRule data model, sprint naming (`sprintNaming.ts`, `SprintForm`) (no migration), `eventRecurrence.ts` date logic, work-day rules (`WorkCalendar`), repeat form rules, Events page calendar selection, skip dates, timezone/UTC-midnight and day-of-month gotchas
+- `docs/canvas-art-guide.md` — Reusable Canvas 2D art lessons from the garden (leaves, wood, light map, wall-scallop spotlights, shadows), with snippets; add to it when you learn a new drawing technique
 
 ## Branches, Deploys & Test Resources
 Every pushed branch gets a Vercel preview build, and the Neon integration creates a Neon branch plus branch-scoped env vars for each preview (the free tier runs out fast).

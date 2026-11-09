@@ -616,7 +616,7 @@ function paintLightMap(c: Ctx, width: number, height: number, dark: boolean, lig
   if (dark) {
     c.save();
     c.globalCompositeOperation = 'lighten';
-    for (const x of spotsOf(p)) spotPool(c, p, x, (alpha) => `rgba(255,226,182,${alpha})`, 1);
+    for (const x of spotsOf(p)) paintScallop(c, p, x, (alpha) => `rgba(255,226,182,${alpha})`, 1);
     c.restore();
   }
 }
@@ -630,82 +630,111 @@ function spotsOf(p: Plan) {
 
 const SPOT_RGB = '255,214,160';
 
-// The lamp heads: a short stem from the ceiling (just above the picture) and a matt grey can tilted a little
-// toward the wall, its lens facing down
+// The lamp heads: a short stem from the ceiling (just above the picture) and a matt grey can, its lens facing down
+const LAMP = { stem: 8, can: 30, width: 24 };
+
+function lensY(p: Plan) {
+  return (LAMP.stem + LAMP.can) * p.unit;
+}
+
 function paintSpotFixtures(c: Ctx, p: Plan) {
   const { unit } = p;
+  const half = (LAMP.width / 2) * unit;
   for (const x of spotsOf(p)) {
     c.save();
     c.translate(x, 0);
     c.fillStyle = '#4A4D52';
-    c.fillRect(-1.5 * unit, 0, 3 * unit, 26 * unit);
-    c.translate(0, 26 * unit);
-    const can = c.createLinearGradient(-13 * unit, 0, 13 * unit, 0);
+    c.fillRect(-1.5 * unit, 0, 3 * unit, LAMP.stem * unit);
+    c.translate(0, LAMP.stem * unit);
+    const can = c.createLinearGradient(-half, 0, half, 0);
     can.addColorStop(0, '#3E4146');
     can.addColorStop(0.65, '#6A6E74');
     can.addColorStop(1, '#4A4D52');
     c.fillStyle = can;
     c.beginPath();
-    c.roundRect(-13 * unit, 0, 26 * unit, 34 * unit, [3 * unit, 3 * unit, 1 * unit, 1 * unit]);
-    c.fill();
-    c.fillStyle = '#2E3034';
-    c.beginPath();
-    c.ellipse(0, 34 * unit, 12 * unit, 3 * unit, 0, 0, Math.PI * 2);
+    c.roundRect(-half, 0, half * 2, LAMP.can * unit, [3 * unit, 3 * unit, 1 * unit, 1 * unit]);
     c.fill();
     c.restore();
   }
 }
 
-// Where each spot's light lands: a tall oval pool on the wall, brightest a little above the furniture, fading
-// out sideways so the wall between two lamps stays in the dark
-function spotPool(c: Ctx, p: Plan, x: number, color: (alpha: number) => string, strength: number) {
+// How a ceiling spot aimed down past a wall lights it ("scalloping"): its cone cuts the wall in a curved arch,
+// a hyperbola with its apex a little below the lamp. Inside the arch the wall is lit, brightest just under the
+// apex and fading as the light travels further (inverse square); the edge is fairly crisp, softer lower down. The
+// beam itself is invisible in clean air, and above the arch the wall stays dark.
+const SCALLOP = { gap: 18, bend: 120, spread: 0.28 };
+
+function scallopPath(c: Ctx, p: Plan, x: number) {
   const { unit, footY } = p;
-  const centre = footY * 0.6,
-    across = 200 * unit,
-    tall = 1.9;
+  const apex = lensY(p) + SCALLOP.gap * unit,
+    a = SCALLOP.bend * unit;
+  const widthAt = (d: number) => SCALLOP.spread * Math.sqrt((d + a) ** 2 - a * a);
+  c.beginPath();
+  c.moveTo(x, apex);
+  for (let y = apex; y <= footY; y += 6 * unit) c.lineTo(x + widthAt(y - apex), y);
+  c.lineTo(x + widthAt(footY - apex), footY);
+  c.lineTo(x - widthAt(footY - apex), footY);
+  for (let y = footY; y >= apex; y -= 6 * unit) c.lineTo(x - widthAt(y - apex), y);
+  c.closePath();
+}
+
+// One scallop and the pool where the beam meets the floor, filled with `color(alpha)`: bright under the apex,
+// falling off downward
+function paintScallop(c: Ctx, p: Plan, x: number, color: (alpha: number) => string, strength: number) {
+  const { unit, footY } = p;
+  const apex = lensY(p) + SCALLOP.gap * unit;
+  const reach = footY - apex;
+  const falloff = c.createRadialGradient(x, apex, 0, x, apex, reach * 0.85);
+  falloff.addColorStop(0, color(strength));
+  falloff.addColorStop(0.08, color(strength * 0.95));
+  falloff.addColorStop(0.3, color(strength * 0.5));
+  falloff.addColorStop(0.65, color(strength * 0.16));
+  falloff.addColorStop(1, color(0));
+  // Light bounced back off the lit wall and floor: a faint, wide warmth all round, so the room is not black
+  // between the lamps
+  const bounce = c.createRadialGradient(x, footY * 0.65, 0, x, footY * 0.65, 420 * unit);
+  bounce.addColorStop(0, color(strength * 0.22));
+  bounce.addColorStop(1, color(0));
+  c.fillStyle = bounce;
+  c.fillRect(x - 420 * unit, footY * 0.65 - 420 * unit, 840 * unit, 840 * unit);
+
   c.save();
-  c.translate(x, centre);
-  c.scale(1, tall);
-  const pool = c.createRadialGradient(0, 0, 0, 0, 0, across);
-  pool.addColorStop(0, color(strength));
-  pool.addColorStop(0.5, color(strength * 0.6));
+  c.filter = `blur(${Math.max(1, 5 * unit)}px)`;
+  scallopPath(c, p, x);
+  c.fillStyle = falloff;
+  c.fill();
+  c.restore();
+
+  // The floor in front of the wall where the beam lands
+  c.save();
+  c.translate(x, footY + 30 * unit);
+  c.scale(1, 0.22);
+  const pool = c.createRadialGradient(0, 0, 0, 0, 0, 240 * unit);
+  pool.addColorStop(0, color(strength * 0.55));
   pool.addColorStop(1, color(0));
   c.fillStyle = pool;
-  c.fillRect(-across, -across, across * 2, across * 2);
+  c.fillRect(-240 * unit, -240 * unit, 480 * unit, 480 * unit);
   c.restore();
 }
 
-// Night glow on top of the scene: the beams' haze from each lens down, the warm pools, the lenses themselves
+// Night glow on top of the scene: a little warmth inside each scallop and the lens seen from below
 function paintSpotGlow(c: Ctx, width: number, height: number, dark: boolean) {
   if (!dark) return;
   const p = plan(width, height);
-  const { unit, footY } = p;
-  const lens = 60 * unit;
+  const { unit } = p;
+  const lens = lensY(p);
   for (const x of spotsOf(p)) {
-    // Beam: a soft cone widening toward the floor
-    const half = 170 * unit;
-    const beam = c.createLinearGradient(0, lens, 0, footY);
-    beam.addColorStop(0, `rgba(${SPOT_RGB},.16)`);
-    beam.addColorStop(1, `rgba(${SPOT_RGB},.03)`);
-    c.fillStyle = beam;
+    paintScallop(c, p, x, (alpha) => `rgba(${SPOT_RGB},${alpha})`, 0.22);
+    // The lens: a bright warm sliver under the can with a small glare
+    c.fillStyle = 'rgba(255,240,210,.95)';
     c.beginPath();
-    c.moveTo(x - 10 * unit, lens);
-    c.lineTo(x + 10 * unit, lens);
-    c.lineTo(x + half, footY);
-    c.lineTo(x - half, footY);
-    c.closePath();
-    c.save();
-    c.filter = `blur(${Math.max(2, 18 * unit)}px)`;
+    c.ellipse(x, lens, 9 * unit, 2.2 * unit, 0, 0, Math.PI * 2);
     c.fill();
-    c.restore();
-    spotPool(c, p, x, (alpha) => `rgba(${SPOT_RGB},${alpha})`, 0.24);
-    // Lens: a bright warm spot with a small halo
-    const glow = c.createRadialGradient(x, lens - 2 * unit, 0, x, lens - 2 * unit, 40 * unit);
-    glow.addColorStop(0, 'rgba(255,240,210,.95)');
-    glow.addColorStop(0.15, `rgba(${SPOT_RGB},.5)`);
-    glow.addColorStop(1, `rgba(${SPOT_RGB},0)`);
-    c.fillStyle = glow;
-    c.fillRect(x - 40 * unit, lens - 42 * unit, 80 * unit, 84 * unit);
+    const glare = c.createRadialGradient(x, lens, 0, x, lens, 22 * unit);
+    glare.addColorStop(0, `rgba(${SPOT_RGB},.45)`);
+    glare.addColorStop(1, `rgba(${SPOT_RGB},0)`);
+    c.fillStyle = glare;
+    c.fillRect(x - 22 * unit, lens - 22 * unit, 44 * unit, 44 * unit);
   }
 }
 
