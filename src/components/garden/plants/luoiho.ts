@@ -8,10 +8,13 @@ function paintBlade(c: Ctx, x: number, lean: number, height: number, width: numb
   c.save();
   c.translate(x, 0);
   c.rotate(lean);
-  const blade = new Path2D();
-  blade.moveTo(-width * 0.5, 0);
-  blade.bezierCurveTo(-width * 0.75, -height * 0.45, -width * (0.55 - twist), -height * 0.8, twist * width, -height);
-  blade.bezierCurveTo(width * (0.55 + twist), -height * 0.8, width * 0.75, -height * 0.45, width * 0.5, 0);
+  // The two sides from base to tip, left open at the base: the margin runs up the sides only, never across the
+  // base where the leaf comes out of the soil
+  const sides = new Path2D();
+  sides.moveTo(-width * 0.5, 0);
+  sides.bezierCurveTo(-width * 0.75, -height * 0.45, -width * (0.55 - twist), -height * 0.8, twist * width, -height);
+  sides.bezierCurveTo(width * (0.55 + twist), -height * 0.8, width * 0.75, -height * 0.45, width * 0.5, 0);
+  const blade = new Path2D(sides);
   blade.closePath();
   c.fillStyle = linear(c, -width, 0, width, 0, [
     [0, '#5E8F52'],
@@ -38,7 +41,8 @@ function paintBlade(c: Ctx, x: number, lean: number, height: number, width: numb
   // Golden edge
   c.strokeStyle = '#D9C657';
   c.lineWidth = 1.1;
-  c.stroke(blade);
+  c.lineCap = 'butt';
+  c.stroke(sides);
   c.strokeStyle = 'rgba(255,250,200,.35)';
   c.lineWidth = 0.35;
   c.beginPath();
