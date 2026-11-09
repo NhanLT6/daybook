@@ -44,7 +44,9 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   just below the can, brightest under its rounded top and fading downward (`paintScallop`, `SCALLOP`), a pool on the
   floor and a faint wide bounce. It goes into the light map (`lighten`) and, weaker, into a glow layer added with
   `screen` (`paintGlow`, plus a small lens glare). No visible beam haze: a beam is invisible in clean air. Plant
-  shadows fall almost straight down, leaning away from the nearest lamp (`nightShadow`).
+  shadows fall almost straight down, leaning away from the nearest lamp (`nightShadow`). At night the lamps are the
+  main light, so the room (warm even fill, `NIGHT.room`) is brighter than the courtyard (dim cool moonlight, with
+  lamplight spilling a little past the threshold; `paintNightMap`).
   Woody plants' leaves (the courtyard trees, the bougainvillea) use `plants/foliage.ts` `paintFoliageLeaf`: a
   stalk, a blade folded along its midrib (lit half lighter), foreshortening, a soft contact shadow, a per-leaf
   hue (`leafVariety`, derived from a number the plant already has so shapes stay the same), no bright outline.

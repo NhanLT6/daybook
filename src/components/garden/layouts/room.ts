@@ -587,9 +587,10 @@ function paintSun(c: Ctx, p: Plan, width: number, height: number, rgb: string, s
 // away from it, with a soft edge along the line where the room's roof cuts the light off.
 function paintLightMap(c: Ctx, width: number, height: number, dark: boolean, light?: Daylight | null) {
   const p = plan(width, height);
-  const lit = dark ? '#A3ADBF' : light?.sun ? '#FFFFFF' : '#E3E4EE';
-  const shade = dark ? '#40465A' : (light?.shade ?? '#B9B1A6');
-  const slant = dark ? 0.55 : (light?.sun?.slant ?? 0.2);
+  if (dark) return paintNightMap(c, p, width, height);
+  const lit = light?.sun ? '#FFFFFF' : '#E3E4EE';
+  const shade = light?.shade ?? '#B9B1A6';
+  const slant = light?.sun?.slant ?? 0.2;
   const line = lightLine(p, slant);
   const reach = width * 0.9,
     soft = 26 * p.unit;
@@ -612,13 +613,35 @@ function paintLightMap(c: Ctx, width: number, height: number, dark: boolean, lig
     courtShape(c, p, width, height);
     c.fill();
   }
-  // At night the ceiling spots lift the room where their light lands
-  if (dark) {
+}
+
+// Night: the lamps are the main light now, so the room is brighter than the courtyard outside. The room gets a
+// warm even fill (light bounced around by the walls and floor), each lamp its scallop and pool on top; the open
+// courtyard only has dim, cool moonlight, with a little lamplight spilling out across the threshold.
+const NIGHT = { room: '#8F8B88', court: '#4A5168', spill: 'rgba(170,160,150,1)' };
+
+function paintNightMap(c: Ctx, p: Plan, width: number, height: number) {
+  c.fillStyle = NIGHT.room;
+  c.fillRect(0, 0, width, height);
+
+  if (p.courtX < width) {
     c.save();
-    c.globalCompositeOperation = 'lighten';
-    for (const x of spotsOf(p)) paintScallop(c, p, x, (alpha) => `rgba(255,226,182,${alpha})`, 1);
+    courtShape(c, p, width, height);
+    c.clip();
+    c.fillStyle = NIGHT.court;
+    c.fillRect(0, 0, width, height);
+    const spill = c.createLinearGradient(p.courtX, 0, p.courtX + 160 * p.unit, 0);
+    spill.addColorStop(0, NIGHT.spill);
+    spill.addColorStop(1, 'rgba(170,160,150,0)');
+    c.fillStyle = spill;
+    c.fillRect(0, 0, width, height);
     c.restore();
   }
+
+  c.save();
+  c.globalCompositeOperation = 'lighten';
+  for (const x of spotsOf(p)) paintScallop(c, p, x, (alpha) => `rgba(255,228,190,${alpha})`, 1);
+  c.restore();
 }
 
 // Three ceiling spotlights on a rail: over the cabinet, the shelf and the hanging stand (on a phone, the shelf only).
@@ -693,7 +716,7 @@ function paintScallop(c: Ctx, p: Plan, x: number, color: (alpha: number) => stri
   // Light bounced back off the lit wall and floor: a faint, wide warmth all round, so the room is not black
   // between the lamps
   const bounce = c.createRadialGradient(x, footY * 0.65, 0, x, footY * 0.65, 420 * unit);
-  bounce.addColorStop(0, color(strength * 0.22));
+  bounce.addColorStop(0, color(strength * 0.35));
   bounce.addColorStop(1, color(0));
   c.fillStyle = bounce;
   c.fillRect(x - 420 * unit, footY * 0.65 - 420 * unit, 840 * unit, 840 * unit);
