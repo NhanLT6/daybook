@@ -618,7 +618,7 @@ function paintLightMap(c: Ctx, width: number, height: number, dark: boolean, lig
 // Night: the lamps are the main light now, so the room is brighter than the courtyard outside. The room gets a
 // warm even fill (light bounced around by the walls and floor), each lamp its scallop and pool on top; the open
 // courtyard only has dim, cool moonlight, with a little lamplight spilling out across the threshold.
-const NIGHT = { room: '#8F8B88', court: '#4A5168', spill: 'rgba(170,160,150,1)' };
+const NIGHT = { room: '#B8B2AC', court: '#A3ADBF', spill: 'rgba(170,160,150,1)' };
 
 function paintNightMap(c: Ctx, p: Plan, width: number, height: number) {
   c.fillStyle = NIGHT.room;
@@ -685,7 +685,7 @@ function paintSpotFixtures(c: Ctx, p: Plan) {
 // a hyperbola with its apex a little below the lamp. Inside the arch the wall is lit, brightest just under the
 // apex and fading as the light travels further (inverse square); the edge is fairly crisp, softer lower down. The
 // beam itself is invisible in clean air, and above the arch the wall stays dark.
-const SCALLOP = { gap: 18, bend: 120, spread: 0.28 };
+const SCALLOP = { gap: 18, bend: 120, spread: 0.36 };
 
 function scallopPath(c: Ctx, p: Plan, x: number) {
   const { unit, footY } = p;

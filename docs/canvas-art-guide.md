@@ -150,7 +150,7 @@ c.fill();
 ```
 
 At night indoors the lamps are the main light, so the room should read brighter than outside: give the room an
-even warm fill (light bounced off walls and floor) and the outdoors a darker, cooler moonlight, with a little
+even warm fill (light bounced off walls and floor) and leave the outdoors in its cooler moonlight, with a little
 lamplight spilling out past the doorway (`paintNightMap`).
 
 Paint this into the light map with `lighten` (so it brightens the night map without washing out what is already
