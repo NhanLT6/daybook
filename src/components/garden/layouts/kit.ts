@@ -40,6 +40,10 @@ export interface GardenLayout {
   paintBackdrop: (c: Ctx, width: number, height: number, dark: boolean, light?: Daylight | null) => void;
   // Light and shade multiplied over everything, plants included: white where the light falls, darker away from it
   paintLight?: (c: Ctx, width: number, height: number, dark: boolean, light?: Daylight | null) => void;
+  // Light added over everything (screen), built once per size and theme: lamps that glow at night
+  paintGlow?: (c: Ctx, width: number, height: number, dark: boolean) => void;
+  // At night, where a plant standing at scene x throws its shadow on the wall, in plant pixels (before mirroring)
+  nightShadow?: (x: number, width: number, height: number) => { x: number; y: number };
   // Where the watering can rests (its base), and how big it is
   canHome: (width: number, height: number) => { x: number; y: number };
   canScale: number;

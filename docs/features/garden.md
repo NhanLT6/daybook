@@ -39,6 +39,10 @@ A new plant starts at stage 1 (seedling with its tag), not 0 (bare soil).
   offset down-left, as its shadow (strength from `paintBehind`'s `sun`). Branches may reach into the room above
   the floor, in front of the room's post (`treeArea`); only the top of the picture cuts the crown.
   By day, soft leaf shade drifts on the courtyard floor (`paintShade`, drawn every frame under the light map).
+  Three ceiling spotlights on a rail (over the cabinet, the shelf and the stand; `spotsOf`) are off by day. In dark
+  mode they light warm cones: pools in the light map (`lighten`), a glow layer added with `screen` (`paintGlow`:
+  beam haze, pools, lens), and plant shadows falling almost straight down, leaning away from the nearest lamp
+  (`nightShadow`).
   Woody plants' leaves (the courtyard trees, the bougainvillea) use `plants/foliage.ts` `paintFoliageLeaf`: a
   stalk, a blade folded along its midrib (lit half lighter), foreshortening, a soft contact shadow, a per-leaf
   hue (`leafVariety`, derived from a number the plant already has so shapes stay the same), no bright outline.

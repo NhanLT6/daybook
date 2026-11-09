@@ -147,6 +147,7 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
   const flip = layout.lightFromRight ? -1 : 1;
 
   let lightMap: HTMLCanvasElement | null = null;
+  let glowMap: HTMLCanvasElement | null = null;
 
   // The layout's scenery is the only fixed layer: painted once per size and theme, then copied every frame
   function buildBackdrop() {
@@ -159,6 +160,11 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       layout.paintLight(map.context, width, height, dark, light());
       lightMap = map.canvas;
     } else lightMap = null;
+    if (layout.paintGlow && dark) {
+      const glow = layer();
+      layout.paintGlow(glow.context, width, height, dark);
+      glowMap = glow.canvas;
+    } else glowMap = null;
   }
 
   function plantBitmap(index: number): HTMLCanvasElement {
@@ -285,13 +291,15 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
     layout.paintBehind?.(c, width, height, time, dark ? 0.35 : (light()?.sun?.strength ?? 0));
 
     // Plant shadows on the wall first, behind every pot and plant; they sway with their plant
+    // By day they fall away from the courtyard's light; at night away from the nearest ceiling lamp
     const cast = layout.castShadow,
-      shadow = light()?.shadow;
-    if (cast && shadow) {
+      shadow = light()?.shadow ?? (dark && layout.nightShadow ? { alpha: 0.3, length: 1 } : null);
+    if ((cast || dark) && shadow) {
       c.save();
       c.globalAlpha = shadow.alpha;
       for (const { index, x, soilY } of slots) {
         if (!state.plants[index]) continue;
+        const offset = dark && layout.nightShadow ? layout.nightShadow(x, width, height) : cast!;
         const lift = digLift(index, now);
         c.save();
         c.translate(x + lift.x, soilY + 0.5 - lift.y);
@@ -299,8 +307,8 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
         c.scale(plantScaleOf(index) * flip, plantScaleOf(index));
         c.drawImage(
           shadowOf(plantBitmap(index)),
-          -100 + cast.x * shadow.length,
-          -130 + cast.y * shadow.length,
+          -100 + offset.x * shadow.length,
+          -130 + offset.y * shadow.length,
           200,
           PLANT_BITMAP_HEIGHT,
         );
@@ -366,6 +374,13 @@ export function createGardenScene(canvas: HTMLCanvasElement, options: GardenScen
       ctx.globalCompositeOperation = 'soft-light';
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+    // Lamps lit at night add their warm light on top
+    if (glowMap) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.drawImage(glowMap, 0, 0, width, height);
       ctx.restore();
     }
     followClock(now);

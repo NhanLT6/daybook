@@ -612,6 +612,101 @@ function paintLightMap(c: Ctx, width: number, height: number, dark: boolean, lig
     courtShape(c, p, width, height);
     c.fill();
   }
+  // At night the ceiling spots lift the room where their light lands
+  if (dark) {
+    c.save();
+    c.globalCompositeOperation = 'lighten';
+    for (const x of spotsOf(p)) spotPool(c, p, x, (alpha) => `rgba(255,226,182,${alpha})`, 1);
+    c.restore();
+  }
+}
+
+// Three ceiling spotlights on a rail: over the cabinet, the shelf and the hanging stand (on a phone, the shelf only).
+// At night they throw warm cones down onto the wall and floor; by day they are off.
+function spotsOf(p: Plan) {
+  const shelf = p.shelfX + (SHELF.width / 2) * p.unit;
+  return [p.cabinet?.x, shelf, p.stand?.x].filter((x): x is number => x !== undefined);
+}
+
+const SPOT_RGB = '255,214,160';
+
+// The lamp heads: a short stem from the ceiling (just above the picture) and a matt grey can tilted a little
+// toward the wall, its lens facing down
+function paintSpotFixtures(c: Ctx, p: Plan) {
+  const { unit } = p;
+  for (const x of spotsOf(p)) {
+    c.save();
+    c.translate(x, 0);
+    c.fillStyle = '#4A4D52';
+    c.fillRect(-1.5 * unit, 0, 3 * unit, 26 * unit);
+    c.translate(0, 26 * unit);
+    const can = c.createLinearGradient(-13 * unit, 0, 13 * unit, 0);
+    can.addColorStop(0, '#3E4146');
+    can.addColorStop(0.65, '#6A6E74');
+    can.addColorStop(1, '#4A4D52');
+    c.fillStyle = can;
+    c.beginPath();
+    c.roundRect(-13 * unit, 0, 26 * unit, 34 * unit, [3 * unit, 3 * unit, 1 * unit, 1 * unit]);
+    c.fill();
+    c.fillStyle = '#2E3034';
+    c.beginPath();
+    c.ellipse(0, 34 * unit, 12 * unit, 3 * unit, 0, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  }
+}
+
+// Where each spot's light lands: a tall oval pool on the wall, brightest a little above the furniture, fading
+// out sideways so the wall between two lamps stays in the dark
+function spotPool(c: Ctx, p: Plan, x: number, color: (alpha: number) => string, strength: number) {
+  const { unit, footY } = p;
+  const centre = footY * 0.6,
+    across = 200 * unit,
+    tall = 1.9;
+  c.save();
+  c.translate(x, centre);
+  c.scale(1, tall);
+  const pool = c.createRadialGradient(0, 0, 0, 0, 0, across);
+  pool.addColorStop(0, color(strength));
+  pool.addColorStop(0.5, color(strength * 0.6));
+  pool.addColorStop(1, color(0));
+  c.fillStyle = pool;
+  c.fillRect(-across, -across, across * 2, across * 2);
+  c.restore();
+}
+
+// Night glow on top of the scene: the beams' haze from each lens down, the warm pools, the lenses themselves
+function paintSpotGlow(c: Ctx, width: number, height: number, dark: boolean) {
+  if (!dark) return;
+  const p = plan(width, height);
+  const { unit, footY } = p;
+  const lens = 60 * unit;
+  for (const x of spotsOf(p)) {
+    // Beam: a soft cone widening toward the floor
+    const half = 170 * unit;
+    const beam = c.createLinearGradient(0, lens, 0, footY);
+    beam.addColorStop(0, `rgba(${SPOT_RGB},.16)`);
+    beam.addColorStop(1, `rgba(${SPOT_RGB},.03)`);
+    c.fillStyle = beam;
+    c.beginPath();
+    c.moveTo(x - 10 * unit, lens);
+    c.lineTo(x + 10 * unit, lens);
+    c.lineTo(x + half, footY);
+    c.lineTo(x - half, footY);
+    c.closePath();
+    c.save();
+    c.filter = `blur(${Math.max(2, 18 * unit)}px)`;
+    c.fill();
+    c.restore();
+    spotPool(c, p, x, (alpha) => `rgba(${SPOT_RGB},${alpha})`, 0.24);
+    // Lens: a bright warm spot with a small halo
+    const glow = c.createRadialGradient(x, lens - 2 * unit, 0, x, lens - 2 * unit, 40 * unit);
+    glow.addColorStop(0, 'rgba(255,240,210,.95)');
+    glow.addColorStop(0.15, `rgba(${SPOT_RGB},.5)`);
+    glow.addColorStop(1, `rgba(${SPOT_RGB},0)`);
+    c.fillStyle = glow;
+    c.fillRect(x - 40 * unit, lens - 42 * unit, 80 * unit, 84 * unit);
+  }
 }
 
 // Blend two #rrggbb colours
@@ -667,6 +762,8 @@ function paintRoom(c: Ctx, width: number, height: number, decorKey: DecorKey, da
       t.restore();
     }
   });
+
+  paintSpotFixtures(c, p);
 
   if (p.cabinet && decor.lit) {
     c.save();
@@ -770,6 +867,15 @@ export function roomLayout(decor: DecorKey): GardenLayout {
     lightFromRight: true,
     // Light from above and to the right throws each plant's shadow onto the wall down and to the left
     castShadow: { x: 14, y: 14 },
+    paintGlow: paintSpotGlow,
+    // Under a lamp a plant's shadow drops almost straight down the wall, leaning away from the lamp; the pots are
+    // drawn mirrored, so plant pixels run right to left
+    nightShadow(x, width, height) {
+      const p = plan(width, height);
+      const nearest = spotsOf(p).reduce((best, spot) => (Math.abs(spot - x) < Math.abs(best - x) ? spot : best));
+      const away = Math.max(-16, Math.min(16, ((x - nearest) / p.unit) * 0.08));
+      return { x: -away, y: 16 };
+    },
     paintBehind: paintTrees,
     paintShade: paintLeafShade,
     // The band of sunlight falling in from the courtyard's edge, where dust drifts by day
